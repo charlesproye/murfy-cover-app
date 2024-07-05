@@ -27,14 +27,14 @@ def iterate_over_ids(query_str:str=None, use_progress_track=True, **kwarges) -> 
         
 
 def compute_fleet_info() -> DF:
-    from processed_watea_ts import process_raw_time_series
+    from processed_watea_ts import pre_process_raw_time_series
 
     fleet_info_dicts: list[dict] = []
     for file in track(glob(path.join(PATH_TO_RAW_TS_FOLDER, "*.snappy.parquet"))):
         raw_ts = pd.read_parquet(file)
-        vehicle_df = process_raw_time_series(raw_ts)
+        vehicle_df = pre_process_raw_time_series(raw_ts)
         fleet_info_dicts.append({
-            "id": file.split('.')[0].split("=")[1],
+            "id": path.basename(file.split('.')[0]),
             "len": len(vehicle_df),
             **(100 * vehicle_df.count() / len(vehicle_df)).add_suffix("_not_nan_percentage").to_dict(),
             "min_odo": vehicle_df["odometer"].min(),

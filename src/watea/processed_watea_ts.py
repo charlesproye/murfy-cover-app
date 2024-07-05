@@ -37,6 +37,16 @@ def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
 
 def process_raw_time_series(raw_vehicle_df: DF, id:str) -> DF:
     return (
+        pre_process_raw_time_series(raw_vehicle_df)
+        .pipe(ts.soh_from_est_battery_range, "autonomy_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
+        .pipe(ts.in_motion_mask_from_odo_diff)
+        .pipe(ts.in_charge_and_discharge_mask_fromo_soc_diff)
+        .eval("power = current * voltage")
+        .pipe(ts.add_cum_energy_from_power_cols, "power", "energy")
+    )
+
+def pre_process_raw_time_series(raw_vehicle_df: DF) -> DF:        
+    return (
         raw_vehicle_df
         .rename(columns={
             "distance_totalizer": "odometer",
@@ -49,12 +59,8 @@ def process_raw_time_series(raw_vehicle_df: DF, id:str) -> DF:
         .drop_duplicates("date")
         .set_index("date", drop=False)
         .sort_index()
-        .pipe(ts.soh_from_est_battery_range, "autonomy_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
-        .pipe(ts.in_motion_mask_from_odo_diff)
-        .pipe(ts.in_charge_and_discharge_mask_fromo_soc_diff)
-        .eval("power = current * voltage")
-        .pipe(ts.add_cum_energy_from_power_cols, "power", "energy")
     )
+
 
 if __name__ == '__main__':
     main()

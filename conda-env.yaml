@@ -1,3 +1,4 @@
+name: data_ev
 channels:
   - conda-forge
 dependencies:
@@ -22,6 +23,7 @@ dependencies:
     # - sqlmodel==0.0.8
     # - uuid6==2023.5.2     #2022.10.25
     # - apscheduler==3.10.1 #Pas possible tant qu'on a la dépendance à la branch dans the march 
+    - -e .
     - apscheduler==3.10.1
     # - boto3 == 1.28.4
     - git+https://themarch-bib@bitbucket.org/bib-batteries/bib-models.git@master#subdirectory=src
