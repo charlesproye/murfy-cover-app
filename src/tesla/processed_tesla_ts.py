@@ -42,7 +42,7 @@ def process_raw_time_series(raw_vehicle_df: DF, vin:str, **kwargs) -> DF:
     )
     vehicle_df = ts.soh_from_est_battery_range(vehicle_df, "battery_range_km", MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC)
     vehicle_df = ts.in_motion_mask_from_odo_diff(vehicle_df)
-    vehicle_df = is_charging_mask(vehicle_df)
+    vehicle_df = in_charge_perf_mask(vehicle_df)
     vehicle_df = ts.self_discharge(vehicle_df)
     vehicle_df = last_charge_soh(vehicle_df, vin)
 
@@ -77,11 +77,11 @@ def last_charge_soh(vehicle_df: DF, vin:str) -> DF:
 
     return vehicle_df
 
-def is_charging_mask(vehicle_df: DF) -> DF:
-    vehicle_df["is_charging"] = vehicle_df.eval("charging_state == 'Charging'")
-    vehicle_df["is_charging_idx"] = ts.period_idx_of_mask(vehicle_df["is_charging"])
-    vehicle_df["is_charging_mask"] = vehicle_df.groupby("is_charging_idx")["soc"].transform(ts.trim_off_mask_perf_period) & vehicle_df["is_charging"]
-    vehicle_df["is_charging_idx"] = ts.period_idx_of_mask(vehicle_df["is_charging_mask"])
+def in_charge_perf_mask(vehicle_df: DF) -> DF:
+    vehicle_df["in_charge"] = vehicle_df.eval("charging_state == 'Charging'")
+    vehicle_df["in_charge_idx"] = ts.period_idx_of_mask(vehicle_df["in_charge"])
+    vehicle_df["in_charge_perf_mask"] = vehicle_df.groupby("in_charge_idx")["soc"].transform(ts.trim_off_mask_perf_period) & vehicle_df["in_charge"]
+    vehicle_df["in_charge_perf_idx"] = ts.period_idx_of_mask(vehicle_df["in_charge_perf_mask"])
 
     return vehicle_df
 

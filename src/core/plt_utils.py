@@ -18,42 +18,45 @@ perf_df_idx = 0
 
 perf_col_idx = 0
 PERF_VARS_DICT = {
-    "charging_perfs": ["sec_per_soc", "soh_energy_added", "soh_cum_charger_energy", "battery_range_added_soh"],
+    "charging_perfs": ["sec_per_soc", "energy_soh", "soh_cum_charger_energy", "battery_range_added_soh"],
     "motion_perfs": ["dist_per_soc", "range_soh"],
     "self_discharge_perfs": ["secs_per_soc", "range_soh"]
 }
 
-def plt_single_vehicle_sohs(vehicle_df:DF, perfs_dict:dict[str, DF], y_col:str="odometer", **kwargs):
+def plt_single_vehicle_sohs(vehicle_df:DF, perfs_dict:dict[str, DF], x_col:str="odometer", **kwargs):
     fig = None
     fig, axs = plt.subplots(4, sharex=True)
-    fill_axs_by_sohs(vehicle_df, perfs_dict, axs, y_col=y_col, **kwargs)
-    for ax in axs:
-        twin_ax = ax.twinx()    
-        vehicle_df["outside_temp"].plot.line(ax=twin_ax, color="red", linestyle="--")
+    fill_axs_by_sohs(vehicle_df, perfs_dict, axs, x_col=x_col, **kwargs)
+    if "outside_temp" in  vehicle_df.columns:
+        for ax in axs:
+            twin_ax = ax.twinx()    
+            vehicle_df["outside_temp"].plot.line(ax=twin_ax, color="red", linestyle="--")
     fig.tight_layout()
     fig.legend()
-    fig.suptitle(f"all sohs based on {y_col}")
+    fig.suptitle(f"all sohs based on {x_col}")
     plt.show()
     
-def fill_axs_by_sohs(vehicle_df:DF, perfs_dict:dict[str, DF], axs: list[Axes], y_col:str="odometer", y_col_periods="mean_odo", time_series_alpha=0.7, perf_alpha=0.7, plt_variance:bool=False):
+def fill_axs_by_sohs(vehicle_df:DF, perfs_dict:dict[str, DF], axs: list[Axes], x_col:str="odometer", x_col_periods="mean_odo", time_series_alpha=0.7, perf_alpha=0.7, plt_variance:bool=False):
     def plot_variance(ax:Axes, time_series:Series):
         var_ax = ax.twinx()
         var_series = time_series.sub(time_series.mean()).rolling("12h", center=True).var()
-        var_ax.plot(vehicle_df[y_col], var_series, alpha=time_series_alpha - 0.25, color='red', label=f"{time_series.name} variance")
+        var_ax.plot(vehicle_df[x_col], var_series, alpha=time_series_alpha - 0.25, color='red', label=f"{time_series.name} variance")
     if plt_variance:
         plot_variance(axs[0], vehicle_df["range_soh"])
         plot_variance(axs[1], vehicle_df["last_charge_soh"])
-    axs[0].plot(vehicle_df[y_col], vehicle_df["range_soh"], marker=".", alpha=time_series_alpha, label="range_soh")
-    axs[1].plot(vehicle_df[y_col], vehicle_df["last_charge_soh"], marker=".", alpha=time_series_alpha, label="last_charge_soh")
+    axs[0].plot(vehicle_df[x_col], vehicle_df["range_soh"], marker=".", alpha=time_series_alpha, label="range_soh")
+    if "last_charge_soh" in vehicle_df.columns:
+        axs[1].plot(vehicle_df[x_col], vehicle_df["last_charge_soh"], marker=".", alpha=time_series_alpha, label="last_charge_soh")
     # energy added
+    print(perfs_dict["charging_perfs"].dtypes)
     axs[2].plot(
-        perfs_dict["charging_perfs"][y_col_periods],
-        perfs_dict["charging_perfs"]["soh_energy_added"],
+        perfs_dict["charging_perfs"][x_col_periods],
+        perfs_dict["charging_perfs"]["energy_soh"],
         marker=".",
         alpha=perf_alpha,
     )
     axs[3].plot(
-        perfs_dict["charging_perfs"][y_col_periods],
+        perfs_dict["charging_perfs"][x_col_periods],
         perfs_dict["charging_perfs"]["battery_range_added_soh"],
         marker=".",
         alpha=perf_alpha,
@@ -173,7 +176,7 @@ def plt_only_perfs(vehicle_df: DF, perfs_dict: dict[str, DF]):
     axs[0].legend()
     axs[0].set_title("range soh")
     # charging perf energy added 
-    plt_perf_period(perfs_dict, "charging_perfs", "soh_energy_added", axs[1], color="green", alpha=0.6)
+    plt_perf_period(perfs_dict, "charging_perfs", "energy_soh", axs[1], color="green", alpha=0.6)
     # charging perf energy added 
     plt_perf_period(perfs_dict, "charging_perfs", "battery_range_added_soh", axs[2], color="green", alpha=0.6)
 

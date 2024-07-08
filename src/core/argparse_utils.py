@@ -35,7 +35,7 @@ def parse_kwargs() -> dict:
             continue
 
         key, value_str = item_tokens
-        key = item.lstrip('-')
+        key = key.lstrip('-')
         # Use ast.literal_eval to safely evaluate the value string
         try:
             value = ast.literal_eval(value_str)
@@ -43,4 +43,5 @@ def parse_kwargs() -> dict:
             # Fallback to using the string directly if evaluation fails
             value = value_str
         kwargs[key.lstrip('-')] = value
+        print(kwargs)
     return kwargs

@@ -33,7 +33,7 @@ def main():
     if vin:
         vehicle_df = processed_time_series_of(vin)
         perfs = compute_all_perfs(vehicle_df, vin)
-        plt_single_vehicle_sohs(vehicle_df, perfs, y_col=args.y_col, y_col_periods=args.y_col_perf, plt_variance=True)
+        plt_single_vehicle_sohs(vehicle_df, perfs, x_col=args.y_col, y_col_periods=args.y_col_perf, plt_variance=True)
 
 def iterate_over_perfs_df(**kwargs) -> Generator[tuple[str, dict[str, DF]], None, None]:
     for vin, vehicle_df in iterate_overs_processed_ts(**kwargs):
@@ -53,21 +53,20 @@ def compute_all_perfs(vehicle_df: DF, vin:str) -> dict[str, DF]:
 def compute_charging_perfs(vehicle_df: DF, default_kwh_per_soc:float) -> DF:
     charging_perfs_df = agg_diffs_df_of(
         vehicle_df,
-        "is_charging_mask",
-        "is_charging_idx",
+        "in_charge_perf_mask",
+        "in_charge_idx",
         {
             "cum_charging_energy": "charger_cum_energy",
             "charge_energy_added": "energy_added_sum",
             "cum_energy_spent": "energy_spent",
             "charge_miles_added_ideal": "range_gained",
-            "odometer": "dist",
         }
     )
     charging_perfs_df = compute_soh_from_soc_and_energy_diff(charging_perfs_df, "charger_cum_energy", default_kwh_per_soc, "soh_cum_charger_energy")
-    charging_perfs_df = compute_soh_from_soc_and_energy_diff(charging_perfs_df, "energy_added_sum", default_kwh_per_soc, "soh_energy_added")
+    charging_perfs_df = compute_soh_from_soc_and_energy_diff(charging_perfs_df, "energy_added_sum", default_kwh_per_soc, "energy_soh")
     charging_perfs_df["battery_range_added_soh"] = 100 * MILE_TO_KM * charging_perfs_df.eval("range_gained / soc_diff") / MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC
     charging_perfs_df["sec_per_soc"] = charging_perfs_df["duration"].dt.total_seconds() / charging_perfs_df["soc_diff"]
-    charging_perfs_df["mean_odo"] = charging_perfs_df.eval("start_odometer + dist / 2")
+    charging_perfs_df["mean_odo"] = charging_perfs_df.eval("start_odometer + distance / 2")
 
     return charging_perfs_df
 

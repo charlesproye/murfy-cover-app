@@ -38,11 +38,11 @@ def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
 def process_raw_time_series(raw_vehicle_df: DF, id:str) -> DF:
     return (
         pre_process_raw_time_series(raw_vehicle_df)
-        .pipe(ts.soh_from_est_battery_range, "autonomy_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
+        .pipe(ts.soh_from_est_battery_range, "battery_range_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
         .pipe(ts.in_motion_mask_from_odo_diff)
         .pipe(ts.in_charge_and_discharge_mask_fromo_soc_diff)
         .eval("power = current * voltage")
-        .pipe(ts.add_cum_energy_from_power_cols, "power", "energy")
+        .pipe(ts.add_cum_energy_from_power_cols, "power", "cum_energy")
     )
 
 def pre_process_raw_time_series(raw_vehicle_df: DF) -> DF:        
@@ -55,6 +55,7 @@ def pre_process_raw_time_series(raw_vehicle_df: DF) -> DF:
             "battery_hv_temp": "temp",
             "battery_hv_voltage": "voltage",
             "battery_hv_current": "current",
+            "autonomy_km": "battery_range_km"
         })
         .drop_duplicates("date")
         .set_index("date", drop=False)

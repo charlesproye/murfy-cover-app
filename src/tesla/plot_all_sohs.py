@@ -19,7 +19,7 @@ def main():
     pa_parents_vehicle_df = processed_time_series_of(pa_parents_vin)
     perfs_dict = compute_all_perfs(pa_parents_vehicle_df, pa_parents_vin)
     plt_single_vehicle_sohs(pa_parents_vehicle_df, perfs_dict, plt_variance=True)
-    plt_single_vehicle_sohs(pa_parents_vehicle_df, perfs_dict, y_col="date", y_col_periods="mean_date", plt_variance=True)
+    plt_single_vehicle_sohs(pa_parents_vehicle_df, perfs_dict, x_col="date", y_col_periods="mean_date", plt_variance=True)
     histogram_variance_per_period()
     histogram_variance_per_vehicle()
 

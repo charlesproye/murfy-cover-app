@@ -71,7 +71,7 @@ def in_charge_and_discharge_mask_fromo_soc_diff(vheicle_df: DF) -> DF:
 def self_discharge(vehicle_df: DF) -> DF:
     return (
         vehicle_df
-        .assign(in_self_discharge=~vehicle_df["in_motion"] & ~vehicle_df["is_charging"])
+        .assign(in_self_discharge=~vehicle_df["in_motion"] & ~vehicle_df["in_charge"])
         .pipe(perf_mask_and_idx_from_condition_mask, "in_self_discharge")
     )
 
