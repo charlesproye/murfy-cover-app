@@ -4,26 +4,78 @@ import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
 from pandas.api.typing import DataFrameGroupBy as DF_grp_by
+from pandas.api.types import is_bool_dtype
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from scipy import integrate
 from matplotlib.dates import date2num
+from matplotlib.figure import Figure
+from scipy import integrate
 from rich import print
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from core.constant_variables import *
+
 text_show_cid = 0
 perf_df_idx = 0
-
 perf_col_idx = 0
-PERF_VARS_DICT = {
-    "charging_perfs": ["sec_per_soc", "energy_soh", "soh_cum_charger_energy", "battery_range_added_soh"],
-    "motion_perfs": ["dist_per_soc", "range_soh"],
-    "self_discharge_perfs": ["secs_per_soc", "range_soh"]
-}
 
-def plt_single_vehicle_sohs(vehicle_df:DF, perfs_dict:dict[str, DF], x_col:str="odometer", **kwargs):
+def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_pattern:dict, x_col:str="date", show=True, main_title=None) -> tuple[Figure, np.ndarray[Axes]]:
+    # setup
+    ts_cols:list[str|list[str]] = plt_pattern.get("vehicle_df", [])
+    perfs_cols: dict[str, str|list[str]] = plt_pattern.get("perfs_dict", {})
+    nb_rows = len(ts_cols) + sum([len(perf_cols) for _, perf_cols in perfs_cols.items()])
+    fig: Figure
+    axs: np.ndarray[Axes]
+    fig, axs = plt.subplots(nrows=nb_rows, sharex=True)
+    # plt the time series
+    fill_axs_with_df(axs, vehicle_df, ts_cols, x_col)
+    # plt perfs
+    axs_offset = len(ts_cols)
+    for perf_name, perfs_cols in perfs_cols.items():
+        fill_axs_with_df(axs[axs_offset:], perfs_dict[perf_name], perfs_cols, X_TIME_SERIES_COL_TO_X_PERIOD_COL[x_col])
+        axs_offset += len(perfs_cols)
+
+    if main_title:
+        fig.suptitle(main_title)
+    if show:
+        plt.show()
+
+    return fig, axs
+
+def fill_axs_with_df(axs:np.ndarray[Axes], df: DF, ts_cols:dict[str, str|list], x_col:str="date"):
+    for ts_col, ax in zip(ts_cols, axs):
+        ax.set_title(ts_col)
+        if isinstance(ts_col, str) or isinstance(ts_col, dict): 
+            fill_ax(ax, df, x_col, ts_col)
+        if isinstance(ts_col, list): 
+            for sub_ts_col in ts_col:
+                if sub_ts_col == "twinx":
+                    ax.legend()
+                    xmin, xmax = df.index.min(), df.index.max()
+                    ax = ax.twinx()
+                    # plt.hlines(0, xmin, xmax, color="red", linestyles="--")
+
+                else:
+                    fill_ax(ax, df, x_col, sub_ts_col)
+        ax.legend()
+
+                       
+def fill_ax(ax: Axes, df:DF, x:str, y:str|dict, plt_kwargs:dict=DEFAULT_LINE_PLOT_KWARGS):
+    if isinstance(y, dict):
+        assert "y" in y, "Passed dict to plot Axes but there is no column 'y' in that dict."
+        plt_kwargs = {key: val for key, val in y.items() if key != "y"}
+        y = y["y"]
+
+    if is_bool_dtype(df[y]):
+        ax_min, ax_max = ax.get_ylim()
+        ax.fill_between(df.index, ax_min, ax_max, df[y].values, color=plt_kwargs.get("color", "green"), alpha=plt_kwargs.get("alpha", 0.6), label=y)
+        ax.set_ylim(ax_min, ax_max)
+    else:
+        ax.plot(df[x], df[y], label=y, **plt_kwargs)
+
+def plt_single_vehicle_sohs(vehicle_df:DF, perfs_dict:dict[str, DF], x_col:str="odometer", **kwargs) -> tuple[Figure, np.ndarray[Axes]]:
     fig = None
     fig, axs = plt.subplots(4, sharex=True)
     fill_axs_by_sohs(vehicle_df, perfs_dict, axs, x_col=x_col, **kwargs)
@@ -34,21 +86,26 @@ def plt_single_vehicle_sohs(vehicle_df:DF, perfs_dict:dict[str, DF], x_col:str="
     fig.tight_layout()
     fig.legend()
     fig.suptitle(f"all sohs based on {x_col}")
+
     plt.show()
-    
+
+    return fig, axs
+
 def fill_axs_by_sohs(vehicle_df:DF, perfs_dict:dict[str, DF], axs: list[Axes], x_col:str="odometer", x_col_periods="mean_odo", time_series_alpha=0.7, perf_alpha=0.7, plt_variance:bool=False):
     def plot_variance(ax:Axes, time_series:Series):
         var_ax = ax.twinx()
         var_series = time_series.sub(time_series.mean()).rolling("12h", center=True).var()
         var_ax.plot(vehicle_df[x_col], var_series, alpha=time_series_alpha - 0.25, color='red', label=f"{time_series.name} variance")
+    # range soh
     if plt_variance:
         plot_variance(axs[0], vehicle_df["range_soh"])
-        plot_variance(axs[1], vehicle_df["last_charge_soh"])
     axs[0].plot(vehicle_df[x_col], vehicle_df["range_soh"], marker=".", alpha=time_series_alpha, label="range_soh")
+    # last charge soh
     if "last_charge_soh" in vehicle_df.columns:
+        if plt_variance:
+            plot_variance(axs[1], vehicle_df["last_charge_soh"])
         axs[1].plot(vehicle_df[x_col], vehicle_df["last_charge_soh"], marker=".", alpha=time_series_alpha, label="last_charge_soh")
     # energy added
-    print(perfs_dict["charging_perfs"].dtypes)
     axs[2].plot(
         perfs_dict["charging_perfs"][x_col_periods],
         perfs_dict["charging_perfs"]["energy_soh"],

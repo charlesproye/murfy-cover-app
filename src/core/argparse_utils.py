@@ -17,21 +17,31 @@ def get_src_dst_pairs_args(description: str=""):
 
     return ext_ref_files, dest_files
 
-def parse_kwargs() -> dict:
+def parse_kwargs(mandatory_args: list = [], optional_args: dict = {}, **kwargs):
     # Set up argparse to accept known arguments
-    parser = ArgumentParser(description="Example script.")
-    # Use nargs and REMAINDER to accept an arbitrary number of unknown arguments
-    parser.add_argument('kwargs', nargs=REMAINDER, help="Keyword arguments")
-
+    parser = ArgumentParser(**kwargs)
+    
+    # Add mandatory arguments
+    for arg in mandatory_args:
+        parser.add_argument(f'--{arg}', required=True)
+    
+    # Add optional arguments
+    for arg, default in optional_args.items():
+        parser.add_argument(f"--{arg}", default=default)
+    
     # Parse known arguments
-    _, str_kwargs = parser.parse_known_args()
+    known_args, unknown_args = parser.parse_known_args()
 
-    kwargs = {}
-    for item in str_kwargs:
+    # Convert known_args (Namespace) to a dictionary
+    known_args_dict = vars(known_args)
+
+    # Parse unknown arguments manually
+    parsed_kwargs = {}
+    for item in unknown_args:
         # Split the argument on the first "=" to separate the key and the value
         item_tokens = item.split("=", 1)
         if len(item_tokens) == 1:
-            kwargs[item.lstrip('-')] = True
+            parsed_kwargs[item.lstrip('-')] = True
             continue
 
         key, value_str = item_tokens
@@ -42,6 +52,7 @@ def parse_kwargs() -> dict:
         except (ValueError, SyntaxError):
             # Fallback to using the string directly if evaluation fails
             value = value_str
-        kwargs[key.lstrip('-')] = value
-        print(kwargs)
-    return kwargs
+        parsed_kwargs[key] = value
+
+    # Combine known_args_dict with parsed_kwargs
+    return {**parsed_kwargs, **known_args_dict}

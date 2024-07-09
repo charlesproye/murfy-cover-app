@@ -8,12 +8,12 @@ from pandas import DataFrame as DF
 from rich import print
 
 import core.time_series_processing as ts
-from watea_constants import *
 from core.caching_utils import data_caching_wrapper
-from watea_fleet_info import iterate_over_ids
 from core.argparse_utils import parse_kwargs
-from raw_watea_ts import raw_ts_of
 from core.plt_utils import plt_time_series
+from watea.watea_constants import *
+from watea.watea_fleet_info import iterate_over_ids
+from watea.raw_watea_ts import raw_ts_of
 
 def main():
     kwargs = parse_kwargs()
@@ -40,7 +40,7 @@ def process_raw_time_series(raw_vehicle_df: DF, id:str) -> DF:
         pre_process_raw_time_series(raw_vehicle_df)
         .pipe(ts.soh_from_est_battery_range, "battery_range_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
         .pipe(ts.in_motion_mask_from_odo_diff)
-        .pipe(ts.in_charge_and_discharge_mask_fromo_soc_diff)
+        .pipe(ts.all_charge_and_discharge_cols_from_soc_diff)
         .eval("power = current * voltage")
         .pipe(ts.add_cum_energy_from_power_cols, "power", "cum_energy")
     )

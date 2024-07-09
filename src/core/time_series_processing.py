@@ -1,3 +1,5 @@
+from datetime import timedelta as TD
+
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
@@ -8,7 +10,7 @@ from scipy import integrate
 from rich import print
 import numpy as np
 
-from .constant_variables import KJ_TO_KWH
+from .constant_variables import *
 
 def add_cum_energy_from_power_cols(vehicle_df: DF, power_col:str, energy_col:str) -> DF:
     vehicle_df[energy_col] = cum_energy_from_power(vehicle_df[power_col])
@@ -26,7 +28,7 @@ def cum_energy_from_power(power_series: Series) -> Series:
     cum_energy_data = integrate.cumulative_trapezoid(
         # Make sure that date time units are in seconds before converting to int
         x=power_series.index.to_series().dt.as_unit("s").astype(int),
-        y=power_series.values,
+        y=power_series.fillna(0).values,
         initial=0,
     )
     return Series(cum_energy_data * KJ_TO_KWH, index=power_series.index)
@@ -54,26 +56,51 @@ def double_rolling_median_smoothing(src:Series, window:str|int="3h") -> Series:
 def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
         vehicle_df
-        .assign(in_motion=vehicle_df["odometer"].diff().ne(0, fill_value=False))
+        # use interpolate before checking if the odometer increased to composate for missing values
+        .assign(in_motion=vehicle_df["odometer"].interpolate(method="time").diff().gt(0, fill_value=False))
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
 
-def in_charge_and_discharge_mask_fromo_soc_diff(vheicle_df: DF) -> DF:
+def all_charge_and_discharge_cols_from_soc_diff(vheicle_df: DF) -> DF:
     return (
         vheicle_df
-        .assign(soc_diff=vheicle_df["soc"].diff())
-        .eval("in_charge = soc_diff > 0")
-        .eval("in_discharge = soc_diff <= 0")
+        .pipe(in_discharge_and_charge_from_soc_diff)
+        .pipe(in_discharge_and_charge_from_soc_diff)
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
         .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
-        # .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
     )
 
-def self_discharge(vehicle_df: DF) -> DF:
-    return (
-        vehicle_df
-        .assign(in_self_discharge=~vehicle_df["in_motion"] & ~vehicle_df["in_charge"])
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_self_discharge")
+def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
+    soc_diff = vehicle_df["soc"].ffill().diff()
+    vehicle_df["soc_dir"] = np.nan
+    vehicle_df["soc_dir"] = (
+        vehicle_df["soc_dir"] 
+        .mask(soc_diff.gt(0, fill_value=False), 1)
+        .mask(soc_diff.lt(0, fill_value=False), -1)
     )
+    # mitigate soc spikes effect on mask
+    prev_dir = vehicle_df["soc_dir"].ffill().shift()
+    next_dir = vehicle_df["soc_dir"].bfill().shift(-1)
+    vehicle_df["value_is_spike"] = (next_dir == prev_dir) & (vehicle_df["soc_dir"] != next_dir) & vehicle_df["soc_dir"].notna()
+    vehicle_df["soc_dir"] = vehicle_df["soc_dir"].mask(vehicle_df["value_is_spike"], np.nan)
+    vehicle_df["smoothed_soc_dir"] = vehicle_df["soc_dir"].rolling(window=TD(minutes=20), center=True).mean()
+    vehicle_df["soc_dir"] = (
+        vehicle_df["soc_dir"]
+        .mask(vehicle_df["smoothed_soc_dir"].gt(0), 1)
+        .mask(vehicle_df["smoothed_soc_dir"].lt(0), -1)
+    )
+
+    bfilled_dir = vehicle_df["soc_dir"].bfill()
+    ffilled_dir = vehicle_df["soc_dir"].ffill()
+    vehicle_df["soc_dir"] = vehicle_df["soc_dir"].mask(bfilled_dir == ffilled_dir, ffilled_dir)
+    vehicle_df = (
+        vehicle_df
+        .eval("in_discharge = soc_dir == -1")
+        .eval("in_charge = soc_dir == 1")
+    ) 
+
+    return vehicle_df
+
 
 # TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
 def perf_mask_and_idx_from_condition_mask(vehicle_df: DF, src_mask:str) -> DF:

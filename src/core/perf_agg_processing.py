@@ -23,16 +23,16 @@ def self_discharge_df_of(vehicle_df: DF, stock_kwh_per_soc: float, cum_energy_sp
     return self_discharge_df
 
 def motion_perfs_df_of(vehicle_df: DF, stock_kwh_per_soc: float, cum_energy_spent_col:str="cum_energy_spent") -> DF:
-    motion_perfs_df = agg_diffs_df_of(
-        vehicle_df,
-        "in_motion_perf_mask",
-        "in_motion_perf_idx",
-        {cum_energy_spent_col: "energy_diff"}
-    )
-    motion_perfs_df = compute_soh_from_soc_and_energy_diff(motion_perfs_df, "energy_diff", stock_kwh_per_soc, "motion_energy_soh")
-    motion_perfs_df["dist_per_soc"] = motion_perfs_df["distance"] / motion_perfs_df["soc_diff"]
-
-    return motion_perfs_df
+    return (
+        agg_diffs_df_of(
+            vehicle_df,
+            "in_motion_perf_mask",
+            "in_motion_perf_idx",
+            {cum_energy_spent_col: "energy_diff"}
+        )
+        .pipe(compute_soh_from_soc_and_energy_diff, "energy_diff", stock_kwh_per_soc, "motion_energy_soh")
+        .eval("km_per_soc = distance / soc_diff")
+    ) 
 
 def compute_soh_from_soc_and_energy_diff(perf_df: DF, kwh_energy_col: str, stock_kwh_per_soc, soh_col) -> DF:
     """
@@ -40,7 +40,6 @@ def compute_soh_from_soc_and_energy_diff(perf_df: DF, kwh_energy_col: str, stock
     Computes the soh estimation based on a kWh diff, soc diff and stock kwh per soc ratio.
     Make sure the energy diff is in kwh.
     """
-    print(perf_df.dtypes)
     return (
         perf_df
         .eval(f"kwh_per_soc = {kwh_energy_col} / soc_diff")
