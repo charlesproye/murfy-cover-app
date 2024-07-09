@@ -1,15 +1,13 @@
-from typing import Callable
+from typing import Callable, Generator
 
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
-from pandas.api.typing import DataFrameGroupBy as DF_grp_by
 from pandas.api.types import is_bool_dtype
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.dates import date2num
 from matplotlib.figure import Figure
-from scipy import integrate
 from rich import print
 import numpy as np
 import plotly.graph_objects as go
@@ -21,14 +19,40 @@ text_show_cid = 0
 perf_df_idx = 0
 perf_col_idx = 0
 
-def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_pattern:dict, x_col:str="date", show=True, main_title=None) -> tuple[Figure, np.ndarray[Axes]]:
+def plt_fleet(fleet_iterator: Callable[..., Generator[tuple[str, DF, dict[str, DF]], None, None]], plt_layout:dict, x_col:str="date", show=True, title=None) -> tuple[Figure, np.ndarray[Axes]]:
+    fig, axs, ts_cols, perfs_cols = setup_fig_axs_and_layouts(plt_layout, title)
+    set_titles_and_legends(axs, ts_cols, perfs_cols)
+    for id, vehicle_df, perfs_dict in fleet_iterator():
+        fill_single_axs_for_single_vehicle(vehicle_df, perfs_dict, ts_cols, perfs_cols, axs, x_col)
+    if show:
+            plt.show()
+
+    return fig, axs
+
+def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict, x_col:str="date", show=True, title=None) -> tuple[Figure, np.ndarray[Axes]]:
+    fig, axs, ts_cols, perfs_cols = setup_fig_axs_and_layouts(plt_layout, title)
+    fill_single_axs_for_single_vehicle(vehicle_df, perfs_dict, ts_cols, perfs_cols, axs, x_col)
+    set_titles_and_legends(axs, ts_cols, perfs_cols)
+    if show:
+        plt.show()
+
+    return fig, axs
+
+def setup_fig_axs_and_layouts(plt_layout:dict, title=None) -> tuple[Figure, np.ndarray[Axes], list, dict]:
     # setup
-    ts_cols:list[str|list[str]] = plt_pattern.get("vehicle_df", [])
-    perfs_cols: dict[str, str|list[str]] = plt_pattern.get("perfs_dict", {})
+    ts_cols:list[str|list[str]] = plt_layout.get("vehicle_df", [])
+    perfs_cols: dict[str, str|list[str]] = plt_layout.get("perfs_dict", {})
     nb_rows = len(ts_cols) + sum([len(perf_cols) for _, perf_cols in perfs_cols.items()])
     fig: Figure
     axs: np.ndarray[Axes]
     fig, axs = plt.subplots(nrows=nb_rows, sharex=True)
+
+    if title:
+        fig.suptitle(title)
+
+    return fig, axs, ts_cols, perfs_cols
+
+def fill_single_axs_for_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], ts_cols:list, perfs_cols:dict, axs:np.ndarray[Axes], x_col:str="date"):
     # plt the time series
     fill_axs_with_df(axs, vehicle_df, ts_cols, x_col)
     # plt perfs
@@ -37,37 +61,34 @@ def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_pattern:dic
         fill_axs_with_df(axs[axs_offset:], perfs_dict[perf_name], perfs_cols, X_TIME_SERIES_COL_TO_X_PERIOD_COL[x_col])
         axs_offset += len(perfs_cols)
 
-    if main_title:
-        fig.suptitle(main_title)
-    if show:
-        plt.show()
-
-    return fig, axs
-
 def fill_axs_with_df(axs:np.ndarray[Axes], df: DF, ts_cols:dict[str, str|list], x_col:str="date"):
     for ts_col, ax in zip(ts_cols, axs):
-        ax.set_title(ts_col)
         if isinstance(ts_col, str) or isinstance(ts_col, dict): 
             fill_ax(ax, df, x_col, ts_col)
         if isinstance(ts_col, list): 
             for sub_ts_col in ts_col:
                 if sub_ts_col == "twinx":
-                    ax.legend()
-                    xmin, xmax = df.index.min(), df.index.max()
+                    # ax.legend()
                     ax = ax.twinx()
-                    # plt.hlines(0, xmin, xmax, color="red", linestyles="--")
-
                 else:
                     fill_ax(ax, df, x_col, sub_ts_col)
-        ax.legend()
 
-                       
+def set_titles_and_legends(axs:np.ndarray[Axes], ts_cols:dict[str, str|list], perfs_cols:dict):
+    for ts_col, ax in zip(ts_cols, axs):
+        ax.set_title(ts_col)
+        ax.legend()
+    axs_offset = len(ts_cols)
+    for _, perf_cols in perfs_cols.items():
+        for perf_col, ax in zip(perf_cols, axs[axs_offset:]):
+            ax.set_title(perf_col)
+            ax.legend()
+        axs_offset += len(perf_cols)
+
 def fill_ax(ax: Axes, df:DF, x:str, y:str|dict, plt_kwargs:dict=DEFAULT_LINE_PLOT_KWARGS):
     if isinstance(y, dict):
         assert "y" in y, "Passed dict to plot Axes but there is no column 'y' in that dict."
         plt_kwargs = {key: val for key, val in y.items() if key != "y"}
         y = y["y"]
-
     if is_bool_dtype(df[y]):
         ax_min, ax_max = ax.get_ylim()
         ax.fill_between(df.index, ax_min, ax_max, df[y].values, color=plt_kwargs.get("color", "green"), alpha=plt_kwargs.get("alpha", 0.6), label=y)

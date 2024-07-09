@@ -28,6 +28,7 @@ def compute_discharge_perfs(vehicle_df:DF, default_kwh_per_soc:float) -> DF:
             {"cum_energy": "energy_diff"}
         )
         .pipe(perfs.compute_soh_from_soc_and_energy_diff, "energy_diff", default_kwh_per_soc, "discharge_soh")
+        .eval("km_per_soc = distance / soc_diff")
     ) 
 
 

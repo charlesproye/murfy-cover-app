@@ -36,3 +36,16 @@ CHARGE_PERF_COMPUTE_PLT_LAYOUT = {
     }
 }
 
+PERF_COMPARAISON_PLT_LAYOUT = {
+    "perfs_dict": {
+        "charge_perfs": [
+            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
+            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
+        ],
+        "discharge_perfs": [
+            {"y":"discharge_soh", "linestyle":"", "marker":".", "alpha":0.7},
+            {"y":"km_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
+        ],
+    }
+}
+
