@@ -8,11 +8,11 @@ from matplotlib.axes import Axes
 import numpy as np
 from rich import print
 
-import watea.watea_constants as constants
-from watea.processed_watea_ts import iterate_over_processed_ts, processed_ts_of
+import tesla.tesla_constants as constants
+from tesla.processed_tesla_ts import iterate_over_processed_ts, processed_ts_of
 from core import plt_utils
-from watea.watea_perfs import compute_perfs
-from watea.watea_fleet_info import fleet_info_df
+from tesla.tesla_perfs import compute_perfs
+from tesla.tesla_fleet_info import fleet_info_df
 from core.argparse_utils import parse_kwargs
 
 def main(): 
@@ -36,8 +36,8 @@ def plt_single_vehicle(id:str, plt_layout, x_col:str):
     plt_utils.plt_single_vehicle(vehicle_df, perfs_dict, plt_layout, title=id, x_col=x_col)
 
 def iterate_over_fleet(query=None):
-    for id, vehicle_df in iterate_over_processed_ts(query):
-        perfs_dict = compute_perfs(vehicle_df)
+    for id, vehicle_df in iterate_over_processed_ts(query_str=query):
+        perfs_dict = compute_perfs(vehicle_df, id)
         yield id, vehicle_df, perfs_dict
 
 if __name__ == "__main__":

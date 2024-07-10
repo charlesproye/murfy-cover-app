@@ -1,5 +1,5 @@
 """
-This module handles a data frame that holds static data about the vehicles such as model, default capacity and range, ect...
+This module handles a data frame that holds static data about the vehicles such as model, default capacity and range, ect...    
 Each line corresponds to a vehicle.
 """
 from glob import glob

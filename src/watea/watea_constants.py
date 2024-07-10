@@ -107,7 +107,7 @@ DEBUG_CHARGE_MASK = {
     ]
 }
 
-PERF_COMPARAISON_PLT_LAYOUT = {
+COMPARE_PERFS = {
     "perfs_dict": {
         "charge_perfs": [
             {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},

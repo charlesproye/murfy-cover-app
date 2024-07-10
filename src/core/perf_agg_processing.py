@@ -17,7 +17,7 @@ def self_discharge_df_of(vehicle_df: DF, stock_kwh_per_soc: float, cum_energy_sp
         "in_self_discharge_perf_idx",
         {cum_energy_spent_col: "energy_diff"}
     )
-    self_discharge_df = compute_soh_from_soc_and_energy_diff(self_discharge_df, "energy_diff", stock_kwh_per_soc)
+    self_discharge_df = compute_soh_from_soc_and_energy_diff(self_discharge_df, "energy_diff", stock_kwh_per_soc, "self_discharge_soh")
     self_discharge_df["secs_per_soc"] = self_discharge_df["duration"].dt.total_seconds() / self_discharge_df["soc_diff"]
 
     return self_discharge_df

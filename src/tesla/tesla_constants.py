@@ -62,3 +62,19 @@ MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC = MODEL_Y_REAR_DRIVE_MIN_RANGE / 100
 MODEL_Y_REAR_DRIVE_STOCK_KJ = 291600
 MODEL_Y_REAR_DRIVE_STOCK_KWH_PER_SOC = 0.81
 
+
+# Plotting
+PERFS_COMPARAISON = {
+    "perfs_dict": {
+        "motion_perfs": [
+            {"y":"km_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
+        ],
+        "self_discharge_perfs": [
+            {"y":"secs_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
+        ],
+        "charging_perfs": [
+            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
+            {"y":"battery_range_added_soh", "linestyle":"", "marker":".", "alpha":0.7},
+        ],
+    }
+}
