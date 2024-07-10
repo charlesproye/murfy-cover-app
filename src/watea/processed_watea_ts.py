@@ -35,7 +35,7 @@ def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
         force_update=force_update,
     )
 
-def process_raw_time_series(raw_vehicle_df: DF, id:str) -> DF:
+def process_raw_time_series(raw_vehicle_df: DF) -> DF:
     return (
         pre_process_raw_time_series(raw_vehicle_df)
         .pipe(ts.soh_from_est_battery_range, "battery_range_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)

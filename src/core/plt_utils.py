@@ -45,7 +45,7 @@ def setup_fig_axs_and_layouts(plt_layout:dict, title=None) -> tuple[Figure, np.n
     nb_rows = len(ts_cols) + sum([len(perf_cols) for _, perf_cols in perfs_cols.items()])
     fig: Figure
     axs: np.ndarray[Axes]
-    fig, axs = plt.subplots(nrows=nb_rows, sharex=True)
+    fig, axs = plt.subplots(nrows=nb_rows, sharex=True, squeeze=True)
 
     if title:
         fig.suptitle(title)
@@ -89,7 +89,12 @@ def fill_ax(ax: Axes, df:DF, x:str, y:str|dict, plt_kwargs:dict=DEFAULT_LINE_PLO
         assert "y" in y, "Passed dict to plot Axes but there is no column 'y' in that dict."
         plt_kwargs = {key: val for key, val in y.items() if key != "y"}
         y = y["y"]
-    if is_bool_dtype(df[y]):
+    if plt_kwargs.get("kind", "line") == "hlines":
+        plt_kwargs = {key: val for key, val in plt_kwargs.items() if key != "kind"}
+        xmin, xmax = ax.get_xlim()
+        ax.hlines(y, xmin, xmax, **plt_kwargs)
+        ax.set_xlim(xmin, xmax)
+    elif is_bool_dtype(df[y]):
         ax_min, ax_max = ax.get_ylim()
         ax.fill_between(df.index, ax_min, ax_max, df[y].values, color=plt_kwargs.get("color", "green"), alpha=plt_kwargs.get("alpha", 0.6), label=y)
         ax.set_ylim(ax_min, ax_max)

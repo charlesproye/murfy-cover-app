@@ -65,7 +65,6 @@ def all_charge_and_discharge_cols_from_soc_diff(vheicle_df: DF) -> DF:
     return (
         vheicle_df
         .pipe(in_discharge_and_charge_from_soc_diff)
-        .pipe(in_discharge_and_charge_from_soc_diff)
         .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
         .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
     )
@@ -86,8 +85,8 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     vehicle_df["smoothed_soc_dir"] = vehicle_df["soc_dir"].rolling(window=TD(minutes=20), center=True).mean()
     vehicle_df["soc_dir"] = (
         vehicle_df["soc_dir"]
-        .mask(vehicle_df["smoothed_soc_dir"].gt(0), 1)
-        .mask(vehicle_df["smoothed_soc_dir"].lt(0), -1)
+        .mask(vehicle_df["smoothed_soc_dir"].gt(0, fill_value=False) & vehicle_df["soc_dir"].lt(0, fill_value=False), np.nan)
+        .mask(vehicle_df["smoothed_soc_dir"].lt(0, fill_value=False) & vehicle_df["soc_dir"].gt(0, fill_value=False), np.nan)
     )
 
     bfilled_dir = vehicle_df["soc_dir"].bfill()
@@ -103,11 +102,12 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
 
 
 # TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
-def perf_mask_and_idx_from_condition_mask(vehicle_df: DF, src_mask:str) -> DF:
+def perf_mask_and_idx_from_condition_mask(vehicle_df: DF, src_mask:str, check_for_monotonicity=False) -> DF:
     src_mask_idx_col_name = f"{src_mask}_idx"
     perf_mask = f"{src_mask}_perf_mask"
     vehicle_df[src_mask_idx_col_name] = period_idx_of_mask(vehicle_df[src_mask])
-    vehicle_df[perf_mask] = vehicle_df.groupby(src_mask_idx_col_name)["soc"].transform(sanitize_perf_period) & vehicle_df[src_mask]
+    perf_grps = vehicle_df.groupby(src_mask_idx_col_name)["soc"]
+    vehicle_df[perf_mask] = perf_grps.transform(sanitize_perf_period) & vehicle_df[src_mask]
     vehicle_df[f"{src_mask}_perf_idx"] = period_idx_of_mask(vehicle_df[perf_mask])
 
     return vehicle_df

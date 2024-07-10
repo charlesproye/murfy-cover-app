@@ -1,5 +1,6 @@
 from pandas import DataFrame as DF
 from rich import print
+import numpy as np
 
 from watea.watea_constants import *
 from core.argparse_utils import parse_kwargs
@@ -13,8 +14,6 @@ def main():
 
 def compute_perfs(vehicle_df: DF) -> dict[str, DF]:        
     return {
-        "motion_perfs": perfs.motion_perfs_df_of(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC, cum_energy_spent_col="cum_energy"),
-        # "self_discharge_perfs": perfs.self_discharge_df_of(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC, cum_energy_spent_col="cum_energy"),
         "discharge_perfs": compute_discharge_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC),
         "charge_perfs": compute_charging_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC),
     }
@@ -28,7 +27,9 @@ def compute_discharge_perfs(vehicle_df:DF, default_kwh_per_soc:float) -> DF:
             {"cum_energy": "energy_diff"}
         )
         .pipe(perfs.compute_soh_from_soc_and_energy_diff, "energy_diff", default_kwh_per_soc, "discharge_soh")
+        .pipe(lambda df: df.assign(discharge_soh=df["discharge_soh"].replace(0, np.nan)))
         .eval("km_per_soc = distance / soc_diff")
+        .pipe(lambda df: df.assign(km_per_soc=df["km_per_soc"].replace(0, np.nan)))
     ) 
 
 
@@ -36,6 +37,7 @@ def compute_charging_perfs(vehicle_df: DF, default_kwh_per_soc:float) -> DF:
     return (
         perfs.agg_diffs_df_of(vehicle_df, "in_charge_perf_mask", "in_charge_perf_idx", {"cum_energy": "energy_added", "battery_range_km": "range_gained"})
         .pipe(perfs.compute_soh_from_soc_and_energy_diff, "energy_added", default_kwh_per_soc, "energy_soh")
+        .pipe(lambda df: df.assign(energy_soh=df["energy_soh"].replace(0, np.nan)))
         .eval("battery_range_added_soh = 100 * (range_gained / soc_diff) / @FORD_ETRANSIT_DEFAULT_KM_PER_SOC")
         .eval("sec_per_soc = sec_duration / soc_diff")
     )
