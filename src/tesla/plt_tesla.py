@@ -1,13 +1,3 @@
-import dotenv
-from typing import Generator
-
-from pandas import Series
-from pandas import DataFrame as DF
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-import numpy as np
-from rich import print
-
 import tesla.tesla_constants as constants
 from tesla.processed_tesla_ts import iterate_over_processed_ts, processed_ts_of
 from core import plt_utils
@@ -18,7 +8,7 @@ from core.argparse_utils import parse_kwargs
 def main(): 
     kwargs = parse_kwargs(["plt_layout"], {"plt_id":"all", "x_col":"date", "query":None})
     plt_layout = getattr(constants, kwargs["plt_layout"])
-    
+
     if kwargs["plt_id"] == "first":
         plt_fleet_info_df = fleet_info_df.query(kwargs["query"]) if kwargs["query"] else fleet_info_df
         plt_single_vehicle(plt_fleet_info_df["id"].iat[0], plt_layout, kwargs["x_col"])
@@ -26,10 +16,10 @@ def main():
         for id, vehicle_df, perfs_dict in iterate_over_fleet(kwargs["query"]):
             plt_single_vehicle(id, plt_layout, kwargs["x_col"])
     elif kwargs["plt_id"] == "fleet":
-        plt_utils.plt_fleet(lambda : iterate_over_fleet(kwargs["query"]), plt_layout, kwargs["x_col"], f"{plt_layout} over {kwargs['x_col']}")
+        plt_utils.plt_fleet(lambda : iterate_over_fleet(kwargs["query"]), plt_layout, kwargs["x_col"], f"{kwargs['plt_layout']} over {kwargs['x_col']}")
     elif kwargs["plt_id"] and str(kwargs["plt_id"]).isalpha():
         plt_single_vehicle(id, plt_layout, kwargs["x_col"])
-    
+
 def plt_single_vehicle(id:str, plt_layout, x_col:str):
     vehicle_df = processed_ts_of(id)
     perfs_dict = compute_perfs(vehicle_df)

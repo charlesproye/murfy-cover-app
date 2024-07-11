@@ -65,6 +65,10 @@ MODEL_Y_REAR_DRIVE_STOCK_KWH_PER_SOC = 0.81
 
 # Plotting
 PERFS_COMPARAISON = {
+    "vehicle_df": [
+        {"y":"range_soh", "linestyle":"", "marker":".", "alpha":0.7},
+        {"y":"last_charge_soh", "linestyle":"", "marker":".", "alpha":0.7},
+    ],
     "perfs_dict": {
         "motion_perfs": [
             {"y":"km_per_soc", "linestyle":"", "marker":".", "alpha":0.7},

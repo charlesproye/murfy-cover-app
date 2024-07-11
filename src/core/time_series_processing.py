@@ -12,6 +12,23 @@ import numpy as np
 
 from .constant_variables import *
 
+def preprocess_date(vehicle_df: DF) -> DF:
+    vehicle_df = (
+        vehicle_df
+        .drop_duplicates("date")
+        .set_index("date", drop=False)
+        .sort_index()
+    )
+    vehicle_df["sec_time_diff"] = (
+        vehicle_df["date"]
+        .ffill()
+        .diff()
+        .dt.as_unit("s")
+        .astype(int)
+    )
+
+    return vehicle_df
+
 def add_cum_energy_from_power_cols(vehicle_df: DF, power_col:str, energy_col:str) -> DF:
     vehicle_df[energy_col] = cum_energy_from_power(vehicle_df[power_col])
     return vehicle_df
@@ -61,12 +78,12 @@ def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
 
-def all_charge_and_discharge_cols_from_soc_diff(vheicle_df: DF) -> DF:
+def all_charge_and_discharge_cols_from_soc_diff(vheicle_df: DF, max_time_diff:TD|None=None) -> DF:
     return (
         vheicle_df
         .pipe(in_discharge_and_charge_from_soc_diff)
         .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
+        .pipe(perf_mask_and_idx_from_charge_mask, max_time_diff)
     )
 
 def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
@@ -101,25 +118,43 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     return vehicle_df
 
 
-# TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
-def perf_mask_and_idx_from_condition_mask(vehicle_df: DF, src_mask:str, check_for_monotonicity=False) -> DF:
-    src_mask_idx_col_name = f"{src_mask}_idx"
-    perf_mask = f"{src_mask}_perf_mask"
-    vehicle_df[src_mask_idx_col_name] = period_idx_of_mask(vehicle_df[src_mask])
-    perf_grps = vehicle_df.groupby(src_mask_idx_col_name)["soc"]
-    vehicle_df[perf_mask] = perf_grps.transform(sanitize_perf_period) & vehicle_df[src_mask]
-    vehicle_df[f"{src_mask}_perf_idx"] = period_idx_of_mask(vehicle_df[perf_mask])
+def perf_mask_and_idx_from_charge_mask(vehicle_df: DF, max_time_diff:TD|None=None) -> DF:
+    vehicle_df = (
+        vehicle_df
+        .assign(interpolated_soc=vehicle_df["soc"].interpolate(method="time"))
+        # .assign(interpolated_soc_diff=vehicle_df["soc"].interpolate(method="time"))
+        # .eval("sec_per_soc = sec_time_diff / interpolated_soc_diff")
+        .eval("in_charge_above_80 = in_charge & interpolated_soc >= 80")
+        .eval("in_charge_bellow_80 = in_charge & interpolated_soc < 80")
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge_above_80", max_time_diff=max_time_diff)
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge_bellow_80", max_time_diff=max_time_diff)
+    )
 
     return vehicle_df
 
-def period_idx_of_mask(mask: Series, period_shift:int=1) -> Series:
+# TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
+def perf_mask_and_idx_from_condition_mask(vehicle_df: DF, src_mask:str, src_mask_idx_col_name="{src_mask}_idx", perf_mask_col_name="{src_mask}_perf_mask", max_time_diff:TD|None=None) -> DF:
+    src_mask_idx_col_name = src_mask_idx_col_name.format(src_mask=src_mask)
+    perf_mask_col_name = perf_mask_col_name.format(src_mask=src_mask)
+    vehicle_df[src_mask_idx_col_name] = period_idx_of_mask(vehicle_df, src_mask, max_time_diff=max_time_diff)
+    perf_grps = vehicle_df.groupby(src_mask_idx_col_name)["soc"]
+    vehicle_df[perf_mask_col_name] = perf_grps.transform(sanitize_perf_period) & vehicle_df[src_mask]
+    vehicle_df[f"{src_mask}_perf_idx"] = period_idx_of_mask(vehicle_df, perf_mask_col_name)
+
+    return vehicle_df
+
+def period_idx_of_mask(vehicle_df:DF, mask_col: str, period_shift:int=1, max_time_diff:TD|None=None) -> Series:
+    if max_time_diff:
+        mask = vehicle_df.eval(f"{mask_col} & sec_time_diff < {max_time_diff.total_seconds()}") 
+    else:
+        mask = vehicle_df[mask_col]
     mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False)
     idx = mask_for_idx.cumsum()
     return idx
 
-def sanitize_perf_period(soc: Series) -> bool|Series:
+def sanitize_perf_period(soc: Series, min_size=2) -> bool|Series:
     trimed_mask = trim_off_mask_perf_period(soc)
-    return trimed_mask if trimed_mask.sum() > 1 else False
+    return trimed_mask if trimed_mask.sum() >= min_size else False
 
 def trim_off_mask_perf_period(soc: Series) -> Series:
     return mask_off_trailing_soc(soc) & mask_off_leading_soc(soc)

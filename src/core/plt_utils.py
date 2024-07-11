@@ -15,7 +15,7 @@ from plotly.subplots import make_subplots
 
 from core.constant_variables import *
 
-def plt_fleet(fleet_iterator: Callable[..., Generator[tuple[str, DF, dict[str, DF]], None, None]], plt_layout:dict, x_col:str="date", show=True, title=None) -> tuple[Figure, np.ndarray[Axes]]:
+def plt_fleet(fleet_iterator: Callable[..., Generator[tuple[str, DF, dict[str, DF]], None, None]], plt_layout:dict, x_col:str="date", title=None, show=True) -> tuple[Figure, np.ndarray[Axes]]:
     fig, axs, ts_cols, perfs_cols = setup_fig_axs_and_layouts(plt_layout, title)
     set_titles_and_legends(axs, ts_cols, perfs_cols)
     for id, vehicle_df, perfs_dict in fleet_iterator():
@@ -25,7 +25,7 @@ def plt_fleet(fleet_iterator: Callable[..., Generator[tuple[str, DF, dict[str, D
 
     return fig, axs
 
-def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict, x_col:str="date", show=True, title=None) -> tuple[Figure, np.ndarray[Axes]]:
+def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict, x_col:str="date", title=None, show=True) -> tuple[Figure, np.ndarray[Axes]]:
     fig, axs, ts_cols, perfs_cols = setup_fig_axs_and_layouts(plt_layout, title)
     fill_single_axs_for_single_vehicle(vehicle_df, perfs_dict, ts_cols, perfs_cols, axs, x_col)
     set_titles_and_legends(axs, ts_cols, perfs_cols)
@@ -71,12 +71,14 @@ def fill_axs_with_df(axs:np.ndarray[Axes], df: DF, ts_cols:dict[str, str|list], 
 
 def set_titles_and_legends(axs:np.ndarray[Axes], ts_cols:dict[str, str|list], perfs_cols:dict):
     for ts_col, ax in zip(ts_cols, axs):
-        ax.set_title(ts_col)
+        if isinstance(ts_col, dict) and "y" in ts_col: 
+            ax.set_title(ts_col["y"])
         ax.legend()
     axs_offset = len(ts_cols)
     for _, perf_cols in perfs_cols.items():
         for perf_col, ax in zip(perf_cols, axs[axs_offset:]):
-            ax.set_title(perf_col)
+            if isinstance(perf_col, dict) and "y" in perf_col: 
+                ax.set_title(perf_col["y"])
             ax.legend()
         axs_offset += len(perf_cols)
 

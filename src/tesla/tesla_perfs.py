@@ -16,24 +16,9 @@ from rich.progress import track
 import core.time_series_processing as ts
 import core.perf_agg_processing as perfs
 from core.perf_agg_processing import compute_soh_from_soc_and_energy_diff, agg_diffs_df_of
-from core.plt_utils import plt_single_vehicle_sohs
 from tesla.tesla_constants import *
 from tesla.tesla_fleet_info import fleet_info_df
 from tesla.processed_tesla_ts import iterate_over_processed_ts, processed_ts_of
-
-def main():
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--vin', type=str, help='Optional VIN string')
-    parser.add_argument('--y_col', type=str, default='odometer', help='Optional y_col string (default: "odometer")')
-    parser.add_argument('--y_col_perf', type=str, default='mean_odo', help='Optional y_col_perf string (default: "mean_odo")')
-
-    args = parser.parse_args()
-    vin = args.vin
-
-    if vin:
-        vehicle_df = processed_ts_of(vin)
-        perfs = compute_perfs(vehicle_df, vin)
-        plt_single_vehicle_sohs(vehicle_df, perfs, x_col=args.y_col, y_col_periods=args.y_col_perf, plt_variance=True)
 
 def iterate_over_perfs_df(**kwargs) -> Generator[tuple[str, dict[str, DF]], None, None]:
     for vin, vehicle_df in iterate_over_processed_ts(**kwargs):
@@ -53,14 +38,13 @@ def compute_perfs(vehicle_df: DF, vin:str) -> dict[str, DF]:
 def compute_charging_perfs(vehicle_df: DF, default_kwh_per_soc:float) -> DF:
     charging_perfs_df = agg_diffs_df_of(
         vehicle_df,
-        "in_charge_perf_mask",
-        "in_charge_perf_idx",
         {
             "cum_charging_energy": "charger_cum_energy",
             "charge_energy_added": "energy_added_sum",
             "cum_energy_spent": "energy_spent",
             "charge_miles_added_ideal": "range_gained",
-        }
+        },
+        "in_charge",
     )
     charging_perfs_df = compute_soh_from_soc_and_energy_diff(charging_perfs_df, "charger_cum_energy", default_kwh_per_soc, "soh_cum_charger_energy")
     charging_perfs_df = compute_soh_from_soc_and_energy_diff(charging_perfs_df, "energy_added_sum", default_kwh_per_soc, "energy_soh")
@@ -68,8 +52,3 @@ def compute_charging_perfs(vehicle_df: DF, default_kwh_per_soc:float) -> DF:
     charging_perfs_df["sec_per_soc"] = charging_perfs_df["duration"].dt.total_seconds() / charging_perfs_df["soc_diff"]
 
     return charging_perfs_df
-
-
-
-if __name__ == "__main__":
-    main()

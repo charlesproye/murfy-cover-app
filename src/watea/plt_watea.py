@@ -1,12 +1,4 @@
-import dotenv
-from typing import Generator
-
-from pandas import Series
-from pandas import DataFrame as DF
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-import numpy as np
-from rich import print
+from rich.traceback import install as install_rich_traceback
 
 import watea.watea_constants as constants
 from watea.processed_watea_ts import iterate_over_processed_ts, processed_ts_of
@@ -16,6 +8,7 @@ from watea.watea_fleet_info import fleet_info_df
 from core.argparse_utils import parse_kwargs
 
 def main(): 
+    install_rich_traceback(extra_lines=0, width=130)
     kwargs = parse_kwargs(["plt_layout"], {"plt_id":"all", "x_col":"date", "query":None})
     plt_layout = getattr(constants, kwargs["plt_layout"])
     
@@ -26,7 +19,7 @@ def main():
         for id, vehicle_df, perfs_dict in iterate_over_fleet(kwargs["query"]):
             plt_single_vehicle(id, plt_layout, kwargs["x_col"])
     elif kwargs["plt_id"] == "fleet":
-        plt_utils.plt_fleet(lambda : iterate_over_fleet(kwargs["query"]), plt_layout, kwargs["x_col"], f"{plt_layout} over {kwargs['x_col']}")
+        plt_utils.plt_fleet(lambda : iterate_over_fleet(kwargs["query"]), plt_layout, kwargs["x_col"], title=f"{kwargs['plt_layout']} over {kwargs['x_col']}")
     elif kwargs["plt_id"] and str(kwargs["plt_id"]).isalpha():
         plt_single_vehicle(id, plt_layout, kwargs["x_col"])
     
