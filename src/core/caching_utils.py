@@ -24,7 +24,6 @@ def data_caching_wrapper(vin: str, path_to_cache: str, data_gen_func: Callable[P
     extension = path_to_cache.split(".")[-1]
     if extension != "csv" and extension != "parquet":
         raise ValueError(f"Extension of path '{path_to_cache}' is must be 'csv' or 'parquet'")
-
     if force_update or not exists(path_to_cache):
         data: DF|Series = data_gen_func(vin, **kwargs)
         safe_cache_to(data, path_to_cache, **write_kwargs)

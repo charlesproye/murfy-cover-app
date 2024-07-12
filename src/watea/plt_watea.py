@@ -25,12 +25,12 @@ def main():
     
 def plt_single_vehicle(id:str, plt_layout, x_col:str):
     vehicle_df = processed_ts_of(id)
-    perfs_dict = compute_perfs(vehicle_df)
+    perfs_dict = compute_perfs(vehicle_df, id)
     plt_utils.plt_single_vehicle(vehicle_df, perfs_dict, plt_layout, title=id, x_col=x_col)
 
 def iterate_over_fleet(query=None):
     for id, vehicle_df in iterate_over_processed_ts(query):
-        perfs_dict = compute_perfs(vehicle_df)
+        perfs_dict = compute_perfs(vehicle_df, id)
         yield id, vehicle_df, perfs_dict
 
 if __name__ == "__main__":

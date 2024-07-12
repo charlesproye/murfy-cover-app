@@ -15,6 +15,7 @@ from .constant_variables import *
 def preprocess_date(vehicle_df: DF) -> DF:
     vehicle_df = (
         vehicle_df
+        .assign(date=vehicle_df["date"].dt.as_unit("s"))
         .drop_duplicates("date")
         .set_index("date", drop=False)
         .sort_index()
@@ -78,14 +79,6 @@ def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
 
-def all_charge_and_discharge_cols_from_soc_diff(vheicle_df: DF, max_time_diff:TD|None=None) -> DF:
-    return (
-        vheicle_df
-        .pipe(in_discharge_and_charge_from_soc_diff)
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
-        .pipe(perf_mask_and_idx_from_charge_mask, max_time_diff)
-    )
-
 def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     soc_diff = vehicle_df["soc"].ffill().diff()
     vehicle_df["soc_dir"] = np.nan
@@ -122,8 +115,10 @@ def perf_mask_and_idx_from_charge_mask(vehicle_df: DF, max_time_diff:TD|None=Non
     vehicle_df = (
         vehicle_df
         .assign(interpolated_soc=vehicle_df["soc"].interpolate(method="time"))
-        # .assign(interpolated_soc_diff=vehicle_df["soc"].interpolate(method="time"))
-        # .eval("sec_per_soc = sec_time_diff / interpolated_soc_diff")
+        .assign(interpolated_soc_diff=vehicle_df["soc"].interpolate(method="time"))
+
+        .eval("sec_per_soc = sec_time_diff / interpolated_soc_diff")
+
         .eval("in_charge_above_80 = in_charge & interpolated_soc >= 80")
         .eval("in_charge_bellow_80 = in_charge & interpolated_soc < 80")
         .pipe(perf_mask_and_idx_from_condition_mask, "in_charge_above_80", max_time_diff=max_time_diff)
@@ -148,7 +143,7 @@ def period_idx_of_mask(vehicle_df:DF, mask_col: str, period_shift:int=1, max_tim
         mask = vehicle_df.eval(f"{mask_col} & sec_time_diff < {max_time_diff.total_seconds()}") 
     else:
         mask = vehicle_df[mask_col]
-    mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False)
+    mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False) #| vehicle_df["soc_per_soc"].diff().abs()
     idx = mask_for_idx.cumsum()
     return idx
 

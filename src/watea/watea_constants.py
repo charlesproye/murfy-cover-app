@@ -12,9 +12,29 @@ PATH_TO_RAW_TS_FOLDER = "data_cache/raw_time_series"
 PATH_TO_RAW_TS = join(PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
 PATH_TO_PROCESSED_TS = "data_cache/processed_time_series/{id}.parquet"
 PATH_TO_FLEET_INFO_DF = "data_cache/fleet_info/fleet_info_df.{extension}"
+PATH_TO_CHARGING_PERF_PER_SOC = "data_cache/perfs/charging_perf_per_soc/{id}.parquet"
 
 # recording dependant constants
 PERF_MAX_TIME_DIFF = TD(minutes=10)
+# charge energy distribution
+ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST = 3000
+TEMP_FLOOR_RANGE_FOR_ENERGY_DIST = 5
+COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
+    "start_odometer",
+    "end_odometer",
+    "mean_odometer",
+    "distance",
+    "start_date",
+    "end_date",
+    "mean_date",
+    "start_soc",
+    "end_soc",
+    "mean_soc",
+    "soc_diff",
+    "sec_per_soc",
+    "mean_odo",
+]
+
 
 # plt constants
 DISCHARGE_PERF_COMPUTE_PLT_LAYOUT = {
@@ -111,6 +131,10 @@ PERFS_COMPARAISON = {
 
 CHARGE_PERFS = {
     "perfs_dict": {
+        "charge": [
+            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
+            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
+        ],
         "charge_above_80": [
             {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
             {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
@@ -145,3 +169,11 @@ FLEET_RANGE_SOH_COMPUTE_PLT_LAYOUT = {
     }
 }
 
+CHARGE_PERF_PER_SOC = {
+    # bar plot of distribution of energy per soc
+    "perfs_dict": {
+        "charge_eprf_per_soc": [
+            
+        ]
+    }
+}

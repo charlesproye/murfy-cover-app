@@ -54,7 +54,7 @@ def fill_single_axs_for_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF],
     # plt perfs
     axs_offset = len(ts_cols)
     for perf_name, perfs_cols in perfs_cols.items():
-        fill_axs_with_df(axs[axs_offset:], perfs_dict[perf_name], perfs_cols, X_TIME_SERIES_COL_TO_X_PERIOD_COL[x_col])
+        fill_axs_with_df(axs[axs_offset:], perfs_dict[perf_name], perfs_cols, X_TIME_SERIES_COL_TO_X_PERIOD_COL.get(x_col, x_col))
         axs_offset += len(perfs_cols)
 
 def fill_axs_with_df(axs:np.ndarray[Axes], df: DF, ts_cols:dict[str, str|list], x_col:str="date"):
@@ -69,8 +69,10 @@ def fill_axs_with_df(axs:np.ndarray[Axes], df: DF, ts_cols:dict[str, str|list], 
                 else:
                     fill_ax(ax, df, x_col, sub_ts_col)
 
-def set_titles_and_legends(axs:np.ndarray[Axes], ts_cols:dict[str, str|list], perfs_cols:dict):
+def set_titles_and_legends(axs:np.ndarray[Axes], ts_cols:dict[str, str|list], perfs_cols:dict,):
     for ts_col, ax in zip(ts_cols, axs):
+        if isinstance(ts_col, str):
+            ax.set_title(ts_col)
         if isinstance(ts_col, dict) and "y" in ts_col: 
             ax.set_title(ts_col["y"])
         ax.legend()

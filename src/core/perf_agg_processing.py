@@ -55,34 +55,35 @@ def agg_diffs_df_of(vehicle_df: DF, get_start_end_diff_args: dict[str, str], que
         Otherwise, assuming that query is a boolean column that served as the source of a perf and idx column using `perf_mask_and_idx_from_condition_mask`.
         In that case, `query = f"{query}_perf_mask` and `grp_by = f"{query}_perf_idx"`.
     """
-    if not grp_by:
+    if grp_by is None:
         grp_by = f"{query}_perf_idx"
         query = f"{query}_perf_mask"
     perfs_grps:DF_grp_by = vehicle_df.query(query).groupby(grp_by)
     period_diffs_df_dict = {}
     diff_cols = {**get_start_end_diff_args, **DEFAULT_DIFF_VARS}
     for source_col, dest_col in diff_cols.items():
-        period_diffs_df_dict = {**get_start_end_diff(perfs_grps, source_col, dest_col), **period_diffs_df_dict}
+        period_diffs_df_dict = {**get_start_end_diff_mean(perfs_grps, source_col, dest_col), **period_diffs_df_dict}
 
     diffs_df = DF(period_diffs_df_dict)
     diffs_df = (
         diffs_df
-        .assign(mean_date=diffs_df["start_date"] + diffs_df["duration"] / 2)
-        .eval("mean_odo = start_odometer + distance / 2")
         .assign(
+            mean_date=diffs_df["start_date"] + diffs_df["duration"] / 2,
             soc_diff=diffs_df["soc_diff"].abs(),
             size=perfs_grps.size(),
             sec_duration=diffs_df["duration"].dt.total_seconds(),
         )
         .query("size > 1")
+        .eval("mean_odo = start_odometer + distance / 2")
     )
 
     return diffs_df
 
-def get_start_end_diff(grp: DF_grp_by, col_str: str, diff_col_name:str) -> dict[str, Series]:
+def get_start_end_diff_mean(grp: DF_grp_by, col_str: str, diff_col_name:str) -> dict[str, Series]:
     data_dict = {
         f"start_{col_str}": grp[col_str].first(),
         f"end_{col_str}": grp[col_str].last(),
+        f"mean_{col_str}": grp[col_str].mean(),
         diff_col_name: grp[col_str].last() - grp[col_str].first()
     }
 
