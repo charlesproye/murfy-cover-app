@@ -52,7 +52,7 @@ Each sub package (except `core`) has the following scripts (where XX is the name
 ├── XX_fleet_info.py
 └── XX_perfs.py
 ```
-- `raw_XX`:  
+- `raw_XX_ts`:  
     - Handles the extraction of raw time series.
     - Implements a `raw_ts_of` function which returns a DF of a specific battery as provided by the data provider.
     - extracts the fleet's raw data when called as a script.
