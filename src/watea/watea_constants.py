@@ -13,12 +13,15 @@ PATH_TO_RAW_TS = join(PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
 PATH_TO_PROCESSED_TS = "data_cache/processed_time_series/{id}.parquet"
 PATH_TO_FLEET_INFO_DF = "data_cache/fleet_info/fleet_info_df.{extension}"
 PATH_TO_CHARGING_PERF_PER_SOC = "data_cache/perfs/charging_perf_per_soc/{id}.parquet"
+PATH_TO_FLEET_WISE_DISTRIBUTION = "data_cache/perfs/fleet_wise_perfs/charging_energy_distribution.parquet"
+PATH_TO_FLEET_3D_DISTRIBUTION = "data_cache/plots/fleet_wise_perfs/charging_energy_distribution.html"
 
 # recording dependant constants
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 # charge energy distribution
 ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST = 3000
 TEMP_FLOOR_RANGE_FOR_ENERGY_DIST = 5
+power_FLOOR_RANGE_FOR_ENERGY_DIST = 5
 COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
     "start_odometer",
     "end_odometer",
@@ -31,12 +34,38 @@ COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
     "end_soc",
     "mean_soc",
     "soc_diff",
-    "sec_per_soc",
+    # "sec_per_soc",
+    "end_cum_energy",
+    "start_cum_energy",
+    "mean_cum_energy",
     "mean_odo",
 ]
 
+VOLTAGE_AND_SOC = {
+    "vehicle_df": [
+        {"y":"voltage", "linestyle":"", "marker":"."},
+        {"y":"soc", "linestyle":"", "marker":"."},
+    ]
+}
 
 # plt constants
+IN_CHARGE_AND_POWER = {
+    "vehicle_df": [
+        ["soc", "in_charge_perf_mask"],
+        [
+            "power",
+            # {"y":"window_power_median", "color":"yellow", "linestyle":"--", "marker":"x"},
+            # {"y":"window_power_mean", "color":"green", "linestyle":"--", "marker":"x"},
+            "twinx",
+            {"y":"temp", "color":"red", "linestyle":"--"}
+        ],
+        [
+            "current",
+            {"y":"window_current_mean", "color":"red", "linestyle":"--", "marker":"."}
+        ],
+            "voltage",
+    ],
+}
 DISCHARGE_PERF_COMPUTE_PLT_LAYOUT = {
     "vehicle_df": [
         ["odometer"],
@@ -50,17 +79,36 @@ DISCHARGE_PERF_COMPUTE_PLT_LAYOUT = {
 }
 
 CHARGE_PERF_COMPUTE_PLT_LAYOUT = {
-    "vehicle_df": [
-        [
-            "soc",
-            "in_charge_above_80_perf_mask",
+    # "vehicle_df": [
+    #     [
+    #         "soc",
+    #         "in_charge_above_80_perf_mask",
+    #     ],
+    #     [
+    #         "soc",
+    #         "in_charge_bellow_80_perf_mask",
+    #     ],
+    # ],
+    "perfs_dict": {
+        "charge": [
+            [
+                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
+            ],
+            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
         ],
-        [
-            "soc",
-            "in_charge_bellow_80_perf_mask",
+        "charge_above_80": [
+            [
+                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
+            ],
+            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
         ],
-        "power",
-    ],
+        "charge_bellow_80": [
+            [
+                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
+            ],
+            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
+        ],
+    }
 }
 
 DEBUG_CHARGE_MASK = {
@@ -122,10 +170,10 @@ PERFS_COMPARAISON = {
             ],
             {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
         ],
-        "discharge": [
-            {"y":"discharge_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            {"y":"km_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
+        # "discharge": [
+        #     {"y":"discharge_soh", "linestyle":"", "marker":".", "alpha":0.7},
+        #     {"y":"km_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
+        # ],
     }
 }
 

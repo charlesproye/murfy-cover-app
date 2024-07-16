@@ -4,8 +4,11 @@ Can also be used as a script to process the entirety of the watea fleet.
 """
 from typing import Generator
 
+import numpy as np
 from pandas import DataFrame as DF
+from pandas import Series
 from rich import print
+from rich.traceback import install as install_rich_traceback
 
 import core.time_series_processing as ts
 from core.caching_utils import data_caching_wrapper
@@ -15,6 +18,7 @@ from watea.watea_fleet_info import iterate_over_ids
 from watea.raw_watea_ts import raw_ts_of
 
 def main():
+    install_rich_traceback(extra_lines=0, width=130)
     kwargs = parse_kwargs()
     for id, vehicle_df in iterate_over_processed_ts(force_update=True, **kwargs):
         print(id)
@@ -39,13 +43,31 @@ def process_raw_time_series(raw_vehicle_df: DF) -> DF:
         .pipe(ts.in_motion_mask_from_odo_diff)
         .pipe(ts.in_discharge_and_charge_from_soc_diff)
         .eval("in_charge = in_charge & soc < 99") # Ford E-Transit recordings tend to plateau at 99 of a random amout of time so remove these 
+        .eval("power = current * voltage")
         .pipe(ts.perf_mask_and_idx_from_condition_mask, "in_charge", max_time_diff=PERF_MAX_TIME_DIFF)
+        .pipe(process_power)
         .pipe(ts.perf_mask_and_idx_from_charge_mask, max_time_diff=PERF_MAX_TIME_DIFF)
         .pipe(ts.perf_mask_and_idx_from_condition_mask, "in_discharge")
         .pipe(ts.perf_mask_and_idx_from_charge_mask, PERF_MAX_TIME_DIFF)
-        .eval("power = current * voltage")
         .pipe(ts.add_cum_energy_from_power_cols, "power", "cum_energy")
     )
+
+def process_power(vehicle_df: DF) -> DF:
+    vehicle_df["window_current_mean"] = (
+        vehicle_df["current"].
+        where(vehicle_df["in_charge"], np.nan).
+        mask(vehicle_df["current"].gt(0), np.nan).
+        rolling(TD(minutes=10)).
+        mean()
+    )
+    vehicle_df['power'] = vehicle_df.eval("current * voltage")
+    # grp_by = [vehicle_df["in_charge_idx"], vehicle_df["soc"].ffill()]
+    # soc_grps = vehicle_df.groupby(grp_by)["power"]
+
+    # vehicle_df["window_power_median"] = soc_grps.transform("median")
+    # vehicle_df["window_power_mean"] = soc_grps.transform("mean")
+
+    return vehicle_df
 
 def pre_process_raw_time_series(raw_vehicle_df: DF) -> DF:        
     return (

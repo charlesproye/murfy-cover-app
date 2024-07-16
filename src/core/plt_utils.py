@@ -12,7 +12,9 @@ from rich import print
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.express as px
 
+from core.caching_utils import ensure_that_dirs_exist
 from core.constant_variables import *
 
 def plt_fleet(fleet_iterator: Callable[..., Generator[tuple[str, DF, dict[str, DF]], None, None]], plt_layout:dict, x_col:str="date", title=None, show=True) -> tuple[Figure, np.ndarray[Axes]]:
@@ -134,6 +136,44 @@ def plt_time_series_plotly(df:DF, cols:list[str], save_to:str=None, show=True):
         fig.show()
     if save_to:
         fig.write_html(save_to)
+
+def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, size=3):
+    fig = go.Figure(data=[go.Scatter3d(
+        x=df[x],
+        y=df[y],
+        z=df[z],
+        mode='markers',
+        marker=dict(
+            size=size,
+            opacity=opacity,
+            color=df[color],
+            colorscale='Viridis',
+            colorbar=dict(title=color),
+
+        )
+    )])
+    fig.update_layout(
+        margin=dict(l=0, r=0, b=0, t=0),
+        scene=dict(
+            xaxis=dict(title=x),
+            yaxis=dict(title=y),
+            zaxis=dict(title=z),
+            camera=dict(
+                projection=dict(
+                    type='orthographic'
+                )
+            )
+        ),
+        # autosize=True,
+        width=2000,  # Adjust width as needed
+        height=1200   # Adjust height as needed
+    )
+    if save_path:
+        ensure_that_dirs_exist(save_path)
+        fig.write_html(save_path)
+
+    fig.show()
+
 
 # text_show_cid = 0
 # perf_df_idx = 0

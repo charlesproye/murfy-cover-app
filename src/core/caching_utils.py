@@ -24,11 +24,17 @@ def data_caching_wrapper(vin: str, path_to_cache: str, data_gen_func: Callable[P
     extension = path_to_cache.split(".")[-1]
     if extension != "csv" and extension != "parquet":
         raise ValueError(f"Extension of path '{path_to_cache}' is must be 'csv' or 'parquet'")
+    # print("======")
+    # print(path_to_cache)
+    # print("force_update:", force_update, ", cache does not exist:", (not exists(path_to_cache)))
+    # print(force_update or not exists(path_to_cache))
     if force_update or not exists(path_to_cache):
+        # print("generating data")
         data: DF|Series = data_gen_func(vin, **kwargs)
         safe_cache_to(data, path_to_cache, **write_kwargs)
         return data
-
+    
+    # print("reading cached data")
     return READ_FUCNTIONS[extension](path_to_cache, **read_kwargs)
 
 def safe_cache_to(data: DF|Series, path:str, **kwargs):
@@ -39,13 +45,16 @@ def safe_cache_to(data: DF|Series, path:str, **kwargs):
     extension = path.split(".")[-1]
     if extension != "csv" and extension != "parquet":
         raise ValueError(f"Extension of path '{path}' is must be 'csv' or 'parquet'")
-    dir_path = dirname(path)
-    if not exists(dir_path):
-        makedirs(dir_path)
+    ensure_that_dirs_exist(path)
     if extension == 'parquet':
         data.to_parquet(path, **kwargs)
     if extension == "csv":
         data.to_csv(path, **kwargs)
+
+def ensure_that_dirs_exist(path:str):
+    dir_path = dirname(path)
+    if not exists(dir_path):
+        makedirs(dir_path)
 
 def iterate_over_data_cache_folder(regex_exp: str, track=True): # -> Generator[tuple[str, DF], None]:
     iterator = track(glob(f"{regex_exp}*")) if track else glob(f"{regex_exp}*")
