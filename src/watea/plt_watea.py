@@ -12,7 +12,6 @@ def main():
     install_rich_traceback(extra_lines=0, width=130)
     kwargs = parse_kwargs(["plt_layout"], {"plt_id":"all", "x_col":"date", "query":None, "ts_query":None})
     plt_layout = getattr(constants, kwargs["plt_layout"])
-
     if kwargs["plt_id"] == "first":
         plt_fleet_info_df = fleet_info_df.query(kwargs["query"]) if kwargs["query"] else fleet_info_df
         plt_single_vehicle(plt_fleet_info_df["id"].iat[0], plt_layout, kwargs["x_col"], kwargs["ts_query"])

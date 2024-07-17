@@ -20,6 +20,7 @@ PATH_TO_FLEET_3D_DISTRIBUTION = "data_cache/plots/fleet_wise_perfs/charging_ener
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 # charge energy distribution
 ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST = 3000
+ODO_RANGE_FORMAT_STR = lambda odo_val: f"[{(odo_val/1000):.0f}k, {((odo_val+ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST)/1000):.0f}k]"
 TEMP_FLOOR_RANGE_FOR_ENERGY_DIST = 5
 power_FLOOR_RANGE_FOR_ENERGY_DIST = 5
 COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
