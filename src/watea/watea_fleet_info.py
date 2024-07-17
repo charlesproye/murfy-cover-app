@@ -1,5 +1,5 @@
 """
-This module handles a data frame that holds static data about the vehicles such as model, default capacity and range, ect...
+This module handles a data frame that holds static data about the vehicles such as model, default capacity and range, ect...    
 Each line corresponds to a vehicle.
 """
 from glob import glob
@@ -12,7 +12,7 @@ from rich import print
 from rich.progress import track
 
 from core.caching_utils import safe_cache_to
-from watea_constants import *
+from watea.watea_constants import *
 
 def main():
     fleet_info_df = compute_fleet_info()
@@ -27,24 +27,30 @@ def iterate_over_ids(query_str:str=None, use_progress_track=True, **kwarges) -> 
         
 
 def compute_fleet_info() -> DF:
-    from processed_watea_ts import process_raw_time_series
+    from watea.processed_watea_ts import process_raw_time_series
 
     fleet_info_dicts: list[dict] = []
     for file in track(glob(path.join(PATH_TO_RAW_TS_FOLDER, "*.snappy.parquet"))):
         raw_ts = pd.read_parquet(file)
         vehicle_df = process_raw_time_series(raw_ts)
+        discharge_grps = vehicle_df.query("in_discharge_perf_mask").groupby("in_discharge_perf_idx")
+        charge_grps = vehicle_df.query("in_charge_perf_mask").groupby("in_charge_perf_idx")
         fleet_info_dicts.append({
-            "id": file.split('.')[0].split("=")[1],
+            "id": path.basename(file.split('.')[0]),
             "len": len(vehicle_df),
-            **(100 * vehicle_df.count() / len(vehicle_df)).add_suffix("_not_nan_percentage").to_dict(),
+            **(100 * vehicle_df[["power", "temp"]].count() / len(vehicle_df)).add_suffix("_not_nan_percentage").to_dict(),
             "min_odo": vehicle_df["odometer"].min(),
             "max_odo": vehicle_df["odometer"].max(),
+            "power_during_discharge_pct": (100 * discharge_grps["power"].count() / discharge_grps.size()).mean(),
+            "power_during_charge_pct": (100 * charge_grps["power"].count() / charge_grps.size()).mean(),
         })
+        print(fleet_info_dicts[-1]["power_during_discharge_pct"])
+        print(fleet_info_dicts[-1]["power_during_charge_pct"])
     fleet_info_df = (
         DF(fleet_info_dicts)
         .set_index("id", drop=False)
-        .eval("has_elec_records = voltage_not_nan_percentage != 0 & current_not_nan_percentage != 0")
-        .eval("has_temp_records = temp_not_nan_percentage != 0")
+        .eval("has_power_during_discharge = power_during_discharge_pct > 90")
+        .eval("has_power_during_charge = power_during_charge_pct > 90")
     )
 
     return fleet_info_df

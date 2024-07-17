@@ -16,9 +16,9 @@ from rich.progress import track
 
 import core.time_series_processing as ts
 import core.perf_agg_processing as perfs
-from tesla_constants import *
+from tesla.tesla_constants import *
 from core.caching_utils import data_caching_wrapper
-from raw_tesla_ts import raw_ts_of
+from tesla.raw_tesla_ts import raw_ts_of
 
 def main():
     fleet_info_df = compute_fleet_info()
