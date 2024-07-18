@@ -15,7 +15,7 @@ from plotly.subplots import make_subplots
 import plotly.express as px
 
 from core.caching_utils import ensure_that_dirs_exist
-from core.constant_variables import *
+from core.constants import *
 
 def plt_fleet(fleet_iterator: Callable[..., Generator[tuple[str, DF, dict[str, DF]], None, None]], plt_layout:dict, x_col:str="date", title=None, show=True) -> tuple[Figure, np.ndarray[Axes]]:
     fig, axs, ts_cols, perfs_cols = setup_fig_axs_and_layouts(plt_layout, title)
@@ -42,8 +42,8 @@ def setup_fig_axs_and_layouts(plt_layout:dict, title=None) -> tuple[Figure, np.n
     perfs_cols: dict[str, str|list[str]] = plt_layout.get("perfs_dict", {})
     nb_rows = len(ts_cols) + sum([len(perf_cols) for _, perf_cols in perfs_cols.items()])
     fig: Figure
-    axs: np.ndarray[Axes]
-    fig, axs = plt.subplots(nrows=nb_rows, sharex=True, squeeze=True)
+    fig, axs = plt.subplots(nrows=nb_rows, sharex=True, squeeze=False)
+    axs: np.ndarray[Axes] = axs[:, 0]
 
     if title:
         fig.suptitle(title)

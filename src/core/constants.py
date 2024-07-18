@@ -1,7 +1,3 @@
-"""
-Yes, I know, it is weird to have a module called constant_variables...
-"""
-
 from datetime import timedelta as TD
 
 KJ_TO_KWH = 0.00027777777

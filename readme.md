@@ -20,7 +20,7 @@ The goal of this package is to handle every step of the data analytics service o
 core
 ├── argparse_utils.py
 ├── caching_utils.py
-├── constant_variables.py
+├── constants.py
 ├── perf_agg_processing.py
 ├── plt_utils.py
 └── time_series_processing.py

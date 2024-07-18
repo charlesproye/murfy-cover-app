@@ -42,6 +42,7 @@ COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
     "mean_odo",
 ]
 
+# ========================================================plt constants========================================================
 VOLTAGE_AND_SOC = {
     "vehicle_df": [
         {"y":"voltage", "linestyle":"", "marker":"."},
@@ -49,7 +50,13 @@ VOLTAGE_AND_SOC = {
     ]
 }
 
-# plt constants
+ENERGY_SOH = {
+    
+    "perfs_dict": {
+        "energy_soh": ["soh"]
+    }
+}
+
 IN_CHARGE_AND_POWER = {
     "vehicle_df": [
         ["soc", "in_charge_perf_mask"],
@@ -80,33 +87,18 @@ DISCHARGE_PERF_COMPUTE_PLT_LAYOUT = {
 }
 
 CHARGE_PERF_COMPUTE_PLT_LAYOUT = {
-    # "vehicle_df": [
-    #     [
-    #         "soc",
-    #         "in_charge_above_80_perf_mask",
-    #     ],
-    #     [
-    #         "soc",
-    #         "in_charge_bellow_80_perf_mask",
-    #     ],
-    # ],
     "perfs_dict": {
+        "energy_soh": ["energy_soh"],
         "charge": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
+            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
             {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
         ],
         "charge_above_80": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
+            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
             {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
         ],
         "charge_bellow_80": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
+            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
             {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
         ],
     }
@@ -159,22 +151,15 @@ DEBUG_CHARGE_MASK = {
 
 PERFS_COMPARAISON = {
     "perfs_dict": {
+        "energy_soh": ["soh"],
         "charge_above_80": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
+            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
             {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
         ],
         "charge_bellow_80": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
+            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
             {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
         ],
-        # "discharge": [
-        #     {"y":"discharge_soh", "linestyle":"", "marker":".", "alpha":0.7},
-        #     {"y":"km_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        # ],
     }
 }
 
