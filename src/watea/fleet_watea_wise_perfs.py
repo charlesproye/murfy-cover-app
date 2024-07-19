@@ -1,3 +1,8 @@
+"""
+This module is handles the calculation of watea performances aggreagated over models.
+For now there is only one vehicle model in Watea, once there will be more, the data will have an extra "model" index.
+
+"""
 import pandas as pd
 from pandas import DataFrame as DF
 import numpy as np
@@ -23,6 +28,7 @@ def compute_fleet_wise_energy_distribution(force_update=False, query_str="has_po
     for id, vehicle_df in iterate_over_processed_ts(query_str=query_str):
         distribution_df = charge_energy_points_of(vehicle_df, id, force_update=force_update)
         fleet_data_df[id] = distribution_df
+    fleet_data_df = pd.concat([charge_energy_points_of(vehicle_df, id, force_update=force_update) for id, vehicle_df in iterate_over_processed_ts(query_str=query_str)])
     fleet_data_df: DF = pd.concat(fleet_data_df, axis='index')
     fleet_data_df.index.names = ["id", "odometer", "temp", "soc"]
     fleet_data_df = (
@@ -66,5 +72,3 @@ default_100_soh_charge_energy_dist = default_charge_energy_dist.xs(0, level=0)
 if __name__ == "__main__":
     print(default_charge_energy_dist.index)
     print(default_100_soh_charge_energy_dist.index)
-
-    # print(default_100_soh_charge_energy_dist.to_string(max_rows=None))

@@ -43,18 +43,18 @@ COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
 ]
 
 # ========================================================plt constants========================================================
+ENERGY_SOH = {
+    "perfs_dict": {
+        "energy_soh": ["soh"],
+    },
+    "plt_energy_dist": True,
+}
+
 VOLTAGE_AND_SOC = {
     "vehicle_df": [
         {"y":"voltage", "linestyle":"", "marker":"."},
         {"y":"soc", "linestyle":"", "marker":"."},
     ]
-}
-
-ENERGY_SOH = {
-    
-    "perfs_dict": {
-        "energy_soh": ["soh"]
-    }
 }
 
 IN_CHARGE_AND_POWER = {

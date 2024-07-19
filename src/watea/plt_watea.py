@@ -1,25 +1,32 @@
 from rich.traceback import install as install_rich_traceback
 from pandas import DataFrame as DF
 
+from core.argparse_utils import parse_kwargs
+from core import plt_utils
 import watea.watea_constants as constants
 from watea.processed_watea_ts import iterate_over_processed_ts, processed_ts_of
-from core import plt_utils
 from watea.watea_perfs import compute_perfs
 from watea.watea_fleet_info import fleet_info_df
-from core.argparse_utils import parse_kwargs
+from watea.fleet_watea_wise_perfs import fleet_charge_energy_points_df, default_charge_energy_dist
 
-def main(): 
+def main():
     install_rich_traceback(extra_lines=0, width=130)
-    kwargs = parse_kwargs(["plt_layout"], {"plt_id":"all", "x_col":"date", "query":None, "ts_query":None})
+    kwargs = parse_kwargs(["plt_layout"], {"plt_id":"all", "x_col":"date", "vehilce_query":None, "fleet_query":None})
     plt_layout = getattr(constants, kwargs["plt_layout"])
     if kwargs["plt_id"] == "first":
-        plt_fleet_info_df = fleet_info_df.query(kwargs["query"]) if kwargs["query"] else fleet_info_df
-        plt_single_vehicle(plt_fleet_info_df["id"].iat[0], plt_layout, kwargs["x_col"], kwargs["ts_query"])
+        plt_fleet_info_df = fleet_info_df.query(kwargs["vehilce_query"]) if kwargs["vehilce_query"] else fleet_info_df
+        plt_single_vehicle(plt_fleet_info_df["id"].iat[0], plt_layout, kwargs["x_col"], kwargs["fleet_query"])
     elif kwargs["plt_id"] == "all":
-        for id, vehicle_df, perfs_dict in iterate_over_fleet(kwargs["query"]):
-            plt_single_vehicle(id, plt_layout, kwargs["x_col"], kwargs["ts_query"])
+        for id, vehicle_df, perfs_dict in iterate_over_fleet(kwargs["vehilce_query"]):
+            plt_single_vehicle(id, plt_layout, kwargs["x_col"], kwargs["fleet_query"])
     elif kwargs["plt_id"] == "fleet":
-        plt_utils.plt_fleet(lambda : iterate_over_fleet(kwargs["query"]), plt_layout, kwargs["x_col"], title=f"{kwargs['plt_layout']} over {kwargs['x_col']}")
+        plt_utils.plt_fleet(
+            lambda : iterate_over_fleet(kwargs["vehilce_query"]),
+            plt_layout,
+            {"charge_energy_points": fleet_charge_energy_points_df, "charge_energy_dist": default_charge_energy_dist},
+            kwargs["x_col"],
+            title=f"{kwargs['plt_layout']} over {kwargs['x_col']}"
+        )
     elif kwargs["plt_id"] and str(kwargs["plt_id"]).isalpha():
         plt_single_vehicle(id, plt_layout, kwargs["x_col"])
     

@@ -2,10 +2,6 @@ import pandas as pd
 from pandas import DataFrame as DF
 import numpy as np
 from rich import print
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.dates import date2num
-from matplotlib.figure import Figure
 from rich.traceback import install as install_rich_traceback
 
 from watea.fleet_watea_wise_perfs import default_100_soh_charge_energy_dist, compute_charge_energy_dist
@@ -26,55 +22,51 @@ def main():
 # ==============================PERFS DEPENDANT ON FLEET WISE DATA==============================
 
 def compute_perfs(vehicle_df: DF, id:str, force_update=False) -> dict[str, DF]:
-    return {
-        **independant_perfs_of(vehicle_df, id, force_update=force_update),
-        "energy_soh": compute_energy_soh(vehicle_df, id)
-    }
+    perfs = independant_perfs_of(vehicle_df, id, force_update=force_update)
+    perfs["charge_energy_distribution"] = compute_charge_energy_dist(perfs["charge_energy_points"])
+    perfs["energy_soh"] = compute_energy_soh(perfs["charge_energy_distribution"])
 
-def compute_energy_soh(vehicle_df:DF, id:str) -> Series:
+    return perfs
+
+def compute_energy_soh(charge_energy_distribution: DF) -> Series:
     """
     ### Description:
     Computes the soh from the energy distribution specific to that vehicle and the fleet energy distribution.
     ### Returns:
     Series of soh values indexed by odometer range.
     """
-    raw_vehicle_charge_energy_dist = charge_energy_points_of(vehicle_df, id)
     soh_over_odometer_intervals = (
-        raw_vehicle_charge_energy_dist
-        .pipe(compute_charge_energy_dist)
-        .groupby(level=0)
-        .apply(yes)
-        .groupby(level=0, sort=True)
-        .mean()
-        .mul(100)
+        charge_energy_distribution                  # Get the distribution of required energy to pass to the next half soc over current soc, temperature, odometer interval.
+        .groupby(level=0)                           # For each odometer interval:
+        .apply(compute_ratio_dist)                  # Divide the distribution of the vehicle by the default_100_soh of the fleet.
+        .groupby(level=0, sort=True)                # For each odometer interval:
+        .median()                                   # Get the median of the ratios across all the temperatures and socs.
+        .mul(100)                                   # Multiply the ratios by 100 to get a percentage.
     )
-
-    # print(soh_over_odometer_intervals.values)
-
+    # Turn into a dataframe with extra (unecessary) column for plotting
     soh = DF({
         "soh": soh_over_odometer_intervals,
-        "mean_odo": soh_over_odometer_intervals.index,
+        "mean_odo": soh_over_odometer_intervals.index, 
     })
 
     return soh
 
-def yes(dist_grp: Series) -> Series:
-    dist_grp = dist_grp.droplevel(0)
-    intersecting_index = dist_grp.index.intersection(default_100_soh_charge_energy_dist.index)
-    numerator = dist_grp.loc[intersecting_index]
-    denumerator = default_100_soh_charge_energy_dist.loc[intersecting_index]
+def compute_ratio_dist(dist_grp: Series) -> Series:
+    dist_grp = dist_grp.droplevel(0)                                                            # Remove the odometer index level
+    intersecting_index = dist_grp.index.intersection(default_100_soh_charge_energy_dist.index)  # Get intersection of indices between the vehicle's dist and the defautl 100 soh dist
+    ratio_dist = dist_grp.loc[intersecting_index] / default_100_soh_charge_energy_dist.loc[intersecting_index]
 
-    return numerator / denumerator
+    return ratio_dist
 
 # =====================================INDEPENDANT PERFS========================================
 
 def independant_perfs_of(vehicle_df: DF, id:str, force_update=False) -> dict[str, DF]:
     return {
-        # "discharge": compute_discharge_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC),
+        "discharge": compute_discharge_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC),
         "charge": compute_charging_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC, "in_charge", "energy_soh"),
         "charge_above_80": compute_charging_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC, "in_charge_above_80", "energy_soh_above_80"),
         "charge_bellow_80": compute_charging_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC, "in_charge_bellow_80", "energy_soh_bellow_80"),
-        "energy_distribution_per_soc": charge_energy_points_of(vehicle_df, id, force_update=force_update)
+        "charge_energy_points": charge_energy_points_of(vehicle_df, id, force_update=force_update)
     }
 
 def compute_discharge_perfs(vehicle_df:DF, default_kwh_per_soc:float) -> DF:
