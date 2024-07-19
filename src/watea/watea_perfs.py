@@ -23,8 +23,8 @@ def main():
 
 def compute_perfs(vehicle_df: DF, id:str, force_update=False) -> dict[str, DF]:
     perfs = independant_perfs_of(vehicle_df, id, force_update=force_update)
-    perfs["charge_energy_distribution"] = compute_charge_energy_dist(perfs["charge_energy_points"])
-    perfs["energy_soh"] = compute_energy_soh(perfs["charge_energy_distribution"])
+    perfs["charge_energy_dist"] = compute_charge_energy_dist(perfs["charge_energy_points"])
+    perfs["energy_soh"] = compute_energy_soh(perfs["charge_energy_dist"])
 
     return perfs
 

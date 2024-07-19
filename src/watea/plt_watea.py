@@ -29,7 +29,7 @@ def main():
         )
     elif kwargs["plt_id"] and str(kwargs["plt_id"]).isalpha():
         plt_single_vehicle(id, plt_layout, kwargs["x_col"])
-    
+
 def plt_single_vehicle(id:str, plt_layout, x_col:str, query=None):
     vehicle_df = processed_ts_of(id).pipe(queried_ts, query)
     perfs_dict = compute_perfs(vehicle_df, id)

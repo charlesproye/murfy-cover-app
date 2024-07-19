@@ -34,48 +34,67 @@ def plt_fleet(
     plt_energy_dist = plt_layout.get("plt_energy_dist", False)
     if plt_energy_dist:
         ts_fig, dist_fig = ts_fig.subfigures(nrows=2, squeeze=True, height_ratios=[0.2, 0.8])
-    # only_ts_perfs = {perf_name: perf for perf_name, perf in perfs_dict if not perf_name in ["charge_energy_distribution", "charge_energy_points"] }
     fig, axs, ts_cols, perfs_cols = setup_fig_axs_and_layouts(plt_layout, ts_fig, title)
     set_titles_and_legends(axs, ts_cols, perfs_cols)
     for id, vehicle_df, only_ts_perfs in fleet_iterator():
         fill_single_axs_for_single_vehicle(vehicle_df, only_ts_perfs, ts_cols, perfs_cols, axs, x_col)
-    print(plt_energy_dist)
     if plt_energy_dist:
         # This query is specific to watea remove once energy soh with dist as been moved to core 
         fleet_perfs["charge_energy_points"] = fleet_perfs["charge_energy_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
         dist_axs = dist_fig.subplots(
-            nrows=fleet_perfs["charge_energy_dist"].index.get_level_values(0).nunique(), 
-            ncols=fleet_perfs["charge_energy_dist"].index.get_level_values(1).nunique(),
+            nrows=fleet_perfs["charge_energy_dist"].index.get_level_values(1).nunique(), 
+            ncols=fleet_perfs["charge_energy_dist"].index.get_level_values(0).nunique(),
             sharex=True,
             sharey=True,
         )
         plt_charge_energy_data(fleet_perfs["charge_energy_points"], fleet_perfs["charge_energy_dist"], dist_axs)
     if show:
-            plt.show()
-
-    return fig, axs
-
-def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict, x_col:str="date", title=None, show=True) -> tuple[Figure, np.ndarray[Axes]]:
-    fig = plt.figure(layout='constrained', figsize=(16, 8))
-    fig, axs, ts_cols, perfs_cols = setup_fig_axs_and_layouts(plt_layout, fig, title)
-    fill_single_axs_for_single_vehicle(vehicle_df, perfs_dict, ts_cols, perfs_cols, axs, x_col)
-    set_titles_and_legends(axs, ts_cols, perfs_cols)
-    if show:
         plt.show()
 
     return fig, axs
 
+def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict, x_col:str="date", title=None, show=True) -> tuple[Figure, np.ndarray[Axes]]:
+    ts_fig = plt.figure(layout='constrained', figsize=(16, 8))
+    plt_energy_dist = plt_layout.get("plt_energy_dist", False)
+    if plt_energy_dist:
+        ts_fig, dist_fig = ts_fig.subfigures(nrows=2, squeeze=True, height_ratios=[0.2, 0.8])
+
+    ts_fig, axs, ts_cols, perfs_cols = setup_fig_axs_and_layouts(plt_layout, ts_fig, title)
+    fill_single_axs_for_single_vehicle(vehicle_df, perfs_dict, ts_cols, perfs_cols, axs, x_col)
+    set_titles_and_legends(axs, ts_cols, perfs_cols)
+    if plt_energy_dist:
+        # This query is specific to watea remove once energy soh with dist as been moved to core 
+        perfs_dict["charge_energy_points"] = perfs_dict["charge_energy_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
+        if perfs_dict["charge_energy_dist"].index.get_level_values(0).nunique() > 0 and perfs_dict["charge_energy_dist"].index.get_level_values(1).nunique():
+            dist_axs = dist_fig.subplots(
+                nrows=perfs_dict["charge_energy_dist"].index.get_level_values(1).nunique(), 
+                ncols=perfs_dict["charge_energy_dist"].index.get_level_values(0).nunique(),
+                sharex=True,
+                sharey=True,
+                squeeze=False,
+            )
+            plt_charge_energy_data(perfs_dict["charge_energy_points"], perfs_dict["charge_energy_dist"], dist_axs)
+
+    if show:
+        plt.show()
+
+    return ts_fig, axs
+
 def plt_charge_energy_data(charge_energy_points_df: DF,  charge_energy_dist_df: Series, axs: np.ndarray[Axes], scatter_kwargs=DEFAULT_CHARGE_ENERGY_POINTS_PLT_KWARGS) -> tuple[Figure, np.ndarray[Axes]]:
     # If we ever use more than 3 levels for indexing charge energy data (if we use different models in the same data structures for example) switch to a recursive implementation
-    for lvl_0_idx, lvl_0_axs in zip(charge_energy_dist_df.index.get_level_values(0).unique(), axs):
-        points_lvl_0_xs = charge_energy_points_df.xs(lvl_0_idx, 0)
-        dist_lvl_0_xs = charge_energy_dist_df.xs(lvl_0_idx, 0)
+    for lvl_0_idx, lvl_0_axs in zip(charge_energy_dist_df.index.get_level_values(1).unique(), axs):
+        points_lvl_0_xs = charge_energy_points_df.xs(lvl_0_idx, level=1)
+        dist_lvl_0_xs = charge_energy_dist_df.xs(lvl_0_idx, level=1)
         for lvl_1_idx, ax in zip(dist_lvl_0_xs.index.get_level_values(0).unique(), lvl_0_axs):
-            points_lvl_1_xs = points_lvl_0_xs.xs(lvl_1_idx, 0)
-            dist_lvl_1_xs = dist_lvl_0_xs.xs(lvl_1_idx, 0)
+            points_lvl_1_xs = points_lvl_0_xs.xs(lvl_1_idx, level=0)
+            dist_lvl_1_xs = dist_lvl_0_xs.xs(lvl_1_idx, level=0)
             ax: Axes
             ax.scatter(x=points_lvl_1_xs.index, y=points_lvl_1_xs["energy_added"], **scatter_kwargs)
             ax.plot(dist_lvl_1_xs.index, dist_lvl_1_xs.values, color="green")
+    for lvl_0_idx, ax in zip(charge_energy_dist_df.index.get_level_values(1).unique(), axs[:, 0]):
+        ax.set_ylabel(f"{lvl_0_idx}°\nenergy")
+    for lvl_0_idx, ax in zip(charge_energy_dist_df.index.get_level_values(0).unique(), axs[-1]):
+        ax.set_xlabel(f"soc\n{lvl_0_idx}")
 
 def setup_fig_axs_and_layouts(plt_layout:dict, fig: Figure, title=None,) -> tuple[Figure, np.ndarray[Axes], list, dict]:
     # setup
@@ -97,7 +116,7 @@ def fill_single_axs_for_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF],
     # plt perfs
     axs_offset = len(ts_cols)
     for perf_name, perfs_cols in perfs_cols.items():
-        if not perf_name in  (["charge_energy_distribution", "charge_energy_points"] if x_col == "odometer" else ["charge_energy_distribution", "charge_energy_points", "energy_soh"]):
+        if not perf_name in  (["charge_energy_dist", "charge_energy_points"] if x_col == "odometer" else ["charge_energy_dist", "charge_energy_points", "energy_soh"]):
             fill_axs_with_df(axs[axs_offset:], perfs_dict[perf_name], perfs_cols, X_TIME_SERIES_COL_TO_X_PERIOD_COL.get(x_col, x_col))
             axs_offset += len(perfs_cols)
 
