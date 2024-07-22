@@ -47,7 +47,7 @@ def plt_fleet(
             sharex=True,
             sharey=True,
         )
-        plt_charge_energy_data(fleet_perfs["charge_energy_points"], fleet_perfs["charge_energy_dist"], dist_axs)
+        plt_charge_energy_data(fleet_perfs["charge_energy_points"], fleet_perfs["charge_energy_dist"], dist_axs, dist_fig)
     if show:
         plt.show()
 
@@ -73,14 +73,14 @@ def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict
                 sharey=True,
                 squeeze=False,
             )
-            plt_charge_energy_data(perfs_dict["charge_energy_points"], perfs_dict["charge_energy_dist"], dist_axs)
+            plt_charge_energy_data(perfs_dict["charge_energy_points"], perfs_dict["charge_energy_dist"], dist_axs, dist_fig)
 
     if show:
         plt.show()
 
     return ts_fig, axs
 
-def plt_charge_energy_data(charge_energy_points_df: DF,  charge_energy_dist_df: Series, axs: np.ndarray[Axes], scatter_kwargs=DEFAULT_CHARGE_ENERGY_POINTS_PLT_KWARGS) -> tuple[Figure, np.ndarray[Axes]]:
+def plt_charge_energy_data(charge_energy_points_df: DF,  charge_energy_dist_df: Series, axs: np.ndarray[Axes], fig: Figure, scatter_kwargs=DEFAULT_CHARGE_ENERGY_POINTS_PLT_KWARGS) -> tuple[Figure, np.ndarray[Axes]]:
     # If we ever use more than 3 levels for indexing charge energy data (if we use different models in the same data structures for example) switch to a recursive implementation
     for lvl_0_idx, lvl_0_axs in zip(charge_energy_dist_df.index.get_level_values(1).unique(), axs):
         points_lvl_0_xs = charge_energy_points_df.xs(lvl_0_idx, level=1)
@@ -89,12 +89,15 @@ def plt_charge_energy_data(charge_energy_points_df: DF,  charge_energy_dist_df: 
             points_lvl_1_xs = points_lvl_0_xs.xs(lvl_1_idx, level=0)
             dist_lvl_1_xs = dist_lvl_0_xs.xs(lvl_1_idx, level=0)
             ax: Axes
-            ax.scatter(x=points_lvl_1_xs.index, y=points_lvl_1_xs["energy_added"], **scatter_kwargs)
+            sc = ax.scatter(x=points_lvl_1_xs.index, y=points_lvl_1_xs["energy_added"], c=points_lvl_1_xs["power"], cmap='autumn', **scatter_kwargs)
             ax.plot(dist_lvl_1_xs.index, dist_lvl_1_xs.values, color="green")
     for lvl_0_idx, ax in zip(charge_energy_dist_df.index.get_level_values(1).unique(), axs[:, 0]):
         ax.set_ylabel(f"{lvl_0_idx}°\nenergy")
     for lvl_0_idx, ax in zip(charge_energy_dist_df.index.get_level_values(0).unique(), axs[-1]):
         ax.set_xlabel(f"soc\n{lvl_0_idx}")
+    cbar = fig.colorbar(sc, ax=axs.ravel().tolist(), shrink=0.95)
+    cbar.set_label('power')
+
 
 def setup_fig_axs_and_layouts(plt_layout:dict, fig: Figure, title=None,) -> tuple[Figure, np.ndarray[Axes], list, dict]:
     # setup
