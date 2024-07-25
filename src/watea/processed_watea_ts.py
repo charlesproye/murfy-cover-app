@@ -20,13 +20,16 @@ from watea.raw_watea_ts import raw_ts_of
 def main():
     install_rich_traceback(extra_lines=0, width=130)
     kwargs = parse_kwargs()
-    for id, vehicle_df in iterate_over_processed_ts(force_update=True, **kwargs):
+    for id, vehicle_df in processed_ts_iterator(force_update=True, **kwargs):
         print(id)
         print(vehicle_df)
 
-def iterate_over_processed_ts(query_str: str=None, force_update:bool=False, **kwargs) -> Generator[tuple[str, DF], None, None]:
-    for id in iterate_over_ids(query_str, **kwargs):
-        yield id, processed_ts_of(id, force_update, **kwargs)
+def processed_ts_iterator(fleet_query: str=None, ts_query=None, force_update:bool=False, **kwargs) -> Generator[tuple[str, DF], None, None]:
+    for id in iterate_over_ids(fleet_query, **kwargs):
+        ts = processed_ts_of(id, force_update, **kwargs)
+        if not ts_query is None:
+            ts = ts.query(ts_query)
+        yield id, ts
 
 def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
     return data_caching_wrapper(
@@ -61,11 +64,6 @@ def process_power(vehicle_df: DF) -> DF:
         mean()
     )
     vehicle_df['power'] = vehicle_df.eval("current * voltage")
-    # grp_by = [vehicle_df["in_charge_idx"], vehicle_df["soc"].ffill()]
-    # soc_grps = vehicle_df.groupby(grp_by)["power"]
-
-    # vehicle_df["window_power_median"] = soc_grps.transform("median")
-    # vehicle_df["window_power_mean"] = soc_grps.transform("mean")
 
     return vehicle_df
 

@@ -40,14 +40,14 @@ def plt_fleet(
         fill_single_axs_for_single_vehicle(vehicle_df, only_ts_perfs, ts_cols, perfs_cols, axs, x_col)
     if plt_energy_dist:
         # This query is specific to watea remove once energy soh with dist as been moved to core 
-        fleet_perfs["charge_energy_points"] = fleet_perfs["charge_energy_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
-        plt_charge_energy_data(fleet_perfs["charge_energy_points"], fleet_perfs["charge_energy_dist"], dist_fig)
+        fleet_perfs["charging_points"] = fleet_perfs["charging_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
+        plt_charge_energy_data(fleet_perfs["charging_points"], fleet_perfs["charge_energy_dist"], dist_fig)
     if show:
         plt.show()
 
     return fig, axs
 
-def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict, x_col:str="date", title=None, show=True) -> tuple[Figure, np.ndarray[Axes]]:
+def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict, default_dist_shape: Series, x_col:str="date", title=None, show=True) -> tuple[Figure, np.ndarray[Axes]]:
     ts_fig = plt.figure(layout='constrained', figsize=(16, 8))
     plt_energy_dist = plt_layout.get("plt_energy_dist", False)
     if plt_energy_dist:
@@ -58,16 +58,16 @@ def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict
     set_titles_and_legends(axs, ts_cols, perfs_cols)
     if plt_energy_dist:
         # This query is specific to watea remove once energy soh with dist as been moved to core 
-        perfs_dict["charge_energy_points"] = perfs_dict["charge_energy_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
+        perfs_dict["charging_points"] = perfs_dict["charging_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
         if perfs_dict["charge_energy_dist"].index.get_level_values(0).nunique() > 0 and perfs_dict["charge_energy_dist"].index.get_level_values(1).nunique():
-            plt_charge_energy_data(perfs_dict["charge_energy_points"], perfs_dict["charge_energy_dist"], dist_fig)
+            plt_charge_energy_data(perfs_dict["charging_points"], perfs_dict["charge_energy_dist"], dist_fig, default_dist_shape=default_dist_shape)
 
     if show:
         plt.show()
 
     return ts_fig, axs
 
-def plt_charge_energy_data(charge_energy_points_df: DF, charge_energy_dist_df: Series,fig: Figure, scatter_kwargs=DEFAULT_CHARGE_ENERGY_POINTS_PLT_KWARGS) -> tuple[Figure, np.ndarray[Axes]]:
+def plt_charge_energy_data(charge_energy_points_df: DF, charge_energy_dist_df: Series,fig: Figure, scatter_kwargs=DEFAULT_CHARGE_ENERGY_POINTS_PLT_KWARGS, default_dist_shape:Series=None) -> tuple[Figure, np.ndarray[Axes]]:
     axs = axs_for_energy_dist(fig, charge_energy_dist_df)
     # If we ever use more than 3 levels for indexing charge energy data (if we use different models in the same data structures for example) switch to a recursive implementation
     for lvl_0_idx, lvl_0_axs in zip(charge_energy_dist_df.index.get_level_values(1).unique().sort_values(), axs):
@@ -79,8 +79,9 @@ def plt_charge_energy_data(charge_energy_points_df: DF, charge_energy_dist_df: S
             ax: Axes
             sc = ax.scatter(x=points_lvl_1_xs.index, y=points_lvl_1_xs["energy_added"], c=points_lvl_1_xs["power"], cmap='autumn', **scatter_kwargs)
             dist_lvl_1_xs.plot(ax=ax, color="green")
-            # ax.plot(dist_lvl_1_xs.index, dist_lvl_1_xs.values, color="green")
-            # ax.set_aspect('equal', adjustable='box', share=True)
+            if not default_dist_shape is None:
+                default_dist_shape.plot.line(ax=ax, linestyle="--", color="violet")
+            
     if charge_energy_dist_df.index.get_level_values(0).nunique() > 1:
         row_axs = axs[:-1, -1] if charge_energy_dist_df.index.get_level_values(1).nunique() > 1 else axs[:, -1]
         for row_i, ax in enumerate(row_axs):
@@ -88,6 +89,9 @@ def plt_charge_energy_data(charge_energy_points_df: DF, charge_energy_dist_df: S
             lvl_1_charge_energy_dist_xs = charge_energy_dist_df.xs(xs_val, level=1)
             for x_val in lvl_1_charge_energy_dist_xs.index.get_level_values(0).unique().sort_values():
                 lvl_1_charge_energy_dist_xs.xs(x_val, level=0).plot.line(ax=ax, label=x_val)
+                if not default_dist_shape is None:
+                    default_dist_shape.plot.line(ax=ax, linestyle="--", color="violet")
+
             ax.legend()
 
     if charge_energy_dist_df.index.get_level_values(1).nunique() > 1:
@@ -97,6 +101,9 @@ def plt_charge_energy_data(charge_energy_points_df: DF, charge_energy_dist_df: S
             lvl_0_charge_energy_dist_xs = charge_energy_dist_df.xs(lvl1_xs_val, level=0)
             for y_val in  lvl_0_charge_energy_dist_xs.index.get_level_values(0).unique().sort_values():
                 lvl_0_charge_energy_dist_xs.xs(y_val, level=0).plot.line(ax=ax, label=y_val)
+                if not default_dist_shape is None:
+                    default_dist_shape.plot.line(ax=ax, linestyle="--", color="violet")
+
             ax.legend()
     for ax, lvl_0_idx in zip(axs[-1], charge_energy_dist_df.index.get_level_values(0).unique().sort_values()):
         ax.set_xlabel(f"soc\n{(lvl_0_idx/1000):.0f}km")
@@ -139,7 +146,7 @@ def fill_single_axs_for_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF],
     # plt perfs
     axs_offset = len(ts_cols)
     for perf_name, perfs_cols in perfs_cols.items():
-        if not perf_name in  (["charge_energy_dist", "charge_energy_points"] if x_col == "odometer" else ["charge_energy_dist", "charge_energy_points", "energy_soh"]):
+        if not perf_name in  (["charge_energy_dist", "charging_points"] if x_col == "odometer" else ["charge_energy_dist", "charging_points", "energy_soh"]):
             fill_axs_with_df(axs[axs_offset:], perfs_dict[perf_name], perfs_cols, X_TIME_SERIES_COL_TO_X_PERIOD_COL.get(x_col, x_col))
             axs_offset += len(perfs_cols)
 
@@ -169,7 +176,7 @@ def set_titles_and_legends(axs:np.ndarray[Axes], ts_cols:dict[str, str|list], pe
             ax.legend()
         axs_offset += len(perf_cols)
 
-def fill_ax(ax: Axes, df:DF, x:str, y:str|dict, plt_kwargs:dict=DEFAULT_LINE_PLOT_KWARGS):
+def fill_ax(ax: Axes, data:DF|Series, x:str, y:str|dict, plt_kwargs:dict=DEFAULT_LINE_PLOT_KWARGS):
     
     if isinstance(y, dict):
         assert "y" in y, "Passed dict to plot Axes but there is no column 'y' in that dict."
@@ -180,12 +187,14 @@ def fill_ax(ax: Axes, df:DF, x:str, y:str|dict, plt_kwargs:dict=DEFAULT_LINE_PLO
         xmin, xmax = ax.get_xlim()
         ax.hlines(y, xmin, xmax, **plt_kwargs)
         ax.set_xlim(xmin, xmax)
-    elif is_bool_dtype(df[y]):
+    plt_y = data[y] if isinstance(data, DF) else data
+    plt_x = data[x] if isinstance(data, DF) else data.index
+    if is_bool_dtype(plt_y):
         ax_min, ax_max = ax.get_ylim()
-        ax.fill_between(df.index, ax_min, ax_max, df[y].values, color=plt_kwargs.get("color", "green"), alpha=plt_kwargs.get("alpha", 0.6), label=y)
+        ax.fill_between(data.index, ax_min, ax_max, plt_y.values, color=plt_kwargs.get("color", "green"), alpha=plt_kwargs.get("alpha", 0.6), label=y)
         ax.set_ylim(ax_min, ax_max)
     else:
-        ax.plot(df[x], df[y], label=y, **plt_kwargs)
+        ax.plot(plt_x, plt_y, label=y, **plt_kwargs)
 
 def plt_time_series_plotly(df:DF, cols:list[str], save_to:str=None, show=True):
     df = df[cols]

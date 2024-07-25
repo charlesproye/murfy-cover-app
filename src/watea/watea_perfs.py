@@ -1,95 +1,52 @@
 import pandas as pd
 from pandas import DataFrame as DF
-import numpy as np
-from rich import print
 from rich.traceback import install as install_rich_traceback
+from itertools import starmap
+from os.path import exists
 
-from watea.fleet_watea_wise_perfs import default_100_soh_charge_energy_dist, compute_charge_energy_dist
+from watea.processed_watea_ts import processed_ts_iterator
+from watea.energy_distribution import *
 from watea.watea_constants import *
-from watea.processed_watea_ts import iterate_over_processed_ts
 from core.argparse_utils import parse_kwargs
-import core.perf_agg_processing as perfs
-from core.caching_utils import data_caching_wrapper
+from core.caching_utils import data_caching_wrapper, save_cache_to
 from core.pandas_utils import *
 
 def main():
     install_rich_traceback(extra_lines=0, width=130)
     kwargs = parse_kwargs(optional_args={"task":"compute_all", "force_update":False})
-    if kwargs['task'] == "compute_all":
-        for id, vehicle_df in iterate_over_processed_ts(query_str=kwargs.get("query_str", None)):
-            perfs_dict = compute_perfs(vehicle_df, id, force_update=kwargs["force_update"])
+    fleet_perfs = fleet_wise_perfs_of_watea()
+    save_cache_to(fleet_perfs["default_dist_shape"], PATH_TO_DEFAULT_DIST_SHAPE)
+    save_cache_to(fleet_perfs["default_100_soh_intercepts"], PATH_TO_DEFAULT_100_INTERCEPTS_SHAPE)
+    for id, vehicle_df in processed_ts_iterator(fleet_query=kwargs.get("query_str", None)):
+        energy_soh_perfs_of(id, vehicle_df, fleet_perfs["default_100_soh_intercepts"], fleet_perfs["default_dist_shape"], force_update=kwargs["force_update"])
 
-# ==============================PERFS DEPENDANT ON FLEET WISE DATA==============================
+def energy_soh_perfs_of(vehicle_df: DF, id:str, force_update=False) -> dict[str, DF|Series]:
+    """
+    ### Description:
+    Gets all the data generated to compute the soh of a vehicle, except the fleet wise data.
+    ### Returns:
+    Dict of the dataframes used.
+    """
+    perfs = {"charging_points": charge_energy_points_of(id, vehicle_df, force_update)}
+    perfs["medians"] = compute_charge_energy_median(perfs["charging_points"])
+    perfs["intercepts"] = all_diffs_from_points_to_dist(perfs["medians"], default_dist_shape)
+    perfs["energy_soh"] = soh_from_intercepts(perfs["intercepts"], default_100_soh_intercepts)
+    perfs["charge_energy_dist"] = dists_from_default_dist_and_intercepts(perfs["intercepts"], default_dist_shape)
+    
+    return perfs
 
-def compute_perfs(vehicle_df: DF, id:str, force_update=False) -> dict[str, DF]:
-    perfs = independant_perfs_of(vehicle_df, id, force_update=force_update)
-    perfs["charge_energy_dist"] = compute_charge_energy_dist(perfs["charge_energy_points"])
-    perfs["energy_soh"] = compute_energy_soh(perfs["charge_energy_dist"])
+def fleet_wise_perfs_of_watea(force_update=False) -> dict[str, DF|Series]:
+    energy_points = pd.concat(list(starmap(charge_energy_points_of, processed_ts_iterator("has_power_during_charge", force_update=force_update))))
+    perfs: dict[str, DF] = {"charging_points":energy_points, "medians": compute_charge_energy_median(energy_points)}
+    perfs["default_dist_shape"] = fit_poly_lr_to_charge_dist_xs(perfs["medians"].xs(DIST_TO_FIT_IDX))
+    perfs["default_dist_shape"] = perfs["default_dist_shape"].sub(perfs["default_dist_shape"].min())
+    perfs["intercepts"] = all_diffs_from_points_to_dist(perfs["medians"], perfs["default_dist_shape"])
+    perfs["default_100_soh_intercepts"] = perfs["intercepts"].xs(0)
+    perfs["charge_energy_dist"] = dists_from_default_dist_and_intercepts(perfs["intercepts"], perfs["default_dist_shape"])
 
     return perfs
 
-def compute_energy_soh(charge_energy_distribution: DF) -> Series:
-    """
-    ### Description:
-    Computes the soh from the energy distribution specific to that vehicle and the fleet energy distribution.
-    ### Returns:
-    Series of soh values indexed by odometer range.
-    """
-    soh_over_odometer_intervals = (
-        charge_energy_distribution                  # Get the distribution of required energy to pass to the next half soc over current soc, temperature, odometer interval.
-        .groupby(level=0)                           # For each odometer interval:
-        .apply(compute_ratio_dist)                  # Divide the distribution of the vehicle by the default_100_soh of the fleet.
-        .groupby(level=0, sort=True)                # For each odometer interval:
-        .median()                                   # Get the median of the ratios across all the temperatures and socs.
-        .mul(100)                                   # Multiply the ratios by 100 to get a percentage.
-    )
-    # Turn into a dataframe with extra (unecessary) column for plotting
-    soh = DF({
-        "soh": soh_over_odometer_intervals,
-        "mean_odo": soh_over_odometer_intervals.index, 
-    })
-
-    return soh
-
-def compute_ratio_dist(dist_grp: Series) -> Series:
-    dist_grp = dist_grp.droplevel(0)                                                            # Remove the odometer index level
-    intersecting_index = dist_grp.index.intersection(default_100_soh_charge_energy_dist.index)  # Get intersection of indices between the vehicle's dist and the defautl 100 soh dist
-    ratio_dist = dist_grp.loc[intersecting_index] / default_100_soh_charge_energy_dist.loc[intersecting_index]
-
-    return ratio_dist
-
-# =====================================INDEPENDANT PERFS========================================
-
-def independant_perfs_of(vehicle_df: DF, id:str, force_update=False) -> dict[str, DF]:
-    return {
-        "discharge": compute_discharge_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC),
-        "charge": compute_charging_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC, "in_charge", "energy_soh"),
-        "charge_above_80": compute_charging_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC, "in_charge_above_80", "energy_soh_above_80"),
-        "charge_bellow_80": compute_charging_perfs(vehicle_df, FORD_ETRANSIT_DEFAULT_KWH_PER_SOC, "in_charge_bellow_80", "energy_soh_bellow_80"),
-        "charge_energy_points": charge_energy_points_of(vehicle_df, id, force_update=force_update)
-    }
-
-def compute_discharge_perfs(vehicle_df:DF, default_kwh_per_soc:float) -> DF:
-    return (
-        vehicle_df
-        .pipe(perfs.agg_diffs_df_of, {"cum_energy": "energy_diff"}, "in_discharge",)
-        .pipe(perfs.compute_soh_from_soc_and_energy_diff, "energy_diff", default_kwh_per_soc, "discharge_soh")
-        .pipe(lambda df: df.assign(discharge_soh=df["discharge_soh"].replace(0, np.nan)))
-        .eval("km_per_soc = distance / soc_diff")
-        .pipe(lambda df: df.assign(km_per_soc=df["km_per_soc"].replace(0, np.nan)))
-    ) 
-
-def compute_charging_perfs(vehicle_df: DF, default_kwh_per_soc:float, in_charge_mask:str, energy_soh_name:str) -> DF:
-    return (
-        vehicle_df
-        .pipe(perfs.agg_diffs_df_of, {"cum_energy": "energy_added", "battery_range_km": "range_gained"}, in_charge_mask)
-        .pipe(perfs.compute_soh_from_soc_and_energy_diff, "energy_added", default_kwh_per_soc, energy_soh_name)
-        .pipe(lambda df: df.assign(energy_soh=df[energy_soh_name].replace(0, np.nan)))
-        .eval("battery_range_added_soh = 100 * (range_gained / soc_diff) / @FORD_ETRANSIT_DEFAULT_KM_PER_SOC")
-        .eval("sec_per_soc = sec_duration / soc_diff")
-    )
-
-def charge_energy_points_of(vehicle_df: DF, id:str, force_update=False) -> DF:
+def charge_energy_points_of(id:str, vehicle_df: DF, force_update=False) -> DF:
     return data_caching_wrapper(
         id,
         PATH_TO_CHARGING_PERF_PER_SOC.format(id=id),
@@ -97,42 +54,17 @@ def charge_energy_points_of(vehicle_df: DF, id:str, force_update=False) -> DF:
         force_update,
     )
 
-def compute_charge_energy_points_df(vehicle_df:DF) -> DF:
-    """
-    ### Description:
-    This function computes the distribution of required energy to gain one 0.5% soc over:
-    - odometer intervals of width ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST
-    - temperature intervals of width TEMP_FLOOR_RANGE_FOR_ENERGY_DIST
-    - soc (yes, the energy required to gain one soc also depends on the current soc)
-    # Returns:
-    Dataframe multi indexed by odometer range, temp range, soc. 
-    Main column is energy_added, the other are not really important
-    """
-    return (
-        vehicle_df
-        .pipe(
-            perfs.agg_diffs_df_of,
-            {
-                "cum_energy": "energy_added",
-                "battery_range_km": "range_gained",
-                "power": "power_diff",
-            },
-            "in_charge_perf_mask",
-            [
-                vehicle_df["odometer"].ffill().floordiv(ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST).mul(ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST),
-                vehicle_df["temp"].ffill().floordiv(TEMP_FLOOR_RANGE_FOR_ENERGY_DIST).mul(TEMP_FLOOR_RANGE_FOR_ENERGY_DIST),
-                vehicle_df["in_charge_perf_idx"],
-                vehicle_df["soc"].ffill(),
-            ]
-        )
-        .pipe(lambda df: df.assign(energy_added=df["energy_added"].replace(0, np.nan)))
-        .drop(columns=COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION)
-        .groupby(level=[0, 1, 3])
-        .agg("mean")
-        .sort_index()
-        .eval("energy_added = energy_added * -1")
-        .eval("power = energy_added / sec_duration")
-    )
+# TODO: find a better way implement data caching
+if not exists(PATH_TO_DEFAULT_100_INTERCEPTS_SHAPE) or not exists(PATH_TO_DEFAULT_DIST_SHAPE):
+    fleet_perfs = fleet_wise_perfs_of_watea()
+    default_100_soh_intercepts = fleet_perfs["default_100_soh_intercepts"]
+    default_dist_shape = fleet_perfs["default_dist_shape"]
+    fleet_charge_energy_points_df = fleet_perfs["charging_points"]
+else:
+    default_100_soh_intercepts = pd.read_parquet(PATH_TO_DEFAULT_100_INTERCEPTS_SHAPE)
+    default_dist_shape = pd.read_parquet(PATH_TO_DEFAULT_DIST_SHAPE)
+    fleet_charge_energy_points_df = pd.read_parquet(PATH_TO_FLEET_CHARGING_POINTS)
+print(default_100_soh_intercepts)
 
 if __name__ == '__main__':
     main()
