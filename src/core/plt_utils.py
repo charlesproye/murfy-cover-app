@@ -41,13 +41,7 @@ def plt_fleet(
     if plt_energy_dist:
         # This query is specific to watea remove once energy soh with dist as been moved to core 
         fleet_perfs["charge_energy_points"] = fleet_perfs["charge_energy_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
-        dist_axs = dist_fig.subplots(
-            nrows=fleet_perfs["charge_energy_dist"].index.get_level_values(1).nunique(), 
-            ncols=fleet_perfs["charge_energy_dist"].index.get_level_values(0).nunique(),
-            sharex=True,
-            sharey=True,
-        )
-        plt_charge_energy_data(fleet_perfs["charge_energy_points"], fleet_perfs["charge_energy_dist"], dist_axs, dist_fig)
+        plt_charge_energy_data(fleet_perfs["charge_energy_points"], fleet_perfs["charge_energy_dist"], dist_fig)
     if show:
         plt.show()
 
@@ -66,37 +60,63 @@ def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict
         # This query is specific to watea remove once energy soh with dist as been moved to core 
         perfs_dict["charge_energy_points"] = perfs_dict["charge_energy_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
         if perfs_dict["charge_energy_dist"].index.get_level_values(0).nunique() > 0 and perfs_dict["charge_energy_dist"].index.get_level_values(1).nunique():
-            dist_axs = dist_fig.subplots(
-                nrows=perfs_dict["charge_energy_dist"].index.get_level_values(1).nunique(), 
-                ncols=perfs_dict["charge_energy_dist"].index.get_level_values(0).nunique(),
-                sharex=True,
-                sharey=True,
-                squeeze=False,
-            )
-            plt_charge_energy_data(perfs_dict["charge_energy_points"], perfs_dict["charge_energy_dist"], dist_axs, dist_fig)
+            plt_charge_energy_data(perfs_dict["charge_energy_points"], perfs_dict["charge_energy_dist"], dist_fig)
 
     if show:
         plt.show()
 
     return ts_fig, axs
 
-def plt_charge_energy_data(charge_energy_points_df: DF,  charge_energy_dist_df: Series, axs: np.ndarray[Axes], fig: Figure, scatter_kwargs=DEFAULT_CHARGE_ENERGY_POINTS_PLT_KWARGS) -> tuple[Figure, np.ndarray[Axes]]:
+def plt_charge_energy_data(charge_energy_points_df: DF, charge_energy_dist_df: Series,fig: Figure, scatter_kwargs=DEFAULT_CHARGE_ENERGY_POINTS_PLT_KWARGS) -> tuple[Figure, np.ndarray[Axes]]:
+    axs = axs_for_energy_dist(fig, charge_energy_dist_df)
     # If we ever use more than 3 levels for indexing charge energy data (if we use different models in the same data structures for example) switch to a recursive implementation
-    for lvl_0_idx, lvl_0_axs in zip(charge_energy_dist_df.index.get_level_values(1).unique(), axs):
+    for lvl_0_idx, lvl_0_axs in zip(charge_energy_dist_df.index.get_level_values(1).unique().sort_values(), axs):
         points_lvl_0_xs = charge_energy_points_df.xs(lvl_0_idx, level=1)
         dist_lvl_0_xs = charge_energy_dist_df.xs(lvl_0_idx, level=1)
-        for lvl_1_idx, ax in zip(dist_lvl_0_xs.index.get_level_values(0).unique(), lvl_0_axs):
+        for lvl_1_idx, ax in zip(dist_lvl_0_xs.index.get_level_values(0).unique().sort_values(), lvl_0_axs):
             points_lvl_1_xs = points_lvl_0_xs.xs(lvl_1_idx, level=0)
             dist_lvl_1_xs = dist_lvl_0_xs.xs(lvl_1_idx, level=0)
             ax: Axes
             sc = ax.scatter(x=points_lvl_1_xs.index, y=points_lvl_1_xs["energy_added"], c=points_lvl_1_xs["power"], cmap='autumn', **scatter_kwargs)
-            ax.plot(dist_lvl_1_xs.index, dist_lvl_1_xs.values, color="green")
-    for lvl_0_idx, ax in zip(charge_energy_dist_df.index.get_level_values(1).unique(), axs[:, 0]):
-        ax.set_ylabel(f"{lvl_0_idx}°\nenergy")
-    for lvl_0_idx, ax in zip(charge_energy_dist_df.index.get_level_values(0).unique(), axs[-1]):
-        ax.set_xlabel(f"soc\n{lvl_0_idx}")
+            dist_lvl_1_xs.plot(ax=ax, color="green")
+            # ax.plot(dist_lvl_1_xs.index, dist_lvl_1_xs.values, color="green")
+            # ax.set_aspect('equal', adjustable='box', share=True)
+    if charge_energy_dist_df.index.get_level_values(0).nunique() > 1:
+        row_axs = axs[:-1, -1] if charge_energy_dist_df.index.get_level_values(1).nunique() > 1 else axs[:, -1]
+        for row_i, ax in enumerate(row_axs):
+            xs_val = charge_energy_dist_df.index.get_level_values(1).unique().sort_values()[row_i]
+            lvl_1_charge_energy_dist_xs = charge_energy_dist_df.xs(xs_val, level=1)
+            for x_val in lvl_1_charge_energy_dist_xs.index.get_level_values(0).unique().sort_values():
+                lvl_1_charge_energy_dist_xs.xs(x_val, level=0).plot.line(ax=ax, label=x_val)
+            ax.legend()
+
+    if charge_energy_dist_df.index.get_level_values(1).nunique() > 1:
+        col_axs = axs[-1, :-1] if charge_energy_dist_df.index.get_level_values(0).nunique() > 1 else axs[-1]
+        for col_i, ax in enumerate(col_axs):
+            lvl1_xs_val = charge_energy_dist_df.index.get_level_values(0).unique().sort_values()[col_i]
+            lvl_0_charge_energy_dist_xs = charge_energy_dist_df.xs(lvl1_xs_val, level=0)
+            for y_val in  lvl_0_charge_energy_dist_xs.index.get_level_values(0).unique().sort_values():
+                lvl_0_charge_energy_dist_xs.xs(y_val, level=0).plot.line(ax=ax, label=y_val)
+            ax.legend()
+    for ax, lvl_0_idx in zip(axs[-1], charge_energy_dist_df.index.get_level_values(0).unique().sort_values()):
+        ax.set_xlabel(f"soc\n{(lvl_0_idx/1000):.0f}km")
+
+    for ax, lvl_1_idx in zip(axs[:, 0], charge_energy_dist_df.index.get_level_values(1).unique().sort_values()):
+        ax.set_ylabel(f"energy\n{lvl_1_idx}C°")
     cbar = fig.colorbar(sc, ax=axs.ravel().tolist(), shrink=0.95)
     cbar.set_label('power')
+    # fig.tight_layout()
+
+def axs_for_energy_dist(fig: Figure, df:DF) -> np.ndarray[Axes]:
+    nunique_lvl_0 = df.index.get_level_values(0).nunique()
+    nunique_lvl_1 = df.index.get_level_values(1).nunique()
+    return fig.subplots(
+        nrows=nunique_lvl_1 + (1 if nunique_lvl_1 > 1 else 0), 
+        ncols=nunique_lvl_0 + (1 if nunique_lvl_0 > 1 else 0),
+        sharex=True,
+        sharey=True,
+        squeeze=False,
+    )
 
 
 def setup_fig_axs_and_layouts(plt_layout:dict, fig: Figure, title=None,) -> tuple[Figure, np.ndarray[Axes], list, dict]:
@@ -236,19 +256,3 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
         fig.write_html(save_path)
 
     fig.show()
-
-
-# text_show_cid = 0
-# perf_df_idx = 0
-# perf_col_idx = 0
-# text_visible = False
-    # def on_key(event):
-    #     global text_visible
-    #     if event.key == 't':
-    #         text_visible = not text_visible
-    #         for text_obj in ax.texts:
-    #             text_obj.set_visible(text_visible)
-    #         plt.draw()
-
-    # global text_show_cid
-    # text_show_cid = plt.gcf().canvas.mpl_connect('key_press_event', on_key)
