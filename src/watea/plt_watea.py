@@ -27,18 +27,19 @@ def main():
             kwargs["x_col"],
             title=f"{kwargs['plt_layout']} over {kwargs['x_col']}"
         )
-    elif kwargs["plt_id"] and str(kwargs["plt_id"]).isalpha():
-        plt_single_vehicle(id, plt_layout, kwargs["x_col"])
+    else:
+        print("plotting", kwargs["plt_id"])
+        plt_single_vehicle(kwargs["plt_id"], plt_layout, kwargs["x_col"])
 
-def plt_single_vehicle(id:str, plt_layout, x_col:str, query=None):
-    vehicle_df = processed_ts_of(id).pipe(queried_ts, query)
+def plt_single_vehicle(id:str, plt_layout, x_col:str, fleet_query=None):
+    vehicle_df = processed_ts_of(id).pipe(queried_ts, fleet_query)
     perfs_dict = compute_perfs(vehicle_df, id)
     plt_utils.plt_single_vehicle(vehicle_df, perfs_dict, plt_layout, title=id, x_col=x_col)
 
-def queried_ts(vehicle_df: DF, query=None) -> DF:
-    if query is None:
+def queried_ts(vehicle_df: DF, fleet_query=None) -> DF:
+    if fleet_query is None:
         return vehicle_df
-    return vehicle_df.query(query)
+    return vehicle_df.query(fleet_query)
 
 def iterate_over_fleet(query=None):
     for id, vehicle_df in iterate_over_processed_ts(query):
