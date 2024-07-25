@@ -46,7 +46,7 @@ def compute_charge_energy_dist(charge_energy_points_df: DF) -> pd.Series:
     """
     return (
         charge_energy_points_df
-        .query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
+        .query(MOST_COMMON_CHARGE_REGIME_QUERY)
         .loc[:, "energy_added"]
         .groupby(level=[0, 1, 2])
         .agg("median")

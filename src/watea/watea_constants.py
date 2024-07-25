@@ -1,6 +1,11 @@
 from datetime import timedelta as TD
 from os.path import join
 
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures, FunctionTransformer
+from sklearn.pipeline import Pipeline
+
 # Default vehicle values
 FORD_ETRANSIT_DEFAULT_KWH_CAPACITY = 89
 FORD_ETRANSIT_DEFAULT_KWH_PER_SOC = FORD_ETRANSIT_DEFAULT_KWH_CAPACITY / 100 
@@ -18,6 +23,7 @@ PATH_TO_FLEET_3D_DISTRIBUTION = "data_cache/plots/fleet_wise_perfs/charging_ener
 
 # recording dependant constants
 PERF_MAX_TIME_DIFF = TD(minutes=10)
+
 # charge energy distribution
 ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST = 3000
 ODO_RANGE_FORMAT_STR = lambda odo_val: f"[{(odo_val/1000):.0f}k, {((odo_val+ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST)/1000):.0f}k]"
@@ -41,6 +47,13 @@ COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
     "mean_cum_energy",
     "mean_odo",
 ]
+MOST_COMMON_CHARGE_REGIME_QUERY = "energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5"
+SOC_RANGE = np.arange(0, 100.5, 0.5, dtype=float)
+CHARGE_ENERGY_POINTS_TO_DIST_MODEL = Pipeline([
+    ('reshape', FunctionTransformer(lambda x: x.reshape(-1, 1))),
+    ('poly_features', PolynomialFeatures(degree=4)),
+    ('regressor', LinearRegression())
+])
 
 # ========================================================plt constants========================================================
 ENERGY_SOH = {

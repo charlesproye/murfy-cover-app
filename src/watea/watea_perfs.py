@@ -122,7 +122,7 @@ def compute_charge_energy_points_df(vehicle_df:DF) -> DF:
                 vehicle_df["odometer"].ffill().floordiv(ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST).mul(ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST),
                 vehicle_df["temp"].ffill().floordiv(TEMP_FLOOR_RANGE_FOR_ENERGY_DIST).mul(TEMP_FLOOR_RANGE_FOR_ENERGY_DIST),
                 vehicle_df["in_charge_perf_idx"],
-                vehicle_df["soc"].ffill() 
+                vehicle_df["soc"].ffill(),
             ]
         )
         .pipe(lambda df: df.assign(energy_added=df["energy_added"].replace(0, np.nan)))
