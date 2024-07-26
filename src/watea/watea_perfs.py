@@ -32,7 +32,7 @@ def energy_soh_perfs_of(vehicle_df: DF, id:str, force_update=False) -> dict[str,
     perfs["intercepts"] = all_diffs_from_points_to_dist(perfs["medians"], default_dist_shape)
     perfs["energy_soh"] = soh_from_intercepts(perfs["intercepts"], default_100_soh_intercepts)
     perfs["charge_energy_dist"] = dists_from_default_dist_and_intercepts(perfs["intercepts"], default_dist_shape)
-    
+
     return perfs
 
 def fleet_wise_perfs_of_watea(force_update=False) -> dict[str, DF|Series]:
@@ -43,6 +43,7 @@ def fleet_wise_perfs_of_watea(force_update=False) -> dict[str, DF|Series]:
     perfs["intercepts"] = all_diffs_from_points_to_dist(perfs["medians"], perfs["default_dist_shape"])
     perfs["default_100_soh_intercepts"] = perfs["intercepts"].xs(0)
     perfs["charge_energy_dist"] = dists_from_default_dist_and_intercepts(perfs["intercepts"], perfs["default_dist_shape"])
+    perfs["default_100_soh_dist"] = perfs["charge_energy_dist"].xs(0)
 
     return perfs
 
@@ -50,21 +51,28 @@ def charge_energy_points_of(id:str, vehicle_df: DF, force_update=False) -> DF:
     return data_caching_wrapper(
         id,
         PATH_TO_CHARGING_PERF_PER_SOC.format(id=id),
-        lambda _: compute_charge_energy_points_df(vehicle_df),
+        lambda _: charging_points_of(vehicle_df),
         force_update,
     )
 
 # TODO: find a better way implement data caching
-if not exists(PATH_TO_DEFAULT_100_INTERCEPTS_SHAPE) or not exists(PATH_TO_DEFAULT_DIST_SHAPE):
-    fleet_perfs = fleet_wise_perfs_of_watea()
-    default_100_soh_intercepts = fleet_perfs["default_100_soh_intercepts"]
-    default_dist_shape = fleet_perfs["default_dist_shape"]
-    fleet_charge_energy_points_df = fleet_perfs["charging_points"]
-else:
-    default_100_soh_intercepts = pd.read_parquet(PATH_TO_DEFAULT_100_INTERCEPTS_SHAPE)
-    default_dist_shape = pd.read_parquet(PATH_TO_DEFAULT_DIST_SHAPE)
-    fleet_charge_energy_points_df = pd.read_parquet(PATH_TO_FLEET_CHARGING_POINTS)
-print(default_100_soh_intercepts)
+# if not exists(PATH_TO_DEFAULT_100_INTERCEPTS_SHAPE) or not exists(PATH_TO_DEFAULT_DIST_SHAPE):
+fleet_perfs = fleet_wise_perfs_of_watea()
+default_100_soh_intercepts = fleet_perfs["default_100_soh_intercepts"]
+default_dist_shape = fleet_perfs["default_dist_shape"]
+fleet_charge_energy_points_df = fleet_perfs["charging_points"]
+default_100_soh_dist = fleet_perfs["default_100_soh_dist"]
+
+# print(fleet_perfs["charging_points"].query(MOST_COMMON_CHARGE_REGIME_QUERY).index.get_level_values(1).unique())
+# print(fleet_perfs["medians"].index.get_level_values(1).unique())
+# print(fleet_perfs["intercepts"].index.unique())
+# print(default_100_soh_intercepts.index.get_level_values(0).unique())
+# print(default_100_soh_dist.index.get_level_values(0).unique())
+# else:
+#     default_100_soh_intercepts = pd.read_parquet(PATH_TO_DEFAULT_100_INTERCEPTS_SHAPE)
+#     default_dist_shape = pd.read_parquet(PATH_TO_DEFAULT_DIST_SHAPE)
+#     fleet_charge_energy_points_df = pd.read_parquet(PATH_TO_FLEET_CHARGING_POINTS)
+# print(default_100_soh_intercepts)
 
 if __name__ == '__main__':
     main()
