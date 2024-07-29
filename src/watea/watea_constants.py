@@ -58,6 +58,11 @@ CHARGE_ENERGY_POINTS_TO_DIST_MODEL = Pipeline([
 DIST_TO_FIT_IDX = (0, 25.0)
 
 # ========================================================plt constants========================================================
+JUST_ENERGY_SOH = {
+    "perfs_dict": {
+        "energy_soh": ["soh"],
+    },
+}
 ENERGY_SOH = {
     "perfs_dict": {
         "energy_soh": ["soh"],

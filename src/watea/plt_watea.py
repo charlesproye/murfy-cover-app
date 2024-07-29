@@ -41,7 +41,7 @@ def my_plt_single_vehicle(id:str, plt_layout, x_col:str):
     plt_utils.plt_single_vehicle(vehicle_df, perfs_dict, plt_layout, default_100_soh_dist, title=id, x_col=x_col)
 
 def iterate_over_fleet(fleet_query=None, ts_query=None):
-    for id, vehicle_df in processed_ts_iterator(fleet_query, ts_query):
+    for id, vehicle_df in processed_ts_iterator(fleet_query, ts_query, track_kwargs={}):
         perfs_dict = energy_soh_perfs_of(vehicle_df, id)
         yield id, vehicle_df, perfs_dict
 

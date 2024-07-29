@@ -20,7 +20,7 @@ from watea.raw_watea_ts import raw_ts_of
 def main():
     install_rich_traceback(extra_lines=0, width=130)
     kwargs = parse_kwargs()
-    for id, vehicle_df in processed_ts_iterator(force_update=True, **kwargs):
+    for id, vehicle_df in processed_ts_iterator(force_update=True, track_kwargs={}):
         print(id)
         print(vehicle_df)
 

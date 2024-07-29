@@ -58,8 +58,11 @@ def plt_single_vehicle(vehicle_df: DF, perfs_dict:dict[str, DF], plt_layout:dict
     set_titles_and_legends(axs, ts_cols, perfs_cols)
     if plt_energy_dist:
         # This query is specific to watea remove once energy soh with dist as been moved to core 
-        perfs_dict["charging_points"] = perfs_dict["charging_points"].query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
-        if perfs_dict["charge_energy_dist"].index.get_level_values(0).nunique() > 0 and perfs_dict["charge_energy_dist"].index.get_level_values(1).nunique():
+        perfs_dict["charging_points"] = (
+            perfs_dict["charging_points"]
+            .query("energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5")
+        )
+        if perfs_dict["charge_energy_dist"].index.get_level_values(0).nunique()  and perfs_dict["charge_energy_dist"].index.get_level_values(1).nunique():
             plt_charge_energy_data(perfs_dict["charging_points"], perfs_dict["charge_energy_dist"], dist_fig, default_100_soh_dist=default_100_soh_dist)
 
     if show:
@@ -82,9 +85,9 @@ def plt_charge_energy_data(charging_points: DF, dists: Series,fig: Figure, scatt
             ax: Axes = axs[ax_y_idx, ax_x_idx]
             sc = ax.scatter(x=points_lvl_1_xs.index, y=points_lvl_1_xs["energy_added"], c=points_lvl_1_xs["power"], cmap='autumn', **scatter_kwargs)
             dist_lvl_1_xs.plot(ax=ax, color="green")
-            if not default_100_soh_dist is None:
+            if not default_100_soh_dist is None and lvl_1_idx in default_100_soh_dist.index:
                 default_100_soh_dist.xs(lvl_1_idx).plot.line(ax=ax, linestyle="--", color="violet")
-            
+
     if len(lvl_0_idxs) > 1:
         row_axs = axs[:-1, -1] if len(lvl_1_idxs) > 1 else axs[:, -1]
         for row_i, ax in enumerate(row_axs):
@@ -92,7 +95,7 @@ def plt_charge_energy_data(charging_points: DF, dists: Series,fig: Figure, scatt
             lvl_1_charge_energy_dist_xs = dists.xs(xs_val, level=1)
             for x_val in lvl_1_charge_energy_dist_xs.index.get_level_values(0).unique().sort_values():
                 lvl_1_charge_energy_dist_xs.xs(x_val, level=0).plot.line(ax=ax, label=x_val)
-                if not default_100_soh_dist is None:
+                if not default_100_soh_dist is None and xs_val in default_100_soh_dist.index:
                     default_100_soh_dist.xs(xs_val).plot.line(ax=ax, linestyle="--", color="violet")
 
     if len(lvl_1_idxs) > 1:
