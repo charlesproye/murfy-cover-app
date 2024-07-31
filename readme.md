@@ -124,3 +124,9 @@ Each sub package (except `core`) has the following scripts (where XX is the name
     ```
     Result:
     ![result](./documentation/plt_XX_result_example.png)
+
+#### Data caches
+Most of the `data_cache` sub folders will be created automatically.  
+The only one that you need to set up is the one used by `raw_XX_ts` to create the raw time series tables.  
+In the case of watea, this is `bib_export` and the folders corresponding to the vehicles.  
+Then you should be able to run any script and the data that it depends on should be generated if it is not yet cached.  
