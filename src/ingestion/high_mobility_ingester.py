@@ -56,6 +56,14 @@ class HMIngester:
         if HM_CLIENT_SECRET is None:
             logging.error("HM_CLIENT_SECRET environment variable not found")
             return
+        S3_ENDPOINT = os.getenv("S3_ENDPOINT")
+        if S3_ENDPOINT is None:
+            logging.error("S3_ENDPOINT environment variable not found")
+            return
+        S3_REGION = os.getenv("S3_REGION")
+        if S3_REGION is None:
+            logging.error("S3_ENDPOINT environment variable not found")
+            return
         S3_BUCKET = os.getenv("S3_BUCKET")
         if S3_BUCKET is None:
             logging.error("S3_BUCKET environment variable not found")
@@ -71,8 +79,8 @@ class HMIngester:
         self.__api = HMApi(HM_BASE_URL, HM_CLIENT_ID, HM_CLIENT_SECRET)
         self.__s3 = boto3.client(
             "s3",
-            region_name="fr-par",
-            endpoint_url="https://s3.fr-par.scw.cloud",
+            region_name=S3_REGION,
+            endpoint_url=S3_ENDPOINT,
             aws_access_key_id=S3_KEY,
             aws_secret_access_key=S3_SECRET,
         )
