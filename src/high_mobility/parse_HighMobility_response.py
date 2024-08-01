@@ -15,8 +15,9 @@ from core.argparse_utils import parse_kwargs
 
 def main():
     kwargs = parse_kwargs(["json_source", "csv_dest"])
-    df = parse_json_as_df(kwargs["json_source"])
-    df.to_csv(read_json(kwargs["csv_dest"]))
+    with open(kwargs["json_source"]) as f:
+        df = parse_json_as_df(json.load(f))
+    df.to_csv(kwargs["csv_dest"])
 
 def parse_json_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
@@ -34,7 +35,20 @@ def set_date(df:DF) -> DF:
 
     return df
 
-def flatten_json_obj(src:dict, dst, timestamp=None, path:list[str]=[]) -> dict[Any,dict[str,Any]]:
+def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> dict[Any,dict[str,Any]]:
+    """
+    ### Description:
+    Recursively search for and set store values.  
+    The values are stored in a dict that uses the timestamps as key to avoid having duplicate timestamps.   
+    ### Parameters:
+    - src: response dictionnary
+    - dst:
+        Must be empty when called for the first time. 
+        IDK why but a default value would not reset which led to a bug where raw dataframes would retain the value of previous responses.  
+    Don't fill timestamp and path either.
+    ### Returns:
+    dict of the values indexed by timestamp.
+    """
     if "timestamp" in src:
         timestamp = DT.strptime(src["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ")
 
@@ -50,10 +64,6 @@ def try_add_to_dst(src:dict, dst:dict[Any,dict[str,Any]], timestamp, path:list, 
     if key in src and not isinstance(src[key], dict) and not timestamp is None:
         dst[timestamp] = {**dst.get(timestamp, {}), ".".join(path):src[key]}
     return dst
-
-def read_json(path: str) -> dict|list:
-    with open(path) as f:
-        return json.load(f)
 
 if __name__ == "__main__":
     main()

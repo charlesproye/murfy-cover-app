@@ -15,19 +15,23 @@ def main():
     install_rich_traceback(extra_lines=0, width=130)
     bucket = S3_Bucket()
     
+    # Get list of objects in response key
     keys = Series(bucket.list_keys("response"))
+    # Only retain .cbor responses
     keys = keys[keys.str.endswith(".cbor")]
-    keys = pd.concat((keys, keys.str.split("/", expand=True).loc[:, 1:]), axis="columns")
-    keys.columns = ["key", "brand", "vin", "file"]
-    print(keys)
+    # Reponses are organized as follow response/brand_name/vin/response_timestamp.cbor
+    # We extract the brand and vin
+    keys = pd.concat((keys, keys.str.split("/", expand=True).loc[:, 1:]), axis="columns") 
+    keys.columns = ["key", "brand", "vin", "file"] # Set column names
+    # for each group of responses for a vin create a raw time series parquet
     keys.groupby(["brand", "vin"]).apply(parse_responses_as_raw_ts, bucket, include_groups=False)
 
 def parse_responses_as_raw_ts(src_keys:DF, bucket:S3_Bucket):
-    raw_jsons:Series = src_keys["key"].apply(bucket.read_cbor)
-    raw_df:DF = pd.concat([parse_json_as_df(raw_json) for raw_json in raw_jsons])
-    raw_df = raw_df[~raw_df.duplicated()].sort_index()
-    dest_key = "/".join(["parquet", *src_keys.name]) + ".parquet"
-    bucket.save_pandas_obj_as_parquet(raw_df, dest_key)
+    raw_jsons:Series = src_keys["key"].apply(bucket.read_cbor)                      # Read responses
+    raw_df:DF = pd.concat([parse_json_as_df(raw_json) for raw_json in raw_jsons])   # Parse and concat them into a single df 
+    raw_df = raw_df[~raw_df.duplicated()].sort_index()                              # Remove duplicates
+    dest_key = "/".join(["parquet", *src_keys.name]) + ".parquet"                   # Create path to save the raw ts
+    bucket.save_pandas_obj_as_parquet(raw_df, dest_key)                             # save the raw ts
 
 
 if __name__ == "__main__":
