@@ -2,16 +2,12 @@
 This script converts High Mobility json responses into raw parquet time series.
 The script operates on S3 buckets. 
 """
-from os.path import join
-import json
-
 from rich import print
 from rich.traceback import install as install_rich_traceback
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
 
-from core.caching_utils import save_cache_to, ensure_that_dirs_exist
 from high_mobility.parse_HighMobility_response import parse_json_as_df
 from core.s3_utils import S3_Bucket
 
@@ -31,7 +27,6 @@ def parse_responses_as_raw_ts(src_keys:DF, bucket:S3_Bucket):
     raw_df:DF = pd.concat([parse_json_as_df(raw_json) for raw_json in raw_jsons])
     raw_df = raw_df[~raw_df.duplicated()].sort_index()
     dest_key = "/".join(["parquet", *src_keys.name]) + ".parquet"
-    print(dest_key)
     bucket.save_pandas_obj_as_parquet(raw_df, dest_key)
 
 
