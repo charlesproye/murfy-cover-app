@@ -1,5 +1,6 @@
 from datetime import timedelta as TD
 
+MILES_TO_KM = 1.60934
 KJ_TO_KWH = 0.00027777777
 
 #time series processing
