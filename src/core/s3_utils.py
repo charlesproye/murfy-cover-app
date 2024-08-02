@@ -5,7 +5,10 @@ from dotenv import load_dotenv
 import cbor2
 import json
 
+import pyarrow.parquet as pq
+
 import boto3
+import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
 from rich import print
@@ -53,6 +56,21 @@ class S3_Bucket():
                     keys.append(obj['Key'])
 
         return keys
+
+    def read_parquet(self, key:str) -> DF|Series:
+        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
+
+        parquet_bytes = response["Body"].read()
+        # Convert bytes to a file-like buffer
+        parquet_buffer = BytesIO(parquet_bytes)
+        
+        # Use pyarrow to read the buffer
+        table = pq.read_table(parquet_buffer)
+        
+        # Convert the table to a pandas DataFrame
+        df = table.to_pandas()
+
+        return df
     
     def read_json_file(self, key:str) -> Any:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
