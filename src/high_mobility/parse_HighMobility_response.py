@@ -22,6 +22,7 @@ def main():
 def parse_response_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
     df = DF.from_dict(flatten_dict, orient="index").pipe(set_date)
+    print(df)
 
     return df
 
@@ -62,6 +63,8 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
 
 def try_add_to_dst(src:dict, dst:dict[Any,dict[str,Any]], timestamp, path:list, key:str):
     if key in src and not isinstance(src[key], dict) and not timestamp is None:
+        if "unit" in src and isinstance(src["unit"], str):
+            path.append(src["unit"])
         dst[timestamp] = {**dst.get(timestamp, {}), ".".join(path):src[key]}
     return dst
 
