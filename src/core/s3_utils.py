@@ -15,14 +15,14 @@ load_dotenv()
 class S3_Bucket():
     def __init__(self):
         assert "S3_KEY" in os.environ, "S3_KEY varible is not in the environement."
-        assert "S3_ENDPOINT_URL" in os.environ, "S3_ENDPOINT_URL varible is not in the environement."
+        assert "S3_ENDPOINT" in os.environ, "S3_ENDPOINT varible is not in the environement."
         assert "S3_SECRET" in os.environ, "S3_SECRET varible is not in the environement."
         assert "S3_BUCKET" in os.environ, "S3_BUCKET varible is not in the environement."
 
         self._s3_client = boto3.client(
             "s3",
             region_name="fr-par",
-            endpoint_url=os.getenv("S3_ENDPOINT_URL"),
+            endpoint_url=os.getenv("S3_ENDPOINT"),
             aws_access_key_id=os.getenv("S3_KEY"),
             aws_secret_access_key=os.getenv("S3_SECRET"),
         )
