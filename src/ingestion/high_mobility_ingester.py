@@ -62,7 +62,7 @@ class HMIngester:
             return
         S3_REGION = os.getenv("S3_REGION")
         if S3_REGION is None:
-            logging.error("S3_ENDPOINT environment variable not found")
+            logging.error("S3_REGION environment variable not found")
             return
         S3_BUCKET = os.getenv("S3_BUCKET")
         if S3_BUCKET is None:
