@@ -16,10 +16,10 @@ from core.argparse_utils import parse_kwargs
 def main():
     kwargs = parse_kwargs(["json_source", "csv_dest"])
     with open(kwargs["json_source"]) as f:
-        df = parse_json_as_df(json.load(f))
+        df = parse_response_as_df(json.load(f))
     df.to_csv(kwargs["csv_dest"])
 
-def parse_json_as_df(src) -> DF:
+def parse_response_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
     df = DF.from_dict(flatten_dict, orient="index").pipe(set_date)
 
