@@ -22,7 +22,6 @@ def main():
 def parse_response_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
     df = DF.from_dict(flatten_dict, orient="index").pipe(set_date)
-    print(df)
 
     return df
 

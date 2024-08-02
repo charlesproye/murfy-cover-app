@@ -2,14 +2,18 @@
 This script converts High Mobility responses into raw parquet time series.
 The script operates on S3 buckets. 
 """
+import logging
+
 from rich import print
 from rich.traceback import install as install_rich_traceback
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
 
-from high_mobility.parse_HighMobility_response import parse_response_as_df
+from high_mobility.high_mobility_response_parsing import parse_response_as_df
 from core.s3_utils import S3_Bucket
+
+logger = logging.getLogger(__name__)
 
 def main():
     install_rich_traceback(extra_lines=0, width=130)
@@ -17,6 +21,12 @@ def main():
     
     # Get list of objects in response key
     keys = Series(bucket.list_keys("response"))
+    if len(keys) == 0:
+        logger.info("""
+            No responses found in the 'response' folder.
+            No raw time series have been generated.
+        """)
+        return
     # Only retain .cbor responses
     keys = keys[keys.str.endswith(".cbor")]
     # Reponses are organized as follow response/brand_name/vin/response_timestamp.cbor
@@ -29,8 +39,7 @@ def main():
 def parse_responses_as_raw_ts(src_keys:DF, bucket:S3_Bucket):
     raw_jsons:Series = src_keys["key"].apply(bucket.read_cbor)                      # Read responses
     raw_df:DF = pd.concat([parse_response_as_df(raw_json) for raw_json in raw_jsons])   # Parse and concat them into a single df 
-    raw_df = raw_df[~raw_df.duplicated()].sort_index()                              # Remove duplicates
-    dest_key = "/".join(["parquet", *src_keys.name]) + ".parquet"                   # Create path to save the raw ts
+    dest_key = "/".join(["raw_ts", "time_series", *src_keys.name]) + ".parquet"                   # Create path to save the raw ts
     bucket.save_pandas_obj_as_parquet(raw_df, dest_key)                             # save the raw ts
 
 
