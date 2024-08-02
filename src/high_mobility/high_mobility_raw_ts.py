@@ -39,7 +39,7 @@ def main():
 def parse_responses_as_raw_ts(src_keys:DF, bucket:S3_Bucket):
     raw_jsons:Series = src_keys["key"].apply(bucket.read_cbor)                      # Read responses
     raw_df:DF = pd.concat([parse_response_as_df(raw_json) for raw_json in raw_jsons])   # Parse and concat them into a single df 
-    dest_key = "/".join(["raw_ts", "high_mobility_response_parsing.py", *src_keys.name]) + ".parquet"                   # Create path to save the raw ts
+    dest_key = "/".join(["raw_ts", "time_series", *src_keys.name]) + ".parquet"                   # Create path to save the raw ts
     bucket.save_pandas_obj_as_parquet(raw_df, dest_key)                             # save the raw ts
 
 
