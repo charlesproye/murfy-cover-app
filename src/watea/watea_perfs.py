@@ -7,7 +7,7 @@ from os.path import exists
 from watea.processed_watea_ts import processed_ts_iterator
 from watea.energy_distribution import *
 from watea.watea_constants import *
-from core.argparse_utils import parse_kwargs
+from core.console_utils import parse_kwargs
 from core.caching_utils import data_caching_wrapper, save_cache_to
 from core.pandas_utils import *
 
