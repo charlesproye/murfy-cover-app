@@ -44,16 +44,11 @@ def parse_responses_as_raw_ts(src_keys:DF, bucket:S3_Bucket):
     raw_jsons:Series = src_keys["key"].apply(bucket.read_cbor)                          # Read responses
     raw_df:DF = pd.concat([parse_response_as_df(raw_json) for raw_json in raw_jsons])   # Parse and concat them into a single df 
     dest_key = "/".join(["raw_ts", "time_series", *src_keys.name]) + ".parquet"         # Create path to save the raw ts
-    print(src_keys.name)
-    print(raw_df)
     bucket.save_pandas_obj_as_parquet(raw_df, dest_key)                                 # save the raw ts
 
 def parse_response_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
-    print(flatten_dict)
     df = DF.from_dict(flatten_dict, orient="index").pipe(set_date)
-    print(df)
-    print("=============")
 
     return df
 

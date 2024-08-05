@@ -16,7 +16,6 @@ from core.s3_utils import S3_Bucket
 from core.constants import *
 from core.console_utils import main_decorator
 from high_mobility.high_mobility_constants import *
-from core.pandas_utils import print_data
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,6 @@ def main():
     keys.columns = ["key", "brand", "vin"] # Set column names
     keys["vin"] = keys["vin"].str.strip(".parquet")
     # for each group of responses for a vin create a raw time series parquet
-    # print(keys)
     processed_ts_metada_data = keys.apply(processed_ts_ETL, bucket=bucket, axis=1)
     # bucket.save_pandas_obj_as_parquet(processed_ts_metada_data, "processed_ts/ts_metadata.parquet")
 
@@ -43,11 +41,8 @@ def processed_ts_ETL(key_data:Series, bucket: S3_Bucket) -> Series:
     ### Returns:
     Metadata about the time series.
     """
-    # print(key_data)
-    print(key_data[["brand", "vin"]])
     raw_ts = bucket.read_parquet(key_data["key"])
     processed_ts = process_raw_ts(raw_ts, key_data)
-    print("=================")
     dest_key = "/".join(("processed_ts", "time_series", key_data["brand"], key_data["vin"])) + ".parquet"
     bucket.save_pandas_obj_as_parquet(processed_ts, dest_key)
 
@@ -74,7 +69,6 @@ def process_raw_ts(ts:DF, key_data:Series) -> DF:
     - in_discharge  
     *Do not merge the last two into one column as we sometime don't know if the vehicule is charging or discharging.*
     """
-    print(ts)
     return (
         ts
         # For some reason, date index seems to get reset when written or read from or to s3...
@@ -86,7 +80,6 @@ def process_raw_ts(ts:DF, key_data:Series) -> DF:
         .pipe(standaridize_soc, "diagnostics_soc")
         .assign(soc=lambda df:df.get("diagnostic_soc", Series([np.nan] * len(df), dtype="float")))
         .pipe(compute_charging_status_columns)
-        .pipe(print_data)
     )
 
 def standardize_units(ts: DF, key_data:Series) -> DF:
