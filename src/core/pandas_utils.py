@@ -1,5 +1,6 @@
 from typing import TypeVar
 
+from rich import print
 import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
