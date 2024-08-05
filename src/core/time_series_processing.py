@@ -75,7 +75,7 @@ def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
         vehicle_df
         # use interpolate before checking if the odometer increased to composate for missing values
-        .assign(in_motion=vehicle_df["odometer"].interpolate(method="time").diff().gt(0, fill_value=False))
+        .assign(in_motion=vehicle_df["odometer"].interpolate(method="time").diff().gt(0))
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
 
@@ -84,8 +84,8 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     vehicle_df["soc_dir"] = np.nan
     vehicle_df["soc_dir"] = (
         vehicle_df["soc_dir"] 
-        .mask(soc_diff.gt(0, fill_value=False), 1)
-        .mask(soc_diff.lt(0, fill_value=False), -1)
+        .mask(soc_diff.gt(0), 1)
+        .mask(soc_diff.lt(0), -1)
     )
     # mitigate soc spikes effect on mask
     prev_dir = vehicle_df["soc_dir"].ffill().shift()
@@ -95,8 +95,8 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     vehicle_df["smoothed_soc_dir"] = vehicle_df["soc_dir"].rolling(window=TD(minutes=20), center=True).mean()
     vehicle_df["soc_dir"] = (
         vehicle_df["soc_dir"]
-        .mask(vehicle_df["smoothed_soc_dir"].gt(0, fill_value=False) & vehicle_df["soc_dir"].lt(0, fill_value=False), np.nan)
-        .mask(vehicle_df["smoothed_soc_dir"].lt(0, fill_value=False) & vehicle_df["soc_dir"].gt(0, fill_value=False), np.nan)
+        .mask(vehicle_df["smoothed_soc_dir"].gt(0) & vehicle_df["soc_dir"].lt(0), np.nan)
+        .mask(vehicle_df["smoothed_soc_dir"].lt(0) & vehicle_df["soc_dir"].gt(0), np.nan)
     )
 
     bfilled_dir = vehicle_df["soc_dir"].bfill()
