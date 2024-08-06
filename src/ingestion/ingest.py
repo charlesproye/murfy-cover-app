@@ -44,7 +44,6 @@ if __name__ == "__main__":
 
     ingester: HMIngester
 
-    print(args)
     match args.refresh_interval, args.max_workers:
         case None, None:
             ingester = HMIngester()
