@@ -189,7 +189,7 @@ class HMApi:
         else:
             return result.status_code, result.json()
 
-    def get_vehicle_info(self, vin: str) -> tuple[int, object]:
+    def get_vehicle_info(self, vin: str) -> tuple[int, bytes]:
         """Get a vehicle's info
 
         Arguments
@@ -207,5 +207,5 @@ class HMApi:
             f"{self.base_url}/v1/vehicle-data/autoapi-13/{vin}",
             headers={"Authorization": f"Bearer {token}"},
         )
-        return result.status_code, result.json()
+        return result.status_code, result.content
 

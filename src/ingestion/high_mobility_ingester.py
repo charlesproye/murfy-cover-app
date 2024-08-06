@@ -7,10 +7,15 @@ from queue import Queue
 from typing import Callable, Optional
 
 import boto3
-import cbor2
 import dotenv
+import msgspec
 import schedule
 from ingestion.high_mobility_api import HMApi
+from ingestion.schema.high_mobility_schema import (
+    KiaInfo,
+    MercedesBenzInfo,
+    RenaultInfo,
+)
 from ingestion.vehicle import Vehicle
 
 
@@ -212,15 +217,42 @@ class HMIngester:
                 logging.info(
                     f"Fetched vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
                 )
-                filename = f"response/{vehicle.brand}/{vehicle.vin}/{int(datetime.now().timestamp())}.cbor"
-                self.__s3.put_object(
-                    Body=cbor2.dumps(info),
+                try:
+                    match vehicle.brand:
+                        case "mercedes-benz":
+                            decoded = msgspec.json.decode(info, type=MercedesBenzInfo)
+                        case "renault":
+                            decoded = msgspec.json.decode(info, type=RenaultInfo)
+                        case "kia":
+                            decoded = msgspec.json.decode(info, type=KiaInfo)
+                        case _:
+                            logging.error(
+                                f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): unsupported vehicle brand"
+                            )
+                            return
+                except msgspec.ValidationError as e:
+                    logging.error(
+                        f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): response {info} does not fit schema ({e})"
+                    )
+                    return
+                logging.info(
+                    f"Parsed response for vehicle with VIN {vehicle.vin} correctly"
+                )
+                filename = f"response/{vehicle.brand}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
+                uploaded = self.__s3.put_object(
+                    Body=msgspec.json.encode(decoded),
                     Bucket=self.__bucket,
                     Key=filename,
                 )
-                logging.info(
-                    f"Uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
-                )
+                match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
+                    case 200:
+                        logging.info(
+                            f"Uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
+                        )
+                    case _:
+                        logging.error(
+                            f"Error uploading info for vehicle with vin {vehicle.vin}: {uploaded}"
+                        )
                 return
             case _:
                 log_error(info)
