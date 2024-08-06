@@ -4,7 +4,7 @@ import os
 import threading
 from datetime import datetime
 from queue import Queue
-from typing import Callable
+from typing import Callable, Optional
 
 import boto3
 import cbor2
@@ -32,14 +32,19 @@ class HMIngester:
         "ford": 36,
     }
 
-    refresh_interval: int = 2 * 60 * 60
+    refresh_interval: int = 2 * 60
+    upload_interval: int = 60
 
-    def __init__(self, refresh_interval=2 * 60 * 60, max_workers=10):
+    def __init__(
+        self,
+        refresh_interval: Optional[int] = 2 * 60,
+        max_workers: Optional[int] = 10,
+    ):
         """
         Parameters
         ----------
-        refresh_interval: datetime.timedelta, optional
-            The interval at wich to update the vehicle list
+        refresh_interval: int, optional
+            The interval at wich to update the vehicle list (in minutes)
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
         """
@@ -87,7 +92,7 @@ class HMIngester:
         self.__bucket = S3_BUCKET
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.__job_queue = Queue()
-        self.refresh_interval = refresh_interval
+        self.refresh_interval = refresh_interval or self.refresh_interval
 
     def __fetch_clearances(self) -> list[Vehicle] | None:
         error, info = self.__api.list_clearances(status="approved")
@@ -148,12 +153,12 @@ class HMIngester:
             logging.info(
                 f"Adding vehicle with VIN {vehicle.vin} (brand {vehicle.brand}) to the scheduler (interval: {vehicle.rate_limit} seconds)"
             )
-        self.__scheduler.every(self.refresh_interval).seconds.do(
+        self.__scheduler.every(self.refresh_interval).minutes.do(
             self.__job_queue.put,
             self.__update_vehicles,
         ).tag("refresh")
         logging.info(
-            f"Scheduled refresh of vehicle list in {self.refresh_interval} seconds"
+            f"Scheduled refresh of vehicle list in {self.refresh_interval} minutes"
         )
 
     def __update_vehicles(self) -> None:
