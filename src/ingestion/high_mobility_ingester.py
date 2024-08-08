@@ -46,7 +46,7 @@ class HMIngester:
     def __init__(
         self,
         refresh_interval: Optional[int] = 2 * 60,
-        max_workers: Optional[int] = 10,
+        max_workers: Optional[int] = 8,
         compress_time: Optional[str] = "04:00",
     ):
         """
@@ -54,8 +54,10 @@ class HMIngester:
         ----------
         refresh_interval: int, optional
             The interval at wich to update the vehicle list (in minutes)
+            default: 120
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
+            default: 8
         compress_time: str, optional
             The time of day at which to compress the S3 data
             default: 04:00
