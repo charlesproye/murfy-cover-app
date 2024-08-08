@@ -4,12 +4,6 @@ services:
   hm_ingestion_sevice: 
     build: . 
     container_name: hm_ingestion
-    environment:
-      - PYTHONUNBUFFERED=1
-      - PYTHONDONTWRITEBYTECODE=1
-      - PIP_NO_CACHE_DIR=off
-      - PIP_DISABLE_PIP_VERSION_CHECK=on TEST
-      - PIP_DEFAULT_TIMEOUT=100
     env_file: 
       - path: ./.env
         required: true
@@ -18,6 +12,5 @@ services:
       - path: ./.args.env
         required: false
     volumes:
-      - .:/app TEST
-    command: [./start.sh, --dotenv]
+      - .:/app
 
