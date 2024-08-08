@@ -39,8 +39,8 @@ main() {
     export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src"
 
     LOG_LEVEL=${LOG_LEVEL:-INFO}
-    MAX_WORKERS=${MAX_WORKERS:-10}
-    REFRESH_INTERVAL=${REFRESH_INTERVAL:-120}
+    MAX_WORKERS=${MAX_WORKERS:-}
+    REFRESH_INTERVAL=${REFRESH_INTERVAL:-}
     COMPRESS_TIME=${COMPRESS_TIME:-}
     # ACCESSLOG=${ACCESSLOG:-true}
     # ERRORLOG=${ERRORLOG:-true}
@@ -49,8 +49,8 @@ main() {
 
     # [[ "$ACCESSLOG" == "true" ]] && chunks+=("--access-logfile" "-")
     # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")
-    [[ ! -z "$MAX_WORKERS" ]] && chunks+=("--max-workers" "$MAX_WORKERS")
-    [[ ! -z "$REFRESH_INTERVAL" ]] && chunks+=("--refresh-interval" "$REFRESH_INTERVAL")
+    [[ ! -z "$MAX_WORKERS" ]] && chunks+=("--max_workers" "$MAX_WORKERS")
+    [[ ! -z "$REFRESH_INTERVAL" ]] && chunks+=("--refresh_interval" "$REFRESH_INTERVAL")
     [[ ! -z "$COMPRESS_TIME" ]] && chunks+=("--compress_time" "$COMPRESS_TIME")
 
     for e in "${chunks[@]}"

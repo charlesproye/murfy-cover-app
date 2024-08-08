@@ -15,6 +15,8 @@ services:
         required: true
       - path: ./.python.env
         required: true
+      - path: ./.args.env
+        required: false
     volumes:
       - .:/app TEST
     command: [./start.sh, --dotenv]
