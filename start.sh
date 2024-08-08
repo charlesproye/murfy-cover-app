@@ -41,6 +41,7 @@ main() {
     LOG_LEVEL=${LOG_LEVEL:-INFO}
     MAX_WORKERS=${MAX_WORKERS:-10}
     REFRESH_INTERVAL=${REFRESH_INTERVAL:-120}
+    COMPRESS_TIME=${COMPRESS_TIME:-}
     # ACCESSLOG=${ACCESSLOG:-true}
     # ERRORLOG=${ERRORLOG:-true}
 
@@ -50,6 +51,7 @@ main() {
     # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")
     [[ ! -z "$MAX_WORKERS" ]] && chunks+=("--max-workers" "$MAX_WORKERS")
     [[ ! -z "$REFRESH_INTERVAL" ]] && chunks+=("--refresh-interval" "$REFRESH_INTERVAL")
+    [[ ! -z "$COMPRESS_TIME" ]] && chunks+=("--compress_time" "$COMPRESS_TIME")
 
     for e in "${chunks[@]}"
     do

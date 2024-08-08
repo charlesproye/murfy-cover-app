@@ -40,21 +40,18 @@ if __name__ == "__main__":
         type=int,
         help="maximum number of threads to fetch the vehicles info (mostly limited by S3)",
     )
+    parser.add_argument(
+        "--compress_time",
+        type=str,
+        help="time of day at which to compress S3 data",
+    )
     args = parser.parse_args()
 
-    ingester: HMIngester
-
-    match args.refresh_interval, args.max_workers:
-        case None, None:
-            ingester = HMIngester()
-        case interval, None:
-            ingester = HMIngester(refresh_interval=interval)
-        case None, workers:
-            ingester = HMIngester(max_workers=workers)
-        case _:
-            ingester = HMIngester(
-                refresh_interval=args.refresh_interval, max_workers=args.max_workers
-            )
+    ingester = HMIngester(
+        refresh_interval=args.refresh_interval,
+        max_workers=args.max_workers,
+        compress_time=args.compress_time,
+    )
 
     ingester.run()
 

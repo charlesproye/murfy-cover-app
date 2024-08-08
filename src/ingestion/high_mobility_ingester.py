@@ -10,6 +10,7 @@ import boto3
 import dotenv
 import msgspec
 import schedule
+from ingestion.compress_high_mobility_data import HMCompresser
 from ingestion.high_mobility_api import HMApi
 from ingestion.schema.high_mobility_schema import (
     KiaInfo,
@@ -23,6 +24,7 @@ class HMIngester:
     __api: HMApi
     __s3 = boto3.client("s3")
     __bucket: str
+    __compresser: HMCompresser
 
     __scheduler = schedule.Scheduler()
     __vehicles: set[Vehicle] = set()
@@ -39,11 +41,13 @@ class HMIngester:
 
     refresh_interval: int = 2 * 60
     upload_interval: int = 60
+    compress_time: str = "04:00"
 
     def __init__(
         self,
         refresh_interval: Optional[int] = 2 * 60,
         max_workers: Optional[int] = 10,
+        compress_time: Optional[str] = "04:00",
     ):
         """
         Parameters
@@ -52,6 +56,9 @@ class HMIngester:
             The interval at wich to update the vehicle list (in minutes)
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
+        compress_time: str, optional
+            The time of day at which to compress the S3 data
+            default: 04:00
         """
         dotenv.load_dotenv()
         HM_BASE_URL = os.getenv("HM_BASE_URL")
@@ -95,9 +102,11 @@ class HMIngester:
             aws_secret_access_key=S3_SECRET,
         )
         self.__bucket = S3_BUCKET
+        self.__compresser = HMCompresser(self.__s3, self.__bucket)
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.__job_queue = Queue()
         self.refresh_interval = refresh_interval or self.refresh_interval
+        self.compress_time = compress_time or self.compress_time
 
     def __fetch_clearances(self) -> list[Vehicle] | None:
         error, info = self.__api.list_clearances(status="approved")
@@ -270,6 +279,10 @@ class HMIngester:
         worker_thread = threading.Thread(target=self.__process_job_queue)
         logging.info("Starting scheduler")
         self.__scheduler.run_all()
+        self.__scheduler.every().day.at(self.compress_time).do(
+            self.__job_queue.put, self.__compresser.run
+        ).tag("compress")
+        logging.info("Schedule S3 compressing at 4AM")
         logging.info("Starting worker thread")
         worker_thread.start()
         while 1:
