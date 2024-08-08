@@ -1,21 +1,16 @@
-# Use the latest Miniconda3 image
-FROM continuumio/miniconda3:latest
+# Use the latest MambaForge image (lighter than miniconad)
+FROM mambaorg/micromamba:latest as conda
 
-# Set some environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=off \
-    PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PIP_DEFAULT_TIMEOUT=100
-
-# Copy your app into the container
-COPY . /app/
 WORKDIR /app
 
-# Install dependencies
-RUN conda update -n base -c defaults conda
-RUN conda env update --prune -n base -f conda-env.yaml
-RUN chmod +x ./start.sh
+# Create environment
+COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yaml /tmp/conda-lock.yaml
+RUN micromamba install -y -n base -f /tmp/conda-lock.yaml && \
+    micromamba clean --all --yes
 
+COPY . .
+
+ARG MAMBA_DOCKERFILE_ACTIVATE=1  # (otherwise python will not be found)
 # Start the application
 CMD ["./start.sh"]
+
