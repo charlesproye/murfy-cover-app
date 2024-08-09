@@ -38,8 +38,8 @@ def process_raw_time_series(raw_vehicle_df: DF, vin:str, **kwargs) -> DF:
     vehicle_df = preprocess_raw_time_series(raw_vehicle_df)
     vehicle_df = (
         vehicle_df.assign(
-        cum_energy_spent=ts.cum_energy_from_power(vehicle_df["power"]),
-        cum_charging_energy=ts.cum_energy_from_power(vehicle_df["charger_power"]),
+        cum_energy_spent=ts.cum_integral(vehicle_df["power"]),
+        cum_charging_energy=ts.cum_integral(vehicle_df["charger_power"]),
         )
         .pipe(ts.soh_from_est_battery_range, "battery_range_km", MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC)
         .pipe(ts.in_motion_mask_from_odo_diff)

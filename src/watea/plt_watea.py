@@ -13,7 +13,7 @@ from watea.watea_perfs import fleet_wise_perfs_of_watea, default_100_soh_dist
 def main():
     install_rich_traceback(extra_lines=0, width=130)
     try:
-        kwargs = parse_kwargs(["plt_layout"], {"plt_id":"all", "x_col":"date", "vehilce_query":None, "fleet_query":None, "ts_query":None})
+        kwargs = parse_kwargs(["plt_layout"], {"plt_id":"all", "x_col":"date", "fleet_query":None, "ts_query":None})
         plt_layout = getattr(constants, kwargs["plt_layout"])
         if kwargs["plt_id"] == "first":
             plt_fleet_info_df = fleet_info_df.query(kwargs["fleet_query"]) if kwargs["fleet_query"] else fleet_info_df
@@ -23,7 +23,7 @@ def main():
                 plt_utils.plt_single_vehicle(vehicle_df, perfs_dict, plt_layout, default_100_soh_dist, title=id, x_col=kwargs["x_col"])
         elif kwargs["plt_id"] == "fleet":
             plt_utils.plt_fleet(
-                lambda : iterate_over_fleet(kwargs["vehilce_query"]),
+                lambda : iterate_over_fleet(kwargs["fleet_query"]),
                 plt_layout,
                 fleet_wise_perfs_of_watea(),
                 kwargs["x_col"],

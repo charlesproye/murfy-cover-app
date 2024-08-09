@@ -38,7 +38,7 @@ def compute_soh_from_soc_and_energy_diff(perf_df: DF, kwh_energy_col: str, stock
         .eval(f"{soh_col} = kwh_per_soc / {stock_kwh_per_soc}")
     )
 
-def agg_diffs_df_of(vehicle_df: DF, get_start_end_diff_args: dict[str, str], query:str, grp_by=None) -> DF:
+def agg_diffs_df_of(vehicle_df: DF, get_start_end_diff_args: dict[str, str], query:str, grp_by=None, use_default_diffs=True) -> DF:
     """
     ### Description:
     Computes the "base dataframe" for perf calculation based on diffrences.  
@@ -60,9 +60,12 @@ def agg_diffs_df_of(vehicle_df: DF, get_start_end_diff_args: dict[str, str], que
         query = f"{query}_perf_mask"
     perfs_grps:DF_grp_by = vehicle_df.query(query).groupby(grp_by)
     period_diffs_df_dict = {}
-    diff_cols = {**get_start_end_diff_args, **DEFAULT_DIFF_VARS}
-    for source_col, dest_col in diff_cols.items():
-        period_diffs_df_dict = {**get_start_end_diff_mean(perfs_grps, source_col, dest_col), **period_diffs_df_dict}
+    if use_default_diffs:
+        diff_cols = {**get_start_end_diff_args, **DEFAULT_DIFF_VARS}
+        for source_col, dest_col in diff_cols.items():
+            period_diffs_df_dict = {**get_start_end_diff_mean(perfs_grps, source_col, dest_col), **period_diffs_df_dict}
+    else:
+        diff_cols = get_start_end_diff_args
 
     diffs_df = DF(period_diffs_df_dict)
     diffs_df = (

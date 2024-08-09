@@ -30,11 +30,16 @@ def preprocess_date(vehicle_df: DF) -> DF:
 
     return vehicle_df
 
-def add_cum_energy_from_power_cols(vehicle_df: DF, power_col:str, energy_col:str) -> DF:
-    vehicle_df[energy_col] = cum_energy_from_power(vehicle_df[power_col])
+def compute_cum_integrals_of_current_vars(vehicle_df: DF) -> DF:
+    """
+    ### Description:
+    Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).
+    """
+    vehicle_df["cum_energy"] = cum_integral(vehicle_df["power"])
+    vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"])
     return vehicle_df
 
-def cum_energy_from_power(power_series: Series) -> Series:
+def cum_integral(power_series: Series) -> Series:
     """
     ### Description:
     Computes the cumulative energy of the time series by using cumulative trapezoid intergrating of the power column.

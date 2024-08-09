@@ -41,6 +41,7 @@ def compute_fleet_info() -> DF:
             "model": "string",
             "manufacturer": "string",
             "kwh_capacity": "float",
+            "default_km_range": "float"
         })
         .set_index("model")
     )
@@ -52,6 +53,8 @@ def compute_fleet_info() -> DF:
         }
         vehicle_info_dict["default_kwh_energy_capacity"] = model_infos.at[vehicle_info_dict["model"], "kwh_capacity"]
         vehicle_info_dict["default_kwh_per_soc"] = vehicle_info_dict["default_kwh_energy_capacity"] / 100
+        vehicle_info_dict["default_km_range"] = model_infos.at[vehicle_info_dict["model"], "default_km_range"]
+        vehicle_info_dict["default_km_range_per_soc"] = vehicle_info_dict["default_km_range"] / 100
         fleet_info_objs.append(vehicle_info_dict)
 
     fleet_info_df = DF.from_dict(fleet_info_objs).set_index("vin", drop=False)

@@ -52,16 +52,16 @@ def process_raw_time_series(raw_vehicle_df: DF) -> DF:
         .pipe(ts.perf_mask_and_idx_from_charge_mask, max_time_diff=PERF_MAX_TIME_DIFF)
         .pipe(ts.perf_mask_and_idx_from_condition_mask, "in_discharge")
         .pipe(ts.perf_mask_and_idx_from_charge_mask, PERF_MAX_TIME_DIFF)
-        .pipe(ts.add_cum_energy_from_power_cols, "power", "cum_energy")
+        .pipe(ts.compute_cum_integrals_of_current_vars)
     )
 
 def process_power(vehicle_df: DF) -> DF:
     vehicle_df["window_current_mean"] = (
-        vehicle_df["current"].
-        where(vehicle_df["in_charge"], np.nan).
-        mask(vehicle_df["current"].gt(0), np.nan).
-        rolling(TD(minutes=10)).
-        mean()
+        vehicle_df["current"]
+        .where(vehicle_df["in_charge"], np.nan)
+        .mask(vehicle_df["current"].gt(0), np.nan)
+        .rolling(TD(minutes=10))
+        .mean()
     )
     vehicle_df['power'] = vehicle_df.eval("current * voltage")
 

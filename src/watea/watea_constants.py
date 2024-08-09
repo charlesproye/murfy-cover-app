@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures, FunctionTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
 
 # Default vehicle values
 FORD_ETRANSIT_DEFAULT_KWH_CAPACITY = 89
@@ -17,7 +18,7 @@ PATH_TO_RAW_TS_FOLDER = "data_cache/raw_time_series"
 PATH_TO_RAW_TS = join(PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
 PATH_TO_PROCESSED_TS = "data_cache/processed_time_series/{id}.parquet"
 PATH_TO_FLEET_INFO_DF = "data_cache/fleet_info/fleet_info_df.{extension}"
-PATH_TO_CHARGING_PERF_PER_SOC = "data_cache/perfs/charging_perf_per_soc/{id}.parquet"
+PATH_TO_CHARGING_PERF = "data_cache/perfs/charging_perf_per_soc/{id}.parquet"
 PATH_TO_FLEET_WISE_DISTRIBUTION = "data_cache/perfs/fleet_wise_perfs/charging_energy_distribution.parquet"
 PATH_TO_FLEET_3D_DISTRIBUTION = "data_cache/plots/fleet_wise_perfs/charging_energy_distribution.html"
 PATH_TO_DEFAULT_DIST_SHAPE = "perfs/default/dist_shape.parquet"
@@ -27,11 +28,23 @@ PATH_TO_FLEET_CHARGING_POINTS = "perfs/default/fleet_charging_points.parquet"
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 
 # charge energy distribution
-ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST = 3000
-ODO_RANGE_FORMAT_STR = lambda odo_val: f"[{(odo_val/1000):.0f}k, {((odo_val+ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST)/1000):.0f}k]"
-TEMP_FLOOR_RANGE_FOR_ENERGY_DIST = 5
-power_FLOOR_RANGE_FOR_ENERGY_DIST = 5
-COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
+# energy points group by constants:
+ENERGY_POINTS_GRP_BY_ODOMETER_QUANTIZATION = 3000
+ENERGY_POINTS_GRP_BY_TEMPERATURE_QUANTIZATION = 5
+ENERGY_POINTS_GRP_BY_VOLTAGE_QUANTIZATION = 0.5
+ENERGY_POINTS_GRP_BY_SOC_QUANTIZATION = 0.5
+# Data to extract from charge periods:
+ENERGY_POINTS_AGGREGATION_DICT = {
+    "cum_energy": "energy_added",
+    "battery_range_km": "range_gained",
+    "power": "power_diff",
+    "cum_charge": "charge",
+    "voltage": "voltage_diff",
+    "current": "current_diff",
+    "temp": "temp_diff",
+}
+# Unecessary columns
+COLS_TO_DROP_FOR_ENERGY_POINTS = [
     "start_odometer",
     "end_odometer",
     "mean_odometer",
@@ -41,23 +54,37 @@ COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
     "mean_date",
     "start_soc",
     "end_soc",
-    "mean_soc",
+    # "mean_soc",
     "soc_diff",
     "end_cum_energy",
     "start_cum_energy",
     "mean_cum_energy",
     "mean_odo",
 ]
-MOST_COMMON_CHARGE_REGIME_QUERY = "energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5"
-SOC_RANGE = np.arange(0, 100.5, 0.5, dtype=float)
+# MEDIAN COMPUTATION
+MOST_COMMON_CHARGE_REGIME_QUERY = "energy_added > 300 & sec_duration < 900 & temp < 35 & mean_voltage < 400 & mean_current > -40"
+# DIST FIT
+SOC_RANGE = np.arange(0, 100 + ENERGY_POINTS_GRP_BY_SOC_QUANTIZATION, ENERGY_POINTS_GRP_BY_SOC_QUANTIZATION, dtype=float)
+VOLTAGE_RANGE = np.arange(330, 400 + ENERGY_POINTS_GRP_BY_VOLTAGE_QUANTIZATION, ENERGY_POINTS_GRP_BY_VOLTAGE_QUANTIZATION, dtype=float)
+
+# Combine polynomial and cosine features using ColumnTransformer
+# cosine_transformer = FunctionTransformer(lambda x: np.cos(x), validate=False)
+# feature_augmentation = ColumnTransformer([
+#     ('poly_features', PolynomialFeatures(degree=4), [0]),  # Use list of one item
+#     ('cosine_feature', cosine_transformer, [0])  # Use list of one item
+# ])
+
+# Define the pipeline
 CHARGE_ENERGY_POINTS_TO_DIST_MODEL = Pipeline([
     ('reshape', FunctionTransformer(lambda x: x.reshape(-1, 1))),
-    ('poly_features', PolynomialFeatures(degree=4)),
+    # ('feature_augmentation', feature_augmentation),
     ('regressor', LinearRegression())
 ])
 DIST_TO_FIT_IDX = (0, 25.0)
 
 # ========================================================plt constants========================================================
+ODO_RANGE_FORMAT_STR = lambda odo_val: f"[{(odo_val/1000):.0f}k, {((odo_val+ENERGY_POINTS_GRP_BY_ODOMETER_QUANTIZATION)/1000):.0f}k]"
+# plt layouts:
 JUST_ENERGY_SOH = {
     "perfs_dict": {
         "energy_soh": ["soh"],
@@ -127,13 +154,22 @@ DEBUG_CHARGE_MASK = {
                 "color":"green",
                 "alpha":0.4
             },
-            {
-                "kind":"hlines",
-                "y":0.,
-                "linestyle":"--",
-                "color":"blue",
-                "alpha":0.7,
-            },
+        ],
+    ]
+}
+
+POWER_AND_CHARGE = {
+    "vehicle_df": [
+        {"y":"current", "color":"green"},
+        {"y":"voltage", "color":"red"},
+        [
+            "soc",
+            "in_charge",
+        ],
+        [
+            {"y":"cum_energy", "color":"green"},
+            "twinx",
+            {"y":"cum_charge", "color":"red"},
         ],
     ]
 }

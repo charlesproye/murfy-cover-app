@@ -31,7 +31,7 @@ def data_caching_wrapper(vin: str, path_to_cache: str, data_gen_func: Callable[P
     
     return READ_FUCNTIONS[extension](path_to_cache, **read_kwargs)
 
-def save_cache_to(data: DF|Series, path:str, **kwargs):
+def save_cache_to(data: DF, path:str, **kwargs):
     """
     ### Description:
     Creates the parent dirs if they don't exist.

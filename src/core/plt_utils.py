@@ -74,6 +74,12 @@ def plt_charge_energy_data(charging_points: DF, dists: Series,fig: Figure, scatt
     axs = axs_for_energy_dist(fig, dists)
     lvl_0_idxs: pd.Index = dists.index.get_level_values(0).unique().sort_values()
     lvl_1_idxs: pd.Index = dists.index.get_level_values(1).unique().sort_values()
+
+    print(dists.xs(25.0, level=1).drop_duplicates())
+
+    # print(dists.index.get_level_values(1).unique())
+    # print(charging_points.index.get_level_values(1).unique())
+    
     for lvl_1_idx in lvl_1_idxs:
         points_lvl_0_xs = charging_points.xs(lvl_1_idx, level=1)
         dist_lvl_0_xs = dists.xs(lvl_1_idx, level=1)
@@ -230,7 +236,7 @@ def plt_time_series_plotly(df:DF, cols:list[str], save_to:str=None, show=True):
     if save_to:
         fig.write_html(save_to)
 
-def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, size=3):
+def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, colorscale='Viridis', size=3, figure_kwargs={}):
     fig = go.Figure(data=[go.Scatter3d(
         x=df[x],
         y=df[y],
@@ -240,10 +246,11 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
             size=size,
             opacity=opacity,
             color=df[color],
-            colorscale='Viridis',
+            colorscale=colorscale,
             colorbar=dict(title=color),
 
-        )
+        ),
+        
     )])
     fig.update_layout(
         margin=dict(l=0, r=0, b=0, t=0),
@@ -260,6 +267,8 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
         width=2000,  # Adjust width as needed
         height=1200   # Adjust height as needed
     )
+    # fig.update_yaxes(type="log")
+
     if save_path:
         ensure_that_dirs_exist(save_path)
         fig.write_html(save_path)
