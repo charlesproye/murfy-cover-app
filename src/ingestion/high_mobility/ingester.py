@@ -298,17 +298,22 @@ class HMIngester:
             self.__job_queue.task_done()
 
     def run(self):
-        self.__update_vehicles_initial()
-        worker_thread = threading.Thread(target=self.__process_job_queue)
-        self.__scheduler_logger.info("Starting initial scheduler run")
-        self.__scheduler.run_all()
-        self.__scheduler.every().day.at(self.compress_time).do(
-            self.__job_queue.put, self.__compress
-        ).tag("compress")
-        self.__scheduler_logger.info(f"Schedule S3 compressing at {self.compress_time}")
-        self.__ingester_logger.info("Starting worker thread")
-        worker_thread.start()
-        self.__scheduler_logger.info("Starting scheduler")
-        while 1:
-            self.__scheduler.run_pending()
+        if os.getenv("COMPRESS_ONLY"):
+            self.__compress()
+        else:
+            self.__update_vehicles_initial()
+            worker_thread = threading.Thread(target=self.__process_job_queue)
+            self.__scheduler_logger.info("Starting initial scheduler run")
+            self.__scheduler.run_all()
+            self.__scheduler.every().day.at(self.compress_time).do(
+                self.__job_queue.put, self.__compress
+            ).tag("compress")
+            self.__scheduler_logger.info(
+                f"Schedule S3 compressing at {self.compress_time}"
+            )
+            self.__ingester_logger.info("Starting worker thread")
+            worker_thread.start()
+            self.__scheduler_logger.info("Starting scheduler")
+            while 1:
+                self.__scheduler.run_pending()
 
