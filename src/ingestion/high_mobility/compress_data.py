@@ -17,6 +17,8 @@ T = TypeVar("T")
 
 
 class HMCompresser:
+    __logger: logging.Logger
+
     __s3 = boto3.client("s3")
 
     __kia: dict[str, set[str]]
@@ -24,9 +26,10 @@ class HMCompresser:
     __mercedes_benz: dict[str, set[str]]
 
     def __init__(self, s3, bucket) -> None:
+        self.__logger = logging.getLogger("COMPRESSER")
         self.__s3 = s3
         self.__bucket = bucket
-        logging.info("Listing bucket objects")
+        self.__logger.info("Listing bucket objects")
         self.list_objects()
 
     def list_objects(self):
@@ -50,7 +53,7 @@ class HMCompresser:
             k: set(filter(lambda e: e.startswith(f"response/kia/{k}/temp/"), kia))
             for k in kia_vins
         }
-        logging.info("Listed all kia vehicles")
+        self.__logger.info("Listed all kia vehicles")
         renault_vins = set(map(lambda v: v.split("/")[2], renault))
         self.__renault = {
             k: set(
@@ -58,7 +61,7 @@ class HMCompresser:
             )
             for k in renault_vins
         }
-        logging.info("Listed all renault vehicles")
+        self.__logger.info("Listed all renault vehicles")
         mercedes_benz_vins = set(map(lambda v: v.split("/")[2], mercedes_benz))
         self.__mercedes_benz = {
             k: set(
@@ -69,16 +72,16 @@ class HMCompresser:
             )
             for k in mercedes_benz_vins
         }
-        logging.info("Listed all mercedes-benz vehicles")
+        self.__logger.info("Listed all mercedes-benz vehicles")
 
     def __process_temp(self, items, brand, merge):
         for k, v in items.items():
             today = datetime.today().date()
-            logging.info(f"Compressing data for VIN {k} (brand {brand})")
+            self.__logger.info(f"Compressing data for VIN {k} (brand {brand})")
             try:
                 encoded = msgspec.json.encode(merge(v))
             except msgspec.EncodeError as e:
-                logging.error(
+                self.__logger.error(
                     f"Failed to encode merged vehicle data for VIN {k} (brand {brand}): {e}"
                 )
                 return None
@@ -89,11 +92,11 @@ class HMCompresser:
             )
             match put_response["ResponseMetadata"]["HTTPStatusCode"]:
                 case 200:
-                    logging.info(
+                    self.__logger.info(
                         f"Uploaded compressed data for VIN {k} (brand {brand}) at location response/{brand}/{k}/{today}.json"
                     )
                 case _:
-                    logging.error(
+                    self.__logger.error(
                         f"Failed to upload compressed data for VIN {k} (brand {brand}): {put_response}"
                     )
 
@@ -104,19 +107,19 @@ class HMCompresser:
                 get_response = self.__s3.get_object(Bucket=self.__bucket, Key=k)
                 match get_response["ResponseMetadata"]["HTTPStatusCode"]:
                     case 200:
-                        logging.info(
+                        self.__logger.info(
                             f"Fetched temporary data {k} (brand kia) successfully"
                         )
                         content = get_response["Body"].read().decode("utf-8")
                     case _:
-                        logging.error(
+                        self.__logger.error(
                             f"Failed to fetch temporary data {k} (brand kia): {get_response}"
                         )
                         return None
                 try:
                     parsed = msgspec.json.decode(content, type=KiaInfo)
                 except msgspec.ValidationError as e:
-                    logging.error(
+                    self.__logger.error(
                         f"Failed to parse temporary data {k} (brand kia): {e}"
                     )
                     return None
@@ -128,9 +131,11 @@ class HMCompresser:
                 delete_response = self.__s3.delete_object(Bucket=self.__bucket, Key=k)
                 match delete_response["ResponseMetadata"]["HTTPStatusCode"]:
                     case 204:
-                        logging.info(f"Deleted temporary datapoint {k} (brand kia)")
+                        self.__logger.info(
+                            f"Deleted temporary datapoint {k} (brand kia)"
+                        )
                     case _:
-                        logging.error(
+                        self.__logger.error(
                             f"Error deleting temporary datapoint {k} (brand kia): {delete_response}"
                         )
                         return None
@@ -145,19 +150,19 @@ class HMCompresser:
                 get_response = self.__s3.get_object(Bucket=self.__bucket, Key=k)
                 match get_response["ResponseMetadata"]["HTTPStatusCode"]:
                     case 200:
-                        logging.info(
+                        self.__logger.info(
                             f"Fetched temporary data {k} (brand renault) successfully"
                         )
                         content = get_response["Body"].read().decode("utf-8")
                     case _:
-                        logging.error(
+                        self.__logger.error(
                             f"Failed to fetch temporary data {k} (brand renault): {get_response}"
                         )
                         return None
                 try:
                     parsed = msgspec.json.decode(content, type=RenaultInfo)
                 except msgspec.ValidationError as e:
-                    logging.error(
+                    self.__logger.error(
                         f"Failed to parse temporary data {k} (brand renault): {e}"
                     )
                     return None
@@ -169,9 +174,11 @@ class HMCompresser:
                 delete_response = self.__s3.delete_object(Bucket=self.__bucket, Key=k)
                 match delete_response["ResponseMetadata"]["HTTPStatusCode"]:
                     case 204:
-                        logging.info(f"Deleted temporary datapoint {k} (brand renault)")
+                        self.__logger.info(
+                            f"Deleted temporary datapoint {k} (brand renault)"
+                        )
                     case _:
-                        logging.error(
+                        self.__logger.error(
                             f"Error deleting temporary datapoint {k} (brand renault): {delete_response}"
                         )
                         return None
@@ -186,19 +193,19 @@ class HMCompresser:
                 get_response = self.__s3.get_object(Bucket=self.__bucket, Key=k)
                 match get_response["ResponseMetadata"]["HTTPStatusCode"]:
                     case 200:
-                        logging.info(
+                        self.__logger.info(
                             f"Fetched temporary data {k} (brand mercedes-benz) successfully"
                         )
                         content = get_response["Body"].read().decode("utf-8")
                     case _:
-                        logging.error(
+                        self.__logger.error(
                             f"Failed to fetch temporary data {k} (brand mercedes-benz): {get_response}"
                         )
                         return None
                 try:
                     parsed = msgspec.json.decode(content, type=MercedesBenzInfo)
                 except msgspec.ValidationError as e:
-                    logging.error(
+                    self.__logger.error(
                         f"Failed to parse temporary data {k} (brand mercedes-benz): {e}"
                     )
                     return None
@@ -210,11 +217,11 @@ class HMCompresser:
                 delete_response = self.__s3.delete_object(Bucket=self.__bucket, Key=k)
                 match delete_response["ResponseMetadata"]["HTTPStatusCode"]:
                     case 204:
-                        logging.info(
+                        self.__logger.info(
                             f"Deleted temporary datapoint {k} (brand mercedes-benz)"
                         )
                     case _:
-                        logging.error(
+                        self.__logger.error(
                             f"Error deleting temporary datapoint {k} (brand mercedes-benz): {delete_response}"
                         )
                         return None
@@ -223,10 +230,10 @@ class HMCompresser:
         self.__process_temp(self.__mercedes_benz, "mercedes-benz", merge)
 
     def run(self):
-        logging.info("Starting mercedes-benz data compression")
+        self.__logger.info("Starting mercedes-benz data compression")
         self.compress_mercedes_benz()
-        logging.info("Starting kia data compression")
+        self.__logger.info("Starting kia data compression")
         self.compress_kia()
-        logging.info("Starting renault data compression")
+        self.__logger.info("Starting renault data compression")
         self.compress_renault()
 

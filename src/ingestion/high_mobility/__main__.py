@@ -14,13 +14,13 @@ def main():
     if LOG_FILE is None:
         logging.basicConfig(
             level=logging.getLevelNamesMapping().get(LOG_LEVEL),
-            format="%(asctime)s - %(levelname)s - %(message)s",
+            format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         )
     else:
         logging.basicConfig(
             filename=LOG_FILE,
             level=logging.getLevelNamesMapping().get(LOG_LEVEL),
-            format="%(asctime)s - %(levelname)s - %(message)s",
+            format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         )
 
     parser = argparse.ArgumentParser(
