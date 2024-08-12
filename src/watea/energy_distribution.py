@@ -1,6 +1,3 @@
-"""
-This module implements the energy_soh pipeline. 
-"""
 # Currently this is in watea but it's destined to be moved to core when we will use it for tesla
 from pandas import DataFrame as DF
 from pandas import Series
@@ -85,88 +82,33 @@ def aggregate_energy_points_across_charges(energy_points:DF) -> DF:
     )
 
 def compute_charging_points(ts:DF, id:str) -> DF:
-    """
-    ### Description:
-    This function computes the distribution of required energy to gain one 0.5% soc over:
-    - odometer intervals of width ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST
-    - temperature intervals of width TEMP_FLOOR_RANGE_FOR_ENERGY_DIST
-    - soc (yes, the energy required to gain one soc also depends on the current soc)
-    # Returns:
-    Dataframe multi indexed by odometer range, temp range, soc. 
-    Main column is energy_added, the other are not really important
-    """
     # Use the index/location of the id of the ts in the fleet_info_df to track back the origin of energy points during debugging
     # TODO: use hashing or another method that is only dependent on the id instead of the location in the fleet info order
     id_idx = fleet_info_df.index.get_loc(id) 
     return (
         ts
         .assign(ffilled_odometer=ts["odometer"].ffill())
-        .assign(ffilled_current=ts["current"].ffill())
-        # .assign(ffilled_voltage=ts["voltage"].ffill()) 
-        # .assign(ffilled_temp=ts["temp"].ffill())
+        .assign(floored_soc=floor_to(ts["soc"].ffill(), ENERGY_POINTS_GRP_BY_SOC_QUANTIZATION))
         .query("in_charge_perf_mask")
-        .groupby([
-                ts["in_charge_perf_idx"],
-                floor_to(ts["soc"].ffill(), ENERGY_POINTS_GRP_BY_SOC_QUANTIZATION),
-            ], 
-            sort=True,
+        .groupby(["in_charge_perf_idx","floored_soc",], sort=True)
+        # TODO: Use pd.NamedAgg & agg kwargs instead of agg & rename
+        .agg(
+            odometer=pd.NamedAgg("ffilled_odometer", "mean"),
+            energy_added=pd.NamedAgg("cum_energy", series_start_end_diff),
+            voltage=pd.NamedAgg("voltage", "median"),
+            current=pd.NamedAgg("current", "median"),
+            temperature=pd.NamedAgg("temp", "median"),
+            sec_duration=pd.NamedAgg("date", lambda s: series_start_end_diff(s).total_seconds()),
+            date=pd.NamedAgg("date", lambda s: s.iat[0]),
+            soc=pd.NamedAgg("floored_soc", "mean"),
         )
-        .agg({
-            "ffilled_odometer": "mean",
-            "cum_energy": series_start_end_diff,
-            "voltage": "mean",
-            "temp": "mean",
-            "ffilled_current": "mean",
-        })
-        .rename(columns={
-            "cum_energy": "energy_added",
-            "ffilled_odometer": "odometer",
-            "ffilled_current": "current",
-        })
         .assign(energy_added=lambda df: df["energy_added"].replace(0, np.nan))
         # Deubgging
+        .assign(id=id)
         .assign(charge_idx=lambda df: df.index.get_level_values(0))
-        .assign(charge_id=lambda df: id_idx + df["charge_idx"])
         .assign(id_idx=id_idx)
+        .assign(charge_id= lambda df: id + "_"  + df["charge_idx"].astype("string"))
         .eval("energy_added = energy_added * -1")
-        # .eval("voltage = voltage * -1")
-        # .eval("power = energy_added / sec_duration")
+        .eval("current = current * -1")
     )
-# def compute_charging_points(vehicle_df:DF, id:str) -> DF:
-#     """
-#     ### Description:
-#     This function computes the distribution of required energy to gain one 0.5% soc over:
-#     - odometer intervals of width ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST
-#     - temperature intervals of width TEMP_FLOOR_RANGE_FOR_ENERGY_DIST
-#     - soc (yes, the energy required to gain one soc also depends on the current soc)
-#     # Returns:
-#     Dataframe multi indexed by odometer range, temp range, soc. 
-#     Main column is energy_added, the other are not really important
-#     """
-#     # Use the index/location of the id of the ts in the fleet_info_df to track back the origin of energy points during debugging
-#     id_idx = fleet_info_df.index.get_loc(id) 
-#     return (
-#         vehicle_df
-#         .pipe(
-#             perfs.agg_diffs_df_of,
-#             ENERGY_POINTS_AGGREGATION_DICT, 
-#             "in_charge_perf_mask",
-#             compute_energy_points_grp_by(vehicle_df),
-#         )
-#         .assign(energy_added=lambda df: df["energy_added"].replace(0, np.nan))
-#         .assign(charge_idx=lambda df: df.index.get_level_values(2))
-#         .drop(columns=COLS_TO_DROP_FOR_ENERGY_POINTS)
-#         .sort_index()
-#         .assign(charge_id=lambda df: id_idx + df["charge_idx"])
-#         .assign(id_idx=id_idx)
-#         .eval("energy_added = energy_added * -1")
-#         .eval("power = energy_added / sec_duration")
-#     )
 
-# def compute_energy_points_grp_by(ts: DF) -> list[Series]:
-#     return [
-#         floor_to(ts["odometer"].ffill(), ENERGY_POINTS_GRP_BY_ODOMETER_QUANTIZATION),
-#         floor_to(ts["temp"].ffill(), ENERGY_POINTS_GRP_BY_TEMPERATURE_QUANTIZATION),
-#         ts["in_charge_perf_idx"],
-#         floor_to(ts["soc"].ffill(), ENERGY_POINTS_GRP_BY_SOC_QUANTIZATION),
-#     ]
