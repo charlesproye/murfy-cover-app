@@ -50,13 +50,13 @@ class HMIngester:
 
     refresh_interval: int = 2 * 60
     upload_interval: int = 60
-    compress_time: str = "04:00"
+    compress_interval: int = 12
 
     def __init__(
         self,
         refresh_interval: Optional[int] = 2 * 60,
         max_workers: Optional[int] = 8,
-        compress_time: Optional[str] = "04:00",
+        compress_interval: Optional[int] = 12,
     ):
         """
         Parameters
@@ -67,9 +67,9 @@ class HMIngester:
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
             default: 8
-        compress_time: str, optional
-            The time of day at which to compress the S3 data
-            default: 04:00
+        compress_interval: int, optional
+            The interval at which to compress the S3 data (in hours)
+            default: 12
         """
         dotenv.load_dotenv()
         HM_BASE_URL = os.getenv("HM_BASE_URL")
@@ -118,7 +118,7 @@ class HMIngester:
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.__job_queue = Queue()
         self.refresh_interval = refresh_interval or self.refresh_interval
-        self.compress_time = compress_time or self.compress_time
+        self.compress_interval = compress_interval or self.compress_interval
 
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
@@ -305,11 +305,11 @@ class HMIngester:
             worker_thread = threading.Thread(target=self.__process_job_queue)
             self.__scheduler_logger.info("Starting initial scheduler run")
             self.__scheduler.run_all()
-            self.__scheduler.every().day.at(self.compress_time).do(
+            self.__scheduler.every(self.compress_interval).hours.do(
                 self.__job_queue.put, self.__compress
             ).tag("compress")
             self.__scheduler_logger.info(
-                f"Schedule S3 compressing at {self.compress_time}"
+                f"Schedule S3 compressing at {self.compress_interval}"
             )
             self.__ingester_logger.info("Starting worker thread")
             worker_thread.start()

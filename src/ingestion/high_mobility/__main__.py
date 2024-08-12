@@ -42,7 +42,7 @@ def main():
     parser.add_argument(
         "--refresh_interval",
         type=int,
-        help="interval (in seconds) at which to refresh the list of clearances",
+        help="interval (in minutes) at which to refresh the list of clearances",
     )
     parser.add_argument(
         "--max_workers",
@@ -50,16 +50,16 @@ def main():
         help="maximum number of threads to fetch the vehicles info (mostly limited by S3)",
     )
     parser.add_argument(
-        "--compress_time",
+        "--compress_interval",
         type=str,
-        help="time of day at which to compress S3 data",
+        help="interval (in hours) at which to compress S3 data",
     )
     args = parser.parse_args()
 
     ingester = HMIngester(
         refresh_interval=args.refresh_interval,
         max_workers=args.max_workers,
-        compress_time=args.compress_time,
+        compress_interval=args.compress_interval,
     )
 
     ingester.run()
