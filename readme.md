@@ -1,4 +1,4 @@
-# EV data analysis  package
+# EV data analysis package
 
 ### Context:
 The goal of this package is to handle every step of the data analytics service of Bib:
@@ -130,3 +130,9 @@ Most of the `data_cache` sub folders will be created automatically.
 The only one that you need to set up is the one used by `raw_XX_ts` to create the raw time series tables.  
 In the case of watea, this is `bib_export` and the folders corresponding to the vehicles.  
 Then you should be able to run any script and the data that it depends on should be generated if it is not yet cached.  
+
+---
+## Watea:
+To setup watea data, you must:
+1. Download the zip file `bib_export` from the google drive into `data_cache`.
+1. Unzip `bib_export` and then run in `src/watea` `setup_raw_ts.sh`.
