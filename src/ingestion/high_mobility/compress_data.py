@@ -4,7 +4,7 @@ from typing import Optional, TypeVar
 
 import boto3
 import msgspec
-from ingestion.schema.high_mobility_schema import (
+from ingestion.high_mobility.schema import (
     KiaInfo,
     MercedesBenzInfo,
     MergedKiaInfo,

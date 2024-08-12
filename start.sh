@@ -45,7 +45,7 @@ main() {
     # ACCESSLOG=${ACCESSLOG:-true}
     # ERRORLOG=${ERRORLOG:-true}
 
-    chunks=("python3" "./src/ingestion/ingest.py")
+    chunks=("python3" "./src/ingestion/high_mobility")
 
     # [[ "$ACCESSLOG" == "true" ]] && chunks+=("--access-logfile" "-")
     # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")

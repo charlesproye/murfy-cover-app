@@ -4,15 +4,24 @@ import os
 import textwrap
 
 import dotenv
-from ingestion.high_mobility_ingester import HMIngester
+from ingestion.high_mobility.ingester import HMIngester
 
-if __name__ == "__main__":
+
+def main():
     dotenv.load_dotenv()
     LOG_LEVEL = os.getenv("LOG_LEVEL") or "INFO"
-    logging.basicConfig(
-        level=logging.getLevelNamesMapping().get(LOG_LEVEL),
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
+    LOG_FILE = os.getenv("LOG_FILE")
+    if LOG_FILE is None:
+        logging.basicConfig(
+            level=logging.getLevelNamesMapping().get(LOG_LEVEL),
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
+    else:
+        logging.basicConfig(
+            filename=LOG_FILE,
+            level=logging.getLevelNamesMapping().get(LOG_LEVEL),
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -54,4 +63,8 @@ if __name__ == "__main__":
     )
 
     ingester.run()
+
+
+if __name__ == "__main__":
+    main()
 

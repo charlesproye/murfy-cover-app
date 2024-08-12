@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote, urlencode
 
 import requests
-from ingestion.vehicle import Vehicle
+from ingestion.high_mobility.vehicle import Vehicle
 
 
 class HMApi:

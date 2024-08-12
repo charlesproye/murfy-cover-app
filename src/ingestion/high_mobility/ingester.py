@@ -10,26 +10,32 @@ import boto3
 import dotenv
 import msgspec
 import schedule
-from ingestion.compress_high_mobility_data import HMCompresser
-from ingestion.high_mobility_api import HMApi
-from ingestion.schema.high_mobility_schema import (
+from ingestion.high_mobility.api import HMApi
+from ingestion.high_mobility.compress_data import HMCompresser
+from ingestion.high_mobility.schema import (
     KiaInfo,
     MercedesBenzInfo,
     RenaultInfo,
 )
-from ingestion.vehicle import Vehicle
+from ingestion.high_mobility.vehicle import Vehicle
 
 
 class HMIngester:
     __api: HMApi
     __s3 = boto3.client("s3")
     __bucket: str
-    __compresser: HMCompresser
 
     __scheduler = schedule.Scheduler()
     __vehicles: set[Vehicle] = set()
     __executor: concurrent.futures.ThreadPoolExecutor
     __job_queue: Queue[Callable]
+
+    __json_encoder = msgspec.json.Encoder()
+    __encode_buffer = bytearray()
+
+    def __encode(self, obj):
+        self.__json_encoder.encode_into(obj, self.__encode_buffer)
+        return self.__encode_buffer
 
     rate_limit: dict[str, int] = {
         # Minimum time in seconds between two requests per vehicle for each maker
@@ -104,7 +110,6 @@ class HMIngester:
             aws_secret_access_key=S3_SECRET,
         )
         self.__bucket = S3_BUCKET
-        self.__compresser = HMCompresser(self.__s3, self.__bucket)
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.__job_queue = Queue()
         self.refresh_interval = refresh_interval or self.refresh_interval
@@ -250,8 +255,9 @@ class HMIngester:
                     f"Parsed response for vehicle with VIN {vehicle.vin} correctly"
                 )
                 filename = f"response/{vehicle.brand}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
+                encoded = self.__encode(decoded)
                 uploaded = self.__s3.put_object(
-                    Body=msgspec.json.encode(decoded),
+                    Body=encoded,
                     Bucket=self.__bucket,
                     Key=filename,
                 )
@@ -269,6 +275,11 @@ class HMIngester:
                 log_error(info)
                 return
 
+    def __compress(self):
+        logging.info("Starting compression job")
+        compresser = HMCompresser(self.__s3, self.__bucket)
+        compresser.run()
+
     def __process_job_queue(self):
         logging.info("Starting processing job queue")
         while 1:
@@ -282,9 +293,9 @@ class HMIngester:
         logging.info("Starting scheduler")
         self.__scheduler.run_all()
         self.__scheduler.every().day.at(self.compress_time).do(
-            self.__job_queue.put, self.__compresser.run
+            self.__job_queue.put, self.__compress
         ).tag("compress")
-        logging.info("Schedule S3 compressing at 4AM")
+        logging.info(f"Schedule S3 compressing at {self.compress_time}")
         logging.info("Starting worker thread")
         worker_thread.start()
         while 1:
