@@ -67,17 +67,10 @@ MOST_COMMON_CHARGE_REGIME_QUERY = "energy_added > 300 & sec_duration < 900 & tem
 SOC_RANGE = np.arange(0, 100 + ENERGY_POINTS_GRP_BY_SOC_QUANTIZATION, ENERGY_POINTS_GRP_BY_SOC_QUANTIZATION, dtype=float)
 VOLTAGE_RANGE = np.arange(330, 400 + ENERGY_POINTS_GRP_BY_VOLTAGE_QUANTIZATION, ENERGY_POINTS_GRP_BY_VOLTAGE_QUANTIZATION, dtype=float)
 
-# Combine polynomial and cosine features using ColumnTransformer
-# cosine_transformer = FunctionTransformer(lambda x: np.cos(x), validate=False)
-# feature_augmentation = ColumnTransformer([
-#     ('poly_features', PolynomialFeatures(degree=4), [0]),  # Use list of one item
-#     ('cosine_feature', cosine_transformer, [0])  # Use list of one item
-# ])
-
 # Define the pipeline
 CHARGE_ENERGY_POINTS_TO_DIST_MODEL = Pipeline([
     ('reshape', FunctionTransformer(lambda x: x.reshape(-1, 1))),
-    # ('feature_augmentation', feature_augmentation),
+    ('poly_features', PolynomialFeatures(degree=6)),
     ('regressor', LinearRegression())
 ])
 DIST_TO_FIT_IDX = (0, 25.0)
