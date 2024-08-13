@@ -20,11 +20,11 @@ from watea.raw_watea_ts import raw_ts_of
 def main():
     install_rich_traceback(extra_lines=0, width=130)
     kwargs = parse_kwargs()
-    for id, vehicle_df in processed_ts_iterator(force_update=True):
+    for id, vehicle_df in processed_ts_it(force_update=True):
         print(id)
         print(vehicle_df)
 
-def processed_ts_iterator(fleet_query: str=None, ts_query=None, force_update:bool=False, **kwargs) -> Generator[tuple[str, DF], None, None]:
+def processed_ts_it(fleet_query: str=None, ts_query=None, force_update:bool=False, **kwargs) -> Generator[tuple[str, DF], None, None]:
     for id in iterate_over_ids(fleet_query, **kwargs):
         ts = processed_ts_of(id, force_update, **kwargs)
         if not ts_query is None:
