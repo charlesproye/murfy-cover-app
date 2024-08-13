@@ -3,7 +3,7 @@ from pandas import DataFrame as DF
 from rich.traceback import install as install_rich_traceback
 from itertools import starmap
 
-from watea.processed_watea_ts import processed_ts_iterator
+from watea.processed_watea_ts import processed_ts_it
 from watea.energy_distribution import *
 from watea.watea_constants import *
 from core.argparse_utils import parse_kwargs
@@ -35,7 +35,7 @@ def energy_soh_perfs_of(vehicle_df: DF, id:str, force_update=False) -> dict[str,
     return perfs
 
 def fleet_wise_perfs_of_watea(force_update=False) -> dict[str, DF|Series]:
-    energy_points = pd.concat(list(starmap(lambda id, ts: charge_energy_points_of(id, ts, force_update), processed_ts_iterator("has_power_during_charge"))))
+    energy_points = pd.concat(list(starmap(lambda id, ts: charge_energy_points_of(id, ts, force_update), processed_ts_it("has_power_during_charge"))))
     perfs: dict[str, DF] = {"charging_points":energy_points, "medians": compute_charge_energy_median(energy_points)}
     perfs["default_dist_shape"] = fit_poly_lr_to_charge_dist_xs(perfs["medians"].xs(DIST_TO_FIT_IDX))
     perfs["default_dist_shape"] = perfs["default_dist_shape"].sub(perfs["default_dist_shape"].min())
@@ -50,7 +50,7 @@ def charge_energy_points_of(id:str, vehicle_df: DF, force_update=False) -> DF:
     return data_caching_wrapper(
         id,
         PATH_TO_CHARGING_PERF.format(id=id),
-        lambda _: compute_charging_points(vehicle_df, id),
+        lambda _: extract_charging_points_of_ts(vehicle_df, id),
         force_update,
     )
 
