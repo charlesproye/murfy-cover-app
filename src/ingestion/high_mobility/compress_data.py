@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from typing import Optional, TypeVar
 
 import boto3
 import msgspec
@@ -13,8 +12,6 @@ from ingestion.high_mobility.schema import (
     RenaultInfo,
 )
 
-T = TypeVar("T")
-
 
 class HMCompresser:
     __logger: logging.Logger
@@ -25,12 +22,15 @@ class HMCompresser:
     __renault: dict[str, set[str]]
     __mercedes_benz: dict[str, set[str]]
 
-    def __init__(self, s3, bucket) -> None:
+    threaded: bool = False
+
+    def __init__(self, s3, bucket, threaded: bool = False) -> None:
         self.__logger = logging.getLogger("COMPRESSER")
         self.__s3 = s3
         self.__bucket = bucket
         self.__logger.info("Listing bucket objects")
         self.list_objects()
+        self.threaded = threaded
 
     def list_objects(self):
         paginator = self.__s3.get_paginator("list_objects_v2")
@@ -74,7 +74,93 @@ class HMCompresser:
         }
         self.__logger.info("Listed all mercedes-benz vehicles")
 
-    def __process_temp(self, items, brand, merge):
+    def __process_temp(self, items, brand):
+        def merge(ks: set[str]):
+            merged = None
+            for k in ks:
+                get_response = self.__s3.get_object(Bucket=self.__bucket, Key=k)
+                match get_response["ResponseMetadata"]["HTTPStatusCode"]:
+                    case 200:
+                        self.__logger.info(
+                            f"Fetched temporary data {k} (brand {brand}) successfully"
+                        )
+                        content = get_response["Body"].read().decode("utf-8")
+                    case _:
+                        self.__logger.error(
+                            f"Failed to fetch temporary data {k} (brand {brand}): {get_response}"
+                        )
+                        return None
+                match brand:
+                    case "kia":
+                        try:
+                            parsed = msgspec.json.decode(content, type=KiaInfo)
+                        except msgspec.ValidationError as e:
+                            self.__logger.error(
+                                f"Failed to parse temporary data {k} (brand {brand}): {e}"
+                            )
+                            return None
+                        if parsed is not None:
+                            if merged is None:
+                                merged = MergedKiaInfo.from_initial(parsed)
+                            else:
+                                if isinstance(merged, MergedKiaInfo):
+                                    merged.merge(parsed)
+                                else:
+                                    self.__logger.error(
+                                        "Cannot compress different vehicle types together"
+                                    )
+                                    return
+                    case "renault":
+                        try:
+                            parsed = msgspec.json.decode(content, type=RenaultInfo)
+                        except msgspec.ValidationError as e:
+                            self.__logger.error(
+                                f"Failed to parse temporary data {k} (brand {brand}): {e}"
+                            )
+                            return None
+                        if parsed is not None:
+                            if merged is None:
+                                merged = MergedRenaultInfo.from_initial(parsed)
+                            else:
+                                if isinstance(merged, MergedRenaultInfo):
+                                    merged.merge(parsed)
+                                else:
+                                    self.__logger.error(
+                                        "Cannot compress different vehicle types together"
+                                    )
+                                    return
+                    case "mercedes-benz":
+                        try:
+                            parsed = msgspec.json.decode(content, type=MercedesBenzInfo)
+                        except msgspec.ValidationError as e:
+                            self.__logger.error(
+                                f"Failed to parse temporary data {k} (brand {brand}): {e}"
+                            )
+                            return None
+                        if parsed is not None:
+                            if merged is None:
+                                merged = MergedMercedesBenzInfo.from_initial(parsed)
+                            else:
+                                if isinstance(merged, MergedMercedesBenzInfo):
+                                    merged.merge(parsed)
+                                else:
+                                    self.__logger.error(
+                                        "Cannot compress different vehicle types together"
+                                    )
+                                    return
+                delete_response = self.__s3.delete_object(Bucket=self.__bucket, Key=k)
+                match delete_response["ResponseMetadata"]["HTTPStatusCode"]:
+                    case 204:
+                        self.__logger.info(
+                            f"Deleted temporary datapoint {k} (brand {brand})"
+                        )
+                    case _:
+                        self.__logger.error(
+                            f"Error deleting temporary datapoint {k} (brand {brand}): {delete_response}"
+                        )
+                        return None
+            return merged
+
         for k, v in items.items():
             today = datetime.today().date()
             self.__logger.info(f"Compressing data for VIN {k} (brand {brand})")
@@ -101,139 +187,22 @@ class HMCompresser:
                     )
 
     def compress_kia(self):
-        def merge(ks: set[str]):
-            merged: Optional[MergedKiaInfo] = None
-            for k in ks:
-                get_response = self.__s3.get_object(Bucket=self.__bucket, Key=k)
-                match get_response["ResponseMetadata"]["HTTPStatusCode"]:
-                    case 200:
-                        self.__logger.info(
-                            f"Fetched temporary data {k} (brand kia) successfully"
-                        )
-                        content = get_response["Body"].read().decode("utf-8")
-                    case _:
-                        self.__logger.error(
-                            f"Failed to fetch temporary data {k} (brand kia): {get_response}"
-                        )
-                        return None
-                try:
-                    parsed = msgspec.json.decode(content, type=KiaInfo)
-                except msgspec.ValidationError as e:
-                    self.__logger.error(
-                        f"Failed to parse temporary data {k} (brand kia): {e}"
-                    )
-                    return None
-                if parsed is not None:
-                    if merged is None:
-                        merged = MergedKiaInfo.from_initial(parsed)
-                    else:
-                        merged.merge(parsed)
-                delete_response = self.__s3.delete_object(Bucket=self.__bucket, Key=k)
-                match delete_response["ResponseMetadata"]["HTTPStatusCode"]:
-                    case 204:
-                        self.__logger.info(
-                            f"Deleted temporary datapoint {k} (brand kia)"
-                        )
-                    case _:
-                        self.__logger.error(
-                            f"Error deleting temporary datapoint {k} (brand kia): {delete_response}"
-                        )
-                        return None
-            return merged
-
-        self.__process_temp(self.__kia, "kia", merge)
+        if not self.threaded:
+            self.__process_temp(self.__kia, "kia")
 
     def compress_renault(self):
-        def merge(ks: set[str]):
-            merged: Optional[MergedRenaultInfo] = None
-            for k in ks:
-                get_response = self.__s3.get_object(Bucket=self.__bucket, Key=k)
-                match get_response["ResponseMetadata"]["HTTPStatusCode"]:
-                    case 200:
-                        self.__logger.info(
-                            f"Fetched temporary data {k} (brand renault) successfully"
-                        )
-                        content = get_response["Body"].read().decode("utf-8")
-                    case _:
-                        self.__logger.error(
-                            f"Failed to fetch temporary data {k} (brand renault): {get_response}"
-                        )
-                        return None
-                try:
-                    parsed = msgspec.json.decode(content, type=RenaultInfo)
-                except msgspec.ValidationError as e:
-                    self.__logger.error(
-                        f"Failed to parse temporary data {k} (brand renault): {e}"
-                    )
-                    return None
-                if parsed is not None:
-                    if merged is None:
-                        merged = MergedRenaultInfo.from_initial(parsed)
-                    else:
-                        merged.merge(parsed)
-                delete_response = self.__s3.delete_object(Bucket=self.__bucket, Key=k)
-                match delete_response["ResponseMetadata"]["HTTPStatusCode"]:
-                    case 204:
-                        self.__logger.info(
-                            f"Deleted temporary datapoint {k} (brand renault)"
-                        )
-                    case _:
-                        self.__logger.error(
-                            f"Error deleting temporary datapoint {k} (brand renault): {delete_response}"
-                        )
-                        return None
-            return merged
-
-        self.__process_temp(self.__renault, "renault", merge)
+        if not self.threaded:
+            self.__process_temp(self.__renault, "renault")
 
     def compress_mercedes_benz(self):
-        def merge(ks: set[str]):
-            merged: Optional[MergedMercedesBenzInfo] = None
-            for k in ks:
-                get_response = self.__s3.get_object(Bucket=self.__bucket, Key=k)
-                match get_response["ResponseMetadata"]["HTTPStatusCode"]:
-                    case 200:
-                        self.__logger.info(
-                            f"Fetched temporary data {k} (brand mercedes-benz) successfully"
-                        )
-                        content = get_response["Body"].read().decode("utf-8")
-                    case _:
-                        self.__logger.error(
-                            f"Failed to fetch temporary data {k} (brand mercedes-benz): {get_response}"
-                        )
-                        return None
-                try:
-                    parsed = msgspec.json.decode(content, type=MercedesBenzInfo)
-                except msgspec.ValidationError as e:
-                    self.__logger.error(
-                        f"Failed to parse temporary data {k} (brand mercedes-benz): {e}"
-                    )
-                    return None
-                if parsed is not None:
-                    if merged is None:
-                        merged = MergedMercedesBenzInfo.from_initial(parsed)
-                    else:
-                        merged.merge(parsed)
-                delete_response = self.__s3.delete_object(Bucket=self.__bucket, Key=k)
-                match delete_response["ResponseMetadata"]["HTTPStatusCode"]:
-                    case 204:
-                        self.__logger.info(
-                            f"Deleted temporary datapoint {k} (brand mercedes-benz)"
-                        )
-                    case _:
-                        self.__logger.error(
-                            f"Error deleting temporary datapoint {k} (brand mercedes-benz): {delete_response}"
-                        )
-                        return None
-            return merged
-
-        self.__process_temp(self.__mercedes_benz, "mercedes-benz", merge)
+        if not self.threaded:
+            self.__process_temp(self.__mercedes_benz, "mercedes-benz")
 
     def run(self):
-        self.__logger.info("Starting mercedes-benz data compression")
-        self.compress_mercedes_benz()
         self.__logger.info("Starting kia data compression")
         self.compress_kia()
+        self.__logger.info("Starting mercedes-benz data compression")
+        self.compress_mercedes_benz()
         self.__logger.info("Starting renault data compression")
         self.compress_renault()
 
