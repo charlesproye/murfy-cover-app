@@ -262,6 +262,51 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
 
     fig.show()
     
+def plot_2d_line(df: pd.DataFrame, x_column: str, y_column: str, line_group_column: str, color: str = None, color_scale: str = None):
+    """
+    Creates a 2D line plot using Plotly with optional color and color scale.
+
+    Parameters:
+        df (pd.DataFrame): The input DataFrame containing the data.
+        x_column (str): The column name for the x-axis.
+        y_column (str): The column name for the y-axis.
+        line_group_column (str): The column name for grouping the lines.
+        color (str, optional): The column name to use for the line color. Default is None.
+        color_scale (str, optional): The color scale to use. Default is None.
+
+    Returns:
+        plotly.graph_objs._figure.Figure: The generated Plotly figure.
+    """
+    if color:
+        # If color is provided, use px.line with color_discrete_sequence
+        fig = px.line(
+            df,
+            x=x_column,
+            y=y_column,
+            line_group=line_group_column,
+            color=color,
+            color_discrete_sequence=px.colors.qualitative.Plotly if not color_scale else getattr(px.colors.qualitative, color_scale)
+        )
+    else:
+        # If no color is provided, create a line plot without coloring
+        fig = px.line(
+            df,
+            x=x_column,
+            y=y_column,
+            line_group=line_group_column
+        )
+    
+    # Update the layout (optional)
+    fig.update_layout(
+        title=f'2D Line Plot of {y_column} vs {x_column} Grouped by {line_group_column}',
+        xaxis_title=x_column,
+        yaxis_title=y_column,
+        legend_title=line_group_column if not color else color
+    )
+    
+    # Show the plot
+    fig.show()
+
     
 def basic_fig_update(fig: Figure, x:str, y:str, z:str) -> Figure:
     return fig.update_layout(
@@ -279,4 +324,3 @@ def basic_fig_update(fig: Figure, x:str, y:str, z:str) -> Figure:
         width=2000,  # Adjust width as needed
         height=1200   # Adjust height as needed
     )
-    
