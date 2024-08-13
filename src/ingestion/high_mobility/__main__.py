@@ -9,7 +9,7 @@ from ingestion.high_mobility.ingester import HMIngester
 
 def main():
     dotenv.load_dotenv()
-    LOG_LEVEL = os.getenv("LOG_LEVEL") or "INFO"
+    LOG_LEVEL = os.getenv("LOG_LEVEL", default="INFO")
     LOG_FILE = os.getenv("LOG_FILE")
     if LOG_FILE is None:
         logging.basicConfig(
@@ -42,16 +42,19 @@ def main():
     parser.add_argument(
         "--refresh_interval",
         type=int,
+        default=120,
         help="interval (in minutes) at which to refresh the list of clearances",
     )
     parser.add_argument(
         "--max_workers",
         type=int,
+        default=8,
         help="maximum number of threads to fetch the vehicles info (mostly limited by S3)",
     )
     parser.add_argument(
         "--compress_interval",
         type=str,
+        default=12,
         help="interval (in hours) at which to compress S3 data",
     )
     args = parser.parse_args()
