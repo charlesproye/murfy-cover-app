@@ -7,6 +7,7 @@ from typing import Any
 import json
 from datetime import datetime as DT
 
+import pandas as pd
 from pandas import DataFrame as DF
 from rich import print
 
@@ -21,13 +22,16 @@ def main():
 
 def parse_response_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
-    df = DF.from_dict(flatten_dict, orient="index").pipe(set_date)
+    df = pd.concat(flatten_dict, axis="columns").pipe(set_date)
+    print(df)
 
     return df
 
 def set_date(df:DF) -> DF:
+    print(df)
     if df.empty:
         return df
+    df.index = pd.to_datetime(df.index, utc=True)
     date = df.index.to_series().dt.as_unit("s")
     df["date"] = date
     df.index = date
@@ -52,20 +56,28 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
     if "timestamp" in src:
         timestamp = DT.strptime(src["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ")
 
-    dst = try_add_to_dst(src, dst, timestamp, path, "data")
-    dst = try_add_to_dst(src, dst, timestamp, path, "value")
     for key, value in src.items():
         if isinstance(value, dict):
             dst = flatten_json_obj(value, dst, timestamp, path + ([key] if key != "data" else []))
+        if isinstance(value, list):
+            str_path = ".".join(path + ([key] if key != "data" else []))
+            # print(value)
+            df = DF.from_records(value)
+            if "data" in df.columns:
+                parsed_data_df = pd.json_normalize(df["data"])
+                if "value" in parsed_data_df.columns and "unit" in parsed_data_df.columns:
+                    unique_units = parsed_data_df["unit"].unique()
+                    if len(unique_units) == 1:
+                        parsed_data_df = parsed_data_df.drop(columns=["unit"])
+                        str_path += "_" + unique_units[0]
+                df = pd.concat((df.drop(columns=["data"]), parsed_data_df), axis="columns")
+            if not df.empty:
+                df = df.set_index("timestamp")
+            dst[str_path] = df
 
     return dst
 
-def try_add_to_dst(src:dict, dst:dict[Any,dict[str,Any]], timestamp, path:list, key:str):
-    if key in src and not isinstance(src[key], dict) and not timestamp is None:
-        if "unit" in src and isinstance(src["unit"], str):
-            path.append(src["unit"])
-        dst[timestamp] = {**dst.get(timestamp, {}), ".".join(path):src[key]}
-    return dst
+# def flatten_list_of_dicts()
 
 if __name__ == "__main__":
     main()
