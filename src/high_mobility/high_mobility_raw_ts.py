@@ -55,7 +55,10 @@ def parse_responses_as_raw_ts(src_keys:DF, bucket:S3_Bucket):
     if len(parsed_dfs) == 0:
         logger.warning(f"No data could be parsed from keys {src_keys['key'].values} for vin {src_keys.name[1]}")
         return
+    print(parsed_dfs)
     raw_df:DF = pd.concat(parsed_dfs)   # Parse and concat them into a single df 
+    print(raw_df)
+    print("==============")
     dest_key = "/".join(["raw_ts", "time_series", *src_keys.name]) + ".parquet"         # Create path to save the raw ts. Note: src_keys.name will be defined by the grouby's by argument (see doc)
     bucket.save_pandas_obj_as_parquet(raw_df, dest_key)                                 # save the raw ts
 

@@ -22,8 +22,8 @@ def main():
 
 def parse_response_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
-    df = pd.concat(flatten_dict, axis="columns").pipe(set_date)
-
+    df = pd.concat(flatten_dict, axis="columns", names=['vaiable', 'property']).pipe(set_date)
+    
     return df
 
 def set_date(df:DF) -> DF:
@@ -62,13 +62,15 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
             # print(value)
             df = DF.from_records(value)
             if "data" in df.columns:
-                parsed_data_df = pd.json_normalize(df["data"])
-                if "value" in parsed_data_df.columns and "unit" in parsed_data_df.columns:
-                    unique_units = parsed_data_df["unit"].unique()
+                parsed_data = pd.json_normalize(df["data"])
+                if "value" in parsed_data.columns and "unit" in parsed_data.columns:
+                    unique_units = parsed_data["unit"].unique()
                     if len(unique_units) == 1:
-                        parsed_data_df = parsed_data_df.drop(columns=["unit"])
-                        str_path += "_" + unique_units[0]
-                df = pd.concat((df.drop(columns=["data"]), parsed_data_df), axis="columns")
+                        parsed_data = parsed_data.drop(columns=["unit"])
+                        str_path += "." + unique_units[0]
+                        if len(parsed_data.columns) == 2:
+                            parsed_data = parsed_data["value"]
+                df = pd.concat((df.drop(columns=["data"]), parsed_data), axis="columns")
             if not df.empty:
                 df = df.set_index("timestamp")
             dst[str_path] = df

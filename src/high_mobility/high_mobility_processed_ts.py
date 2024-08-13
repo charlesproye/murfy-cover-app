@@ -31,7 +31,7 @@ def main():
     # for each group of responses for a vin create a raw time series parquet
     # print(keys)
     processed_ts_metada_data = keys.apply(raw_ts_ETL, bucket=bucket, axis=1)
-    bucket(processed_ts_metada_data, "processed_ts/metadata.parquet")
+    bucket.save_pandas_obj_as_parquet(processed_ts_metada_data, "processed_ts/metadata.parquet")
 
 def raw_ts_ETL(key_data:Series, bucket: S3_Bucket) -> Series:
     """
@@ -47,7 +47,7 @@ def raw_ts_ETL(key_data:Series, bucket: S3_Bucket) -> Series:
     dest_key = "/".join(("processed_ts", "time_series", key_data["brand"], key_data["vin"])) + ".parquet"
     # bucket.save_pandas_obj_as_parquet(processed_ts, dest_key)
 
-    return compute_metada_data(processed_ts)
+    return compute_metada_data(processed_ts, key_data)
 
 def compute_metada_data(processd_ts: DF, key_data:Series) -> Series:
     return Series({
@@ -80,27 +80,25 @@ def process_raw_ts(ts:DF, key_data:Series) -> DF:
     )
 
 def standardize_units(ts: DF, key_data:Series) -> DF:
-    standardized_unit_cols = []
+    new_col_names = []
     col:str
     for col in ts.columns:
         if not col:
-            logger.warn(f"Found empty col in raw_ts of {key_data['vin']}, {key_data['brand']}")
+            logger.warning(f"Found empty col namein raw_ts of {key_data['vin']}, {key_data['brand']}")
             continue
-        col_path = col.split(".")
+        col_path = col[0].split(".")
         col_path_end = col_path[-1]
         if col_path_end in UNIT_CONVERSION_OPS:
-            ts[col] = UNIT_CONVERSION_OPS[col_path_end](ts[col])
-            standardized_unit_cols.append(".".join(col_path[:-1]))
+            if col[1] == "value":
+                ts[col] = UNIT_CONVERSION_OPS[col_path_end](ts[col])
+            new_col_names.append(".".join(col_path[:-1]))
         else:
-            standardized_unit_cols.append(col)
-    ts.columns = standardized_unit_cols
+            new_col_names.append(col)
+    new_columns = list(zip(new_col_names, ts.columns.get_level_values(1)))
+    ts.columns = pd.MultiIndex.from_tuples(new_columns)
 
     return ts
 
-def compute_charging_status_columns(ts: DF) -> DF:
-    # Cases:
-    if "charging_status" in ts.columns: # 
-        
 
 if __name__ == "__main__":
     main()

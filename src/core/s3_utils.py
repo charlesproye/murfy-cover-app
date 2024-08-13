@@ -69,6 +69,11 @@ class S3_Bucket():
         
         # Convert the table to a pandas DataFrame
         df = table.to_pandas()
+        # If there are parenthesis in the columns names it most likely means that it was an incorrectly cached multi indexed column df.
+        new_columns = [eval(col) for col in df.columns]
+        df.columns = pd.MultiIndex.from_tuples(new_columns)
+
+        print(df.columns)
 
         return df
     
