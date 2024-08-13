@@ -23,12 +23,10 @@ def main():
 def parse_response_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
     df = pd.concat(flatten_dict, axis="columns").pipe(set_date)
-    print(df)
 
     return df
 
 def set_date(df:DF) -> DF:
-    print(df)
     if df.empty:
         return df
     df.index = pd.to_datetime(df.index, utc=True)
