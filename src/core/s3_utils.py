@@ -73,8 +73,6 @@ class S3_Bucket():
         new_columns = [eval(col) for col in df.columns]
         df.columns = pd.MultiIndex.from_tuples(new_columns)
 
-        print(df.columns)
-
         return df
     
     def read_json_file(self, key:str) -> Any:

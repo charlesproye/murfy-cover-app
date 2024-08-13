@@ -29,7 +29,6 @@ def main():
     keys.columns = ["key", "brand", "vin"] # Set column names
     keys["vin"] = keys["vin"].str.strip(".parquet")
     # for each group of responses for a vin create a raw time series parquet
-    # print(keys)
     processed_ts_metada_data = keys.apply(raw_ts_ETL, bucket=bucket, axis=1)
     bucket.save_pandas_obj_as_parquet(processed_ts_metada_data, "processed_ts/metadata.parquet")
 
@@ -43,9 +42,8 @@ def raw_ts_ETL(key_data:Series, bucket: S3_Bucket) -> Series:
     # print(key_data)
     raw_ts = bucket.read_parquet(key_data["key"])
     processed_ts = process_raw_ts(raw_ts, key_data)
-    print("=================")
     dest_key = "/".join(("processed_ts", "time_series", key_data["brand"], key_data["vin"])) + ".parquet"
-    # bucket.save_pandas_obj_as_parquet(processed_ts, dest_key)
+    bucket.save_pandas_obj_as_parquet(processed_ts, dest_key)
 
     return compute_metada_data(processed_ts, key_data)
 
