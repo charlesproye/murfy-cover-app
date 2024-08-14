@@ -57,6 +57,12 @@ def main():
         default=12,
         help="interval (in hours) at which to compress S3 data",
     )
+
+    parser.add_argument(
+        "--compress_threaded",
+        action=argparse.BooleanOptionalAction,
+        help="run the compresser in threaded mode",
+    )
     args = parser.parse_args()
 
     ingester = HMIngester(
