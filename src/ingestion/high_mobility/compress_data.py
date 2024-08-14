@@ -23,8 +23,11 @@ class HMCompresser:
     __mercedes_benz: dict[str, set[str]]
 
     threaded: bool = False
+    max_workers: Optional[int] = 8
 
-    def __init__(self, s3, bucket, threaded: bool = False) -> None:
+    def __init__(
+        self, s3, bucket, threaded: bool = False, max_workers: Optional[int] = 8
+    ) -> None:
         self.__logger = logging.getLogger("COMPRESSER")
         self.__s3 = s3
         self.__bucket = bucket
