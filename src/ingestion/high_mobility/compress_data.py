@@ -305,7 +305,6 @@ class HMCompresser:
                     job = job_queue.get()
                     e.submit(job)
                     job_queue.task_done()
-            self.__logger.warning(merged.info)
             try:
                 encoded = msgspec.json.encode(merged.info)
             except msgspec.EncodeError as e:
