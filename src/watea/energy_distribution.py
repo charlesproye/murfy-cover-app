@@ -9,7 +9,7 @@ from sklearn.neighbors import KNeighborsRegressor
 
 import core.perf_agg_processing as perfs
 from core.pandas_utils import floor_to, series_start_end_diff, log_data_and_return_same_data
-from core.caching_utils import save_cache_to
+from core.caching_utils import singleton_data_caching
 from watea.watea_constants import *
 from watea.watea_fleet_info import fleet_info_df
 from watea.processed_watea_ts import processed_ts_it
@@ -35,6 +35,8 @@ def estimate_default_100_soh_energy_added(charging_points:DF, feature_cols=DEFAU
     )
 
 # Preprocessing
+# def compute_
+
 def compute_regime_seperation_feature(fleet_charging_points:DF) -> DF:
     expected_voltage_from_soc = (
         fleet_charging_points
@@ -48,7 +50,7 @@ def compute_regime_seperation_feature(fleet_charging_points:DF) -> DF:
         .dropna()
     )
     expected_voltage = (
-        CHARGE_ENERGY_POINTS_TO_DIST_MODEL
+        POLYNOMIAL_LINEAR_REGRESSION_PIPELINE
         .fit(expected_voltage_from_soc["soc"].values, expected_voltage_from_soc["voltage"].values)
         .predict(fleet_charging_points["soc"].values)
         .squeeze()
@@ -73,14 +75,7 @@ def clean_charging_points(charging_points:DF) -> DF:
         .query("energy_added < 502 & energy_added > 100")
     )
 
-def get_raw_fleet_charging_points(force_update=False) -> DF:
-    if exists(PATH_TO_RAW_FLEET_CHARGING_POINTS) and not force_update:
-        return pd.read_parquet(PATH_TO_RAW_FLEET_CHARGING_POINTS)    
-    else:
-        charging_poitns = extract_raw_fleet_charging_points()
-        save_cache_to(charging_poitns, PATH_TO_RAW_FLEET_CHARGING_POINTS)
-        return charging_poitns
-        
+@singleton_data_caching(PATH_TO_RAW_FLEET_CHARGING_POINTS)
 def extract_raw_fleet_charging_points() -> DF:
     return (
         pd.concat(

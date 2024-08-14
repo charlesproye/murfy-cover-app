@@ -11,7 +11,7 @@ from rich import print
 from tesla.tesla_constants import *
 from tesla.raw_tesla_ts import raw_ts_of
 from tesla.tesla_fleet_info import iterate_over_vins, fleet_info_df
-from core.caching_utils import data_caching_wrapper
+from core.caching_utils import instance_data_caching_wrapper
 from core.argparse_utils import parse_kwargs
 import core.time_series_processing as ts
 
@@ -27,7 +27,7 @@ def iterate_over_processed_ts(**kwargs) -> Generator[tuple[str, DF], None, None]
         yield vin, vehicle_df
 
 def processed_ts_of(vin:str, force_update:bool=False, **kwargs) -> DF:
-    return data_caching_wrapper(
+    return instance_data_caching_wrapper(
         vin,
         PATH_TO_PROCESSED_TESLA_TS,
         lambda vin: process_raw_time_series(raw_ts_of(vin), vin, **kwargs),

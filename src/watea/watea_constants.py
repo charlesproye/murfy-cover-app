@@ -48,7 +48,7 @@ DEFAULT_100_SOH_FEATURES = [
     "energy_added",
     "regime_seperation_feature",
 ]
-CHARGE_ENERGY_POINTS_TO_DIST_MODEL = Pipeline([
+POLYNOMIAL_LINEAR_REGRESSION_PIPELINE = Pipeline([
     ('reshape', FunctionTransformer(lambda x: x.reshape(-1, 1))),
     ('poly_features', PolynomialFeatures(degree=6)),
     ('regressor', LinearRegression())

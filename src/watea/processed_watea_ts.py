@@ -11,7 +11,7 @@ from rich import print
 from rich.traceback import install as install_rich_traceback
 
 import core.time_series_processing as ts
-from core.caching_utils import data_caching_wrapper
+from core.caching_utils import instance_data_caching_wrapper
 from core.argparse_utils import parse_kwargs
 from watea.watea_constants import *
 from watea.watea_fleet_info import iterate_over_ids
@@ -32,7 +32,7 @@ def processed_ts_it(fleet_query: str=None, ts_query=None, force_update:bool=Fals
         yield id, ts
 
 def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
-    return data_caching_wrapper(
+    return instance_data_caching_wrapper(
         id,
         PATH_TO_PROCESSED_TS.format(id=id),
         lambda vin: process_raw_time_series(raw_ts_of(vin), **kwargs),
