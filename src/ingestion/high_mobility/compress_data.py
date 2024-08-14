@@ -48,13 +48,17 @@ class HMCompresser:
                         mercedes_benz.add(key)
                     case "renault":
                         renault.add(key)
-        kia_vins = set(map(lambda v: v.split("/")[2], kia))
+        kia_vins = set(
+            filter(lambda v: len(v) == 17, map(lambda v: v.split("/")[2], kia))
+        )
         self.__kia = {
             k: set(filter(lambda e: e.startswith(f"response/kia/{k}/temp/"), kia))
             for k in kia_vins
         }
         self.__logger.info("Listed all kia vehicles")
-        renault_vins = set(map(lambda v: v.split("/")[2], renault))
+        renault_vins = set(
+            filter(lambda v: len(v) == 17, map(lambda v: v.split("/")[2], renault))
+        )
         self.__renault = {
             k: set(
                 filter(lambda e: e.startswith(f"response/renault/{k}/temp/"), renault)
@@ -62,7 +66,11 @@ class HMCompresser:
             for k in renault_vins
         }
         self.__logger.info("Listed all renault vehicles")
-        mercedes_benz_vins = set(map(lambda v: v.split("/")[2], mercedes_benz))
+        mercedes_benz_vins = set(
+            filter(
+                lambda v: len(v) == 17, map(lambda v: v.split("/")[2], mercedes_benz)
+            )
+        )
         self.__mercedes_benz = {
             k: set(
                 filter(
