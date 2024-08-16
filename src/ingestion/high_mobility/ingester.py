@@ -2,6 +2,7 @@ import concurrent.futures
 import logging
 import os
 import threading
+import time
 from datetime import datetime
 from queue import Queue
 from typing import Callable, Optional
@@ -326,4 +327,5 @@ class HMIngester:
             self.__scheduler_logger.info("Starting scheduler")
             while 1:
                 self.__scheduler.run_pending()
+                time.sleep(1)
 
