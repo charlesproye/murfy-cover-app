@@ -29,7 +29,8 @@ class HMIngester:
     __s3 = boto3.client("s3")
     __bucket: str
 
-    __scheduler = schedule.Scheduler()
+    __fetch_scheduler = schedule.Scheduler()
+    __compress_scheduler = schedule.Scheduler()
     __vehicles: set[Vehicle] = set()
     __executor: concurrent.futures.ThreadPoolExecutor
     __job_queue: Queue[Callable]
@@ -184,13 +185,13 @@ class HMIngester:
         )
         self.__vehicles.update(vehicles)
         for vehicle in vehicles:
-            self.__scheduler.every(vehicle.rate_limit).seconds.do(
+            self.__fetch_scheduler.every(vehicle.rate_limit).seconds.do(
                 self.__job_queue.put, lambda v=vehicle: self.__process_vehicle(v)
             ).tag(vehicle.vin)
             self.__scheduler_logger.info(
                 f"Adding vehicle with VIN {vehicle.vin} (brand {vehicle.brand}) to the scheduler (interval: {vehicle.rate_limit} seconds)"
             )
-        self.__scheduler.every(self.refresh_interval).minutes.do(
+        self.__fetch_scheduler.every(self.refresh_interval).minutes.do(
             self.__job_queue.put,
             self.__update_vehicles,
         ).tag("refresh")
@@ -224,7 +225,7 @@ class HMIngester:
             self.__scheduler_logger.info(
                 f"Adding vehicle with VIN {v.vin} (brand {v.brand}) to scheduler (interval {v.rate_limit} seconds)"
             )
-            self.__scheduler.every(v.rate_limit).seconds.do(
+            self.__fetch_scheduler.every(v.rate_limit).seconds.do(
                 self.__executor.submit, lambda vv=v: self.__process_vehicle(vv)
             )
         for v in vehicles_to_remove:
@@ -315,8 +316,8 @@ class HMIngester:
             self.__update_vehicles_initial()
             worker_thread = threading.Thread(target=self.__process_job_queue)
             self.__scheduler_logger.info("Starting initial scheduler run")
-            self.__scheduler.run_all()
-            self.__scheduler.every(self.compress_interval).hours.do(
+            self.__fetch_scheduler.run_all()
+            self.__compress_scheduler.every(self.compress_interval).hours.do(
                 self.__job_queue.put, self.__compress
             ).tag("compress")
             self.__scheduler_logger.info(
@@ -326,6 +327,10 @@ class HMIngester:
             worker_thread.start()
             self.__scheduler_logger.info("Starting scheduler")
             while 1:
-                self.__scheduler.run_pending()
+                now = datetime.now().hour
+                if now >= 6 and now <= 23:
+                    self.__fetch_scheduler.run_pending()
+                else:
+                    self.__compress_scheduler.run_pending()
                 time.sleep(1)
 
