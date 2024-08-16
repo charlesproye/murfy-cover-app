@@ -52,12 +52,14 @@ class HMIngester:
     upload_interval: int = 60
     compress_interval: int = 12
     max_workers: int = 8
+    compress_threaded: bool = True
 
     def __init__(
         self,
         refresh_interval: Optional[int] = 2 * 60,
         max_workers: Optional[int] = 8,
         compress_interval: Optional[int] = 12,
+        compress_threaded: Optional[bool] = True,
     ):
         """
         Parameters
@@ -121,6 +123,7 @@ class HMIngester:
         self.refresh_interval = refresh_interval or self.refresh_interval
         self.compress_interval = compress_interval or self.compress_interval
         self.max_workers = max_workers or self.max_workers
+        self.compress_threaded = compress_threaded or self.compress_threaded
 
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
@@ -290,7 +293,10 @@ class HMIngester:
     def __compress(self):
         self.__ingester_logger.info("Starting compression job")
         compresser = HMCompresser(
-            self.__s3, self.__bucket, threaded=True, max_workers=self.max_workers
+            self.__s3,
+            self.__bucket,
+            threaded=self.compress_threaded,
+            max_workers=self.max_workers,
         )
         compresser.run()
 
