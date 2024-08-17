@@ -8,18 +8,39 @@
     - per charges.
     - per point (although it seems like we have enough points to mitigate the noise per point).
 - We don't have enough points for some regimes.
+- KNN seems to be better than LR...
+- There doesn't seem to be much correlation between current and enerrgy added within most common regime.
+- Our estimator states that: "A battery has an soh X because the median of its energy_added is X% of the energy_added of the default_100_soh batteries in the same charge region".
+
+**Hypothesis**:
+- Use dodometer as target feature instead of energy_added of default_100_soh 
+- Use the entire charge as sample instead of charging points to automatically prune out charging points that introduce too noise.
+- Using energy_added is not a great way of evaluating soh.
+- Odometer has much lower correlation with soh than expected.
+- Energy_added calculation might be worse than we thought...
+- Instead of evaluating the estimation based on the correlation betweem soh and fleet wise odometer, we could evaluate it based on vehicle wise odometer.
+
+- target feature + evaluation proposals:
+    - odometer + monotonicty over odometer of a vehicule
 
 **Questions**:
+- How does soc quantization effects soh estimation?
+- Are there feature regions that contribute more to the noise of the output?
+- Are there feature regions that have better soh correlation with odometer than others?
+- Would estimators perform better without current?
 - How does the knn distance influences the soh estimation?
-- Could we simply replace KNNregressor with LR:
-    - Segment charging regimes
-    - Does the shape of the energy distribution changes over odometer?
-        - Yes: probably can't just use 
+- How to evaluate the soh estimation? 
+- Why KNN seems to be better than LR?
+- What other target feature could we use?
+
+**Proposals**:
+- Add another data cleaning step to retain only data points with decreasing energy_added over recharges/odometer/date
+
 
 **Tasks**:
-- Segment charging regimes
-- Does the shape of the energy distribution changes over odometer (check for all the chargign regimes)?
-- Try to use LR on most common charging regime with temp, current, voltage.
-- Visualize nearest neighbours in 3d plot:
-    - Check the relation between variance in soh and distances in knn.
-    - Try to get a certainty estimation.
+- Create a scorer/loss function to quantify/evaluate the soh estimations.
+- Use odometer as target feature to see what is the best correlation possible between energy added and odometer.
+- Implement estimator that takes in the entire charge.
+- Iteratively:
+    - Create a full sklearn Pipeline that we can hypertune from extraction to estimation.
+    - Optimize the pipeline through hyperparameter tunning.

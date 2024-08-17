@@ -45,7 +45,7 @@ def process_raw_time_series(raw_vehicle_df: DF) -> DF:
         .pipe(ts.soh_from_est_battery_range, "battery_range_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
         .pipe(ts.in_motion_mask_from_odo_diff)
         .pipe(ts.in_discharge_and_charge_from_soc_diff)
-        # .eval("in_charge = in_charge & soc < 99") # Ford E-Transit recordings tend to plateau at 99 of a random amout of time so remove these 
+        .eval("in_charge = in_charge & soc < 99") # Ford E-Transit recordings tend to plateau at 99 of a random amout of time so remove these 
         .eval("power = current * voltage")
         .pipe(ts.perf_mask_and_idx_from_condition_mask, "in_charge", max_time_diff=PERF_MAX_TIME_DIFF)
         .pipe(process_power)

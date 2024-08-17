@@ -42,7 +42,7 @@ CHARGING_POINTS_AGG_OVER_CHARGES_DICT = {
     "charge_idx":pd.Series.mode,
     "charge_id":pd.Series.mode,
 }
-DEFAULT_100_SOH_FEATURES = [
+SOH_ESTIMATION_FEATURES = [
     "current",
     "voltage",
     "energy_added",

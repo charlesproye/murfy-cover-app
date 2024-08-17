@@ -7,8 +7,7 @@ import pandas as pd
 import numpy as np
 from sklearn.neighbors import KNeighborsRegressor
 
-import core.perf_agg_processing as perfs
-from core.pandas_utils import floor_to, series_start_end_diff, log_data_and_return_same_data
+from core.pandas_utils import floor_to, series_start_end_diff
 from core.caching_utils import singleton_data_caching
 from watea.watea_constants import *
 from watea.watea_fleet_info import fleet_info_df
@@ -23,7 +22,7 @@ def estimate_soh(charging_points:DF) -> DF:
         .eval("soh = energy_added / default_100_soh_energy_added") # All of that just for a division...
     )
 
-def estimate_default_100_soh_energy_added(charging_points:DF, feature_cols=DEFAULT_100_SOH_FEATURES, n_neighbors: int = 4, p=2) -> DF:
+def estimate_default_100_soh_energy_added(charging_points:DF, feature_cols=SOH_ESTIMATION_FEATURES, n_neighbors: int = 4, p=2) -> DF:
     fit_samples = charging_points.query("is_default_100_soh")
     regressor = (
         KNeighborsRegressor(n_neighbors=n_neighbors, weights="distance", p=p)
@@ -59,6 +58,14 @@ def compute_regime_seperation_feature(fleet_charging_points:DF) -> DF:
     
     return fleet_charging_points
 
+def clean_charging_points(charging_points:DF) -> DF:
+    return (
+        charging_points
+        .dropna(how="any")
+        .query("energy_added < 502 & energy_added > 100")
+        .reset_index(drop=True)
+    )
+
 # Extraction:
 def agg_charging_points_over_charges(charging_points:DF, agg_dict:dict=CHARGING_POINTS_AGG_OVER_CHARGES_DICT) -> DF:
     agg_dict = {key: value for key, value in agg_dict.items() if key in charging_points.columns}
@@ -66,13 +73,6 @@ def agg_charging_points_over_charges(charging_points:DF, agg_dict:dict=CHARGING_
         charging_points
         .groupby("charge_id")
         .agg(agg_dict)
-    )
-
-def clean_charging_points(charging_points:DF) -> DF:
-    return (
-        charging_points
-        .dropna(how="any")
-        .query("energy_added < 502 & energy_added > 100")
     )
 
 @singleton_data_caching(PATH_TO_RAW_FLEET_CHARGING_POINTS)
