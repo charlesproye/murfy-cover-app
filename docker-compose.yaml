@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  ms_ingestion_sevice: 
+    build:
+      context: .
+      dockerfile: mobilisights.Dockerfile
+    container_name: ms-ingestion
+    env_file: 
+      - path: ./.env
+        required: true
+      - path: ./.python.env
+        required: true
+      - path: ./.args.env
+        required: false
+    volumes:
+      - .:/app
+
