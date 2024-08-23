@@ -11,6 +11,7 @@ import boto3
 import dotenv
 import msgspec
 import schedule
+from botocore.client import ClientError
 from ingestion.high_mobility.api import HMApi
 from ingestion.high_mobility.compress_data import HMCompresser
 from ingestion.high_mobility.schema import (
@@ -34,13 +35,6 @@ class HMIngester:
     __vehicles: set[Vehicle] = set()
     __executor: concurrent.futures.ThreadPoolExecutor
     __job_queue: Queue[Callable]
-
-    __json_encoder = msgspec.json.Encoder()
-    __encode_buffer = bytearray()
-
-    def __encode(self, obj):
-        self.__json_encoder.encode_into(obj, self.__encode_buffer)
-        return self.__encode_buffer
 
     rate_limit: dict[str, int] = {
         # Minimum time in seconds between two requests per vehicle for each maker
@@ -263,7 +257,7 @@ class HMIngester:
                                 f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): unsupported vehicle brand"
                             )
                             return
-                except msgspec.ValidationError as e:
+                except (msgspec.ValidationError, msgspec.DecodeError) as e:
                     self.__ingester_logger.error(
                         f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): response {info} does not fit schema ({e})"
                     )
@@ -272,21 +266,30 @@ class HMIngester:
                     f"Parsed response for vehicle with VIN {vehicle.vin} correctly"
                 )
                 filename = f"response/{vehicle.brand}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
-                encoded = self.__encode(decoded)
-                uploaded = self.__s3.put_object(
-                    Body=encoded,
-                    Bucket=self.__bucket,
-                    Key=filename,
-                )
-                match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
-                    case 200:
-                        self.__ingester_logger.info(
-                            f"Uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
-                        )
-                    case _:
-                        self.__ingester_logger.error(
-                            f"Error uploading info for vehicle with vin {vehicle.vin}: {uploaded}"
-                        )
+                try:
+                    encoded = msgspec.json.encode(decoded)
+                except msgspec.EncodeError as e:
+                    self.__ingester_logger.error(f"Failed to encode vehicle data: {e}")
+                    return
+                try:
+                    uploaded = self.__s3.put_object(
+                        Body=encoded,
+                        Bucket=self.__bucket,
+                        Key=filename,
+                    )
+                    match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
+                        case 200:
+                            self.__ingester_logger.info(
+                                f"Uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
+                            )
+                        case _:
+                            self.__ingester_logger.error(
+                                f"Error uploading info for vehicle with VIN {vehicle.vin}: {uploaded['Error']['Message']}"
+                            )
+                except ClientError as e:
+                    self.__ingester_logger.error(
+                        f"Error uploading info for vehicle with VIN {vehicle.vin}: {e.response['Error']['Message']}"
+                    )
                 return
             case _:
                 log_error(info)
