@@ -11,6 +11,7 @@ import dotenv
 import msgspec
 import schedule
 from botocore.credentials import threading
+from botocore.exceptions import ClientError
 from ingestion.mobilisights.api import MSApi
 from ingestion.mobilisights.schema import CarState, ErrorMesage
 
@@ -123,28 +124,36 @@ class MobilisightsIngester:
     def __process_vehicle(self, data: Any):
         try:
             car_state = msgspec.json.decode(data, type=CarState)
-        except msgspec.ValidationError as e:
+        except (msgspec.ValidationError, msgspec.DecodeError) as e:
             self.__ingester_logger.error(f"Failed to parse car data: {e}")
             return
         self.__ingester_logger.info(f"Parsed data for VIN {car_state.vin} successfully")
         filename = f"response/stellantis/{car_state.vin}/temp/{int(datetime.now().timestamp())}.json"
-        encoded = self.__encode(car_state)
-        uploaded = self.__s3.put_object(
-            Body=encoded,
-            Bucket=self.__bucket,
-            Key=filename,
-        )
-        match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
-            case 200:
-                self.__ingester_logger.info(
-                    f"Uploaded info for vehicle with VIN {car_state.vin} at location {filename}"
-                )
-            case _:
-                self.__ingester_logger.error(
-                    f"Error uploading info for vehicle with vin {car_state.vin}: {uploaded}"
-                )
-        return
-        encoded = msgspec.json.encode(car_state)
+        try:
+            encoded = msgspec.json.encode(car_state)
+        except msgspec.EncodeError as e:
+            self.__ingester_logger.error(f"Failed to reencode car data: {e}")
+            return
+        try:
+            uploaded = self.__s3.put_object(
+                Body=encoded,
+                Bucket=self.__bucket,
+                Key=filename,
+            )
+            match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
+                case 200:
+                    self.__ingester_logger.info(
+                        f"Uploaded info for vehicle with VIN {car_state.vin} at location {filename}"
+                    )
+                case _:
+                    self.__ingester_logger.error(
+                        f"Error uploading info for vehicle with VIN {car_state.vin}: {uploaded['Error']['Message']}"
+                    )
+                    return
+        except ClientError as e:
+            self.__ingester_logger.error(
+                f"Error uploading info vehicle with VIN {car_state.vin}: {e.response['Error']['Message']}"
+            )
 
     def __fetch_vehicles(self):
         code, res = self.__api.export_car_info()
