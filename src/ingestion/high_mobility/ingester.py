@@ -1,10 +1,12 @@
 import concurrent.futures
 import logging
 import os
+import signal
 import threading
 import time
 from datetime import datetime
-from queue import Queue
+from queue import Empty, Queue
+from types import FrameType
 from typing import Callable, Optional
 
 import boto3
@@ -33,8 +35,11 @@ class HMIngester:
     __fetch_scheduler = schedule.Scheduler()
     __compress_scheduler = schedule.Scheduler()
     __vehicles: set[Vehicle] = set()
+    __worker_thread: threading.Thread
     __executor: concurrent.futures.ThreadPoolExecutor
     __job_queue: Queue[Callable]
+
+    __shutdown_requested = threading.Event()
 
     rate_limit: dict[str, int] = {
         # Minimum time in seconds between two requests per vehicle for each maker
@@ -123,6 +128,23 @@ class HMIngester:
 
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
+        signal.signal(signal.SIGTERM, self.__handle_shutdown_signal)
+        signal.signal(signal.SIGINT, self.__handle_shutdown_signal)
+
+    def __handle_shutdown_signal(self, signum: int, _frame: Optional[FrameType]):
+        self.__ingester_logger.warn(
+            f"Received signal {signal.Signals(signum).name}, shutting down"
+        )
+        self.__shutdown_requested.set()
+
+    def __shutdown(self):
+        self.__worker_thread.join()
+        self.__ingester_logger.info("Worker thread stopped")
+        self.__fetch_scheduler.clear()
+        self.__ingester_logger.info("Canceled all jobs")
+        self.__executor.shutdown(wait=True, cancel_futures=True)
+        self.__ingester_logger.info("Cleared threadpool")
+        self.__ingester_logger.info("Main thread stopped")
 
     def __fetch_clearances(self) -> list[Vehicle] | None:
         error, info = self.__api.list_clearances(status="approved")
@@ -307,17 +329,21 @@ class HMIngester:
 
     def __process_job_queue(self):
         self.__ingester_logger.info("Starting processing job queue")
-        while 1:
-            job = self.__job_queue.get()
-            self.__executor.submit(job)
-            self.__job_queue.task_done()
+        while not self.__shutdown_requested.is_set():
+            try:
+                job = self.__job_queue.get_nowait()
+                self.__executor.submit(job)
+                self.__job_queue.task_done()
+            except Empty:
+                pass
+        self.__ingester_logger.info("Stopping worker thread")
 
     def run(self):
         if os.getenv("COMPRESS_ONLY"):
             self.__compress()
         else:
             self.__update_vehicles_initial()
-            worker_thread = threading.Thread(target=self.__process_job_queue)
+            self.__worker_thread = threading.Thread(target=self.__process_job_queue)
             self.__scheduler_logger.info("Starting initial scheduler run")
             self.__fetch_scheduler.run_all()
             self.__compress_scheduler.every(self.compress_interval).hours.do(
@@ -327,13 +353,14 @@ class HMIngester:
                 f"Schedule S3 compressing at {self.compress_interval}"
             )
             self.__ingester_logger.info("Starting worker thread")
-            worker_thread.start()
+            self.__worker_thread.start()
             self.__scheduler_logger.info("Starting scheduler")
-            while 1:
+            while not self.__shutdown_requested.is_set():
                 now = datetime.now().hour
                 if now >= 6 and now <= 23:
                     self.__fetch_scheduler.run_pending()
                 else:
                     self.__compress_scheduler.run_pending()
                 time.sleep(1)
+            self.__shutdown()
 
