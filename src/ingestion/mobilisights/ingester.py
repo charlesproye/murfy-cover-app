@@ -28,12 +28,6 @@ class MobilisightsIngester:
     __executor: concurrent.futures.ThreadPoolExecutor
     __job_queue: Queue[Callable]
 
-    __json_encoder = msgspec.json.Encoder()
-    __encode_buffer = bytearray()
-
-    def __encode(self, obj):
-        self.__json_encoder.encode_into(obj, self.__encode_buffer)
-        return self.__encode_buffer
 
     rate_limit: int = 36
     upload_interval: int = 60
@@ -150,6 +144,7 @@ class MobilisightsIngester:
                     f"Error uploading info for vehicle with vin {car_state.vin}: {uploaded}"
                 )
         return
+        encoded = msgspec.json.encode(car_state)
 
     def __fetch_vehicles(self):
         code, res = self.__api.export_car_info()
