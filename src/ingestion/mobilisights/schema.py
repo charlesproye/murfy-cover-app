@@ -1,7 +1,7 @@
 import datetime
 from datetime import datetime as dt
 from enum import StrEnum
-from typing import Annotated, Generic, Optional, TypeVar
+from typing import Annotated, Generic, Iterable, Optional, Self, TypeVar
 
 import msgspec
 
@@ -24,6 +24,14 @@ class TimestampedValue(
 ):
     value: T
 
+    @classmethod
+    def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
+        res: list[Self] = []
+        for el in lst:
+            if el.datetime not in set(map(lambda e: e.datetime, res)):
+                res.append(el)
+        return res
+
 
 class ValueWithUnit(
     msgspec.Struct,
@@ -42,6 +50,14 @@ class TimestampedValueWithUnit(
 ):
     value: T
     unit: U
+
+    @classmethod
+    def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
+        res: list[Self] = []
+        for el in lst:
+            if el.datetime not in set(map(lambda e: e.datetime, res)):
+                res.append(el)
+        return res
 
 
 class Percentage(
@@ -92,6 +108,14 @@ class Geolocation(WithTimestamp):
     gps_signal: Annotated[float, msgspec.Meta(ge=0, le=100)]
     altitude: TimestampedValueWithUnit[float, DistanceUnit]
 
+    @classmethod
+    def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
+        res: list[Self] = []
+        for el in lst:
+            if el.datetime not in set(map(lambda e: e.datetime, res)):
+                res.append(el)
+        return res
+
 
 class SpeedUnit(StrEnum):
     kilometers_per_hour = "km/h"
@@ -127,6 +151,14 @@ class FuelConsumptionLevel(WithTimestamp):
     def __post_init__(self):
         self.percentage = float(self.percentage)
 
+    @classmethod
+    def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
+        res: list[Self] = []
+        for el in lst:
+            if el.datetime not in set(map(lambda e: e.datetime, res)):
+                res.append(el)
+        return res
+
 
 class EngineStatus(StrEnum):
     off = "off"
@@ -161,6 +193,45 @@ class Fuel(
     engine: Optional[EngineSmall] = None
 
 
+class MergedFuel(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    average_consumption: list[TimestampedValueWithUnit[float, FuelConsumptionUnit]] = []
+    instant_consumption: list[TimestampedValueWithUnit[float, FuelConsumptionUnit]] = []
+    total_consumption: list[TimestampedValueWithUnit[float, VolumeUnit]] = []
+    level: list[FuelConsumptionLevel] = []
+    residual_autonomy: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
+    engine_speed: list[TimestampedValueWithUnit[float, EngineSpeedUnit]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Fuel]) -> Self:
+        res = cls()
+        res.average_consumption = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.average_consumption, lst) if x is not None]
+        )
+        res.instant_consumption = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.instant_consumption, lst) if x is not None]
+        )
+        res.total_consumption = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.total_consumption, lst) if x is not None]
+        )
+        res.level = FuelConsumptionLevel.merge_list(
+            [x for x in map(lambda e: e.level, lst) if x is not None]
+        )
+        res.residual_autonomy = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.residual_autonomy, lst) if x is not None]
+        )
+        res.engine_speed = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(lambda e: e.engine.speed if e.engine else None, lst)
+                if x is not None
+            ]
+        )
+
+        return res
+
+
 class EnergyConsumptionUnit(StrEnum):
     kilowatthours_per_100_kilometers = "kWh/100 km"
 
@@ -176,6 +247,14 @@ class EnergyConsumptionLevel(WithTimestamp):
 
     def __post_init__(self):
         self.percentage = float(self.percentage)
+
+    @classmethod
+    def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
+        res: list[Self] = []
+        for el in lst:
+            if el.datetime not in set(map(lambda e: e.datetime, res)):
+                res.append(el)
+        return res
 
 
 class CapacityUnit(StrEnum):
@@ -207,6 +286,14 @@ class Charging(WithTimestamp):
     mode: ChargingMode
     planned: dt
 
+    @classmethod
+    def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
+        res: list[Self] = []
+        for el in lst:
+            if el.datetime not in set(map(lambda e: e.datetime, res)):
+                res.append(el)
+        return res
+
 
 class Electricity(
     msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
@@ -219,6 +306,46 @@ class Electricity(
     capacity: Optional[TimestampedValueWithUnit[float, CapacityUnit]] = None
     charging: Optional[Charging] = None
     engine: Optional[EngineSmall] = None
+
+
+class MergedElectricity(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    instant_consumption: list[
+        TimestampedValueWithUnit[float, EnergyConsumptionUnit]
+    ] = []
+    level: list[EnergyConsumptionLevel] = []
+    residual_autonomy: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
+    capacity: list[TimestampedValueWithUnit[float, CapacityUnit]] = []
+    charging: list[Charging] = []
+    engine_speed: list[TimestampedValueWithUnit[float, EngineSpeedUnit]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Electricity]) -> Self:
+        res = cls()
+        res.instant_consumption = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.instant_consumption, lst) if x is not None]
+        )
+        res.level = EnergyConsumptionLevel.merge_list(
+            [x for x in map(lambda e: e.level, lst) if x is not None]
+        )
+        res.residual_autonomy = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.residual_autonomy, lst) if x is not None]
+        )
+        res.capacity = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.capacity, lst) if x is not None]
+        )
+        res.charging = Charging.merge_list(
+            [x for x in map(lambda e: e.charging, lst) if x is not None]
+        )
+        res.engine_speed = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(lambda e: e.engine.speed if e.engine else None, lst)
+                if x is not None
+            ]
+        )
+        return res
 
 
 class TemperatureUnit(StrEnum):
@@ -247,6 +374,14 @@ class EngineBattery(WithTimestamp):
     resistance: Optional[object] = None
     voltage: Optional[TimestampedValueWithUnit[float, VoltageUnit]] = None
 
+    @classmethod
+    def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
+        res: list[Self] = []
+        for el in lst:
+            if el.datetime not in set(map(lambda e: e.datetime, res)):
+                res.append(el)
+        return res
+
 
 class EngineCoolant(
     msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
@@ -267,6 +402,66 @@ class Engine(
     coolant: Optional[EngineCoolant] = None
 
 
+class MergedEngine(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    oil_temperature: list[TimestampedValueWithUnit[float, TemperatureUnit]] = []
+    oil_pressure: list[TimestampedValueWithUnit[float, PressureUnit]] = []
+    contact: list[TimestampedValue[bool]] = []
+    status: list[TimestampedValue[EngineStatus]] = []
+    speed: list[TimestampedValueWithUnit[float, EngineSpeedUnit]] = []
+    ignition: list[TimestampedValue[bool]] = []
+    battery: list[EngineBattery] = []
+    run_time: list[TimestampedValue[float]] = []
+    coolant_temperature: list[TimestampedValueWithUnit[float, TemperatureUnit]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Engine]) -> Self:
+        res = cls()
+        res.oil_temperature = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(lambda e: e.oil.temperature if e.oil else None, lst)
+                if x is not None
+            ]
+        )
+        res.oil_pressure = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(lambda e: e.oil.pressure if e.oil else None, lst)
+                if x is not None
+            ]
+        )
+        res.contact = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.contact, lst) if x is not None]
+        )
+        res.status = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.status, lst) if x is not None]
+        )
+        res.speed = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.speed, lst) if x is not None]
+        )
+        res.ignition = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.ignition, lst) if x is not None]
+        )
+        res.battery = EngineBattery.merge_list(
+            [x for x in map(lambda e: e.battery, lst) if x is not None]
+        )
+        res.run_time = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.run_time, lst) if x is not None]
+        )
+        res.coolant_temperature = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(
+                    lambda e: e.coolant.temperature if e.coolant else None, lst
+                )
+                if x is not None
+            ]
+        )
+        return res
+
+
 class ParkAssistValue(
     msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
 ):
@@ -274,11 +469,47 @@ class ParkAssistValue(
     muted: TimestampedValue[bool]
 
 
+class MergedParkAssistValue(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    alarm: list[TimestampedValue[bool]] = []
+    muted: list[TimestampedValue[bool]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[ParkAssistValue]) -> Self:
+        res = cls()
+        res.alarm = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.alarm, lst) if x is not None]
+        )
+        res.muted = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.muted, lst) if x is not None]
+        )
+        return res
+
+
 class ParkAssist(
     msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
 ):
     front: ParkAssistValue
     rear: ParkAssistValue
+
+
+class MergedParkAssist(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    front: Optional[MergedParkAssistValue] = None
+    rear: Optional[MergedParkAssistValue] = None
+
+    @classmethod
+    def from_list(cls, lst: list[ParkAssist]) -> Self:
+        res = cls()
+        res.front = MergedParkAssistValue.from_list(
+            [x for x in map(lambda e: e.front, lst) if x is not None]
+        )
+        res.rear = MergedParkAssistValue.from_list(
+            [x for x in map(lambda e: e.rear, lst) if x is not None]
+        )
+        return res
 
 
 class KeepAssist(
@@ -294,9 +525,34 @@ class Lane(
     keep_assist: KeepAssist
 
 
-class Sli(WithTimestamp):
-    value: float
-    unit: SpeedUnit
+class MergedLaneKeepAssist(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    right: list[TimestampedValue[bool]] = []
+    left: list[TimestampedValue[bool]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Lane]) -> Self:
+        res = cls()
+        res.left = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(
+                    lambda e: e.keep_assist.left if e.keep_assist else None, lst
+                )
+                if x is not None
+            ]
+        )
+        res.right = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(
+                    lambda e: e.keep_assist.right if e.keep_assist else None, lst
+                )
+                if x is not None
+            ]
+        )
+        return res
 
 
 class Adas(
@@ -308,7 +564,45 @@ class Adas(
     abs: Optional[TimestampedValue[bool]] = None
     blind_spot_monitoring: Optional[TimestampedValue[bool]] = None
     fse: Optional[TimestampedValue[bool]] = None
-    sli: Optional[Sli] = None
+    sli: Optional[TimestampedValueWithUnit[float, SpeedUnit]] = None
+
+
+class MergedAdas(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    park_assist: Optional[MergedParkAssist] = None
+    lane_keep_assist: Optional[MergedLaneKeepAssist] = None
+    esp: list[TimestampedValue[bool]] = []
+    abs: list[TimestampedValue[bool]] = []
+    blind_spot_monitoring: list[TimestampedValue[bool]] = []
+    fse: list[TimestampedValue[bool]] = []
+    sli: list[TimestampedValueWithUnit[float, SpeedUnit]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Adas]) -> Self:
+        res = cls()
+        res.park_assist = MergedParkAssist.from_list(
+            [x for x in map(lambda e: e.park_assist, lst) if x is not None]
+        )
+        res.lane_keep_assist = MergedLaneKeepAssist.from_list(
+            [x for x in map(lambda e: e.lane, lst) if x is not None]
+        )
+        res.esp = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.esp, lst) if x is not None]
+        )
+        res.abs = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.abs, lst) if x is not None]
+        )
+        res.blind_spot_monitoring = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.blind_spot_monitoring, lst) if x is not None]
+        )
+        res.fse = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.fse, lst) if x is not None]
+        )
+        res.sli = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.sli, lst) if x is not None]
+        )
+        return res
 
 
 class FogLights(
@@ -329,6 +623,40 @@ class Lights(
     fog: Optional[FogLights] = None
     turn: Optional[TimestampedValue[Turn]] = None
     warnings: Optional[TimestampedValue[bool]] = None
+
+
+class MergedLights(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    fog_front: list[TimestampedValue[bool]] = []
+    fog_rear: list[TimestampedValue[bool]] = []
+    turn: list[TimestampedValue[Turn]] = []
+    warnings: list[TimestampedValue[bool]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Lights]) -> Self:
+        res = cls()
+        res.fog_front = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(lambda e: e.fog.front if e.fog else None, lst)
+                if x is not None
+            ]
+        )
+        res.fog_rear = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(lambda e: e.fog.rear if e.fog else None, lst)
+                if x is not None
+            ]
+        )
+        res.turn = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.turn, lst) if x is not None]
+        )
+        res.warnings = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.warnings, lst) if x is not None]
+        )
+        return res
 
 
 class RearPassengerSeatbelt(
@@ -353,6 +681,58 @@ class Seatbelt(
     passenger: Optional[PassengerSeatbelt] = None
 
 
+class MergedSeatbelt(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    driver: list[TimestampedValue[bool]] = []
+    passenger_front: list[TimestampedValue[bool]] = []
+    passenger_rear_left: list[TimestampedValue[bool]] = []
+    passenger_rear_right: list[TimestampedValue[bool]] = []
+    passenger_rear_central: list[TimestampedValue[bool]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Seatbelt]) -> Self:
+        res = cls()
+        res.driver = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.driver, lst) if x is not None]
+        )
+        res.passenger_front = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(lambda e: e.passenger.front if e.passenger else None, lst)
+                if x is not None
+            ]
+        )
+        res.passenger_rear_left = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(
+                    lambda e: e.passenger.rear.left if e.passenger else None, lst
+                )
+                if x is not None
+            ]
+        )
+        res.passenger_rear_right = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(
+                    lambda e: e.passenger.rear.right if e.passenger else None, lst
+                )
+                if x is not None
+            ]
+        )
+        res.passenger_rear_central = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(
+                    lambda e: e.passenger.rear.central if e.passenger else None, lst
+                )
+                if x is not None
+            ]
+        )
+        return res
+
+
 class TirePairPressure(
     msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
 ):
@@ -365,6 +745,48 @@ class TirePressure(
 ):
     front: Optional[TirePairPressure] = None
     rear: Optional[TirePairPressure] = None
+
+
+class MergedTirePressure(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    front_left: list[TimestampedValueWithUnit[float, PressureUnit]] = []
+    front_right: list[TimestampedValueWithUnit[float, PressureUnit]] = []
+    rear_left: list[TimestampedValueWithUnit[float, PressureUnit]] = []
+    rear_right: list[TimestampedValueWithUnit[float, PressureUnit]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[TirePressure]) -> Self:
+        res = cls()
+        res.front_left = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(lambda e: e.front.left if e.front else None, lst)
+                if x is not None
+            ]
+        )
+        res.front_right = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(lambda e: e.front.right if e.front else None, lst)
+                if x is not None
+            ]
+        )
+        res.rear_left = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(lambda e: e.rear.left if e.rear else None, lst)
+                if x is not None
+            ]
+        )
+        res.rear_right = TimestampedValueWithUnit.merge_list(
+            [
+                x
+                for x in map(lambda e: e.rear.right if e.rear else None, lst)
+                if x is not None
+            ]
+        )
+        return res
 
 
 class TransmissionGearStateValue(StrEnum):
@@ -415,6 +837,50 @@ class Setup(
     adas: Optional[SetupAdas] = None
 
 
+class MergedSetup(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    privacy: list[TimestampedValue[bool]] = []
+    privacy_state: list[TimestampedValue[PrivacyState]] = []
+    requested_privacy: list[TimestampedValue[bool]] = []
+    requested_privacy_state: list[TimestampedValue[PrivacyState]] = []
+    adas_lane_keep_assist: list[TimestampedValue[bool]] = []
+    adas_blind_spot_monitoring: list[TimestampedValue[bool]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Setup]) -> Self:
+        res = cls()
+        res.privacy = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.privacy, lst) if x is not None]
+        )
+        res.privacy_state = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.privacy_state, lst) if x is not None]
+        )
+        res.requested_privacy = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.requested_privacy, lst) if x is not None]
+        )
+        res.requested_privacy_state = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.requested_privacy_state, lst) if x is not None]
+        )
+        res.adas_lane_keep_assist = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(lambda e: e.adas.lane_keep_assist if e.adas else None, lst)
+                if x is not None
+            ]
+        )
+        res.adas_blind_spot_monitoring = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(
+                    lambda e: e.adas.blind_spot_monitoring if e.adas else None, lst
+                )
+                if x is not None
+            ]
+        )
+        return res
+
+
 class Maintenance(
     msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
 ):
@@ -428,6 +894,28 @@ class Crash(
     auto_ecall: Optional[TimestampedValue[bool]] = None
     pedestrian: Optional[TimestampedValue[bool]] = None
     tipped_over: Optional[TimestampedValue[bool]] = None
+
+
+class MergedCrash(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    auto_ecall: list[TimestampedValue[bool]] = []
+    pedestrian: list[TimestampedValue[bool]] = []
+    tipped_over: list[TimestampedValue[bool]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Crash]) -> Self:
+        res = cls()
+        res.auto_ecall = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.auto_ecall, lst) if x is not None]
+        )
+        res.pedestrian = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.pedestrian, lst) if x is not None]
+        )
+        res.tipped_over = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.tipped_over, lst) if x is not None]
+        )
+        return res
 
 
 class CarState(
@@ -464,6 +952,118 @@ class CarState(
     setup: Optional[Setup] = None
     maintenance: Optional[Maintenance] = None
     crash: Optional[Crash] = None
+
+
+class MergedCarState(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    _id: Annotated[str, msgspec.Meta(pattern="^[a-z0-9]{24}$")]
+    vin: Annotated[str, msgspec.Meta(pattern="^[A-Z0-9]{17}$")]
+    heading: list[
+        TimestampedValueWithUnit[
+            Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit
+        ]
+    ] = []
+    geolocation: list[Geolocation] = []
+    odometer: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
+    moving: list[TimestampedValue[bool]] = []
+    speed: list[TimestampedValueWithUnit[float, SpeedUnit]] = []
+    status: list[TimestampedValue[VehicleStatus]] = []
+    acceleration: list[TimestampedValueWithUnit[float, AccelerationUnit]] = []
+    acceleration_lat: list[TimestampedValueWithUnit[float, AccelerationUnit]] = []
+    fuel: Optional[MergedFuel] = None
+    electricity: Optional[MergedElectricity] = None
+    engine: Optional[MergedEngine] = None
+    external_temperature: list[TimestampedValueWithUnit[float, TemperatureUnit]] = []
+    adas: Optional[MergedAdas] = None
+    alerts: list[TimestampedValue[list[str]]] = []
+    lights: Optional[MergedLights] = None
+    seatbelt: Optional[MergedSeatbelt] = None
+    tire_pressure: Optional[MergedTirePressure] = None
+    transmission_gear_state: list[TimestampedValue[TransmissionGearStateValue]] = []
+    setup: Optional[MergedSetup] = None
+    maintenance_date: list[TimestampedValue[datetime.date]] = []
+    maintenance_odometer: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
+    crash: Optional[MergedCrash] = None
+
+    @classmethod
+    def from_list(cls, lst: list[CarState]) -> Optional[Self]:
+        if len(lst) == 0:
+            return None
+        res = cls(
+            _id=lst[0]._id,
+            vin=lst[0].vin,
+        )
+        res.heading = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.heading, lst) if x is not None]
+        )
+        res.geolocation = Geolocation.merge_list(
+            [x for x in map(lambda e: e.geolocation, lst) if x is not None]
+        )
+        res.odometer = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.odometer, lst) if x is not None]
+        )
+        res.moving = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.moving, lst) if x is not None]
+        )
+        res.speed = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.speed, lst) if x is not None]
+        )
+        res.status = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.status, lst) if x is not None]
+        )
+        res.acceleration = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.acceleration, lst) if x is not None]
+        )
+        res.acceleration_lat = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.acceleration_lat, lst) if x is not None]
+        )
+        res.fuel = MergedFuel.from_list(
+            [x for x in map(lambda e: e.fuel, lst) if x is not None]
+        )
+        res.electricity = MergedElectricity.from_list(
+            [x for x in map(lambda e: e.electricity, lst) if x is not None]
+        )
+        res.engine = MergedEngine.from_list(
+            [x for x in map(lambda e: e.engine, lst) if x is not None]
+        )
+        res.external_temperature = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.external_temperature, lst) if x is not None]
+        )
+        res.adas = MergedAdas.from_list(
+            [x for x in map(lambda e: e.adas, lst) if x is not None]
+        )
+        res.alerts = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.alerts, lst) if x is not None]
+        )
+        res.lights = MergedLights.from_list(
+            [x for x in map(lambda e: e.lights, lst) if x is not None]
+        )
+        res.seatbelt = MergedSeatbelt.from_list(
+            [x for x in map(lambda e: e.seatbelt, lst) if x is not None]
+        )
+        res.tire_pressure = MergedTirePressure.from_list(
+            [x for x in map(lambda e: e.tire_pressure, lst) if x is not None]
+        )
+        res.transmission_gear_state = TimestampedValue.merge_list(
+            [
+                x
+                for x in map(
+                    lambda e: e.transmission_gear.state
+                    if e.transmission_gear
+                    else None,
+                    lst,
+                )
+                if x is not None
+            ]
+        )
+        res.setup = MergedSetup.from_list(
+            [x for x in map(lambda e: e.setup, lst) if x is not None]
+        )
+        res.crash = MergedCrash.from_list(
+            [x for x in map(lambda e: e.crash, lst) if x is not None]
+        )
+        return res
 
 
 class ErrorMesage(msgspec.Struct):
