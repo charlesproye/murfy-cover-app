@@ -15,6 +15,7 @@ import schedule
 from botocore.credentials import threading
 from botocore.exceptions import ClientError
 from ingestion.mobilisights.api import MSApi
+from ingestion.mobilisights.compresser import MobilisightsCompresser
 from ingestion.mobilisights.schema import CarState, ErrorMesage
 
 
@@ -36,7 +37,7 @@ class MobilisightsIngester:
 
     rate_limit: int = 36
     upload_interval: int = 60
-    compress_interval: int = 12
+    compress_time: str = "00"
     max_workers: int = 8
     compress_threaded: bool = True
 
@@ -44,8 +45,7 @@ class MobilisightsIngester:
         self,
         rate_limit: Optional[int] = 36,
         max_workers: Optional[int] = 8,
-        compress_interval: Optional[int] = 12,
-        compress_threaded: Optional[bool] = True,
+        compress_time: Optional[str] = "00:00",
     ):
         """
         Parameters
@@ -56,9 +56,9 @@ class MobilisightsIngester:
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
             default: 8
-        compress_interval: int, optional
-            The interval at which to compress the S3 data (in hours)
-            default: 12
+        compress_time: str, optional
+            The time of day at which to compress the S3 data
+            default: "00:00"
         """
         dotenv.load_dotenv()
         MS_BASE_URL = os.getenv("MS_BASE_URL")
@@ -111,9 +111,8 @@ class MobilisightsIngester:
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.__job_queue = Queue()
         self.rate_limit = rate_limit or self.rate_limit
-        self.compress_interval = compress_interval or self.compress_interval
+        self.compress_time = compress_time or self.compress_time
         self.max_workers = max_workers or self.max_workers
-        self.compress_threaded = compress_threaded or self.compress_threaded
 
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
@@ -199,6 +198,16 @@ class MobilisightsIngester:
                         f"Encountered error {error.name} while fetching vehicle data: {error.message}"
                     )
 
+    def __compress(self):
+        self.__ingester_logger.info("Starting compression job")
+        compresser = MobilisightsCompresser(
+            self.__s3,
+            self.__bucket,
+            threaded=False,
+            max_workers=self.max_workers,
+        )
+        compresser.run()
+
     def run(self):
         self.__worker_thread = threading.Thread(target=self.__process_job_queue)
         self.__scheduler_logger.info(
@@ -209,6 +218,12 @@ class MobilisightsIngester:
         )
         self.__scheduler_logger.info("Running initial scheduled tasks")
         self.__fetch_scheduler.run_all()
+        self.__compress_scheduler.every().day.at(self.compress_time).do(
+            self.__job_queue.put, self.__compress
+        )
+        self.__scheduler_logger.info(
+            f"Scheduled data compression at {self.compress_time}"
+        )
         self.__ingester_logger.info("Starting worker thread")
         self.__worker_thread.start()
         self.__scheduler_logger.info("Starting scheduler")

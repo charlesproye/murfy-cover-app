@@ -42,6 +42,7 @@ main() {
     MAX_WORKERS=${MAX_WORKERS:-}
     RATE_LIMIT=${RATE_LIMIT:-}
     COMPRESS_THREADED=${COMPRESS_THREADED:-}
+    COMPRESS_TIME=${COMPRESS_TIME:-}
     # ACCESSLOG=${ACCESSLOG:-true}
     # ERRORLOG=${ERRORLOG:-true}
 
@@ -51,6 +52,7 @@ main() {
     # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")
     [[ ! -z "$MAX_WORKERS" ]] && chunks+=("--max_workers" "$MAX_WORKERS")
     [[ ! -z "$RATE_LIMIT" ]] && chunks+=("--refresh_interval" "$RATE_LIMIT")
+    [[ ! -z "$COMPRESS_TIME" ]] && chunks+=("--refresh_interval" "$COMPRESS_TIME")
     [[ ! -z "$COMPRESS_THREADED" ]] && chunks+=("--compress_threaded")
 
     for e in "${chunks[@]}"

@@ -52,23 +52,18 @@ def main():
         help="maximum number of threads to process the vehicles info (mostly limited by S3)",
     )
     parser.add_argument(
-        "--compress_interval",
+        "--compress_time",
         type=str,
-        default=12,
-        help="interval (in hours) at which to compress S3 data",
+        default="00:00",
+        help="time of day at which to compress S3 data",
     )
 
-    parser.add_argument(
-        "--compress_threaded",
-        action=argparse.BooleanOptionalAction,
-        help="run the compresser in threaded mode",
-    )
     args = parser.parse_args()
 
     ingester = MobilisightsIngester(
         rate_limit=args.rate_limit,
         max_workers=args.max_workers,
-        compress_interval=args.compress_interval,
+        compress_time=args.compress_time,
     )
 
     ingester.run()
