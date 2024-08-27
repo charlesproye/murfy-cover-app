@@ -1,5 +1,5 @@
 """
-This module implements a the `parse_json_obj` function.  
+This module implements a `parse_json_obj` function.  
 It converts a HighMobility response dict into a df.  
 When called as a script, it takes in two mandatory path arguments: `json_source` and `csv_dest`.
 """
@@ -14,11 +14,10 @@ from rich import print
 from core.argparse_utils import parse_kwargs
 
 
-def main():
-    kwargs = parse_kwargs(["json_source", "csv_dest"])
-    with open(kwargs["json_source"]) as f:
+def main(json_source, csv_dest):
+    with open(json_source) as f:
         df = parse_response_as_df(json.load(f))
-    df.to_csv(kwargs["csv_dest"])
+    df.to_csv(csv_dest)
 
 def parse_response_as_df(src) -> DF:
     flatten_dict = flatten_json_obj(src, {})
@@ -79,5 +78,13 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
 
 # def flatten_list_of_dicts()
 
-if __name__ == "__main__":
-    main()
+class mercedes_parsing():
+    def __init__(self, source, dest):
+        self.source = source
+        self.dest = dest
+
+
+    async def run(self):
+        main(self.source, self.dest)
+
+

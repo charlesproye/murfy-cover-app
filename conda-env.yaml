@@ -15,6 +15,9 @@ dependencies:
   - scikit-learn=1.5.1
   - boto3=1.26.76
   - cbor2=5.6.4
-  - pip:
-    - -e .
+  - tqdm=4.66.5       
 
+  - pip:
+    - git+https://bib-batteries-admin@bitbucket.org/bib-batteries/bib-models.git@DATAEV-31-access_get_handler#subdirectory=src
+    - -e .
+  - apscheduler=3.10.4
