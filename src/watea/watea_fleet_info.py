@@ -31,7 +31,9 @@ def compute_fleet_info() -> DF:
 
     fleet_info_dicts: list[dict] = []
     for file in track(glob(path.join(PATH_TO_RAW_TS_FOLDER, "*.snappy.parquet"))):
+        print("file", file)
         raw_ts = pd.read_parquet(file)
+        print("oooooo", raw_ts)
         vehicle_df = process_raw_time_series(raw_ts)
         discharge_grps = vehicle_df.query("in_discharge_perf_mask").groupby("in_discharge_perf_idx")
         charge_grps = vehicle_df.query("in_charge_perf_mask").groupby("in_charge_perf_idx")
@@ -46,6 +48,10 @@ def compute_fleet_info() -> DF:
         })
         print(fleet_info_dicts[-1]["power_during_discharge_pct"])
         print(fleet_info_dicts[-1]["power_during_charge_pct"])
+    
+    if not fleet_info_dicts:
+        raise ValueError("No data was processed. Check if the raw TS folder contains any files.")
+    
     fleet_info_df = (
         DF(fleet_info_dicts)
         .set_index("id", drop=False)
