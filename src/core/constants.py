@@ -1,7 +1,3 @@
-"""
-Yes, I know, it is weird to have a module called constant_variables...
-"""
-
 from datetime import timedelta as TD
 
 KJ_TO_KWH = 0.00027777777
@@ -28,4 +24,7 @@ X_TIME_SERIES_COL_TO_X_PERIOD_COL = {
 }
 DEFAULT_LINE_PLOT_KWARGS = {
     "marker":".",
+}
+DEFAULT_CHARGING_POINTS_PLT_KWARGS = {
+    "alpha": 0.45,
 }

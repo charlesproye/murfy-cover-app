@@ -8,7 +8,7 @@ from pandas import Series
 from pandas import DataFrame as DF
 from pandas.api.typing import DataFrameGroupBy as DF_grp_by
 
-from core.constant_variables import DEFAULT_DIFF_VARS
+from core.constants import DEFAULT_DIFF_VARS
 
 def self_discharge_df_of(vehicle_df: DF, stock_kwh_per_soc: float, cum_energy_spent_col:str="cum_energy_spent") -> DF:
     return (

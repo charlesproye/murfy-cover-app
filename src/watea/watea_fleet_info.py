@@ -11,19 +11,19 @@ from pandas import DataFrame as DF
 from rich import print
 from rich.progress import track
 
-from core.caching_utils import safe_cache_to
+from core.caching_utils import save_cache_to
 from watea.watea_constants import *
 
 def main():
     fleet_info_df = compute_fleet_info()
     print(fleet_info_df)
-    safe_cache_to(fleet_info_df, PATH_TO_FLEET_INFO_DF.format(extension="csv"), index=False)
-    safe_cache_to(fleet_info_df, PATH_TO_FLEET_INFO_DF.format(extension="parquet"))
+    save_cache_to(fleet_info_df, PATH_TO_FLEET_INFO_DF.format(extension="csv"), index=False)
+    save_cache_to(fleet_info_df, PATH_TO_FLEET_INFO_DF.format(extension="parquet"))
 
 
-def iterate_over_ids(query_str:str=None, use_progress_track=True, **kwarges) -> Generator[str, None, None]:
-    filtered_fleet_info_df = fleet_info_df.query(query_str) if query_str else fleet_info_df
-    return track(filtered_fleet_info_df["id"]) if use_progress_track else filtered_fleet_info_df["id"]
+def iterate_over_ids(query_str:str=None, use_progress_track=True, track_kwargs={}) -> Generator[str, None, None]:
+    filtered_fleet_info_df = fleet_info_df.query(query_str) if not query_str is None else fleet_info_df
+    return track(filtered_fleet_info_df["id"], **track_kwargs) if use_progress_track else filtered_fleet_info_df["id"]
         
 
 def compute_fleet_info() -> DF:

@@ -8,7 +8,7 @@ from os.path import exists
 import pandas as pd
 from pandas import DataFrame as DF
 
-from tesla_constants import *
+from tesla.tesla_constants import *
 
 def main():
     split_raw_csv_into_raw_parquets_ts()

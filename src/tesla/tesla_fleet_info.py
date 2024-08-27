@@ -10,7 +10,7 @@ import json
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
-from pandas.api.typing import DataFrameGroupBy as DF_grp_by
+# from pandas.api.typing import DataFrameGroupBy as DF_grp_by
 from rich import print
 from rich.progress import track
 

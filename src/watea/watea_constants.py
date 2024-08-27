@@ -1,6 +1,11 @@
 from datetime import timedelta as TD
 from os.path import join
 
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures, FunctionTransformer
+from sklearn.pipeline import Pipeline
+
 # Default vehicle values
 FORD_ETRANSIT_DEFAULT_KWH_CAPACITY = 89
 FORD_ETRANSIT_DEFAULT_KWH_PER_SOC = FORD_ETRANSIT_DEFAULT_KWH_CAPACITY / 100 
@@ -15,9 +20,12 @@ PATH_TO_FLEET_INFO_DF = "data_cache/fleet_info/fleet_info_df.{extension}"
 PATH_TO_CHARGING_PERF_PER_SOC = "data_cache/perfs/charging_perf_per_soc/{id}.parquet"
 PATH_TO_FLEET_WISE_DISTRIBUTION = "data_cache/perfs/fleet_wise_perfs/charging_energy_distribution.parquet"
 PATH_TO_FLEET_3D_DISTRIBUTION = "data_cache/plots/fleet_wise_perfs/charging_energy_distribution.html"
-
+PATH_TO_DEFAULT_DIST_SHAPE = "perfs/default/dist_shape.parquet"
+PATH_TO_DEFAULT_100_INTERCEPTS_SHAPE = "perfs/default/default_100_soh_intercepts.parquet"
+PATH_TO_FLEET_CHARGING_POINTS = "perfs/default/fleet_charging_points.parquet"
 # recording dependant constants
 PERF_MAX_TIME_DIFF = TD(minutes=10)
+
 # charge energy distribution
 ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST = 3000
 ODO_RANGE_FORMAT_STR = lambda odo_val: f"[{(odo_val/1000):.0f}k, {((odo_val+ODOMETER_FLOOR_RANGE_FOR_ENERGY_DIST)/1000):.0f}k]"
@@ -35,12 +43,32 @@ COLS_TO_DROP_FOR_ENERGY_DISTRIBUTION = [
     "end_soc",
     "mean_soc",
     "soc_diff",
-    # "sec_per_soc",
     "end_cum_energy",
     "start_cum_energy",
     "mean_cum_energy",
     "mean_odo",
 ]
+MOST_COMMON_CHARGE_REGIME_QUERY = "energy_added > 300 & energy_added < 500 & sec_duration < 900 & temp < 35 & power < 4 & power > 1.5"
+SOC_RANGE = np.arange(0, 100.5, 0.5, dtype=float)
+CHARGE_ENERGY_POINTS_TO_DIST_MODEL = Pipeline([
+    ('reshape', FunctionTransformer(lambda x: x.reshape(-1, 1))),
+    ('poly_features', PolynomialFeatures(degree=4)),
+    ('regressor', LinearRegression())
+])
+DIST_TO_FIT_IDX = (0, 25.0)
+
+# ========================================================plt constants========================================================
+JUST_ENERGY_SOH = {
+    "perfs_dict": {
+        "energy_soh": ["soh"],
+    },
+}
+ENERGY_SOH = {
+    "perfs_dict": {
+        "energy_soh": ["soh"],
+    },
+    "plt_energy_dist": True,
+}
 
 VOLTAGE_AND_SOC = {
     "vehicle_df": [
@@ -49,14 +77,11 @@ VOLTAGE_AND_SOC = {
     ]
 }
 
-# plt constants
 IN_CHARGE_AND_POWER = {
     "vehicle_df": [
         ["soc", "in_charge_perf_mask"],
         [
             "power",
-            # {"y":"window_power_median", "color":"yellow", "linestyle":"--", "marker":"x"},
-            # {"y":"window_power_mean", "color":"green", "linestyle":"--", "marker":"x"},
             "twinx",
             {"y":"temp", "color":"red", "linestyle":"--"}
         ],
@@ -66,50 +91,6 @@ IN_CHARGE_AND_POWER = {
         ],
             "voltage",
     ],
-}
-DISCHARGE_PERF_COMPUTE_PLT_LAYOUT = {
-    "vehicle_df": [
-        ["odometer"],
-        ["soc", "in_discharge_perf_mask"],
-        "power",
-        "cum_energy",
-    ],
-    "perfs_dict": {
-        "discharge": ["discharge_soh"]
-    }
-}
-
-CHARGE_PERF_COMPUTE_PLT_LAYOUT = {
-    # "vehicle_df": [
-    #     [
-    #         "soc",
-    #         "in_charge_above_80_perf_mask",
-    #     ],
-    #     [
-    #         "soc",
-    #         "in_charge_bellow_80_perf_mask",
-    #     ],
-    # ],
-    "perfs_dict": {
-        "charge": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-        "charge_above_80": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-        "charge_bellow_80": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-    }
 }
 
 DEBUG_CHARGE_MASK = {
@@ -155,74 +136,4 @@ DEBUG_CHARGE_MASK = {
             },
         ],
     ]
-}
-
-PERFS_COMPARAISON = {
-    "perfs_dict": {
-        "charge_above_80": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-        "charge_bellow_80": [
-            [
-                {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            ],
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-        # "discharge": [
-        #     {"y":"discharge_soh", "linestyle":"", "marker":".", "alpha":0.7},
-        #     {"y":"km_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        # ],
-    }
-}
-
-CHARGE_PERFS = {
-    "perfs_dict": {
-        "charge": [
-            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-        "charge_above_80": [
-            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-        "charge_bellow_80": [
-            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-    }
-}
-
-RANGE_SOH_COMPUTE_PLT_LAYOUT = {
-    "vehicle_df": [
-        ["odometer"],
-        ["soc", "in_discharge", "twinx", {"y":"smoothed_soc_dir", "linestyle":"--", "marker":"x", "color":"red", "alpha":0.4}],
-        "range_soh"
-    ]
-}
-ELEC_VARS_PLT_LAYOUT = {
-    "vehicle_df": [
-        ["voltage"], "soc"
-    ]
-}
-FLEET_RANGE_SOH_COMPUTE_PLT_LAYOUT = {
-    "vehicle_df": [
-        {"y":"range_soh", "linestyle":"", "marker":".", "alpha":0.7}
-    ],
-    "perfs_dict": {
-        "charge": [
-            {"y":"energy_soh", "linestyle":"", "marker":".", "alpha":0.7},
-        ]
-    }
-}
-
-CHARGE_PERF_PER_SOC = {
-    # bar plot of distribution of energy per soc
-    "perfs_dict": {
-        "charge_eprf_per_soc": [
-            
-        ]
-    }
 }
