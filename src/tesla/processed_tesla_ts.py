@@ -8,25 +8,25 @@ from pandas import Series
 from pandas import DataFrame as DF
 from rich import print
 
-import core.time_series_processing as ts
-from tesla_constants import *
+from tesla.tesla_constants import *
+from tesla.raw_tesla_ts import raw_ts_of
+from tesla.tesla_fleet_info import iterate_over_vins, fleet_info_df
 from core.caching_utils import data_caching_wrapper
-from raw_tesla_ts import raw_ts_of
-from tesla_fleet_info import iterate_over_vins, fleet_info_df
 from core.argparse_utils import parse_kwargs
+import core.time_series_processing as ts
 
 def main():
     kwargs = parse_kwargs()
-    for vin, vehicle_df in iterate_overs_processed_ts(force_update=True, **kwargs):
+    for vin, vehicle_df in iterate_over_processed_ts(force_update=True, **kwargs):
         print(vehicle_df)
 
-def iterate_overs_processed_ts(**kwargs) -> Generator[tuple[str, DF], None, None]:
+def iterate_over_processed_ts(**kwargs) -> Generator[tuple[str, DF], None, None]:
     for vin in iterate_over_vins(**kwargs):
-        vehicle_df = processed_time_series_of(vin, **kwargs)
+        vehicle_df = processed_ts_of(vin, **kwargs)
 
         yield vin, vehicle_df
 
-def processed_time_series_of(vin:str, force_update:bool=False, **kwargs) -> DF:
+def processed_ts_of(vin:str, force_update:bool=False, **kwargs) -> DF:
     return data_caching_wrapper(
         vin,
         PATH_TO_PROCESSED_TESLA_TS,
@@ -36,15 +36,18 @@ def processed_time_series_of(vin:str, force_update:bool=False, **kwargs) -> DF:
 
 def process_raw_time_series(raw_vehicle_df: DF, vin:str, **kwargs) -> DF:
     vehicle_df = preprocess_raw_time_series(raw_vehicle_df)
-    vehicle_df = vehicle_df.assign(
+    vehicle_df = (
+        vehicle_df.assign(
         cum_energy_spent=ts.cum_energy_from_power(vehicle_df["power"]),
         cum_charging_energy=ts.cum_energy_from_power(vehicle_df["charger_power"]),
-    )
-    vehicle_df = ts.soh_from_est_battery_range(vehicle_df, "battery_range_km", MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC)
-    vehicle_df = ts.in_motion_mask_from_odo_diff(vehicle_df)
-    vehicle_df = is_charging_mask(vehicle_df)
-    vehicle_df = ts.self_discharge(vehicle_df)
-    vehicle_df = last_charge_soh(vehicle_df, vin)
+        )
+        .pipe(ts.soh_from_est_battery_range, "battery_range_km", MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC)
+        .pipe(ts.in_motion_mask_from_odo_diff)
+        .pipe(in_charge)
+        .pipe(last_charge_soh, vin)
+        .eval("in_self_discharge = ~in_motion & ~in_charge")
+        .pipe(ts.perf_mask_and_idx_from_condition_mask, "in_self_discharge")
+        )
 
     return vehicle_df
 
@@ -77,13 +80,12 @@ def last_charge_soh(vehicle_df: DF, vin:str) -> DF:
 
     return vehicle_df
 
-def is_charging_mask(vehicle_df: DF) -> DF:
-    vehicle_df["is_charging"] = vehicle_df.eval("charging_state == 'Charging'")
-    vehicle_df["is_charging_idx"] = ts.period_idx_of_mask(vehicle_df["is_charging"])
-    vehicle_df["is_charging_mask"] = vehicle_df.groupby("is_charging_idx")["soc"].transform(ts.trim_off_mask_perf_period) & vehicle_df["is_charging"]
-    vehicle_df["is_charging_idx"] = ts.period_idx_of_mask(vehicle_df["is_charging_mask"])
-
-    return vehicle_df
+def in_charge(vehicle_df: DF) -> DF:
+    return (
+        vehicle_df
+        .eval("in_charge = charging_state == 'Charging'")
+        .pipe(ts.perf_mask_and_idx_from_condition_mask,  "in_charge")
+    )
 
 if __name__ == "__main__":
     main()

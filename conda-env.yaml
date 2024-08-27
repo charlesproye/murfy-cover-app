@@ -1,29 +1,20 @@
+name: data_ev
 channels:
   - conda-forge
 dependencies:
   - python=3.11.3
-  - pip=23.1.2      #22.3.1
+  - pip=23.1.2
   - plotly=5.19.0
   - streamlit=1.32.0
   - python-dotenv=1.0.0
-  - alembic=1.10.4  # 1.9.1q
-  # - httpx=0.24.0    #0.23.3
-  # - orjson=3.8.12 #3.8.5
-  - asyncpg=0.27.0
   - pydantic=1.10.7
-  - pandas=2.0.1       #2.0.0
-  - scipy=1.10.1       #1.10.0
-  - s3fs=2023.6.0  #2023.5.0 #2022.11.0
-  - tqdm=4.65.0         #4.64.1
-  # - tenacity=8.2.2
-  - cryptography=38.0.4  #40.0.2    #38.0.4 ### Cannot go with further version because it is incomptabile with s3fs
+  - pandas=2.2.2
+  - scipy=1.10.1
+  - s3fs=2023.6.0
   - matplotlib = 3.7.2
+  - scikit-learn=1.5.1
+  - boto3=1.26.76
+  - cbor2=5.6.4
   - pip:
-    # - sqlmodel==0.0.8
-    # - uuid6==2023.5.2     #2022.10.25
-    # - apscheduler==3.10.1 #Pas possible tant qu'on a la dépendance à la branch dans the march 
-    - apscheduler==3.10.1
-    # - boto3 == 1.28.4
-    - git+https://themarch-bib@bitbucket.org/bib-batteries/bib-models.git@master#subdirectory=src
-    # - hypercorn==0.14.3
-    - resilient==51.0.2.0.974
+    - -e .
+

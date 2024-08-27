@@ -8,14 +8,14 @@ from os.path import exists
 import pandas as pd
 from pandas import DataFrame as DF
 
-from tesla_constants import *
+from tesla.tesla_constants import *
 
 def main():
     split_raw_csv_into_raw_parquets_ts()
     add_extra_raw_time_series("data_cache/tesla/extra_raw_time_series/LRWYGCFS6PC552861.csv", "LRWYGCFS6PC552861")
     # Count number of points per vehicle per day
 
-    
+
 def raw_ts_of(vin:str) -> DF:
     return pd.read_parquet(PATH_TO_RAW_TESLA_TS.format(vin=vin))
 
