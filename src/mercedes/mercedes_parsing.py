@@ -12,17 +12,46 @@ from pandas import DataFrame as DF
 from rich import print
 
 from core.argparse_utils import parse_kwargs
+from utils.files import ABCFileManager
 
 
-def main(json_source, csv_dest):
-    with open(json_source) as f:
-        df = parse_response_as_df(json.load(f))
-    df.to_csv(csv_dest)
+def main(fm1: ABCFileManager, fm2: ABCFileManager, json_source, csv_dest):
+    print("json", type(json_source))
+    try:
+        print("Attempting to open file...")
+        json_data = fm1.load(json_source)
+        print("File opened successfully")
+        # json_data = json_data.read()
+        # print("File content read successfully")
+        
+        # print("Attempting to parse JSON...")
+        # parsed_data = json.loads(json_data)
+        # print("JSON parsed successfully")
+        print("Calling parse_response_as_df...")
+        df = parse_response_as_df(json_data)
+        print("DataFrame created successfully")
+        
+        print("Saving to CSV...")
+        df.to_csv(csv_dest)
+        print("CSV saved successfully")
+    except FileNotFoundError:
+        print(f"Error: File not found - {json_source}")
+    except json.JSONDecodeError:
+        print(f"Error: Invalid JSON in file - {json_source}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {str(e)}")
+        raise
+    # with open(json_source, 'r') as f:
+    #     print("into main")
+    #     df = parse_response_as_df(json.load(f))
+    # df.to_csv(csv_dest)
 
 def parse_response_as_df(src) -> DF:
+    print("into parse_response_as_df")
     flatten_dict = flatten_json_obj(src, {})
+    print("flatten_dict", flatten_dict)
     df = pd.concat(flatten_dict, axis="columns", names=['vaiable', 'property']).pipe(set_date)
-    
+    print("into parse_response_as_df")
     return df
 
 def set_date(df:DF) -> DF:
@@ -79,12 +108,13 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
 # def flatten_list_of_dicts()
 
 class mercedes_parsing():
-    def __init__(self, source, dest):
+    def __init__(self, fm1: ABCFileManager, fm2: ABCFileManager, source, dest):
         self.source = source
-        self.dest = dest
-
+        self.dest = dest,
+        self.fm1=fm1
+        self.fm2=fm2
 
     async def run(self):
-        main(self.source, self.dest)
+        main(self.fm1, self.fm2, self.source, self.dest)
 
 

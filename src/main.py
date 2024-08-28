@@ -26,7 +26,6 @@ async def main(start_scheduler: bool = True):
     #### Daily
 
     await MercedesTransform().add_to_schedule(scheduler)
-
  
     # Start the scheduler
     if not start_scheduler:

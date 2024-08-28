@@ -197,11 +197,11 @@ class MercedesTransform(Jobinterval):
     """
     id: str = "MercedesTransform"
     name: str = "MercedesTransform"
-    first_fire_date = datetime.now() + timedelta(seconds=5)
+    first_fire_date = datetime.now() + timedelta(seconds=2)
     trigger = IntervalTrigger(days=1, start_date=first_fire_date)
     logger: logging.Logger = logging.getLogger("MercedesTransform")
 
-    now = datetime.now() + timedelta(seconds=5)
+    now = datetime.now() + timedelta(seconds=2)
     trigger = CronTrigger(
         year=now.year,
         month=now.month,
@@ -222,55 +222,47 @@ class MercedesTransform(Jobinterval):
         try:
             date = datetime.now()
             self.logger.info("Parsing data mercedes")
-            fm = S3FileManager.from_fs(
+            fm1 = S3FileManager.from_fs(
                 fs,
                 settings.S3_BUCKET,
-                "response/mercedes-benz",
+                "response/mercedes-benz/",
             )
-            for file in fm.list_files():
-                self.logger.info(file)
-                source = f"{settings.S3_BUCKET}/response/mercedes-benz/{file}"
-                dest = f"{settings.S3_BUCKET}/raw_ts/mercedes-benz/{file}"
+            fm2 = S3FileManager.from_fs(
+                fs,
+                settings.S3_BUCKET,
+                "raw_ts/mercedes-benz/",
+            )
+            # Test S3FileManager separately
+            # test_source = "2024-08-14.json"
+            # try:
+            #     test_content = fm1.load(test_source)
+            #     print(f"Test file content loaded, length: {len(test_content)}")
+            # except Exception as e:
+            #     print(f"Error loading test file: {type(e).__name__}: {str(e)}")
+            folders = fs.ls(f"{settings.S3_BUCKET}/response/mercedes-benz/", detail=False)
+            for folder_path in folders[2:4]: # The two first one are juste the same root as the folder
+                files = fs.ls(folder_path, detail=False)
+                folder = os.path.basename(folder_path)
+                for file_path in files[2:]: 
+                    file = os.path.basename(file_path)
+                    if file.lower().endswith('.json'):
+                        self.logger.info(f"Processing file: {file}")
+                        source = f"{folder}/{file}"
+                        dest = f"{folder}/{file}"
+                        print(f"Source: {source}")
+                        print(f"Destination: {dest}")
+                        try:
+                            await mercedes_parsing(fm1, fm2, source, dest).run()
+                        except Exception as e:
+                            print(f"Error loading file: {e}")
+                    ##Parsing response
+                    # await mercedes_parsing(fm, f"{folder}/{file}", dest).run()
 
-            ##Parsing response
-            await mercedes_parsing(source,dest).run()
+                    # ##Raw data
+                    # await mercedes_raw_ts().run()
 
-            # ##Raw data
-            # await mercedes_raw_ts().run()
-
-            # ##Processed data
-            # await mercedes_processed_ts().run()
-
-            # ##Parsing response
-            # await mercedes_parsing().run()
-
-            # ##Tieorg2
-            # source = f"{settings.S3_BUCKET}/tier/ebicycle_tieorg_split.csv"
-            # source1 = f"{settings.S3_BUCKET}/tier/escooter_tieorg_split.csv"
-            # source2 = f"{settings.S3_BUCKET}/tier/ebicycle_tiesqy_split.csv"  
-            # source3 = f"{settings.S3_BUCKET}/tier/escooter_tiesqy_split.csv"
-            # source4 = f"{settings.S3_BUCKET}/tier/ebicycle_tiepar_split.csv"
-            # sourceX = f"{settings.S3_BUCKET}/tier/merged_new_rental_facts.csv"
-
-
-            # dest = f"{settings.S3_BUCKET}/tier/old_battery_daily/" + "ebicycle_tieorg"+ str(date) +".csv"
-            # dest1 = f"{settings.S3_BUCKET}/tier/old_battery_daily/" + "escooter_tieorg"+ str(date) +".csv"
-            # dest2= f"{settings.S3_BUCKET}/tier/old_battery_daily/" + "ebicycle_tiesqy"+ str(date) +".csv"
-            # dest3 = f"{settings.S3_BUCKET}/tier/old_battery_daily/" + "escooter_tiesqy"+ str(date) +".csv"
-            # dest4 = f"{settings.S3_BUCKET}/tier/old_battery_daily/" + "ebicycle_tiepar"+ str(date) +".csv"
-
-            # destX = f"{settings.S3_BUCKET}/tier/old_rental_facts/merged-" + str(date) +".csv"
-
-            # fs.mv(source, dest)
-            # fs.mv(source1, dest1)
-            # fs.mv(source2, dest2)
-            # fs.mv(source3, dest3)
-            # fs.mv(source4, dest4)
-
-            # fs.mv(sourceX, destX)
-
-            # # # await DecayedETLTiepar().run()
-
+                    # ##Processed data
+                    # await mercedes_processed_ts().run()
 
  
         except FileNotFoundError as e:
