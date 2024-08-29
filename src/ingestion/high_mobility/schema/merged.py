@@ -21,6 +21,15 @@ from ingestion.high_mobility.schema import (
     is_new_value,
 )
 
+T = TypeVar("T", contravariant=True)
+
+
+class MergedInfoProtocol(Protocol[T]):
+    @classmethod
+    def new(cls) -> Self: ...
+    @classmethod
+    def from_initial(cls, initial: T) -> Self: ...
+    def merge(self, other: T) -> None: ...
 
 
 class MergedMercedesBenzDiagnostics(msgspec.Struct):
