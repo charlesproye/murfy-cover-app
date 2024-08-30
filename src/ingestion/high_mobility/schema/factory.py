@@ -96,7 +96,6 @@ def make_all_brands() -> dict[str, Brand]:
             merged_info_class=_MERGED_INFO_CLASSES[normalized_brand_name],
             rate_limit=_INFO_CLASSES[normalized_brand_name].rate_limit,
         )
-    print(res)
     return res
 
 
