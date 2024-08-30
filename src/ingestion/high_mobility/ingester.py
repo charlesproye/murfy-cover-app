@@ -15,13 +15,9 @@ import msgspec
 import schedule
 from botocore.client import ClientError
 from ingestion.high_mobility.api import HMApi
-from ingestion.high_mobility.brands import brands
 from ingestion.high_mobility.compress_data import HMCompresser
-from ingestion.high_mobility.schema import (
-    KiaInfo,
-    MercedesBenzInfo,
-    RenaultInfo,
-)
+from ingestion.high_mobility.schema import brands
+from ingestion.high_mobility.schema.brands import decode_vehicle_info
 from ingestion.high_mobility.vehicle import Vehicle
 
 
@@ -271,18 +267,7 @@ class HMIngester:
                     f"Fetched vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
                 )
                 try:
-                    match vehicle.brand:
-                        case "mercedes-benz":
-                            decoded = msgspec.json.decode(info, type=MercedesBenzInfo)
-                        case "renault":
-                            decoded = msgspec.json.decode(info, type=RenaultInfo)
-                        case "kia":
-                            decoded = msgspec.json.decode(info, type=KiaInfo)
-                        case _:
-                            self.__ingester_logger.error(
-                                f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): unsupported vehicle brand"
-                            )
-                            return
+                    decoded = decode_vehicle_info(info, vehicle.brand)
                 except (msgspec.ValidationError, msgspec.DecodeError) as e:
                     self.__ingester_logger.error(
                         f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): response {info} does not fit schema ({e})"

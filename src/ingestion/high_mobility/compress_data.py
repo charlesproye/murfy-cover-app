@@ -9,8 +9,8 @@ import boto3
 import msgspec
 from botocore.client import ClientError
 from botocore.credentials import threading
-from ingestion.high_mobility.brands import brands
 from ingestion.high_mobility.multithreading import MergedInfoWrapper
+from ingestion.high_mobility.schema import brands
 
 
 class HMCompresser:

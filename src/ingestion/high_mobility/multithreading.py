@@ -2,16 +2,10 @@ from threading import Lock
 from typing import Generic, Type, TypeVar
 
 from ingestion.high_mobility.schema import (
-    BmwInfo,
-    KiaInfo,
-    MercedesBenzInfo,
-    RenaultInfo,
-)
-from ingestion.high_mobility.schema.merged import (
     MergedInfoProtocol,
 )
 
-U = TypeVar("U", BmwInfo, KiaInfo, MercedesBenzInfo, RenaultInfo)
+U = TypeVar("U")
 V = TypeVar("V", bound=MergedInfoProtocol)
 
 
@@ -26,15 +20,6 @@ class MergedInfoWrapper(Generic[U, V]):
     def set_info(self, info: U) -> None:
         with self.__lock:
             self.info = type(self.info).from_initial(info)
-            # match info:
-            #     case KiaInfo():
-            #         self.info = MergedKiaInfo.from_initial(info)
-            #     case RenaultInfo():
-            #         self.info = MergedRenaultInfo.from_initial(info)
-            #     case MercedesBenzInfo():
-            #         self.info = MergedMercedesBenzInfo.from_initial(info)
-            #     case _:
-            #         return
 
     def merge(self, other: U):
         with self.__lock:
