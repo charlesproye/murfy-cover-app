@@ -10,7 +10,7 @@ import msgspec
 from botocore.client import ClientError
 from botocore.credentials import threading
 from ingestion.high_mobility.multithreading import MergedInfoWrapper
-from ingestion.high_mobility.schema import brands
+from ingestion.high_mobility.schema import all_brands
 
 
 class HMCompresser:
@@ -40,7 +40,7 @@ class HMCompresser:
 
     def list_objects(self):
         paginator = self.__s3.get_paginator("list_objects_v2")
-        for brand_name in brands.keys():
+        for brand_name in all_brands.keys():
             bucket_iterator = paginator.paginate(
                 Bucket=self.__bucket, Prefix=f"response/{brand_name}"
             )
@@ -86,7 +86,7 @@ class HMCompresser:
                     )
                     return
             try:
-                parsed = msgspec.json.decode(content, type=brands[brand].info_class)
+                parsed = msgspec.json.decode(content, type=all_brands[brand].info_class)
             except msgspec.ValidationError as e:
                 self.__logger.error(
                     f"Failed to parse temporary data {s3_key} (brand {brand}): {e}"
@@ -96,7 +96,7 @@ class HMCompresser:
                 if merged.info is None:
                     merged.set_info(parsed)
                 else:
-                    if isinstance(merged.info, brands[brand].merged_info_class):
+                    if isinstance(merged.info, all_brands[brand].merged_info_class):
                         merged.merge(parsed)
                     else:
                         self.__logger.error(
@@ -127,8 +127,8 @@ class HMCompresser:
             if self.__shutdown_requested.is_set():
                 return
             self.__logger.info(f"{vin}, {temp_data}")
-            info_type = brands[brand].info_class
-            merged_type = brands[brand].merged_info_class
+            info_type = all_brands[brand].info_class
+            merged_type = all_brands[brand].merged_info_class
             merged = MergedInfoWrapper[info_type, merged_type](merged_type)
             today = datetime.today().date()
             job_queue: Queue[Callable] = Queue()
@@ -173,7 +173,7 @@ class HMCompresser:
     def run(self):
         self.__logger.info("Listing bucket objects")
         self.list_objects()
-        for brand_name in brands.keys():
+        for brand_name in all_brands.keys():
             if not self.__shutdown_requested.is_set():
                 self.__logger.info(f"Starting {brand_name} data compression")
                 self.__process(self.__s3_keys_by_vin[brand_name], brand_name)

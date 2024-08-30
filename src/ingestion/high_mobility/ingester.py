@@ -16,7 +16,7 @@ import schedule
 from botocore.client import ClientError
 from ingestion.high_mobility.api import HMApi
 from ingestion.high_mobility.compress_data import HMCompresser
-from ingestion.high_mobility.schema import brands
+from ingestion.high_mobility.schema import all_brands
 from ingestion.high_mobility.schema.brands import decode_vehicle_info
 from ingestion.high_mobility.vehicle import Vehicle
 
@@ -191,7 +191,7 @@ class HMIngester:
             Vehicle(
                 vin=clearance.vin,
                 brand=clearance.brand,
-                rate_limit=brands[clearance.brand].rate_limit,
+                rate_limit=all_brands[clearance.brand].rate_limit,
                 clearance_status=clearance.clearance_status,
             )
             for clearance in clearances
@@ -224,7 +224,7 @@ class HMIngester:
                 Vehicle(
                     vin=clearance.vin,
                     brand=clearance.brand,
-                    rate_limit=brands[clearance.brand].rate_limit,
+                    rate_limit=all_brands[clearance.brand].rate_limit,
                     clearance_status=clearance.clearance_status,
                 )
                 for clearance in clearances
