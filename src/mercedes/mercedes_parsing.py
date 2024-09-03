@@ -10,28 +10,34 @@ from datetime import datetime as DT
 import pandas as pd
 from pandas import DataFrame as DF
 from rich import print
+import os
 
 from core.argparse_utils import parse_kwargs
 from utils.files import ABCFileManager
 
 
+import os
+
 def main(fm1: ABCFileManager, fm2: ABCFileManager, json_source, csv_dest):
-    print("json", type(json_source))
+    print("json_source:", type(json_source), json_source)
+    print("csv_dest:", type(csv_dest), csv_dest)
+    
     try:
         print("Attempting to open file...")
         json_data = fm1.load(json_source)
         print("File opened successfully")
-        # json_data = json_data.read()
-        # print("File content read successfully")
         
-        # print("Attempting to parse JSON...")
-        # parsed_data = json.loads(json_data)
-        # print("JSON parsed successfully")
         print("Calling parse_response_as_df...")
         df = parse_response_as_df(json_data)
         print("DataFrame created successfully")
         
         print("Saving to CSV...")
+        if isinstance(csv_dest, tuple):
+            csv_dest = csv_dest[0]  # Prendre le premier élément si c'est un tuple
+        
+        # Créer le répertoire si nécessaire
+        os.makedirs(os.path.dirname(csv_dest), exist_ok=True)
+        
         df.to_csv(csv_dest)
         print("CSV saved successfully")
     except FileNotFoundError:
@@ -41,28 +47,43 @@ def main(fm1: ABCFileManager, fm2: ABCFileManager, json_source, csv_dest):
     except Exception as e:
         print(f"An unexpected error occurred: {str(e)}")
         raise
-    # with open(json_source, 'r') as f:
-    #     print("into main")
-    #     df = parse_response_as_df(json.load(f))
-    # df.to_csv(csv_dest)
 
 def parse_response_as_df(src) -> DF:
-    print("into parse_response_as_df")
     flatten_dict = flatten_json_obj(src, {})
-    print("flatten_dict", flatten_dict)
     df = pd.concat(flatten_dict, axis="columns", names=['vaiable', 'property']).pipe(set_date)
-    print("into parse_response_as_df")
+    print("second into parse_response_as_df")
     return df
 
-def set_date(df:DF) -> DF:
+def set_date(df: DF) -> DF:
     if df.empty:
         return df
-    df.index = pd.to_datetime(df.index, utc=True)
-    date = df.index.to_series().dt.as_unit("s")
-    df["date"] = date
-    df.index = date
-    df.index.name = "date"
-
+    
+    # Check if there's already a DatetimeIndex
+    if isinstance(df.index, pd.DatetimeIndex):
+        return df
+    
+    # List of possible date column names
+    date_column_names = ['timestamp', 'date', 'time']
+    
+    # Try to find a date column
+    date_column = None
+    for col in date_column_names:
+        if col in df.columns.get_level_values(1):
+            try:
+                date_series = df.loc[:, df.columns.get_level_values(1) == col].iloc[:, 0]
+                df['date'] = pd.to_datetime(date_series, utc=True)
+                date_column = col
+                break
+            except ValueError:
+                continue
+    
+    if date_column:
+        df = df.set_index('date')
+        df.index.name = 'date'
+    else:
+        df['date'] = pd.date_range(start=pd.Timestamp.now(), periods=len(df), freq='s')
+        df = df.set_index('date')
+        df.index.name = 'date'    
     return df
 
 def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> dict[Any,dict[str,Any]]:
@@ -81,15 +102,17 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
     """
     if "timestamp" in src:
         timestamp = DT.strptime(src["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ")
-
     for key, value in src.items():
         if isinstance(value, dict):
+            print("value is a dict")
             dst = flatten_json_obj(value, dst, timestamp, path + ([key] if key != "data" else []))
         if isinstance(value, list):
+            print("value is a list")
             str_path = ".".join(path + ([key] if key != "data" else []))
             # print(value)
             df = DF.from_records(value)
             if "data" in df.columns:
+                print("inside df", df.columns)
                 parsed_data = pd.json_normalize(df["data"])
                 if "value" in parsed_data.columns and "unit" in parsed_data.columns:
                     unique_units = parsed_data["unit"].unique()
@@ -102,7 +125,13 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
             if not df.empty:
                 df = df.set_index("timestamp")
             dst[str_path] = df
-
+        elif isinstance(value, pd.Series):
+            str_path = ".".join(path + [key])
+            dst[str_path] = value.to_frame()
+        else: 
+            print(f"value is not a dict, list, or Series, type: {type(value)}")
+            str_path = ".".join(path + [key])
+            dst[str_path] = pd.Series(value, name=key)
     return dst
 
 # def flatten_list_of_dicts()
