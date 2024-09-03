@@ -18,27 +18,17 @@ from utils.files import ABCFileManager
 
 import os
 
-def main(fm1: ABCFileManager, fm2: ABCFileManager, json_source, csv_dest):
-    print("json_source:", type(json_source), json_source)
-    print("csv_dest:", type(csv_dest), csv_dest)
+def main(fm1: ABCFileManager, fm2: ABCFileManager, json_source, csv_dest) :
     
     try:
-        print("Attempting to open file...")
         json_data = fm1.load(json_source)
-        print("File opened successfully")
-        
-        print("Calling parse_response_as_df...")
         df = parse_response_as_df(json_data)
-        print("DataFrame created successfully")
-        
         print("Saving to CSV...")
-        if isinstance(csv_dest, tuple):
-            csv_dest = csv_dest[0]  # Prendre le premier élément si c'est un tuple
+        # df.to_csv(csv_dest)
+        fm2.save(df, csv_dest)
+        print("CSV saved successfully")
         
-        # Créer le répertoire si nécessaire
-        os.makedirs(os.path.dirname(csv_dest), exist_ok=True)
-        
-        df.to_csv(csv_dest)
+        # df.to_csv(csv_dest)
         print("CSV saved successfully")
     except FileNotFoundError:
         print(f"Error: File not found - {json_source}")
@@ -137,9 +127,9 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
 # def flatten_list_of_dicts()
 
 class mercedes_parsing():
-    def __init__(self, fm1: ABCFileManager, fm2: ABCFileManager, source, dest):
+    def __init__(self, fm1: ABCFileManager, fm2: ABCFileManager, source : str, dest : str):
         self.source = source
-        self.dest = dest,
+        self.dest = dest
         self.fm1=fm1
         self.fm2=fm2
 

@@ -22,6 +22,18 @@ class ABCFileManager(ABC):
     def open(self, relative_path, *args, **kwarg):
         raise NotImplementedError()
 
+    def ensure_folder_exists(self, path):
+        s3_path = path[5:]  # Remove 's3://' prefix
+        folder_path = os.path.dirname(s3_path)
+        """creates subfolders if necessary"""
+        if not self.fs.exists(folder_path):
+            print("checking existance")
+            self.fs.makedirs(folder_path)
+            print(f'Folder created: {folder_path}')
+        else:
+            print(f'Folder already exists: {path}')
+
+
     def save(self, thing: pd.DataFrame, relative_path, *args, **kwargs):
         """Save object (usually dataframe) to file
 
@@ -31,7 +43,9 @@ class ABCFileManager(ABC):
         >>> df = pd.DataFrame()
         >>> files.save(df, 'clean/iris.pickle')
         """
-        path = self.get_filepath(relative_path, create_folders=True)
+        path = self.get_filepath(relative_path)
+        print("path save", path)
+        self.ensure_folder_exists(path)  # Ensure the folder exists
         basename = os.path.basename(path)
         if ".pickle" in basename:
             # assuming this is a pandas df
@@ -40,10 +54,13 @@ class ABCFileManager(ABC):
         elif ".csv" in basename:
             # assuming this is a pandas df
             logging.debug("Saving object to " + path)
+            print("après debug")
+            print("thing", thing)
+            print("type(thing)", type(thing))
             thing.to_csv(path, *args, **kwargs)
         elif ".json" in basename:
             # assuming this is a pandas df
-            logging.debug("Saving object to " + path)
+            # logging.debug("Saving object to " + path)
             thing.to_json(path, *args, **kwargs)
         elif ".xml" in basename:
             # assuming this is a pandas df
@@ -71,6 +88,7 @@ class ABCFileManager(ABC):
         """
         path = self.get_filepath(relative_path)
         basename = os.path.basename(path)
+        print("path load", path)
         logging.debug("Loading from: " + path)
         if ".pickle" in basename:
             return pd.read_pickle(path, *args, **kwargs)

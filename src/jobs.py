@@ -16,16 +16,8 @@ from tqdm import tqdm
 
 from bib_models_data_ev.core.config import settings
 
-# #### Every day worker 
-# from FleetEvolution.warehouse import InsertWarehouse
-# from FleetEvolution.stateevolution import InsertDataState
-# from FleetEvolution.modelevolution import InsertDataModel
-# from etl.fifteen.fifsac import InfoETLFifsac, EvolutionETLFifsac, ReviewETLFifsac, StateETLFifsac
-
 
 #### Ponctual worker 
-
-# from etl.tier.tieorg1 import InfoETLTieorg1, DataETLTieorg1, EvolutionETLTieorg1, ReviewETLTieorg1, StateETLTieorg1, DecayedETLTieorg1
 
 from mercedes.mercedes_parsing import mercedes_parsing
 # from mercedes.mercedes_raw_ts import mercedes_raw_ts
@@ -249,14 +241,14 @@ class MercedesTransform(Jobinterval):
                         self.logger.info(f"Processing file: {file}")
                         source = f"{folder}/{file}"
                         dest = f"{folder}/{file}"
+                        dest= dest.replace(".json", ".csv")
+                        print("type(dest)", type(dest))
                         print(f"Source: {source}")
                         print(f"Destination: {dest}")
                         try:
                             await mercedes_parsing(fm1, fm2, source, dest).run()
                         except Exception as e:
                             print(f"Error loading file: {e}")
-                    ##Parsing response
-                    # await mercedes_parsing(fm, f"{folder}/{file}", dest).run()
 
                     # ##Raw data
                     # await mercedes_raw_ts().run()
