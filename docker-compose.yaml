@@ -4,6 +4,11 @@ services:
   hm_ingestion_sevice: 
     build: . 
     container_name: hm_ingestion
+  ms_ingestion_sevice: 
+    build:
+      context: .
+      dockerfile: mobilisights.Dockerfile
+    container_name: ms-ingestion
     env_file: 
       - path: ./.env
         required: true
