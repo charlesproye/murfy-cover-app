@@ -16,11 +16,8 @@ import schedule
 from botocore.client import ClientError
 from ingestion.high_mobility.api import HMApi
 from ingestion.high_mobility.compress_data import HMCompresser
-from ingestion.high_mobility.schema import (
-    KiaInfo,
-    MercedesBenzInfo,
-    RenaultInfo,
-)
+from ingestion.high_mobility.schema import all_brands
+from ingestion.high_mobility.schema.brands import decode_vehicle_info
 from ingestion.high_mobility.vehicle import Vehicle
 
 
@@ -31,6 +28,7 @@ class HMIngester:
     __api: HMApi
     __s3 = boto3.client("s3")
     __bucket: str
+    __compresser: HMCompresser
 
     __fetch_scheduler = schedule.Scheduler()
     __compress_scheduler = schedule.Scheduler()
@@ -40,14 +38,6 @@ class HMIngester:
     __job_queue: Queue[Callable]
 
     __shutdown_requested = threading.Event()
-
-    rate_limit: dict[str, int] = {
-        # Minimum time in seconds between two requests per vehicle for each maker
-        "mercedes-benz": 36,
-        "renault": 36,
-        "kia": 24 * 60 * 60,
-        "ford": 36,
-    }
 
     refresh_interval: int = 2 * 60
     upload_interval: int = 60
@@ -120,6 +110,12 @@ class HMIngester:
         )
         self.__bucket = S3_BUCKET
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        self.__compresser = HMCompresser(
+            self.__s3,
+            self.__bucket,
+            threaded=self.compress_threaded,
+            max_workers=self.max_workers,
+        )
         self.__job_queue = Queue()
         self.refresh_interval = refresh_interval or self.refresh_interval
         self.compress_interval = compress_interval or self.compress_interval
@@ -135,7 +131,11 @@ class HMIngester:
         self.__ingester_logger.warn(
             f"Received signal {signal.Signals(signum).name}, shutting down"
         )
+        self.__request_shutdown()
+
+    def __request_shutdown(self):
         self.__shutdown_requested.set()
+        self.__compresser.shutdown()
 
     def __shutdown(self):
         self.__worker_thread.join()
@@ -191,7 +191,7 @@ class HMIngester:
             Vehicle(
                 vin=clearance.vin,
                 brand=clearance.brand,
-                rate_limit=self.rate_limit[clearance.brand],
+                rate_limit=all_brands[clearance.brand].rate_limit,
                 clearance_status=clearance.clearance_status,
             )
             for clearance in clearances
@@ -224,7 +224,7 @@ class HMIngester:
                 Vehicle(
                     vin=clearance.vin,
                     brand=clearance.brand,
-                    rate_limit=self.rate_limit[clearance.brand],
+                    rate_limit=all_brands[clearance.brand].rate_limit,
                     clearance_status=clearance.clearance_status,
                 )
                 for clearance in clearances
@@ -267,18 +267,7 @@ class HMIngester:
                     f"Fetched vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
                 )
                 try:
-                    match vehicle.brand:
-                        case "mercedes-benz":
-                            decoded = msgspec.json.decode(info, type=MercedesBenzInfo)
-                        case "renault":
-                            decoded = msgspec.json.decode(info, type=RenaultInfo)
-                        case "kia":
-                            decoded = msgspec.json.decode(info, type=KiaInfo)
-                        case _:
-                            self.__ingester_logger.error(
-                                f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): unsupported vehicle brand"
-                            )
-                            return
+                    decoded = decode_vehicle_info(info, vehicle.brand)
                 except (msgspec.ValidationError, msgspec.DecodeError) as e:
                     self.__ingester_logger.error(
                         f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): response {info} does not fit schema ({e})"
@@ -319,13 +308,7 @@ class HMIngester:
 
     def __compress(self):
         self.__ingester_logger.info("Starting compression job")
-        compresser = HMCompresser(
-            self.__s3,
-            self.__bucket,
-            threaded=self.compress_threaded,
-            max_workers=self.max_workers,
-        )
-        compresser.run()
+        self.__compresser.run()
 
     def __process_job_queue(self):
         self.__ingester_logger.info("Starting processing job queue")
