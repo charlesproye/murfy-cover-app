@@ -18,4 +18,3 @@ services:
         required: false
     volumes:
       - .:/app
-
