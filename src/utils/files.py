@@ -7,6 +7,7 @@ import io
 import logging
 import os
 import tarfile
+import boto3
 from abc import ABC, abstractmethod
 
 import pandas as pd
@@ -22,50 +23,52 @@ class ABCFileManager(ABC):
     def open(self, relative_path, *args, **kwarg):
         raise NotImplementedError()
 
-    def ensure_folder_exists(self, fs, thing : pd.DataFrame, path, *args, **kwargs):
-        s3_path = path[5:] if path.startswith('s3://') else path
+    def ensure_folder_exists(self, fs, thing: pd.DataFrame, path, *args, **kwargs):
+        s3_path = path if isinstance(path, str) and path.startswith('s3://') else 's3://' + path
         folder_path = os.path.dirname(s3_path)
-        print("folder_path", folder_path)
-        print("s3_path", s3_path)
-    
-    # Check if folder exists, and create it if it doesn't
+        print("folder_path:", folder_path)
+        print("s3_path:", s3_path)
+
         csv_data = thing.to_csv(index=False)
+        file_name = os.path.basename(s3_path)
+        full_path = f"{folder_path}/{file_name}"
+        session = boto3.Session(
+            aws_access_key_id='SCW68HH2T2FRENB5T5JT',  # S3_KEY de Scaleway
+            aws_secret_access_key='9d33d136-18fe-409d-8927-bf3ff8023faf',  # S3_SECRET de Scaleway
+            region_name='fr-par'  # Région Scaleway
+        )
+
+        s3 = session.client(
+            's3',
+            endpoint_url='https://s3.fr-par.scw.cloud'  # Point de terminaison Scaleway
+        )
+
+        bucket_name = 'bib-platform-dev-data'
+
+        s3_path_parts = full_path.split('raw_ts')
+        if len(s3_path_parts) > 1:
+            relative_path = 'raw_ts' + s3_path_parts[1]
+            print(relative_path)
+        else:
+            print("Path does not contain 'raw_ts':", full_path)
+
         
         try:
             if not fs.exists(folder_path):
                 print("Folder does not exist, creating it.")
                 fs.makedirs(folder_path)
-                with fs.open(s3_path, 'wb') as f:
-                    print("csv data", csv_data)
-                    print("File opened for writing")
-                    # f.write(csv_data.encode('utf-8'))
-                    f.touch(s3_path)
-                    print(csv_data)
-                # fs.touch(s3_path)
-            # else:
-            #     print(f'Folder already exists: {folder_path}')
-
-            # print(f"Attempting to write file to: {s3_path}")
-            # try:
-            #     with fs.open(s3_path, 'wb') as f:
-            #         print("File opened for writing")
-            #         f.write(csv_data.encode('utf-8'))
-            #     print(f"File saved successfully to: {s3_path}")
-            # except Exception as write_error:
-            #     print(f"Error writing file: {str(write_error)}")
-            #     print(f"Write error type: {type(write_error)}")
-            #     raise
+            
+            response = s3.put_object(Bucket=bucket_name, Key=relative_path, Body=csv_data)
+            print("File written successfully", response)
         except Exception as e:
             print(f"Error in ensure_folder_exists: {str(e)}")
             print(f"Error type: {type(e)}")
             print(f"fs type: {type(fs)}")
             print(f"thing type: {type(thing)}")
             print(f"path: {path}")
-        raise
-            
-            # with fs.open(path, 'w') as f:
-            #     print("file opened")
-            #     thing.to_csv(f, index=False, *args, **kwargs)
+            print(f"s3_path: {s3_path}")
+            print(f"folder_path: {folder_path}")
+            print(f"full_path: {full_path}")
             
         
 
