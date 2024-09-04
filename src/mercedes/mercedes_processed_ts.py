@@ -13,7 +13,7 @@ from pandas import DataFrame as DF
 
 from core.s3_utils import S3_Bucket
 from core.constants import *
-from high_mobility.high_mobility_constants import *
+from mercedes.mercedes_constants import *
 from core.pandas_utils import print_data
 
 logger = logging.getLogger(__name__)
@@ -100,3 +100,15 @@ def standardize_units(ts: DF, key_data:Series) -> DF:
 
 if __name__ == "__main__":
     main()
+
+class mercedes_processed_ts():
+    def __init__(self, s3, source : str, dest : str):
+        self.s3 = s3
+        self.source = source
+        self.dest = dest
+        # self.fs = fs
+        # self.fm1=fm1
+        # self.fm2=fm2
+
+    async def run(self):
+        main(self.s3, self.source, self.dest)

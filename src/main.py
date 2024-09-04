@@ -4,7 +4,9 @@ import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from jobs import (
-    MercedesTransform
+    MercedesParsing,
+    MercedesRawTs,
+    MercedesProcessedTs
 )
 
 from utils.platform import PLATFORM_COLORED, PLATFORM
@@ -25,8 +27,10 @@ async def main(start_scheduler: bool = True):
     logging.info(f"Main process PID: {os.getpid()}, running on {PLATFORM_COLORED}")
     #### Daily
 
-    await MercedesTransform().add_to_schedule(scheduler)
- 
+    # await MercedesParsing().add_to_schedule(scheduler)
+    await MercedesRawTs().add_to_schedule(scheduler)
+    # await MercedesProcessedTs().add_to_schedule(scheduler)
+
     # Start the scheduler
     if not start_scheduler:
         return

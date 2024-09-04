@@ -5,8 +5,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from s3fs import S3FileSystem
-from utils.files import S3FileManager
-# import boto3
+# from utils.files import S3FileManager
+import boto3
 import pytz
 import asyncio
 import os
@@ -20,11 +20,11 @@ from bib_models_data_ev.core.config import settings
 #### Ponctual worker 
 
 from mercedes.mercedes_parsing import mercedes_parsing
-# from mercedes.mercedes_raw_ts import mercedes_raw_ts
+from mercedes.mercedes_raw_ts import mercedes_raw_ts
 # from mercedes.mercedes_processed_ts import mercedes_processed_ts
 
 
-from utils.files import S3FileManager
+# from utils.files import S3FileManager
 from utils.format import log_process
 
 
@@ -181,7 +181,7 @@ class Jobinterval: ###Job for which we define an interval between 2 launch ### S
 #             cls.logger.info("No new files")
 
 
-class MercedesTransform(Jobinterval):
+class MercedesParsing(Jobinterval):
     """
     Raw data are collected from the Mercedes API and stored in a json file in the S3 bucket.
     The data are then parsed and transformed into a pandas dataframe.
@@ -203,59 +203,84 @@ class MercedesTransform(Jobinterval):
         second=now.second,
     )
 
-
     @classmethod
     async def func(self, job_obj=None):
-        fs = S3FileSystem(
-            anon=False,
-            key=settings.S3_KEY,
-            secret=settings.S3_SECRET,
-            client_kwargs={"endpoint_url": settings.S3_URL, "region_name": "fr-par"},)
-        try:
-            date = datetime.now()
-            self.logger.info("Parsing data mercedes")
-            fm1 = S3FileManager.from_fs(
-                fs,
-                settings.S3_BUCKET,
-                "response/mercedes-benz/",
+        ##############using boto3 ##################
+        session = boto3.Session(
+                aws_access_key_id=settings.S3_KEY,  # S3_KEY de Scaleway
+                aws_secret_access_key=settings.S3_SECRET,  # S3_SECRET de Scaleway
+                region_name='fr-par'  # Région Scaleway
+        )
+        s3 = session.client(
+                's3',
+                endpoint_url=settings.S3_URL  # Point de terminaison Scaleway
             )
-            fm2 = S3FileManager.from_fs(
-                fs,
-                settings.S3_BUCKET,
-                "raw_ts/mercedes-benz/",
-            )
-            # Test S3FileManager separately
-            # test_source = "2024-08-14.json"
-            # try:
-            #     test_content = fm1.load(test_source)
-            #     print(f"Test file content loaded, length: {len(test_content)}")
-            # except Exception as e:
-            #     print(f"Error loading test file: {type(e).__name__}: {str(e)}")
-            folders = fs.ls(f"{settings.S3_BUCKET}/response/mercedes-benz/", detail=False)
-            for folder_path in folders[2:4]: # The two first one are juste the same root as the folder
-                files = fs.ls(folder_path, detail=False)
-                folder = os.path.basename(folder_path)
-                for file_path in files[2:4]: 
-                    file = os.path.basename(file_path)
-                    if file.lower().endswith('.json'):
-                        self.logger.info(f"Processing file: {file}")
-                        source = f"{folder}/{file}"
-                        dest = f"{folder}/{file}"
-                        dest= dest.replace(".json", ".csv")
-                        print("type(dest)", type(dest))
-                        print(f"Source: {source}")
-                        print(f"Destination: {dest}")
-                        # fm2.save(fs, pd.DataFrame(), "")  # Correct folder creation
-                        # # if not fs.exists(full_s3_path):
-                        #     # print("Folder doesn't exists !!!")
-                        #     # fs.makedirs(full_s3_path, exist_ok=True)
-                        #     # fs.touch("bib-platform-dev-data/raw_ts/mercedes-benz/kiwi")
-                        #     # pd.DataFrame().to_csv("bib-platform-dev-data/raw_ts/mercedes-benz/kiwi/kiwi.csv")
-                        #     # print(f'Folder created')
-                        try:
-                            await mercedes_parsing(fs, fm1, fm2, source, dest).run()
-                        except Exception as e:
-                            print(f"Error loading file: {e}")
+        response = s3.list_objects_v2(Bucket=settings.S3_BUCKET, Prefix="response/mercedes-benz/", Delimiter="/")
+        folders = [prefix['Prefix'] for prefix in response['CommonPrefixes']]
+        for folder_path in folders[2:4]: # The two first one are juste the same root as the folder
+            files_response = s3.list_objects_v2(Bucket=settings.S3_BUCKET, Prefix=folder_path)
+            files = [item['Key'] for item in files_response.get('Contents', []) if item['Key'].lower().endswith('.json')]
+            for file_path in files[2:4]: 
+                file = os.path.basename(file_path)
+                source = f"{folder_path}{file}"
+                dest_response = source.replace('response/', 'raw_ts/').replace('.json', '.csv')
+                dest_raw_ts = source.replace('response/', 'raw_ts/').replace('.json', '.csv')
+                dest_processed_ts = source.replace('response/', 'processed_ts/').replace('.json', '.csv')
+                try:
+                    await mercedes_parsing(s3, source, dest_response).run()
+                except Exception as e:
+                    print(f"Error loading file: {e}")
+        ###############using s3fs ##################
+        # fs = S3FileSystem(
+        #     anon=False,
+        #     key=settings.S3_KEY,
+        #     secret=settings.S3_SECRET,
+        #     client_kwargs={"endpoint_url": settings.S3_URL, "region_name": "fr-par"},)
+        # try:
+        #     date = datetime.now()
+        #     self.logger.info("Parsing data mercedes")
+        #     fm1 = S3FileManager.from_fs(
+        #         fs,
+        #         settings.S3_BUCKET,
+        #         "response/mercedes-benz/",
+        #     )
+        #     fm2 = S3FileManager.from_fs(
+        #         fs,
+        #         settings.S3_BUCKET,
+        #         "raw_ts/mercedes-benz/",
+        #     )
+        #     # Test S3FileManager separately
+        #     # test_source = "2024-08-14.json"
+        #     # try:
+        #     #     test_content = fm1.load(test_source)
+        #     #     print(f"Test file content loaded, length: {len(test_content)}")
+        #     # except Exception as e:
+        #     #     print(f"Error loading test file: {type(e).__name__}: {str(e)}")
+        #     folders = fs.ls(f"{settings.S3_BUCKET}/response/mercedes-benz/", detail=False)
+        #     for folder_path in folders[2:4]: # The two first one are juste the same root as the folder
+        #         files = fs.ls(folder_path, detail=False)
+        #         folder = os.path.basename(folder_path)
+        #         for file_path in files[2:4]: 
+        #             file = os.path.basename(file_path)
+        #             if file.lower().endswith('.json'):
+        #                 self.logger.info(f"Processing file: {file}")
+        #                 source = f"{folder}/{file}"
+        #                 dest = f"{folder}/{file}"
+        #                 dest= dest.replace(".json", ".csv")
+        #                 print("type(dest)", type(dest))
+        #                 print(f"Source: {source}")
+        #                 print(f"Destination: {dest}")
+        #                 # fm2.save(fs, pd.DataFrame(), "")  # Correct folder creation
+        #                 # # if not fs.exists(full_s3_path):
+        #                 #     # print("Folder doesn't exists !!!")
+        #                 #     # fs.makedirs(full_s3_path, exist_ok=True)
+        #                 #     # fs.touch("bib-platform-dev-data/raw_ts/mercedes-benz/kiwi")
+        #                 #     # pd.DataFrame().to_csv("bib-platform-dev-data/raw_ts/mercedes-benz/kiwi/kiwi.csv")
+        #                 #     # print(f'Folder created')
+        #                 try:
+        #                     await mercedes_parsing(fs, fm1, fm2, source, dest).run()
+        #                 except Exception as e:
+        #                     print(f"Error loading file: {e}")
 
                     # ##Raw data
                     # await mercedes_raw_ts().run()
@@ -264,7 +289,107 @@ class MercedesTransform(Jobinterval):
                     # await mercedes_processed_ts().run()
 
  
-        except FileNotFoundError as e:
-            self.logger.info("No new files")
+        # except FileNotFoundError as e:
+        #     self.logger.info("No new files")
 
+class MercedesRawTs(Jobinterval):
 
+    """
+    Raw data are collected from the Mercedes API and stored in a json file in the S3 bucket.
+    The data are then parsed and transformed into a pandas dataframe.
+    The dataframe is then stored in a parquet file in the S3 bucket.
+    """
+    id: str = "MercedesRawTs"
+    name: str = "MercedesRawTs"
+    first_fire_date = datetime.now() + timedelta(seconds=2)
+    trigger = IntervalTrigger(days=1, start_date=first_fire_date)
+    logger: logging.Logger = logging.getLogger("MercedesRawTs")
+
+    now = datetime.now() + timedelta(seconds=2)
+    trigger = CronTrigger(
+        year=now.year,
+        month=now.month,
+        day=now.day,
+        hour=now.hour,
+        minute=now.minute,
+        second=now.second,
+    )
+
+    @classmethod
+    async def func(self, job_obj=None):
+        ##############using boto3 ##################
+        session = boto3.Session(
+                aws_access_key_id=settings.S3_KEY,  # S3_KEY de Scaleway
+                aws_secret_access_key=settings.S3_SECRET,  # S3_SECRET de Scaleway
+                region_name='fr-par'  # Région Scaleway
+        )
+        s3 = session.client(
+                's3',
+                endpoint_url=settings.S3_URL  # Point de terminaison Scaleway
+            )
+        response = s3.list_objects_v2(Bucket=settings.S3_BUCKET, Prefix="raw_ts/mercedes-benz/", Delimiter="/")
+        folders = [prefix['Prefix'] for prefix in response['CommonPrefixes']]
+        for folder_path in folders[2:4]: # The two first one are juste the same root as the folder
+            files_response = s3.list_objects_v2(Bucket=settings.S3_BUCKET, Prefix=folder_path)
+            files = [item['Key'] for item in files_response.get('Contents', []) if item['Key'].lower().endswith('.json')]
+            for file_path in files[2:4]: 
+                file = os.path.basename(file_path)
+                source = f"{folder_path}{file}"
+                dest_response = source.replace('raw_ts/', 'processed_ts/').replace('.csv', '.parquet')
+                dest_raw_ts = source.replace('raw_ts/', 'processed_ts/').replace('.csv', '.parquet')
+                dest_processed_ts = source.replace('raw_ts/', 'processed_ts/').replace('.csv', '.parquet')
+                try:
+                    await mercedes_raw_ts(s3, source, dest_response).run()
+                except Exception as e:
+                    print(f"Error loading file: {e}")
+
+class MercedesProcessedTs(Jobinterval):
+    
+    """
+    Raw data are collected from the Mercedes API and stored in a json file in the S3 bucket.
+    The data are then parsed and transformed into a pandas dataframe.
+    The dataframe is then stored in a parquet file in the S3 bucket.
+    """
+    id: str = "MercedesTransform"
+    name: str = "MercedesTransform"
+    first_fire_date = datetime.now() + timedelta(seconds=2)
+    trigger = IntervalTrigger(days=1, start_date=first_fire_date)
+    logger: logging.Logger = logging.getLogger("MercedesTransform")
+
+    now = datetime.now() + timedelta(seconds=2)
+    trigger = CronTrigger(
+        year=now.year,
+        month=now.month,
+        day=now.day,
+        hour=now.hour,
+        minute=now.minute,
+        second=now.second,
+    )
+
+    @classmethod
+    async def func(self, job_obj=None):
+        ##############using boto3 ##################
+        session = boto3.Session(
+                aws_access_key_id=settings.S3_KEY,  # S3_KEY de Scaleway
+                aws_secret_access_key=settings.S3_SECRET,  # S3_SECRET de Scaleway
+                region_name='fr-par'  # Région Scaleway
+        )
+        s3 = session.client(
+                's3',
+                endpoint_url=settings.S3_URL  # Point de terminaison Scaleway
+            )
+        response = s3.list_objects_v2(Bucket=settings.S3_BUCKET, Prefix="raw_ts/mercedes-benz/", Delimiter="/")
+        folders = [prefix['Prefix'] for prefix in response['CommonPrefixes']]
+        for folder_path in folders[2:4]: # The two first one are juste the same root as the folder
+            files_response = s3.list_objects_v2(Bucket=settings.S3_BUCKET, Prefix=folder_path)
+            files = [item['Key'] for item in files_response.get('Contents', []) if item['Key'].lower().endswith('.json')]
+            for file_path in files[2:4]: 
+                file = os.path.basename(file_path)
+                source = f"{folder_path}{file}"
+                dest_response = source.replace('raw_ts/', 'processed_ts/').replace('.csv', '.parquet')
+                dest_raw_ts = source.replace('raw_ts/', 'processed_ts/').replace('.csv', '.parquet')
+                dest_processed_ts = source.replace('raw_ts/', 'processed_ts/').replace('.csv', '.parquet')
+                try:
+                    await mercedes_parsing(s3, source, dest_response).run()
+                except Exception as e:
+                    print(f"Error loading file: {e}")

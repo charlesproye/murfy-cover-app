@@ -15,18 +15,24 @@ import os
 from core.argparse_utils import parse_kwargs
 from utils.files import ABCFileManager
 from s3fs import S3FileSystem
+from bib_models_data_ev.core.config import settings
+
 
 
 import os
 
-def main(fs: S3FileSystem, fm1: ABCFileManager, fm2: ABCFileManager, json_source, csv_dest) :
-    
+def main(s3, json_source, csv_dest) :
+    print("into main")
+    print("json_source", json_source)
     try:
-        json_data = fm1.load(json_source)
+        response = s3.get_object(Bucket=settings.S3_BUCKET, Key=json_source)
+        json_content = response['Body'].read().decode('utf-8')
+        json_data = json.loads(json_content)
+        # print("json_data", json_data)
         df = parse_response_as_df(json_data)
         print("Saving to CSV...")
         # df.to_csv(csv_dest)
-        fm2.save(fs, df, csv_dest)
+        s3.put_object(Bucket=settings.S3_BUCKET, Key=csv_dest, Body=df.to_csv(index=False))
         print("CSV saved successfully")
         # df.to_csv(csv_dest)
         print("CSV saved successfully")
@@ -127,14 +133,15 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
 # def flatten_list_of_dicts()
 
 class mercedes_parsing():
-    def __init__(self, fs: S3FileSystem, fm1: ABCFileManager, fm2: ABCFileManager, source : str, dest : str):
+    def __init__(self, s3, source : str, dest : str):
+        self.s3 = s3
         self.source = source
         self.dest = dest
-        self.fs = fs
-        self.fm1=fm1
-        self.fm2=fm2
+        # self.fs = fs
+        # self.fm1=fm1
+        # self.fm2=fm2
 
     async def run(self):
-        main(self.fs, self.fm1, self.fm2, self.source, self.dest)
+        main(self.s3, self.source, self.dest)
 
 

@@ -10,7 +10,7 @@ import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
 
-from high_mobility.high_mobility_response_parsing import parse_response_as_df
+from mercedes.mercedes_parsing import parse_response_as_df
 from core.s3_utils import S3_Bucket
 
 logger = logging.getLogger(__name__)
@@ -65,3 +65,15 @@ def parse_responses_as_raw_ts(src_keys:DF, bucket:S3_Bucket):
 
 if __name__ == "__main__":
     main()
+
+class mercedes_raw_ts():
+    def __init__(self, s3, source : str, dest : str):
+        self.s3 = s3
+        self.source = source
+        self.dest = dest
+        # self.fs = fs
+        # self.fm1=fm1
+        # self.fm2=fm2
+
+    async def run(self):
+        main(self.s3, self.source, self.dest)
