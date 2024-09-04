@@ -14,20 +14,20 @@ import os
 
 from core.argparse_utils import parse_kwargs
 from utils.files import ABCFileManager
+from s3fs import S3FileSystem
 
 
 import os
 
-def main(fm1: ABCFileManager, fm2: ABCFileManager, json_source, csv_dest) :
+def main(fs: S3FileSystem, fm1: ABCFileManager, fm2: ABCFileManager, json_source, csv_dest) :
     
     try:
         json_data = fm1.load(json_source)
         df = parse_response_as_df(json_data)
         print("Saving to CSV...")
         # df.to_csv(csv_dest)
-        fm2.save(df, csv_dest)
+        fm2.save(fs, df, csv_dest)
         print("CSV saved successfully")
-        
         # df.to_csv(csv_dest)
         print("CSV saved successfully")
     except FileNotFoundError:
@@ -127,13 +127,14 @@ def flatten_json_obj(src:dict, dst:dict, timestamp=None, path:list[str]=[]) -> d
 # def flatten_list_of_dicts()
 
 class mercedes_parsing():
-    def __init__(self, fm1: ABCFileManager, fm2: ABCFileManager, source : str, dest : str):
+    def __init__(self, fs: S3FileSystem, fm1: ABCFileManager, fm2: ABCFileManager, source : str, dest : str):
         self.source = source
         self.dest = dest
+        self.fs = fs
         self.fm1=fm1
         self.fm2=fm2
 
     async def run(self):
-        main(self.fm1, self.fm2, self.source, self.dest)
+        main(self.fs, self.fm1, self.fm2, self.source, self.dest)
 
 

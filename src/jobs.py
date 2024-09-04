@@ -11,7 +11,7 @@ import pytz
 import asyncio
 import os
 from multiprocessing import Process
-
+import pandas as pd
 from tqdm import tqdm
 
 from bib_models_data_ev.core.config import settings
@@ -235,7 +235,7 @@ class MercedesTransform(Jobinterval):
             for folder_path in folders[2:4]: # The two first one are juste the same root as the folder
                 files = fs.ls(folder_path, detail=False)
                 folder = os.path.basename(folder_path)
-                for file_path in files[2:]: 
+                for file_path in files[2:4]: 
                     file = os.path.basename(file_path)
                     if file.lower().endswith('.json'):
                         self.logger.info(f"Processing file: {file}")
@@ -245,8 +245,15 @@ class MercedesTransform(Jobinterval):
                         print("type(dest)", type(dest))
                         print(f"Source: {source}")
                         print(f"Destination: {dest}")
+                        # fm2.save(fs, pd.DataFrame(), "")  # Correct folder creation
+                        # # if not fs.exists(full_s3_path):
+                        #     # print("Folder doesn't exists !!!")
+                        #     # fs.makedirs(full_s3_path, exist_ok=True)
+                        #     # fs.touch("bib-platform-dev-data/raw_ts/mercedes-benz/kiwi")
+                        #     # pd.DataFrame().to_csv("bib-platform-dev-data/raw_ts/mercedes-benz/kiwi/kiwi.csv")
+                        #     # print(f'Folder created')
                         try:
-                            await mercedes_parsing(fm1, fm2, source, dest).run()
+                            await mercedes_parsing(fs, fm1, fm2, source, dest).run()
                         except Exception as e:
                             print(f"Error loading file: {e}")
 

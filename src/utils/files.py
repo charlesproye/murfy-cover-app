@@ -22,19 +22,55 @@ class ABCFileManager(ABC):
     def open(self, relative_path, *args, **kwarg):
         raise NotImplementedError()
 
-    def ensure_folder_exists(self, path):
-        s3_path = path[5:]  # Remove 's3://' prefix
+    def ensure_folder_exists(self, fs, thing : pd.DataFrame, path, *args, **kwargs):
+        s3_path = path[5:] if path.startswith('s3://') else path
         folder_path = os.path.dirname(s3_path)
-        """creates subfolders if necessary"""
-        if not self.fs.exists(folder_path):
-            print("checking existance")
-            self.fs.makedirs(folder_path)
-            print(f'Folder created: {folder_path}')
-        else:
-            print(f'Folder already exists: {path}')
+        print("folder_path", folder_path)
+        print("s3_path", s3_path)
+    
+    # Check if folder exists, and create it if it doesn't
+        csv_data = thing.to_csv(index=False)
+        
+        try:
+            if not fs.exists(folder_path):
+                print("Folder does not exist, creating it.")
+                fs.makedirs(folder_path)
+                with fs.open(s3_path, 'wb') as f:
+                    print("csv data", csv_data)
+                    print("File opened for writing")
+                    # f.write(csv_data.encode('utf-8'))
+                    f.touch(s3_path)
+                    print(csv_data)
+                # fs.touch(s3_path)
+            # else:
+            #     print(f'Folder already exists: {folder_path}')
+
+            # print(f"Attempting to write file to: {s3_path}")
+            # try:
+            #     with fs.open(s3_path, 'wb') as f:
+            #         print("File opened for writing")
+            #         f.write(csv_data.encode('utf-8'))
+            #     print(f"File saved successfully to: {s3_path}")
+            # except Exception as write_error:
+            #     print(f"Error writing file: {str(write_error)}")
+            #     print(f"Write error type: {type(write_error)}")
+            #     raise
+        except Exception as e:
+            print(f"Error in ensure_folder_exists: {str(e)}")
+            print(f"Error type: {type(e)}")
+            print(f"fs type: {type(fs)}")
+            print(f"thing type: {type(thing)}")
+            print(f"path: {path}")
+        raise
+            
+            # with fs.open(path, 'w') as f:
+            #     print("file opened")
+            #     thing.to_csv(f, index=False, *args, **kwargs)
+            
+        
 
 
-    def save(self, thing: pd.DataFrame, relative_path, *args, **kwargs):
+    def save(self, fs: s3fs.S3FileSystem, thing: pd.DataFrame, relative_path, *args, **kwargs):
         """Save object (usually dataframe) to file
 
         Additional ``*args`` and ``**kwargs`` are passed to the underlying function.
@@ -45,30 +81,35 @@ class ABCFileManager(ABC):
         """
         path = self.get_filepath(relative_path)
         print("path save", path)
-        self.ensure_folder_exists(path)  # Ensure the folder exists
-        basename = os.path.basename(path)
-        if ".pickle" in basename:
-            # assuming this is a pandas df
-            logging.debug("Saving object to " + path)
-            thing.to_pickle(path, *args, **kwargs)
-        elif ".csv" in basename:
-            # assuming this is a pandas df
-            logging.debug("Saving object to " + path)
-            print("après debug")
-            print("thing", thing)
-            print("type(thing)", type(thing))
-            thing.to_csv(path, *args, **kwargs)
-        elif ".json" in basename:
-            # assuming this is a pandas df
-            # logging.debug("Saving object to " + path)
-            thing.to_json(path, *args, **kwargs)
-        elif ".xml" in basename:
-            # assuming this is a pandas df
-            logging.debug("Saving object to " + path)
-            thing.to_xml(path, *args, **kwargs)
-        else:
-            logging.error("Cannot save to {}. Unkown extension".format(path))
-            raise NotImplementedError("Extension of {} not handled by files.save()".format(path))
+        self.ensure_folder_exists(fs, thing, path)  # Ensure the folder exists
+        print("path save", path)
+        print(f"Saving DataFrame to CSV: {path}")
+        # with fs.open(path, 'w') as f:
+        #     thing.to_csv(f, index=False, *args, **kwargs)
+        print(f"DataFrame saved successfully to: {path}")
+        # basename = os.path.basename(path)
+        # if ".pickle" in basename:
+        #     # assuming this is a pandas df
+        #     logging.debug("Saving object to " + path)
+        #     thing.to_pickle(path, *args, **kwargs)
+        # elif ".csv" in basename:
+        #     # assuming this is a pandas df
+        #     logging.debug("Saving object to " + path)
+        #     print("après debug")
+        #     print("thing", thing)
+        #     print("type(thing)", type(thing))
+        #     thing.to_csv(path, *args, **kwargs)
+        # elif ".json" in basename:
+        #     # assuming this is a pandas df
+        #     # logging.debug("Saving object to " + path)
+        #     thing.to_json(path, *args, **kwargs)
+        # elif ".xml" in basename:
+        #     # assuming this is a pandas df
+        #     logging.debug("Saving object to " + path)
+        #     thing.to_xml(path, *args, **kwargs)
+        # else:
+        #     logging.error("Cannot save to {}. Unkown extension".format(path))
+            # raise NotImplementedError("Extension of {} not handled by files.save()".format(path))
 
     def load(self, relative_path, *args, **kwargs) -> pd.DataFrame:
         """Loads .pickle and .csv from file relative to  ``data/`` folder
@@ -218,9 +259,9 @@ class S3FileManager(ABCFileManager):
         path = self.get_fullpath(relative_path)
         return self.fs.open(path, *args, **kwarg)
 
-    def save(self, thing: pd.DataFrame, relative_path, *args, **kwargs):
+    def save(self, fs: s3fs.S3FileSystem, thing: pd.DataFrame, relative_path, *args, **kwargs):
         kwargs["storage_options"] = self.storage_options
-        return super().save(thing, relative_path, *args, **kwargs)
+        return super().save(fs, thing, relative_path, *args, **kwargs)
 
     def load(self, relative_path, *args, **kwargs) -> pd.DataFrame:
         kwargs["storage_options"] = self.storage_options
