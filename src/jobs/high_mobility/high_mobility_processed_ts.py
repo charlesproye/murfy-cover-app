@@ -60,8 +60,11 @@ class HighMobilityProcessedTS(Jobinterval):
         # print(raw_ts.index)
         if "diagnostics.odometer" in raw_ts.columns:
             processed_ts =  DF({"odometer": raw_ts["diagnostics.odometer"]})
-        if "diagnostics.odometer.miles" in raw_ts.columns:
+        elif "diagnostics.odometer.miles" in raw_ts.columns:
             processed_ts = DF({"odometer": raw_ts["diagnostics.odometer"] * MILES_TO_KM})
+        else: # Ignore df if it does not contain the odometer for now
+            return
+        
         processed_ts = processed_ts.dropna(axis="index")
 
         # print(processed_ts)
