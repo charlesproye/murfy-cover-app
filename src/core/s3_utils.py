@@ -17,10 +17,10 @@ load_dotenv()
 
 class S3_Bucket():
     def __init__(self):
-        assert "S3_KEY" in os.environ, "S3_KEY varible is not in the environement."
         assert "S3_ENDPOINT" in os.environ, "S3_ENDPOINT varible is not in the environement."
         assert "S3_SECRET" in os.environ, "S3_SECRET varible is not in the environement."
         assert "S3_BUCKET" in os.environ, "S3_BUCKET varible is not in the environement."
+        assert "S3_KEY" in os.environ, "S3_KEY varible is not in the environement."
 
         self._s3_client = boto3.client(
             "s3",
@@ -32,9 +32,10 @@ class S3_Bucket():
 
         self.bucket_name = os.getenv("S3_BUCKET")
 
-    def save_pandas_obj_as_parquet(self, pandas_obj:Series|DF, key:str):
+    def save_df_as_parquet(self, pandas_obj:Series|DF, key:str):
         out_buffer = BytesIO()
         pandas_obj.to_parquet(out_buffer, index=False)
+        # print("saving to", key)
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
 
     def list_keys(self, key_prefix:str="") -> list[str]:

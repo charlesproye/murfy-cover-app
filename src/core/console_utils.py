@@ -68,7 +68,7 @@ def main_decorator(main_func):
     """
     ### Description:
     This decorator calls the rich.traceback install function to get better looking tracebacks.  
-    It also catches KeyboardInterrupt exception 
+    It also catches KeyboardInterrupt exception to quit properly.
     """
     def wrapper():
         install_rich_traceback(extra_lines=0, width=130)
