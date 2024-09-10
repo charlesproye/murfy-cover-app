@@ -29,9 +29,9 @@ class HighMobilityRawTS(Jobinterval):
 
     def __init__(self, brand:str) -> None:
         super().__init__()
-
-        self.brand = brand
+        
         self.bucket = S3_Bucket()
+        self.brand = brand
         self.name = brand + "-RawTS"
         self.id = self.name
         self.logger = logging.getLogger(self.name)

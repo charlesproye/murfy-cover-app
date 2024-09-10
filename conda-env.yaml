@@ -16,9 +16,10 @@ dependencies:
   - boto3=1.26.76
   - cbor2=5.6.4
   - tqdm=4.66.5       
+  - sqlalchemy=2.0.34
+
 
   - pip:
     - git+https://bib-batteries-admin@bitbucket.org/bib-batteries/bib-models.git@main#subdirectory=src
     - -e .
-  - apscheduler=3.10.4
-
+    - apscheduler==3.10.4
