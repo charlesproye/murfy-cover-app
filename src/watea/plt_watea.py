@@ -2,7 +2,7 @@ from rich import print
 from rich.traceback import install as install_rich_traceback
 from pandas import DataFrame as DF
 
-from core.argparse_utils import parse_kwargs
+from core.console_utils import parse_kwargs
 from core import plt_utils
 import watea.watea_constants as constants
 from watea.processed_watea_ts import processed_ts_iterator, processed_ts_of

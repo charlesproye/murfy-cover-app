@@ -12,23 +12,33 @@ import numpy as np
 
 from .constants import *
 
-def preprocess_date(vehicle_df: DF) -> DF:
-    vehicle_df = (
-        vehicle_df
-        .assign(date=vehicle_df["date"].dt.as_unit("s"))
+def preprocess_date(raw_ts: DF, add_sec_time_diff_col=True) -> DF:
+    """
+    ### Description:
+    Applies all the boiler plate operation on the "date" column:
+    1. Sets the unit as secondfor easier convertion into timestamps.
+    1. Drops rows with duplicate timestamps.
+    1. Sets the "date" as index without dropping it.
+    1. Sorts the index 
+    1. assigns an int "sec_time_diff" column (optional, set `add_sec_time_diff_col` to False if you don;t want to)
+    """
+    raw_ts = (
+        raw_ts
+        .assign(date=pd.to_datetime(raw_ts["date"]).dt.as_unit("s"))
         .drop_duplicates("date")
         .set_index("date", drop=False)
         .sort_index()
     )
-    vehicle_df["sec_time_diff"] = (
-        vehicle_df["date"]
-        .ffill()
-        .diff()
-        .dt.as_unit("s")
-        .astype(int)
-    )
+    if add_sec_time_diff_col:
+        raw_ts["sec_time_diff"] = (
+            raw_ts["date"]
+            .ffill()
+            .diff()
+            .dt.as_unit("s")
+            .astype(int)
+        )
 
-    return vehicle_df
+    return raw_ts
 
 def add_cum_energy_from_power_cols(vehicle_df: DF, power_col:str, energy_col:str) -> DF:
     vehicle_df[energy_col] = cum_energy_from_power(vehicle_df[power_col])
@@ -75,7 +85,7 @@ def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
         vehicle_df
         # use interpolate before checking if the odometer increased to composate for missing values
-        .assign(in_motion=vehicle_df["odometer"].interpolate(method="time").diff().gt(0, fill_value=False))
+        .assign(in_motion=vehicle_df["odometer"].interpolate(method="time").diff().gt(0))
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
 
@@ -84,8 +94,8 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     vehicle_df["soc_dir"] = np.nan
     vehicle_df["soc_dir"] = (
         vehicle_df["soc_dir"] 
-        .mask(soc_diff.gt(0, fill_value=False), 1)
-        .mask(soc_diff.lt(0, fill_value=False), -1)
+        .mask(soc_diff.gt(0), 1)
+        .mask(soc_diff.lt(0), -1)
     )
     # mitigate soc spikes effect on mask
     prev_dir = vehicle_df["soc_dir"].ffill().shift()
@@ -95,8 +105,8 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     vehicle_df["smoothed_soc_dir"] = vehicle_df["soc_dir"].rolling(window=TD(minutes=20), center=True).mean()
     vehicle_df["soc_dir"] = (
         vehicle_df["soc_dir"]
-        .mask(vehicle_df["smoothed_soc_dir"].gt(0, fill_value=False) & vehicle_df["soc_dir"].lt(0, fill_value=False), np.nan)
-        .mask(vehicle_df["smoothed_soc_dir"].lt(0, fill_value=False) & vehicle_df["soc_dir"].gt(0, fill_value=False), np.nan)
+        .mask(vehicle_df["smoothed_soc_dir"].gt(0) & vehicle_df["soc_dir"].lt(0), np.nan)
+        .mask(vehicle_df["smoothed_soc_dir"].lt(0) & vehicle_df["soc_dir"].gt(0), np.nan)
     )
 
     bfilled_dir = vehicle_df["soc_dir"].bfill()
