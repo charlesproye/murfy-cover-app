@@ -12,6 +12,17 @@ import numpy as np
 
 from .constants import *
 
+def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY_RATIO) -> DF:
+    """
+    ### Description:
+    Estimates an soh according to the odometer and a soh loss per km ratio.
+    Expects the odometer to be in km.
+    Very inacurrate but very handy when your deadline has been advanced from 3 months to 3 days...
+    """
+    ts["soh"] = 100 - ts["odometer"].mul(soh_lost_per_km_ratio).ffill()
+
+    return ts
+
 def preprocess_date(raw_ts: DF, add_sec_time_diff_col=True) -> DF:
     """
     ### Description:

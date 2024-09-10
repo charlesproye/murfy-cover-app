@@ -14,7 +14,7 @@ from pandas import DataFrame as DF
 from apscheduler.triggers.interval import IntervalTrigger
 
 from core.s3_utils import S3_Bucket
-from jobs.base_jobs import Jobinterval
+from jobs.base_jobs.job_interval import Jobinterval
 
 class HighMobilityRawTS(Jobinterval):
     """
@@ -29,15 +29,15 @@ class HighMobilityRawTS(Jobinterval):
 
     def __init__(self, brand:str) -> None:
         super().__init__()
-
+        
         self.brand = brand
-        self.bucket = S3_Bucket()
         self.name = brand + "-RawTS"
         self.id = self.name
         self.logger = logging.getLogger(self.name)
         self.trigger = IntervalTrigger(days=1, start_date=DT.now() - TD(days=1) + TD(seconds=1))
 
     async def func(self):
+        self.bucket = S3_Bucket()
         self.parse_responses_of_all_vins_as_raw_tss()
 
     def parse_responses_of_all_vins_as_raw_tss(self):

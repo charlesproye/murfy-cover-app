@@ -50,5 +50,3 @@ class Jobinterval(ABC): ###Job for which we define an interval between 2 launch 
     @abstractmethod
     async def func(self) :
         pass
-
-

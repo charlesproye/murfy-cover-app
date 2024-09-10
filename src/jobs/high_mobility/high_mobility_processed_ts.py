@@ -10,9 +10,9 @@ from pandas import DataFrame as DF
 from apscheduler.triggers.interval import IntervalTrigger
 
 from core.s3_utils import S3_Bucket
-from jobs.base_jobs import Jobinterval
+from jobs.base_jobs.job_interval import Jobinterval
 from core.constants import *
-from core.time_series_processing import preprocess_date
+from core.time_series_processing import preprocess_date, estimate_dummy_soh
 
 class HighMobilityProcessedTS(Jobinterval):
 
@@ -20,13 +20,13 @@ class HighMobilityProcessedTS(Jobinterval):
         super().__init__()
 
         self.brand = brand
-        self.bucket = S3_Bucket()
         self.name = brand + "-ProcessedTS"
         self.id = self.name
         self.logger = logging.getLogger(self.name)
         self.trigger = IntervalTrigger(days=1, start_date=DT.now() - TD(days=1) + TD(seconds=1))
 
     async def func(self):
+        self.bucket = S3_Bucket()
         self.process_tss_of_all_vins()
 
     def process_tss_of_all_vins(self):
@@ -56,16 +56,21 @@ class HighMobilityProcessedTS(Jobinterval):
         keys.apply(self.process_raw_ts, axis="columns")
 
     def process_raw_ts(self, src_key:DF):
-        raw_ts = self.bucket.read_parquet(src_key["key"]).pipe(preprocess_date, add_sec_time_diff_col=False)
+        raw_ts = self.bucket.read_parquet(src_key["key"])
         # print(raw_ts)
         if "diagnostics.odometer" in raw_ts.columns:
-            processed_ts =  DF({"odometer": raw_ts["diagnostics.odometer"]})
+            processed_ts =  DF({"odometer": raw_ts["diagnostics.odometer"], "date":raw_ts["date"]})
         elif "diagnostics.odometer.miles" in raw_ts.columns:
-            processed_ts = DF({"odometer": raw_ts["diagnostics.odometer"] * MILES_TO_KM})
+            processed_ts = DF({"odometer": raw_ts["diagnostics.odometer"] * MILES_TO_KM, "date":raw_ts["date"]})
         else: # Ignore df if it does not contain the odometer for now
             return
         
-        processed_ts = processed_ts.dropna(axis="index")
+        processed_ts = (
+            processed_ts
+            .dropna(axis="index")
+            .pipe(preprocess_date, add_sec_time_diff_col=False)
+            .pipe(estimate_dummy_soh)
+        )
 
         processed_ts_key = "/".join(["processed_ts", self.brand, "time_series", src_key["vin"]]) + ".paqrquet"
         # print(processed_ts)
