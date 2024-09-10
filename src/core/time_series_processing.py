@@ -12,23 +12,32 @@ import numpy as np
 
 from .constants import *
 
-def preprocess_date(vehicle_df: DF) -> DF:
-    vehicle_df = (
-        vehicle_df
-        .assign(date=vehicle_df["date"].dt.as_unit("s"))
+def preprocess_date(raw_ts: DF) -> DF:
+    """
+    ### Description:
+    Applies all the boiler plate operation on the "date" column:
+    1. Sets the unit as secondfor easier convertion into timestamps.
+    1. Drops rows with duplicate timestamps.
+    1. Sets the "date" as index without dropping it.
+    1. Sorts the index 
+    1. assigns an int "sec_time_diff" column
+    """
+    raw_ts = (
+        raw_ts
+        .assign(date=raw_ts["date"].dt.as_unit("s"))
         .drop_duplicates("date")
         .set_index("date", drop=False)
         .sort_index()
     )
-    vehicle_df["sec_time_diff"] = (
-        vehicle_df["date"]
+    raw_ts["sec_time_diff"] = (
+        raw_ts["date"]
         .ffill()
         .diff()
         .dt.as_unit("s")
         .astype(int)
     )
 
-    return vehicle_df
+    return raw_ts
 
 def add_cum_energy_from_power_cols(vehicle_df: DF, power_col:str, energy_col:str) -> DF:
     vehicle_df[energy_col] = cum_energy_from_power(vehicle_df[power_col])
