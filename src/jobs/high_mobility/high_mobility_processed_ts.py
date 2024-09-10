@@ -27,8 +27,8 @@ class HighMobilityProcessedTS(Jobinterval):
 
     async def func(self):
         self.bucket = S3_Bucket()
-        # self.process_tss_of_all_vins()
-        self.compute_raw_ts_meta_data()
+        self.process_tss_of_all_vins()
+        # self.compute_raw_ts_meta_data()
 
     def compute_raw_ts_meta_data(self):
         # Get list of raw ts in response folder
@@ -93,9 +93,9 @@ class HighMobilityProcessedTS(Jobinterval):
             .pipe(estimate_dummy_soh)
         )
 
-        processed_ts_key = "/".join(["processed_ts", self.brand, "time_series", src_key["vin"]]) + ".paqrquet"
+        processed_ts_key = "/".join(["processed_ts", self.brand, "time_series", src_key["vin"]]) + ".parquet"
         # print(processed_ts)
-        # print(processed_ts_key)
+        print(processed_ts_key)
         # print("============")
         
         self.bucket.save_df_as_parquet(processed_ts, processed_ts_key)
