@@ -10,7 +10,7 @@ from pandas import DataFrame as DF
 from apscheduler.triggers.interval import IntervalTrigger
 
 from core.s3_utils import S3_Bucket
-from jobs.base_job import Jobinterval
+from jobs.base_jobs import Jobinterval
 from core.constants import *
 
 class HighMobilityProcessedTS(Jobinterval):
