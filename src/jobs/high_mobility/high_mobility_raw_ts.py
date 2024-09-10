@@ -46,13 +46,14 @@ class HighMobilityRawTS(Jobinterval):
         Converts the responses of each vin into a single raw parquet series.
         """
         # Get list of objects in response folder
-        keys = Series(self.bucket.list_keys(f"response/{self.brand}"), dtype="string")
+        keys = Series(self.bucket.list_keys(f"response/{self.brand}/"), dtype="string") # Make sure to leave the / at the end
         if len(keys) == 0:
             self.logger.info("""
                 No responses found in the 'response' folder.
                 No raw time series have been generated.
             """)
             return
+        # print(keys)
         # Only retain .json responses
         keys = keys[keys.str.endswith(".json")]
         # Reponses are organized as follow response/brand_name/vin/date-of-response.json
@@ -86,11 +87,12 @@ class HighMobilityRawTS(Jobinterval):
         if len(parsed_raw_tss) == 0:
             self.logger.warning(f"No data could be parsed from keys {src_keys['key'].values} for vin {src_keys.name[1]}")
             return
-        raw_ts:DF = pd.concat(parsed_raw_tss, ignore_index=True).set_index("date", drop=False)   # Parse and concat them into a single df 
+        raw_ts:DF = pd.concat(parsed_raw_tss, ignore_index=True)
+        dest_key = "/".join(["raw_ts", self.brand, "time_series", src_keys.name]) + ".parquet"
+        # print(dest_key)
         # print(raw_ts)
         # print("==============")
-        dest_key = "/".join(["raw_ts", self.brand, "time_series", src_keys.name]) + ".parquet"         # Create path to save the raw ts. Note: src_keys.name will be defined by the grouby's by argument (see doc)
-        self.bucket.save_df_as_parquet(raw_ts, dest_key)                            # save the raw ts
+        self.bucket.save_df_as_parquet(raw_ts, dest_key)
 
     def parse_response_as_raw_ts(self, response:dict) -> DF:
         """
@@ -101,9 +103,6 @@ class HighMobilityRawTS(Jobinterval):
         # We don't really need to know what capability but some variables that belong to different capabilities may have the same name.
         # To differentiate them, we will prepend their correspomding capability to their name.
         flattened_response:dict = {}
-        # if not isinstance(response, dict):
-        #     print("response not isntance of dict:")
-        #     print(response)
         for capability, variables in response.items():
             if not isinstance(variables, dict):
                 # print(variables)
