@@ -5,6 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from jobs.high_mobility.high_mobility_raw_ts import HighMobilityRawTS
 from jobs.high_mobility.high_mobility_processed_ts import HighMobilityProcessedTS
+from jobs.high_mobility.high_mobility_load import HighMobilityLoad
 from utils.platform import PLATFORM_COLORED, PLATFORM
 from bib_models.utils.log_format import get_handler
 import logging
@@ -23,8 +24,9 @@ async def main(start_scheduler: bool = True):
     logging.info(f"Main process PID: {os.getpid()}, running on {PLATFORM_COLORED}")
     #### Daily
 
-    await HighMobilityRawTS("mercedes-benz").add_to_schedule(scheduler)
-    await HighMobilityProcessedTS("mercedes-benz").add_to_schedule(scheduler)
+    # await HighMobilityRawTS("mercedes-benz").add_to_schedule(scheduler)
+    # await HighMobilityProcessedTS("mercedes-benz").add_to_schedule(scheduler)
+    await HighMobilityLoad("mercedes-benz").add_to_schedule(scheduler)
 
     # Start the scheduler
     if not start_scheduler:

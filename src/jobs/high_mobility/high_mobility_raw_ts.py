@@ -29,9 +29,8 @@ class HighMobilityRawTS(Jobinterval):
 
     def __init__(self, brand:str) -> None:
         super().__init__()
-
+        
         self.brand = brand
-        self.bucket = S3_Bucket()
         self.name = brand + "-RawTS"
         self.id = self.name
         self.logger = logging.getLogger(self.name)
@@ -46,6 +45,8 @@ class HighMobilityRawTS(Jobinterval):
         Converts the responses of each vin into a single raw parquet series.
         """
         # Get list of objects in response folder
+        self.bucket = S3_Bucket()
+        print(f"response/{self.brand}")
         keys = Series(self.bucket.list_keys(f"response/{self.brand}"), dtype="string")
         if len(keys) == 0:
             self.logger.info("""
