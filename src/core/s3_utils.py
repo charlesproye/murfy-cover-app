@@ -37,7 +37,7 @@ class S3_Bucket():
         pandas_obj.to_parquet(out_buffer)
         # Ensure that key ends with .parquet
         if not key_prefix.endswith(".parquet"):
-            key_prefix += .parquet
+            key_prefix += ".parquet"
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
 
     def list_keys(self, key_prefix:str="") -> list[str]:
