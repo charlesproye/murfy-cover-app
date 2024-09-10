@@ -35,6 +35,9 @@ class S3_Bucket():
     def save_df_as_parquet(self, pandas_obj:Series|DF, key:str):
         out_buffer = BytesIO()
         pandas_obj.to_parquet(out_buffer)
+        # Ensure that key ends with .parquet
+        if not key_prefix.endswith(".parquet"):
+            key_prefix += .parquet
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
 
     def list_keys(self, key_prefix:str="") -> list[str]:
@@ -48,6 +51,10 @@ class S3_Bucket():
         """
         paginator = self._s3_client.get_paginator('list_objects_v2')
         page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=key_prefix)
+
+        # Ensure that the key ends with a /
+        if not key_prefix.endswith("/"):
+            key_prefix += "/"
 
         keys = []
         for page in page_iterator:

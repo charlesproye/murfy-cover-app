@@ -2,12 +2,15 @@ import asyncio
 from asyncio.exceptions import CancelledError
 import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import logging
+
+from rich import print
 
 from jobs.high_mobility.high_mobility_raw_ts import HighMobilityRawTS
 from jobs.high_mobility.high_mobility_processed_ts import HighMobilityProcessedTS
 from utils.platform import PLATFORM_COLORED, PLATFORM
 from bib_models.utils.log_format import get_handler
-import logging
+from jobs.high_mobility.constants import *
 
 handler = get_handler(is_logged=os.getenv("IS_DEPLOY",False), platform=PLATFORM)
 logging.basicConfig(
@@ -23,8 +26,9 @@ async def main(start_scheduler: bool = True):
     logging.info(f"Main process PID: {os.getpid()}, running on {PLATFORM_COLORED}")
     #### Daily
 
-    await HighMobilityRawTS("mercedes-benz").add_to_schedule(scheduler)
-    await HighMobilityProcessedTS("mercedes-benz").add_to_schedule(scheduler)
+    for brand in HM_HANDLED_BRANDS:
+        # await HighMobilityRawTS(brand).add_to_schedule(scheduler)
+        await HighMobilityProcessedTS(brand).add_to_schedule(scheduler)
 
     # Start the scheduler
     if not start_scheduler:

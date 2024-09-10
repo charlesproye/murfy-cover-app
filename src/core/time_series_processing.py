@@ -12,7 +12,7 @@ import numpy as np
 
 from .constants import *
 
-def preprocess_date(raw_ts: DF) -> DF:
+def preprocess_date(raw_ts: DF, add_sec_time_diff_col=True) -> DF:
     """
     ### Description:
     Applies all the boiler plate operation on the "date" column:
@@ -20,22 +20,23 @@ def preprocess_date(raw_ts: DF) -> DF:
     1. Drops rows with duplicate timestamps.
     1. Sets the "date" as index without dropping it.
     1. Sorts the index 
-    1. assigns an int "sec_time_diff" column
+    1. assigns an int "sec_time_diff" column (optional, set `add_sec_time_diff_col` to False if you don;t want to)
     """
     raw_ts = (
         raw_ts
-        .assign(date=raw_ts["date"].dt.as_unit("s"))
+        .assign(date=pd.to_datetime(raw_ts["date"]).dt.as_unit("s"))
         .drop_duplicates("date")
         .set_index("date", drop=False)
         .sort_index()
     )
-    raw_ts["sec_time_diff"] = (
-        raw_ts["date"]
-        .ffill()
-        .diff()
-        .dt.as_unit("s")
-        .astype(int)
-    )
+    if add_sec_time_diff_col:
+        raw_ts["sec_time_diff"] = (
+            raw_ts["date"]
+            .ffill()
+            .diff()
+            .dt.as_unit("s")
+            .astype(int)
+        )
 
     return raw_ts
 

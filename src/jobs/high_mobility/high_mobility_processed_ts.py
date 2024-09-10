@@ -12,6 +12,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from core.s3_utils import S3_Bucket
 from jobs.base_jobs import Jobinterval
 from core.constants import *
+from core.time_series_processing import preprocess_date
 
 class HighMobilityProcessedTS(Jobinterval):
 
@@ -51,13 +52,12 @@ class HighMobilityProcessedTS(Jobinterval):
             .loc[:, ["key", "vin"]]
             .assign(vin=lambda df: df["vin"].str.split(".", expand=True).iloc[:, 0])
         )
-        print(keys)
+        # self.logger.debug(keys)
         keys.apply(self.process_raw_ts, axis="columns")
 
     def process_raw_ts(self, src_key:DF):
-        # print(src_key["key"])
-        raw_ts = self.bucket.read_parquet(src_key["key"]).set_index("date")
-        # print(raw_ts.index)
+        raw_ts = self.bucket.read_parquet(src_key["key"]).pipe(preprocess_date, add_sec_time_diff_col=False)
+        print(raw_ts)
         if "diagnostics.odometer" in raw_ts.columns:
             processed_ts =  DF({"odometer": raw_ts["diagnostics.odometer"]})
         elif "diagnostics.odometer.miles" in raw_ts.columns:
@@ -67,8 +67,11 @@ class HighMobilityProcessedTS(Jobinterval):
         
         processed_ts = processed_ts.dropna(axis="index")
 
-        # print(processed_ts)
+        processed_ts_key = "/".join(["processed_ts", self.brand, "time_series", src_key["vin"]]) + ".paqrquet"
+        print(processed_ts)
+        print(processed_ts_key)
+        print("============")
         
-        processed_ts_key = "/".join(["processed_ts", self.brand, "time_series", src_key["vin"]])
         self.bucket.save_df_as_parquet(processed_ts, processed_ts_key)
+
 
