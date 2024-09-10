@@ -8,7 +8,6 @@ from rich import print
 
 from jobs.high_mobility.high_mobility_raw_ts import HighMobilityRawTS
 from jobs.high_mobility.high_mobility_processed_ts import HighMobilityProcessedTS
-from jobs.high_mobility.high_mobility_load import HighMobilityLoad
 from utils.platform import PLATFORM_COLORED, PLATFORM
 from bib_models.utils.log_format import get_handler
 from jobs.high_mobility.constants import *
