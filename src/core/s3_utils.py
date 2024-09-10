@@ -34,8 +34,7 @@ class S3_Bucket():
 
     def save_df_as_parquet(self, pandas_obj:Series|DF, key:str):
         out_buffer = BytesIO()
-        pandas_obj.to_parquet(out_buffer, index=False)
-        # print("saving to", key)
+        pandas_obj.to_parquet(out_buffer)
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
 
     def list_keys(self, key_prefix:str="") -> list[str]:
@@ -54,7 +53,8 @@ class S3_Bucket():
         for page in page_iterator:
             if 'Contents' in page:
                 for obj in page['Contents']:
-                    keys.append(obj['Key'])
+                    if obj["Key"] != key_prefix:
+                        keys.append(obj['Key'])
 
         return keys
 
