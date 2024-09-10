@@ -30,7 +30,6 @@ class HighMobilityRawTS(Jobinterval):
     def __init__(self, brand:str) -> None:
         super().__init__()
         
-        self.bucket = S3_Bucket()
         self.brand = brand
         self.name = brand + "-RawTS"
         self.id = self.name
@@ -38,6 +37,7 @@ class HighMobilityRawTS(Jobinterval):
         self.trigger = IntervalTrigger(days=1, start_date=DT.now() - TD(days=1) + TD(seconds=1))
 
     async def func(self):
+        self.bucket = S3_Bucket()
         self.parse_responses_of_all_vins_as_raw_tss()
 
     def parse_responses_of_all_vins_as_raw_tss(self):

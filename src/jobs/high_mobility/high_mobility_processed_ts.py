@@ -20,13 +20,13 @@ class HighMobilityProcessedTS(Jobinterval):
         super().__init__()
 
         self.brand = brand
-        self.bucket = S3_Bucket()
         self.name = brand + "-ProcessedTS"
         self.id = self.name
         self.logger = logging.getLogger(self.name)
         self.trigger = IntervalTrigger(days=1, start_date=DT.now() - TD(days=1) + TD(seconds=1))
 
     async def func(self):
+        self.bucket = S3_Bucket()
         self.process_tss_of_all_vins()
 
     def process_tss_of_all_vins(self):
