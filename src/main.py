@@ -27,7 +27,7 @@ async def main(start_scheduler: bool = True):
     #### Daily
 
     for brand in HM_HANDLED_BRANDS:
-        # await HighMobilityRawTS(brand).add_to_schedule(scheduler)
+        await HighMobilityRawTS(brand).add_to_schedule(scheduler)
         await HighMobilityProcessedTS(brand).add_to_schedule(scheduler)
 
     # Start the scheduler

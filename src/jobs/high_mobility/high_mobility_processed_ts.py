@@ -57,7 +57,7 @@ class HighMobilityProcessedTS(Jobinterval):
 
     def process_raw_ts(self, src_key:DF):
         raw_ts = self.bucket.read_parquet(src_key["key"]).pipe(preprocess_date, add_sec_time_diff_col=False)
-        print(raw_ts)
+        # print(raw_ts)
         if "diagnostics.odometer" in raw_ts.columns:
             processed_ts =  DF({"odometer": raw_ts["diagnostics.odometer"]})
         elif "diagnostics.odometer.miles" in raw_ts.columns:
@@ -68,9 +68,9 @@ class HighMobilityProcessedTS(Jobinterval):
         processed_ts = processed_ts.dropna(axis="index")
 
         processed_ts_key = "/".join(["processed_ts", self.brand, "time_series", src_key["vin"]]) + ".paqrquet"
-        print(processed_ts)
-        print(processed_ts_key)
-        print("============")
+        # print(processed_ts)
+        # print(processed_ts_key)
+        # print("============")
         
         self.bucket.save_df_as_parquet(processed_ts, processed_ts_key)
 
