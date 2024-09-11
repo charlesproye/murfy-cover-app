@@ -84,7 +84,6 @@ class HighMobilityProcessedTS(Jobinterval):
     
     def process_raw_ts_stellantis(self, src_key:DF):
         raw_ts = self.bucket.read_parquet(src_key["key"])
-        print(raw_ts)
         if "odometer.value" in raw_ts.columns:
             processed_ts =  DF({"odometer": raw_ts["odometer.value"], "date":raw_ts["date"]})
         else: # Ignore df if it does not contain the odometer for now
