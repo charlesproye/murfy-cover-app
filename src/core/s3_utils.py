@@ -65,7 +65,7 @@ class S3_Bucket():
 
         return keys
 
-    def read_parquet(self, key:str) -> DF|Series:
+    def read_parquet_df(self, key:str) -> DF|Series:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
 
         parquet_bytes = response["Body"].read()
