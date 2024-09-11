@@ -2,6 +2,6 @@ HM_HANDLED_BRANDS = [
     "bmw",
     "ford",
     "kia",
-    # "mercedes-benz",
+    "mercedes-benz",
     "renault",
 ]
