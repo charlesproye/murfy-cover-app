@@ -32,7 +32,7 @@ async def main(start_scheduler: bool = True):
 
     ## Pour Mobilisight
     # await HighMobilityRawTS("stellantis").add_to_schedule(scheduler)
-    await HighMobilityProcessedTS("stellantis").add_to_schedule(scheduler)
+    # await HighMobilityProcessedTS("stellantis").add_to_schedule(scheduler)
 
     # Start the scheduler
     if not start_scheduler:
