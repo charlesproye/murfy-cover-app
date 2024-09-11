@@ -29,7 +29,7 @@ class S3_Bucket():
             aws_secret_access_key=creds["aws_secret_access_key"],
         )
 
-        self.bucket_name = os.getenv("S3_BUCKET")
+        self.bucket_name = creds["bucket_name"]
 
     @classmethod
     def get_creds_from_dot_env() -> dict[str, str]:
@@ -41,6 +41,7 @@ class S3_Bucket():
             "endpoint_url": os.getenv("S3_ENDPOINT"),
             "aws_access_key_id": os.getenv("S3_KEY"),
             "aws_secret_access_key": os.getenv("S3_SECRET"),
+            "bucket_name": os.getenv("S3_BUCKET"),
         }
 
     def save_df_as_parquet(self, pandas_obj:Series|DF, key:str):

@@ -4,4 +4,5 @@ HM_HANDLED_BRANDS = [
     "kia",
     "mercedes-benz",
     "renault",
+    "stellantis",
 ]
