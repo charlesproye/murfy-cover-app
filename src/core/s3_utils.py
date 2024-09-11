@@ -32,7 +32,7 @@ class S3_Bucket():
         self.bucket_name = creds["bucket_name"]
 
     @classmethod
-    def get_creds_from_dot_env() -> dict[str, str]:
+    def get_creds_from_dot_env(cls) -> dict[str, str]:
         assert "S3_SECRET" in os.environ, "S3_SECRET varible is not in the environement."
         assert "S3_BUCKET" in os.environ, "S3_BUCKET varible is not in the environement."
         assert "S3_KEY" in os.environ, "S3_KEY varible is not in the environement."
