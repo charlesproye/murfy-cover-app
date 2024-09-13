@@ -47,7 +47,7 @@ class HighMobilityProcessedTS(Jobinterval):
             .loc[:, ["key", "vin"]]
             .assign(vin=lambda df: df["vin"].str.split(".", expand=True).iloc[:, 0])
         )
-        meta_data = keys.apply(lambda src_key: self.bucket.read_parquet(src_key["key"]).columns, axis="columns")
+        meta_data = keys.apply(lambda src_key: self.bucket.read_parquet_df(src_key["key"]).columns, axis="columns")
         meta_data = DF(meta_data.to_list(), index=keys["vin"])
         print(self.brand)
         print(set(meta_data.values.ravel()))
@@ -77,7 +77,7 @@ class HighMobilityProcessedTS(Jobinterval):
         keys.apply(self.process_raw_ts, axis="columns")
 
     def process_raw_ts(self, src_key:DF):
-        raw_ts = self.bucket.read_parquet(src_key["key"])
+        raw_ts = self.bucket.read_parquet_df(src_key["key"])
         # print(raw_ts)
         if "diagnostics.odometer" in raw_ts.columns:
             processed_ts =  DF({"odometer": raw_ts["diagnostics.odometer"], "date":raw_ts["date"]})
