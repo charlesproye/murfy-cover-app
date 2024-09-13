@@ -18,3 +18,15 @@ def print_data(data: T) -> T:
 
 def total_MB_memory_usage(df: DF) -> int:
     return df.memory_usage().sum() / 1e6
+
+def split_and_retain_src(src: Series, pattern:str, n:int=None, col_names:list[str]=None, ) -> DF:
+    """
+    ### Description:
+    Splits the series according to a pattern and returns resulting df concatanated with the src series as the last column.
+    """
+    split_df = src.str.split(pattern, n=n, expand=True)
+    result = pd.concat((split_df, src), axis="columns")
+    if not col_names is None:
+        result.columns = col_names
+
+    return result
