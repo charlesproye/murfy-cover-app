@@ -74,7 +74,10 @@ class HighMobilityProcessedTS(Jobinterval):
             .assign(vin=lambda df: df["vin"].str.split(".", expand=True).iloc[:, 0])
         )
         # self.logger.debug(keys)
-        keys.apply(self.process_raw_ts, axis="columns")
+        if self.brand == "stellantis":
+            keys.apply(self.process_raw_ts_stellantis, axis="columns")
+        else: 
+            keys.apply(self.process_raw_ts, axis="columns")
 
     def process_raw_ts(self, src_key:DF):
         raw_ts = self.bucket.read_parquet_df(src_key["key"])
@@ -99,3 +102,26 @@ class HighMobilityProcessedTS(Jobinterval):
         # print("============")
         
         self.bucket.save_df_as_parquet(processed_ts, processed_ts_key)
+    
+    def process_raw_ts_stellantis(self, src_key:DF):
+        raw_ts = self.bucket.read_parquet(src_key["key"])
+        if "odometer.value" in raw_ts.columns:
+            processed_ts =  DF({"odometer": raw_ts["odometer.value"], "date":raw_ts["date"]})
+        else: # Ignore df if it does not contain the odometer for now
+            return
+        
+        processed_ts = (
+            processed_ts
+            .dropna(axis="index")
+            .pipe(preprocess_date, add_sec_time_diff_col=False)
+            .pipe(estimate_dummy_soh)
+        )
+
+        processed_ts_key = "/".join(["processed_ts", self.brand, "time_series", src_key["vin"]]) + ".parquet"
+        # print(processed_ts)
+        # print(processed_ts_key)
+        # print("============")
+        
+        self.bucket.save_df_as_parquet(processed_ts, processed_ts_key)
+
+
