@@ -22,7 +22,7 @@ def main():
     kwargs = parse_kwargs()
     for id, vehicle_df in processed_ts_it(force_update=True):
         print(id)
-        print(vehicle_df)
+        print(vehicle_df.columns)
 
 def processed_ts_it(fleet_query: str=None, ts_query=None, force_update:bool=False, **kwargs) -> Generator[tuple[str, DF], None, None]:
     for id in iterate_over_ids(fleet_query, **kwargs):
@@ -41,7 +41,8 @@ def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
 
 def process_raw_time_series(raw_vehicle_df: DF, **kwargs) -> DF:
     return (
-        pre_process_raw_time_series(raw_vehicle_df)
+        raw_vehicle_df
+        .pipe(pre_process_raw_time_series)
         .pipe(ts.soh_from_est_battery_range, "battery_range_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
         .pipe(ts.in_motion_mask_from_odo_diff)
         .pipe(ts.in_discharge_and_charge_from_soc_diff)

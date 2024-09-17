@@ -2,26 +2,23 @@
 
 ## Soh estimation
 
+<details>
+<summary>with power data</summary>
+
 **Observations**:
 - soh estimation is not consistent enough:
     - over odometer.
     - per charges.
     - per point (although it seems like we have enough points to mitigate the noise per point).
 - We don't have enough points for some regimes.
-- KNN seems to be better than LR...
+- KNN seems to be better than LR... but Martin says that the LR result are more coherent compared to the "norm of soh loss". 
 - There doesn't seem to be much correlation between current and enerrgy added within most common regime.
 - Our estimator states that: "A battery has an soh X because the median of its energy_added is X% of the energy_added of the default_100_soh batteries in the same charge region".
 
 **Hypothesis**:
-- Use dodometer as target feature instead of energy_added of default_100_soh 
-- Use the entire charge as sample instead of charging points to automatically prune out charging points that introduce too noise.
-- Using energy_added is not a great way of evaluating soh.
+- Use the entire charge as sample instead of charging points to automatically prune out charging points that introduce noise.
 - Odometer has much lower correlation with soh than expected.
 - Energy_added calculation might be worse than we thought...
-- Instead of evaluating the estimation based on the correlation betweem soh and fleet wise odometer, we could evaluate it based on vehicle wise odometer.
-
-- target feature + evaluation proposals:
-    - odometer + monotonicty over odometer of a vehicule
 
 **Questions**:
 - How does soc quantization effects soh estimation?
@@ -35,6 +32,7 @@
 
 **Proposals**:
 - Add another data cleaning step to retain only data points with decreasing energy_added over recharges/odometer/date
+- Instead of evaluating the estimation based on the correlation betweem soh and fleet wise odometer, we could evaluate it based on vehicle wise odometer.
 
 
 **Tasks**:
@@ -44,3 +42,9 @@
 - Iteratively:
     - Create a full sklearn Pipeline that we can hypertune from extraction to estimation.
     - Optimize the pipeline through hyperparameter tunning.
+</details>
+
+<details>
+<summary>without power data</summary>
+
+</details>

@@ -20,10 +20,22 @@ PATH_TO_RAW_TS = join(PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
 PATH_TO_PROCESSED_TS = "data_cache/processed_time_series/{id}.parquet"
 PATH_TO_FLEET_INFO_DF = "data_cache/fleet_info/fleet_info_df.{extension}"
 PATH_TO_RAW_FLEET_CHARGING_POINTS = "data_cache/soh_estimation/raw_fleet_charging_points.parquet"
+PATH_TO_PREPROCESSED_FLEET_CHARGING_POINTS = "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet"
 # recording dependant constants
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 
 # soh estimation
+MAIN_CHARGING_REGIME_CLUSTER_IDX = 8
+UMAP_N_COMPONENTS = 3
+UMAP_INPUT_FEATURE_COLS = [
+    "current",
+    "voltage",
+    "regime_seperation_feature",
+    "temperature",
+    "soc",
+]
+UMAP_RANDOM_STATE = 32
+
 CHARGING_POINTS_AGG_OVER_CHARGES_DICT = {
     "odometer":"median",
     "energy_added":"median",
@@ -37,6 +49,8 @@ CHARGING_POINTS_AGG_OVER_CHARGES_DICT = {
     "soc_voltage_feature":"median",
     "default_100_soh_energy_added":"median",
     "soh":"median",
+    "estimated_range": "mean",
+    "estimated_range_diff": "mean",
     #Debugging
     "id":pd.Series.mode,
     "charge_idx":pd.Series.mode,
