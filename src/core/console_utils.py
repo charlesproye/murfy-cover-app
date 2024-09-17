@@ -1,5 +1,11 @@
 from argparse import ArgumentParser, REMAINDER
 import ast
+import logging
+
+# from rich import print
+from rich.traceback import install as install_rich_traceback
+
+logger = logging.getLogger(__name__)
 
 def get_src_dst_pairs_args(description: str=""):
     # arguments parsning
@@ -56,3 +62,18 @@ def parse_kwargs(mandatory_args: list = [], optional_args: dict = {}, **kwargs):
 
     # Combine known_args_dict with parsed_kwargs
     return {**parsed_kwargs, **known_args_dict}
+
+
+def main_decorator(main_func):
+    """
+    ### Description:
+    This decorator calls the rich.traceback install function to get better looking tracebacks.  
+    It also catches KeyboardInterrupt exception to quit properly.
+    """
+    def wrapper():
+        install_rich_traceback(extra_lines=0, width=130)
+        try:
+            main_func()
+        except KeyboardInterrupt:
+            logger.info("KeyboardInterrupt, exiting...")
+    return wrapper

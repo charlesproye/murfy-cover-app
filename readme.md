@@ -18,14 +18,14 @@ The goal of this package is to handle every step of the data analytics service o
 `core` contains the code that is common to any data provider.
 ```
 core
-├── argparse_utils.py
+├── console_utils.py
 ├── caching_utils.py
 ├── constants.py
 ├── perf_agg_processing.py
 ├── plt_utils.py
 └── time_series_processing.py
 ```
-- `argparse_utils`: 
+- `console_utils`: 
     Provides a `parse_args` function which converts the arguments passed to the script as a dict of primitives. 
     This is used to make the scripts modular without having to comment/comment out pieces of code.
 - `caching_utils`:

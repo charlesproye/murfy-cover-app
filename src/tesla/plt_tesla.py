@@ -3,7 +3,7 @@ from tesla.processed_tesla_ts import iterate_over_processed_ts, processed_ts_of
 from core import plt_utils
 from tesla.tesla_perfs import compute_perfs
 from tesla.tesla_fleet_info import fleet_info_df
-from core.argparse_utils import parse_kwargs
+from core.console_utils import parse_kwargs
 
 def main(): 
     kwargs = parse_kwargs(["plt_layout"], {"plt_id":"all", "x_col":"date", "query":None})

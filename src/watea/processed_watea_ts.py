@@ -12,7 +12,7 @@ from rich.traceback import install as install_rich_traceback
 
 import core.time_series_processing as ts
 from core.caching_utils import instance_data_caching_wrapper
-from core.argparse_utils import parse_kwargs
+from core.console_utils import parse_kwargs
 from watea.watea_constants import *
 from watea.watea_fleet_info import iterate_over_ids
 from watea.raw_watea_ts import raw_ts_of
@@ -39,7 +39,7 @@ def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
         force_update=force_update,
     )
 
-def process_raw_time_series(raw_vehicle_df: DF) -> DF:
+def process_raw_time_series(raw_vehicle_df: DF, **kwargs) -> DF:
     return (
         pre_process_raw_time_series(raw_vehicle_df)
         .pipe(ts.soh_from_est_battery_range, "battery_range_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)

@@ -1,6 +1,9 @@
 from datetime import timedelta as TD
 
 KJ_TO_KWH = 0.00027777778
+MILES_TO_KM = 1.60934
+KJ_TO_KWH = 0.00027777777
+
 
 # period perfs
 DEFAULT_DIFF_VARS = {
@@ -25,3 +28,5 @@ DEFAULT_LINE_PLOT_KWARGS = {
 DEFAULT_CHARGING_POINTS_PLT_KWARGS = {
     "alpha": 0.45,
 }
+
+SOH_LOST_PER_KM_DUMMY_RATIO = 0.000028
