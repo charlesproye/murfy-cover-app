@@ -19,6 +19,11 @@ dependencies:
   - sqlalchemy=2.0.34
   - nbformat=5.10.4
   
+
+
+  - msgspec=0.18.6
+  - schedule=1.2.2
+  
   - pip:
     - git+https://bib-batteries-admin@bitbucket.org/bib-batteries/bib-models.git@main#subdirectory=src
     - -e .
