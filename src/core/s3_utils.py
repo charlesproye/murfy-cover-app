@@ -16,28 +16,40 @@ from rich import print
 load_dotenv()
 
 class S3_Bucket():
-    def __init__(self):
+    def __init__(self, creds: dict[str, str]=None):
+
         assert "S3_ENDPOINT" in os.environ, "S3_ENDPOINT varible is not in the environement."
-        assert "S3_SECRET" in os.environ, "S3_SECRET varible is not in the environement."
-        assert "S3_BUCKET" in os.environ, "S3_BUCKET varible is not in the environement."
-        assert "S3_KEY" in os.environ, "S3_KEY varible is not in the environement."
+        creds = creds or S3_Bucket.get_creds_from_dot_env()
 
         self._s3_client = boto3.client(
             "s3",
             region_name="fr-par",
             endpoint_url=os.getenv("S3_ENDPOINT"),
-            aws_access_key_id=os.getenv("S3_KEY"),
-            aws_secret_access_key=os.getenv("S3_SECRET"),
+            aws_access_key_id=creds["aws_access_key_id"],
+            aws_secret_access_key=creds["aws_secret_access_key"],
         )
 
-        self.bucket_name = os.getenv("S3_BUCKET")
+        self.bucket_name = creds["bucket_name"]
+
+    @classmethod
+    def get_creds_from_dot_env(cls) -> dict[str, str]:
+        assert "S3_SECRET" in os.environ, "S3_SECRET varible is not in the environement."
+        assert "S3_BUCKET" in os.environ, "S3_BUCKET varible is not in the environement."
+        assert "S3_KEY" in os.environ, "S3_KEY varible is not in the environement."
+
+        return {
+            "endpoint_url": os.getenv("S3_ENDPOINT"),
+            "aws_access_key_id": os.getenv("S3_KEY"),
+            "aws_secret_access_key": os.getenv("S3_SECRET"),
+            "bucket_name": os.getenv("S3_BUCKET"),
+        }
 
     def save_df_as_parquet(self, pandas_obj:Series|DF, key:str):
         out_buffer = BytesIO()
         pandas_obj.to_parquet(out_buffer)
         # Ensure that key ends with .parquet
-        if not key.endswith(".parquet"):
-            key += ".parquet"
+        # if not key.endswith(".parquet"):
+        #     key += ".parquet"
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
 
     def list_keys(self, key_prefix:str="") -> list[str]:
@@ -65,7 +77,7 @@ class S3_Bucket():
 
         return keys
 
-    def read_parquet(self, key:str) -> DF|Series:
+    def read_parquet_df(self, key:str) -> DF|Series:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
 
         parquet_bytes = response["Body"].read()
@@ -80,6 +92,15 @@ class S3_Bucket():
 
         return df
     
+    def read_key_as_text(self, key:str) -> str:
+        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
+        object_content = response["Body"].read().decode("utf-8")
+
+        return object_content
+    
+    def write_string_into_key(self, content:str, key:str):
+        self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=content)
+
     def read_json_file(self, key:str) -> Any:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
         object_content = response["Body"].read().decode("utf-8")
