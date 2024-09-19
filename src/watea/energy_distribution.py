@@ -18,6 +18,13 @@ from watea.processed_watea_ts import processed_ts_it
 # soh estimation evaluation
 
 # soh estimation
+@singleton_data_caching(PATH_TO_PROCESSED_CLUSTER)
+def get_processed_cluster() -> DF:
+    return (
+        get_preprocessed_charging_points()
+        .pipe(estimate_soh)
+    )
+
 
 def estimate_soh(cluster:DF) -> DF:
     x = cluster[["voltage", "temperature", "current"]].values

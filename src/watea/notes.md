@@ -36,6 +36,7 @@
 
 
 **Tasks**:
+- Visualize all the charges sohs to get an intuative feel of the soh.
 - Create a scorer/loss function to quantify/evaluate the soh estimations.
 - Use odometer as target feature to see what is the best correlation possible between energy added and odometer.
 - Implement estimator that takes in the entire charge.

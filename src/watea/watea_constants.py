@@ -21,6 +21,7 @@ PATH_TO_PROCESSED_TS = "data_cache/processed_time_series/{id}.parquet"
 PATH_TO_FLEET_INFO_DF = "data_cache/fleet_info/fleet_info_df.{extension}"
 PATH_TO_RAW_FLEET_CHARGING_POINTS = "data_cache/soh_estimation/raw_fleet_charging_points.parquet"
 PATH_TO_PREPROCESSED_FLEET_CHARGING_POINTS = "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet"
+PATH_TO_PROCESSED_CLUSTER = "data_cache/soh_estimation/processed_cluster.parquet"
 # recording dependant constants
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 
