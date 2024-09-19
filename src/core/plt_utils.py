@@ -237,7 +237,7 @@ def plt_time_series_plotly(df:DF, cols:list[str], save_to:str=None, show=True):
     if save_to:
         fig.write_html(save_to)
 
-def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, colorscale='Viridis', size=3, symbol=None):
+def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, colorscale='Viridis', size=3, symbol=None) -> Figure:
     fig = go.Figure(data=[go.Scatter3d(
         x=df[x],
         y=df[y],
@@ -261,6 +261,8 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
         fig.write_html(save_path)
 
     fig.show()
+
+    return fig
     
 def plot_2d_line(df: pd.DataFrame, x_column: str, y_column: str, line_group_column: str, color: str = None, color_scale: str = None):
     """
