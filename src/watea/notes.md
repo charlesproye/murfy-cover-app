@@ -2,9 +2,6 @@
 
 ## Soh estimation
 
-<details>
-<summary>with power data</summary>
-
 **Observations**:
 - soh estimation is not consistent enough:
     - over odometer.
@@ -16,9 +13,7 @@
 - Our estimator states that: "A battery has an soh X because the median of its energy_added is X% of the energy_added of the default_100_soh batteries in the same charge region".
 
 **Hypothesis**:
-- Use the entire charge as sample instead of charging points to automatically prune out charging points that introduce noise.
-- Odometer has much lower correlation with soh than expected.
-- Energy_added calculation might be worse than we thought...
+- An estimator who's total energy added over a charge regmie equals the battery capacity of the vehicle would have tbetter accuracy.
 
 **Questions**:
 - How does soc quantization effects soh estimation?
@@ -31,6 +26,11 @@
 - What other target feature could we use?
 
 **Proposals**:
+- estimation score metrics:
+    - monotonicity score over nb charges
+    - energy added entropy over the entire dataset
+    - energy added entropy over dataset regions
+    - soh
 - Add another data cleaning step to retain only data points with decreasing energy_added over recharges/odometer/date
 - Instead of evaluating the estimation based on the correlation betweem soh and fleet wise odometer, we could evaluate it based on vehicle wise odometer.
 
@@ -43,9 +43,3 @@
 - Iteratively:
     - Create a full sklearn Pipeline that we can hypertune from extraction to estimation.
     - Optimize the pipeline through hyperparameter tunning.
-</details>
-
-<details>
-<summary>without power data</summary>
-
-</details>
