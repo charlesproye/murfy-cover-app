@@ -2,9 +2,6 @@
 
 ## Soh estimation
 
-<details>
-<summary>with power data</summary>
-
 **Observations**:
 - soh estimation is not consistent enough:
     - over odometer.
@@ -25,13 +22,18 @@
 - Are there feature regions that contribute more to the noise of the output?
 - Are there feature regions that have better soh correlation with odometer than others?
 - Would estimators perform better without current?
-- How does the knn distance influences the soh estimation?
 - How to evaluate the soh estimation? 
-- Why KNN seems to be better than LR?
-- What other target feature could we use?
 
 **Proposals**:
-- Add another data cleaning step to retain only data points with decreasing energy_added over recharges/odometer/date
+- Visualization:
+    - Visualize the model's curves over each feature as a 2d line plot
+    - Visualize the sohs of all the vehicles
+- Evaluation metrics:
+    - coherence over charges
+    - soh decreasing monotonicity over nb charges
+    - duration decreasing monotonicity over nb charges
+    - similarity of soh over odometer to commonly accepted soh loss over odometer
+- Add another data cleaning step to the pipeline that can remove data points that have negative impact on the evaluation metrics
 - Instead of evaluating the estimation based on the correlation betweem soh and fleet wise odometer, we could evaluate it based on vehicle wise odometer.
 
 
@@ -39,13 +41,6 @@
 - Visualize all the charges sohs to get an intuative feel of the soh.
 - Create a scorer/loss function to quantify/evaluate the soh estimations.
 - Use odometer as target feature to see what is the best correlation possible between energy added and odometer.
-- Implement estimator that takes in the entire charge.
 - Iteratively:
     - Create a full sklearn Pipeline that we can hypertune from extraction to estimation.
     - Optimize the pipeline through hyperparameter tunning.
-</details>
-
-<details>
-<summary>without power data</summary>
-
-</details>
