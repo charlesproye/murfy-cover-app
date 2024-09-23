@@ -1,4 +1,4 @@
-PROCESSED_HANDLED_BRANDS = [
+HANDLED_BRANDS = [
     "bmw",
     "ford",
     "kia",
