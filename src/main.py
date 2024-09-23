@@ -26,9 +26,13 @@ async def main(start_scheduler: bool = True):
     logging.info(f"Main process PID: {os.getpid()}, running on {PLATFORM_COLORED}")
     #### Daily
 
-    for brand in HM_HANDLED_BRANDS:
+    for brand in HANDLED_BRANDS: #each job needs to be run one after the other 
         # await HighMobilityRawTS(brand).add_to_schedule(scheduler)
         await HighMobilityProcessedTS(brand).add_to_schedule(scheduler)
+
+    ## Pour Mobilisight
+    # await HighMobilityRawTS("stellantis").add_to_schedule(scheduler)
+    # await HighMobilityProcessedTS("stellantis").add_to_schedule(scheduler)
 
     # Start the scheduler
     if not start_scheduler:
