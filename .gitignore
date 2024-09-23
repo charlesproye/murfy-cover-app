@@ -1,7 +1,6 @@
 test.ipynb
 data_cache/*
 data_cache
-not_to_track_dir
 .not_to_track_dir
 service_account.json
 .service_account.json
@@ -160,7 +159,7 @@ cython_debug/
 #File 
 .csv 
 .png
-
+*.parquet
 *.csv
 **/*.csv
 

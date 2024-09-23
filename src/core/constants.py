@@ -1,10 +1,9 @@
 from datetime import timedelta as TD
 
+KJ_TO_KWH = 0.00027777778
 MILES_TO_KM = 1.60934
 KJ_TO_KWH = 0.00027777777
 
-#time series processing
-MIN_CHARGE_DURATION = TD(minutes=10)
 
 # period perfs
 DEFAULT_DIFF_VARS = {

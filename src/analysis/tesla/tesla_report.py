@@ -1,29 +1,34 @@
 """
-This module handles a data frame that holds static data about the vehicles such as model, default capacity and range, ect...
-Each line corresponds to a vehicle.
+This script output all the value needed for the tesla passport 
 """
 from glob import glob
 from os import path
+import argparse
 from typing import Generator
-import json
 
 import pandas as pd
-from pandas import Series
 from pandas import DataFrame as DF
-# from pandas.api.typing import DataFrameGroupBy as DF_grp_by
 from rich import print
 from rich.progress import track
 
 import core.time_series_processing as ts
 import core.perf_agg_processing as perfs
+from core.perf_agg_processing import compute_soh_from_soc_and_energy_diff, agg_diffs_df_of
 from tesla.tesla_constants import *
-from tesla.raw_tesla_ts import raw_ts_of
+from tesla.tesla_fleet_info import fleet_info_df
+from tesla.processed_tesla_ts import iterate_over_processed_ts, processed_ts_of
+
+if __name__ == "__main__":
+    main()
 
 def main():
-    fleet_info_df = compute_fleet_info()
-    print(fleet_info_df.to_string(max_rows=None))
-    fleet_info_df.to_csv(path.join(PATH_TO_FLEET_INFO_FOLDER, "fleet_info_df.csv"), index=False)
-    fleet_info_df.to_parquet(path.join(PATH_TO_FLEET_INFO_FOLDER, "fleet_info_df.paruet"))
+    get_odometer_ts()
+    get_soh
+    get_initial_autonomy_ts()
+    get_energy_diff_ts()
+    get_expected_range_ts()
+    
+    
 
 
 def iterate_over_vins(query_str:str=None, use_progress_track=True, **kwarges    ) -> Generator[str, None, None]:
@@ -40,7 +45,6 @@ def compute_fleet_info() -> DF:
             "model": "string",
             "manufacturer": "string",
             "kwh_capacity": "float",
-            "default_km_range": "float"
         })
         .set_index("model")
     )
@@ -52,8 +56,6 @@ def compute_fleet_info() -> DF:
         }
         vehicle_info_dict["default_kwh_energy_capacity"] = model_infos.at[vehicle_info_dict["model"], "kwh_capacity"]
         vehicle_info_dict["default_kwh_per_soc"] = vehicle_info_dict["default_kwh_energy_capacity"] / 100
-        vehicle_info_dict["default_km_range"] = model_infos.at[vehicle_info_dict["model"], "default_km_range"]
-        vehicle_info_dict["default_km_range_per_soc"] = vehicle_info_dict["default_km_range"] / 100
         fleet_info_objs.append(vehicle_info_dict)
 
     fleet_info_df = DF.from_dict(fleet_info_objs).set_index("vin", drop=False)

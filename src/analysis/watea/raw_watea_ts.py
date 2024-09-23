@@ -1,13 +1,15 @@
-"""
-This module provides the function `raw_time_series_of` to provide a raw time series from Tesla's personal API.
-Can also be used as a script to obtain the entirety of the tesla fleet data.
-"""
+from typing import Generator
+import os
+
 import pandas as pd
 from pandas import DataFrame as DF
 
-from watea_constants import *
+from watea.watea_constants import *
 
-# Dummy comment to test pull request
+def raw_ts_it() -> Generator[tuple[str, DF], None, None]:
+    for file in os.listdir("data_cache/raw_time_series"):
+        if file.endswith(".parquet"):
+            yield file[:6], pd.read_parquet("data_cache/raw_time_series/" + file)
 
 def raw_ts_of(id: str) -> DF:
     return pd.read_parquet(PATH_TO_RAW_TS.format(id=id))

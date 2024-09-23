@@ -11,7 +11,7 @@ from rich import print
 from rich.traceback import install as install_rich_traceback
 
 import core.time_series_processing as ts
-from core.caching_utils import data_caching_wrapper
+from core.caching_utils import instance_data_caching_wrapper
 from core.console_utils import parse_kwargs
 from watea.watea_constants import *
 from watea.watea_fleet_info import iterate_over_ids
@@ -20,11 +20,11 @@ from watea.raw_watea_ts import raw_ts_of
 def main():
     install_rich_traceback(extra_lines=0, width=130)
     kwargs = parse_kwargs()
-    for id, vehicle_df in processed_ts_iterator(force_update=True, track_kwargs={}):
+    for id, vehicle_df in processed_ts_it(force_update=True):
         print(id)
-        print(vehicle_df)
+        print(vehicle_df.columns)
 
-def processed_ts_iterator(fleet_query: str=None, ts_query=None, force_update:bool=False, **kwargs) -> Generator[tuple[str, DF], None, None]:
+def processed_ts_it(fleet_query: str=None, ts_query=None, force_update:bool=False, **kwargs) -> Generator[tuple[str, DF], None, None]:
     for id in iterate_over_ids(fleet_query, **kwargs):
         ts = processed_ts_of(id, force_update, **kwargs)
         if not ts_query is None:
@@ -32,7 +32,7 @@ def processed_ts_iterator(fleet_query: str=None, ts_query=None, force_update:boo
         yield id, ts
 
 def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
-    return data_caching_wrapper(
+    return instance_data_caching_wrapper(
         id,
         PATH_TO_PROCESSED_TS.format(id=id),
         lambda vin: process_raw_time_series(raw_ts_of(vin), **kwargs),
@@ -41,7 +41,8 @@ def processed_ts_of(id: str, force_update:bool=False, **kwargs) -> DF:
 
 def process_raw_time_series(raw_vehicle_df: DF, **kwargs) -> DF:
     return (
-        pre_process_raw_time_series(raw_vehicle_df)
+        raw_vehicle_df
+        .pipe(pre_process_raw_time_series)
         .pipe(ts.soh_from_est_battery_range, "battery_range_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
         .pipe(ts.in_motion_mask_from_odo_diff)
         .pipe(ts.in_discharge_and_charge_from_soc_diff)
@@ -52,16 +53,16 @@ def process_raw_time_series(raw_vehicle_df: DF, **kwargs) -> DF:
         .pipe(ts.perf_mask_and_idx_from_charge_mask, max_time_diff=PERF_MAX_TIME_DIFF)
         .pipe(ts.perf_mask_and_idx_from_condition_mask, "in_discharge")
         .pipe(ts.perf_mask_and_idx_from_charge_mask, PERF_MAX_TIME_DIFF)
-        .pipe(ts.add_cum_energy_from_power_cols, "power", "cum_energy")
+        .pipe(ts.compute_cum_integrals_of_current_vars)
     )
 
 def process_power(vehicle_df: DF) -> DF:
     vehicle_df["window_current_mean"] = (
-        vehicle_df["current"].
-        where(vehicle_df["in_charge"], np.nan).
-        mask(vehicle_df["current"].gt(0), np.nan).
-        rolling(TD(minutes=10)).
-        mean()
+        vehicle_df["current"]
+        .where(vehicle_df["in_charge"], np.nan)
+        .mask(vehicle_df["current"].gt(0), np.nan)
+        .rolling(TD(minutes=10))
+        .mean()
     )
     vehicle_df['power'] = vehicle_df.eval("current * voltage")
 
