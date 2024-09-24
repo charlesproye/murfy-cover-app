@@ -1,10 +1,12 @@
+from os.path import dirname, join
+
 from core.constants import *
 
 # path
-JSON_FLEET_INFO_RESPONSE_PATH = "data_cache/api_responses/raw_fleet_info.json"
-INITIAL_FLEET_INFO_PATH = "data_cache/initial_fleet_info.parquet"
-TS_RESPONSES_REGEX_PATH = "data_cache/api_responses/*.csv"
-RAW_TSS_PATH = "data_cache/raw_tss.parquet"
+JSON_FLEET_INFO_RESPONSE_PATH = join(dirname(__file__), "data_cache/api_responses/raw_fleet_info.json")
+INITIAL_FLEET_INFO_PATH = join(dirname(__file__), "data_cache/initial_fleet_info.parquet")
+TS_RESPONSES_REGEX_PATH = join(dirname(__file__), "data_cache/api_responses/*.csv")
+RAW_TSS_PATH = join(dirname(__file__), "data_cache/raw_tss.parquet")
 
 # data types
 DATA_TYPE_RAW_DF_DICT = {
