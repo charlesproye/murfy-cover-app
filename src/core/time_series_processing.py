@@ -56,22 +56,24 @@ def compute_cum_integrals_of_current_vars(vehicle_df: DF) -> DF:
     ### Description:
     Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).
     """
-    vehicle_df["cum_energy"] = cum_integral(vehicle_df["power"])
-    vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"])
+    vehicle_df["cum_energy"] = cum_integral(vehicle_df["power"], date_series=vehicle_df["date"])
+    vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"], date_series=vehicle_df["date"])
     return vehicle_df
 
-def cum_integral(power_series: Series) -> Series:
+def cum_integral(power_series: Series, date_series=None) -> Series:
     """
     ### Description:
     Computes the cumulative energy of the time series by using cumulative trapezoid intergrating of the power column.
     ### Parameters:
     power_col: name of the power column, must be in kw.
+    date_series: optional parameter to provide if the series is not indexed by date.
     ### Returns:
     df with added column with the name of cum_energy_col in kWh.
     """
+    date_series = date_series or power_series.index.to_series()
     cum_energy_data = integrate.cumulative_trapezoid(
         # Make sure that date time units are in seconds before converting to int
-        x=power_series.index.to_series().dt.as_unit("s").astype(int),
+        x=date_series.dt.as_unit("s").astype(int),
         y=power_series.fillna(0).values,
         initial=0,
     )
