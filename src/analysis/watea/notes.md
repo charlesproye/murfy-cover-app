@@ -6,16 +6,18 @@
 - soh estimation is not consistent enough:
     - over odometer.
     - per charges.
-    - per point (although it seems like we have enough points to mitigate the noise per point).
+    - per point .
 - We don't have enough points for some regimes.
 - KNN seems to be better than LR... but Martin says that the LR result are more coherent compared to the "norm of soh loss". 
 - There doesn't seem to be much correlation between current and enerrgy added within most common regime.
 - Our estimator states that: "A battery has an soh X because the median of its energy_added is X% of the energy_added of the default_100_soh batteries in the same charge region".
 
 **Hypothesis**:
-- An estimator who's total energy added over a charge regmie equals the battery capacity of the vehicle would have tbetter accuracy.
+- An estimator who's total energy added over a charge regime equals the battery capacity of the vehicle would have better accuracy.
 
 **Questions**:
+- How can we express 
+- How does/much soc noise affects the soh estimation? 
 - How does soc quantization effects soh estimation?
 - Are there feature regions that contribute more to the noise of the output?
 - Are there feature regions that have better soh correlation with odometer than others?
@@ -33,9 +35,8 @@
     - Visualize the model's curves over each feature as a 2d line plot
     - Visualize the sohs of all the vehicles
 - Evaluation metrics:
-    - coherence over charges
-    - soh decreasing monotonicity over nb charges
-    - duration decreasing monotonicity over nb charges
+    - difference of output distance with input feature distance  
+    - sum of combinations of monotonicity score of soh or duration over odometer fleet wise/or number of charges vehicle wise.
     - similarity of soh over odometer to commonly accepted soh loss over odometer
 - Add another data cleaning step to the pipeline that can remove data points that have negative impact on the evaluation metrics
 - Instead of evaluating the estimation based on the correlation betweem soh and fleet wise odometer, we could evaluate it based on vehicle wise odometer.

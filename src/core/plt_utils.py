@@ -260,7 +260,7 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
         ensure_that_dirs_exist(save_path)
         fig.write_html(save_path)
 
-    fig.show()
+    # fig.show()
 
     return fig
     

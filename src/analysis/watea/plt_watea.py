@@ -4,9 +4,9 @@ from pandas import DataFrame as DF
 
 from core.console_utils import parse_kwargs
 from core import plt_utils
-import watea.watea_constants as constants
-from watea.processed_watea_ts import processed_ts_it, processed_ts_of
-from watea.watea_fleet_info import fleet_info_df
+import analysis.watea.watea_constants as constants
+from analysis.watea.processed_watea_ts import processed_ts_it, processed_ts_of
+from analysis.watea.watea_fleet_info import fleet_info_df
 
 def main():
     install_rich_traceback(extra_lines=0, width=130)
