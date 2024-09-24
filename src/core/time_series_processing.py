@@ -100,7 +100,7 @@ def double_rolling_median_smoothing(src:Series, window:str|int="3h") -> Series:
 def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
         vehicle_df
-        # use interpolate before checking if the odometer increased to composate for missing values
+        # use interpolate before checking if the odometer increased to compensate for missing values
         .assign(in_motion=vehicle_df["odometer"].interpolate(method="time").diff().gt(0))
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
@@ -136,22 +136,6 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
 
     return vehicle_df
 
-
-def perf_mask_and_idx_from_charge_mask(vehicle_df: DF, max_time_diff:TD|None=None) -> DF:
-    vehicle_df = (
-        vehicle_df
-        .assign(interpolated_soc=vehicle_df["soc"].interpolate(method="time"))
-        .assign(interpolated_soc_diff=vehicle_df["soc"].interpolate(method="time"))
-
-        .eval("sec_per_soc = sec_time_diff / interpolated_soc_diff")
-
-        .eval("in_charge_above_80 = in_charge & interpolated_soc >= 80")
-        .eval("in_charge_bellow_80 = in_charge & interpolated_soc < 80")
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge_above_80", max_time_diff=max_time_diff)
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge_bellow_80", max_time_diff=max_time_diff)
-    )
-
-    return vehicle_df
 
 # TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
 def perf_mask_and_idx_from_condition_mask(vehicle_df: DF, src_mask:str, src_mask_idx_col_name="{src_mask}_idx", perf_mask_col_name="{src_mask}_perf_mask", max_time_diff:TD|None=None) -> DF:
