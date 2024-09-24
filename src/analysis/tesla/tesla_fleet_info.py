@@ -6,12 +6,11 @@ from typing import Generator
 import json
 
 import pandas as pd
-from pandas import Series
 from pandas import DataFrame as DF
 from rich import print
 from rich.progress import track
 
-from core.constants import *
+from core.ev_models_info import get_ev_models_infos
 from analysis.tesla.tesla_constants import *
 
 def main():
@@ -29,15 +28,7 @@ def iterate_over_vins(query_str:str=None, use_progress_track=True, **kwarges) ->
 def compute_fleet_info() -> DF:
     with open(INITIAL_JSON_FLEET_INFO_PATH) as json_fleet_info_file:
         raw_json_fleet_info: list[dict] = json.load(json_fleet_info_file)
-    model_infos = (
-        pd.read_csv(PATH_TO_MODELS_INFO)
-        .astype({
-            "model": "string",
-            "manufacturer": "string",
-            "kwh_capacity": "float",
-        })
-        .set_index("model")
-    )
+    model_infos = get_ev_models_infos()
     fleet_info_objs: list[dict] = []
     for raw_dict in raw_json_fleet_info:
         vehicle_info_dict = {
