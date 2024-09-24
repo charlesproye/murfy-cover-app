@@ -3,6 +3,9 @@ from datetime import timedelta as TD
 MILES_TO_KM = 1.60934
 KJ_TO_KWH = 0.00027777777
 
+# paths
+EV_MODELS_INFO_PATH = "data_cache/models_info.csv"
+
 #time series processing
 MIN_CHARGE_DURATION = TD(minutes=10)
 

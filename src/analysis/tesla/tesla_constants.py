@@ -4,6 +4,16 @@ from datetime import timedelta as TD
 import os
 import pandas as pd
 
+from core.constants import *
+
+# path
+INITIAL_JSON_FLEET_INFO_PATH = "data_cache/raw_fleet_info.json"
+INITIAL_PARQUET_FLEET_INFO_PATH = "data_cache/initial_fleet_info.parquet"
+INITIAL_CSV_FLEET_INFO_PATH = "data_cache/initial_fleet_info.parquet"
+TS_RESPONSES_REGEX_PATH = "data_cache/csv_responses/*.csv"
+RAW_TSS_PATH = "data_cache/raw_time_seires/raw_tss.parquet"
+SINGLE_RAW_TS_PATH = "data_cache/raw_time_series/{vin}.parquet"
+
 # data types
 DATA_TYPE_RAW_DF_DICT = {
     # "date": ,
@@ -41,44 +51,10 @@ DATA_TYPE_RAW_DF_DICT = {
     "outside_temp": float,
 }
 DATA_TYPE_RAW_DF_DICT_FOR_EXTRAS = {k: v for k, v in DATA_TYPE_RAW_DF_DICT.items() if k != "vin"}
-# path
-PATH_TO_MODELS_INFO = "data_cache/models_info.csv"
-PATH_TO_FLEET_INFO_FOLDER = "data_cache/tesla/fleet_info"
-PATH_TO_TESLA_PROFILE = "data_cache/tesla/profile/{vin}.parquet"
-PATH_TO_RAW_TESLA_TS_FOLER = "data_cache/tesla/raw_time_series/"
-PATH_TO_RAW_TESLA_TS = "data_cache/tesla/raw_time_series/{vin}.parquet"
-PATH_TO_PROCESSED_TESLA_TS = "data_cache/tesla/processed_time_series/{vin}.parquet"
-PATH_TO_VEHICLES_INFO_DF = os.path.join("data_cache", "vehicles_info", "vehicles_info.parquet")
-NOW = datetime.now()
-RAW_VEHICLE_DF_DATE_MARGIN = timedelta(days=1)
-EWM_SPAN_ENERGY_TO_RANGE_RATIO = 10
-
-# Convertions
-MILE_TO_KM = 1.60934
 # Tesla
 #model y rear drive
-MODEL_Y_REAR_DRIVE_MIN_RANGE = 295 * MILE_TO_KM
+MODEL_Y_REAR_DRIVE_MIN_RANGE = 295 * MILES_TO_KM
 MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC = MODEL_Y_REAR_DRIVE_MIN_RANGE / 100
 MODEL_Y_REAR_DRIVE_STOCK_KJ = 291600
 MODEL_Y_REAR_DRIVE_STOCK_KWH_PER_SOC = 0.81
 
-
-# Plotting
-PERFS_COMPARAISON = {
-    "vehicle_df": [
-        {"y":"range_soh", "linestyle":"", "marker":".", "alpha":0.7},
-        {"y":"last_charge_soh", "linestyle":"", "marker":".", "alpha":0.7},
-    ],
-    "perfs_dict": {
-        "motion_perfs": [
-            {"y":"km_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-        "self_discharge_perfs": [
-            {"y":"secs_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-        "charging_perfs": [
-            {"y":"sec_per_soc", "linestyle":"", "marker":".", "alpha":0.7},
-            {"y":"battery_range_added_soh", "linestyle":"", "marker":".", "alpha":0.7},
-        ],
-    }
-}
