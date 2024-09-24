@@ -30,3 +30,9 @@ def split_and_retain_src(src: Series, pattern:str, n:int=None, col_names:list[st
         result.columns = col_names
 
     return result
+
+def uniques_as_series(s:Series) -> Series:
+    """
+    Warp around Series.unique to return another Series instead of an ndarray.
+    """
+    return Series(s.unique())

@@ -44,11 +44,16 @@ DATA_TYPE_RAW_DF_DICT = {
     "inside_temp": "float",
     "outside_temp": "float",
 }
-DATA_TYPE_RAW_DF_DICT_FOR_EXTRAS = {k: v for k, v in DATA_TYPE_RAW_DF_DICT.items() if k != "vin"}
-# Tesla
+
+VIN_IN_TIME_SERIES_BUT_NOT_IN_FLEET_INFO_WARNING_MSG = """
+There are vins present in the api response that are absent in the fleet info response.
+These vins will be removed from the final raw_tss as we will not know what are there static data(range, battery capacity, ect...)
+Here is the list of vins that are missing:
+"""
+
 #model y rear drive
-MODEL_Y_REAR_DRIVE_MIN_RANGE = 295 * MILES_TO_KM
-MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC = MODEL_Y_REAR_DRIVE_MIN_RANGE / 100
-MODEL_Y_REAR_DRIVE_STOCK_KJ = 291600
-MODEL_Y_REAR_DRIVE_STOCK_KWH_PER_SOC = 0.81
+# MODEL_Y_REAR_DRIVE_MIN_RANGE = 295 * MILES_TO_KM
+# MODEL_Y_REAR_DRIVE_MIN_KM_PER_SOC = MODEL_Y_REAR_DRIVE_MIN_RANGE / 100
+# MODEL_Y_REAR_DRIVE_STOCK_KJ = 291600
+# MODEL_Y_REAR_DRIVE_STOCK_KWH_PER_SOC = 0.81
 
