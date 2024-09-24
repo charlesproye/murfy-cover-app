@@ -18,6 +18,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
+from plotly.graph_objects import Figure
 
 from core.caching_utils import ensure_that_dirs_exist
 from core.constants import *
@@ -74,6 +75,12 @@ def plt_charge_energy_data(charging_points: DF, dists: Series,fig: Figure, scatt
     axs = axs_for_energy_dist(fig, dists)
     lvl_0_idxs: pd.Index = dists.index.get_level_values(0).unique().sort_values()
     lvl_1_idxs: pd.Index = dists.index.get_level_values(1).unique().sort_values()
+
+    print(dists.xs(25.0, level=1).drop_duplicates())
+
+    # print(dists.index.get_level_values(1).unique())
+    # print(charging_points.index.get_level_values(1).unique())
+    
     for lvl_1_idx in lvl_1_idxs:
         points_lvl_0_xs = charging_points.xs(lvl_1_idx, level=1)
         dist_lvl_0_xs = dists.xs(lvl_1_idx, level=1)
@@ -230,7 +237,7 @@ def plt_time_series_plotly(df:DF, cols:list[str], save_to:str=None, show=True):
     if save_to:
         fig.write_html(save_to)
 
-def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, size=3):
+def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, colorscale='Viridis', size=3, symbol=None) -> Figure:
     fig = go.Figure(data=[go.Scatter3d(
         x=df[x],
         y=df[y],
@@ -240,12 +247,71 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
             size=size,
             opacity=opacity,
             color=df[color],
-            colorscale='Viridis',
+            colorscale=colorscale,
             colorbar=dict(title=color),
-
-        )
+            symbol=df[symbol] if not symbol is None else None,
+        ),
+        
     )])
+    fig = basic_fig_update(fig, x, y, z)
+    # fig.update_yaxes(type="log")
+
+    if save_path:
+        ensure_that_dirs_exist(save_path)
+        fig.write_html(save_path)
+
+    fig.show()
+
+    return fig
+    
+def plot_2d_line(df: pd.DataFrame, x_column: str, y_column: str, line_group_column: str, color: str = None, color_scale: str = None):
+    """
+    Creates a 2D line plot using Plotly with optional color and color scale.
+
+    Parameters:
+        df (pd.DataFrame): The input DataFrame containing the data.
+        x_column (str): The column name for the x-axis.
+        y_column (str): The column name for the y-axis.
+        line_group_column (str): The column name for grouping the lines.
+        color (str, optional): The column name to use for the line color. Default is None.
+        color_scale (str, optional): The color scale to use. Default is None.
+
+    Returns:
+        plotly.graph_objs._figure.Figure: The generated Plotly figure.
+    """
+    if color:
+        # If color is provided, use px.line with color_discrete_sequence
+        fig = px.line(
+            df,
+            x=x_column,
+            y=y_column,
+            line_group=line_group_column,
+            color=color,
+            color_discrete_sequence=px.colors.qualitative.Plotly if not color_scale else getattr(px.colors.qualitative, color_scale)
+        )
+    else:
+        # If no color is provided, create a line plot without coloring
+        fig = px.line(
+            df,
+            x=x_column,
+            y=y_column,
+            line_group=line_group_column
+        )
+    
+    # Update the layout (optional)
     fig.update_layout(
+        title=f'2D Line Plot of {y_column} vs {x_column} Grouped by {line_group_column}',
+        xaxis_title=x_column,
+        yaxis_title=y_column,
+        legend_title=line_group_column if not color else color
+    )
+    
+    # Show the plot
+    fig.show()
+
+    
+def basic_fig_update(fig: Figure, x:str, y:str, z:str) -> Figure:
+    return fig.update_layout(
         margin=dict(l=0, r=0, b=0, t=0),
         scene=dict(
             xaxis=dict(title=x),
@@ -260,8 +326,3 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
         width=2000,  # Adjust width as needed
         height=1200   # Adjust height as needed
     )
-    if save_path:
-        ensure_that_dirs_exist(save_path)
-        fig.write_html(save_path)
-
-    fig.show()

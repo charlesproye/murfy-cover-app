@@ -1,6 +1,7 @@
 from datetime import timedelta as TD
 from os.path import join, dirname
 
+KJ_TO_KWH = 0.00027777778
 MILES_TO_KM = 1.60934
 KJ_TO_KWH = 0.00027777777
 
@@ -8,8 +9,6 @@ KJ_TO_KWH = 0.00027777777
 CSV_EV_MODELS_INFO_PATH = join(dirname(__file__), "data_cache/models_info.csv")
 PARQUET_EV_MODELS_INFO_PATH = join(dirname(__file__), "data_cache/models_info.parquet")
 
-#time series processing
-MIN_CHARGE_DURATION = TD(minutes=10)
 
 # period perfs
 DEFAULT_DIFF_VARS = {

@@ -1,4 +1,4 @@
-# EV data analysis  package
+# EV data analysis package
 
 ### Context:
 The goal of this package is to handle every step of the data analytics service of Bib:
@@ -124,3 +124,18 @@ Each sub package (except `core`) has the following scripts (where XX is the name
     ```
     Result:
     ![result](./documentation/plt_XX_result_example.png)
+
+#### Data caches
+Most of the `data_cache` sub folders will be created automatically.  
+The only one that you need to set up is the one used by `raw_XX_ts` to create the raw time series tables.  
+In the case of watea, this is `bib_export` and the folders corresponding to the vehicles.  
+Then you should be able to run any script and the data that it depends on should be generated if it is not yet cached.  
+
+---
+## Watea:
+To setup watea data, you must:
+1. Download the zip file `bib_export` from the google drive into `data_cache`.
+2. Unzip `bib_export` and then run in `src/watea` `setup_raw_ts.sh`.
+3. Then run `python3 watea_constants.py` to create the constants.
+4. Then run `python3 watea_fleet_info.py` to create the fleet_info_df.
+5. Then run 'python3 processed_watea_ts.py' to create the processed_time_series.
