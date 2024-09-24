@@ -13,9 +13,7 @@
 - Our estimator states that: "A battery has an soh X because the median of its energy_added is X% of the energy_added of the default_100_soh batteries in the same charge region".
 
 **Hypothesis**:
-- Use the entire charge as sample instead of charging points to automatically prune out charging points that introduce noise.
-- Odometer has much lower correlation with soh than expected.
-- Energy_added calculation might be worse than we thought...
+- An estimator who's total energy added over a charge regmie equals the battery capacity of the vehicle would have tbetter accuracy.
 
 **Questions**:
 - How does soc quantization effects soh estimation?
