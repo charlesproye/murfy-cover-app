@@ -13,9 +13,9 @@ from rich.traceback import install as install_rich_traceback
 import core.time_series_processing as ts
 from core.caching_utils import instance_data_caching_wrapper
 from core.console_utils import parse_kwargs
-from watea.watea_constants import *
-from watea.watea_fleet_info import iterate_over_ids
-from watea.raw_watea_ts import raw_ts_of
+from analysis.watea.watea_constants import *
+from analysis.watea.watea_fleet_info import iterate_over_ids
+from analysis.watea.raw_watea_ts import raw_ts_of
 
 def main():
     install_rich_traceback(extra_lines=0, width=130)
