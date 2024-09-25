@@ -8,6 +8,7 @@ RUN micromamba install -y -n base -f /tmp/conda-lock.yaml && \
 
 COPY . .
 
+ENV PYTHONPATH="/app:$PYTHONPATH"
 ARG MAMBA_DOCKERFILE_ACTIVATE=1  # (otherwise python will not be found)
 # Start the application
 CMD ["./start.sh"]

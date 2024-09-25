@@ -38,7 +38,7 @@ main() {
     # python3 src/main.py
 
     # Ajoutez le répertoire `src` au PYTHONPATH
-    export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src/ingestion/high_mobility"
+    export PYTHONPATH="${PYTHONPATH:-}:$(pwd)"
 
     LOG_LEVEL=${LOG_LEVEL:-INFO}
     MAX_WORKERS=${MAX_WORKERS:-}
@@ -48,7 +48,7 @@ main() {
     # ACCESSLOG=${ACCESSLOG:-true}
     # ERRORLOG=${ERRORLOG:-true}
 
-    chunks=("python3" "./src/ingestion/high_mobility")
+    chunks=("python3" "-m" "src.ingestion.high_mobility")
 
     # [[ "$ACCESSLOG" == "true" ]] && chunks+=("--access-logfile" "-")
     # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")

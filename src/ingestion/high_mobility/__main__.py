@@ -4,8 +4,7 @@ import os
 import textwrap
 
 import dotenv
-from ingestion.high_mobility.ingester import HMIngester
-
+from src.ingestion.high_mobility.ingester import HMIngester
 
 def main():
     dotenv.load_dotenv()
