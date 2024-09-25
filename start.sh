@@ -38,7 +38,7 @@ main() {
     # python3 src/main.py
 
     # Ajoutez le répertoire `src` au PYTHONPATH
-    export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src"
+    export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src/ingestion/high_mobility"
 
     LOG_LEVEL=${LOG_LEVEL:-INFO}
     MAX_WORKERS=${MAX_WORKERS:-}
