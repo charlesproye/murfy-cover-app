@@ -34,36 +34,34 @@ main() {
     if  [[ $dotenv > 0 ]]; then
       set -a; source .env; set +a;
     fi
-    # To run the test before having a docker container for this part 
-    python3 src/main.py
 
     # Ajoutez le répertoire `src` au PYTHONPATH
-    # export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src"
+    export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src"
 
-    # LOG_LEVEL=${LOG_LEVEL:-INFO}
-    # MAX_WORKERS=${MAX_WORKERS:-}
-    # REFRESH_INTERVAL=${REFRESH_INTERVAL:-}
-    # COMPRESS_INTERVAL=${COMPRESS_INTERVAL:-}
-    # COMPRESS_THREADED=${COMPRESS_THREADED:-}
-    # # ACCESSLOG=${ACCESSLOG:-true}
-    # # ERRORLOG=${ERRORLOG:-true}
+    LOG_LEVEL=${LOG_LEVEL:-INFO}
+    MAX_WORKERS=${MAX_WORKERS:-}
+    REFRESH_INTERVAL=${REFRESH_INTERVAL:-}
+    COMPRESS_INTERVAL=${COMPRESS_INTERVAL:-}
+    COMPRESS_THREADED=${COMPRESS_THREADED:-}
+    # ACCESSLOG=${ACCESSLOG:-true}
+    # ERRORLOG=${ERRORLOG:-true}
 
-    # chunks=("python3" "./src/ingestion/high_mobility")
+    chunks=("python3" "./src/ingestion/high_mobility")
 
-    # # [[ "$ACCESSLOG" == "true" ]] && chunks+=("--access-logfile" "-")
-    # # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")
-    # [[ ! -z "$MAX_WORKERS" ]] && chunks+=("--max_workers" "$MAX_WORKERS")
-    # [[ ! -z "$REFRESH_INTERVAL" ]] && chunks+=("--refresh_interval" "$REFRESH_INTERVAL")
-    # [[ ! -z "$COMPRESS_INTERVAL" ]] && chunks+=("--compress_interval" "$COMPRESS_INTERVAL")
-    # [[ ! -z "$COMPRESS_THREADED" ]] && chunks+=("--compress_threaded")
+    # [[ "$ACCESSLOG" == "true" ]] && chunks+=("--access-logfile" "-")
+    # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")
+    [[ ! -z "$MAX_WORKERS" ]] && chunks+=("--max_workers" "$MAX_WORKERS")
+    [[ ! -z "$REFRESH_INTERVAL" ]] && chunks+=("--refresh_interval" "$REFRESH_INTERVAL")
+    [[ ! -z "$COMPRESS_INTERVAL" ]] && chunks+=("--compress_interval" "$COMPRESS_INTERVAL")
+    [[ ! -z "$COMPRESS_THREADED" ]] && chunks+=("--compress_threaded")
 
-    # for e in "${chunks[@]}"
-    # do
-    #     cmd=${cmd:+$cmd }$e
-    # done
+    for e in "${chunks[@]}"
+    do
+        cmd=${cmd:+$cmd }$e
+    done
 
-    # msg "Exec: $cmd"
-    # exec $cmd
+    msg "Exec: $cmd"
+    exec $cmd
 }
 
 cleanup() {
@@ -85,4 +83,3 @@ die() {
 
 parse_params "$@"
 main
-
