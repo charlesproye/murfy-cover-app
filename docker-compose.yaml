@@ -7,9 +7,13 @@ services:
       context: .
       dockerfile: hm.Dockerfile
     container_name: hm_ingestion
-    env_file:
-      - .env
-      - .python.env
+    env_file: 
+      - path: ./.env
+        required: true
+      - path: ./.python.env
+        required: true
+      - path: ./.args.env
+        required: false
     volumes:
       - .:/app
   ms_ingestion_service: 
