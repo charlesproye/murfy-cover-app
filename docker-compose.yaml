@@ -16,6 +16,9 @@ services:
         required: false
     volumes:
       - .:/app
+    environment:
+      - PYTHONPATH=/app
+  
   ms_ingestion_service: 
     build:
       context: .
@@ -30,3 +33,5 @@ services:
         required: false
     volumes:
       - .:/app
+    environment:
+      - PYTHONPATH=/app
