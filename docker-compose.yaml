@@ -1,25 +1,10 @@
 version: '3.8'
 
 services:
-
-  hm_ingestion_service: 
-    build: 
-      context: .
-      dockerfile: hm.Dockerfile
+  hm_ingestion_sevice: 
+    build: . 
     container_name: hm_ingestion
-    env_file: 
-      - path: ./.env
-        required: true
-      - path: ./.python.env
-        required: true
-      - path: ./.args.env
-        required: false
-    volumes:
-      - .:/app
-    environment:
-      - PYTHONPATH=/app
-  
-  ms_ingestion_service: 
+  ms_ingestion_sevice: 
     build:
       context: .
       dockerfile: mobilisights.Dockerfile
@@ -33,5 +18,3 @@ services:
         required: false
     volumes:
       - .:/app
-    environment:
-      - PYTHONPATH=/app
