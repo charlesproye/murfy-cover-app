@@ -15,6 +15,8 @@ from ..factory import register_brand, register_merged
 
 class MercedesBenzDiagnostics(msgspec.Struct):
     odometer: Optional[HMApiValue[DataWithUnit[float]]] = None
+    battery_voltage: Optional[HMApiValue[DataWithUnit[float]]] = None
+    engine_coolant_temperature: Optional[HMApiValue[DataWithUnit[float]]] = None
 
 
 class MercedesBenzCharging(msgspec.Struct):
@@ -32,7 +34,14 @@ class MercedesBenzCharging(msgspec.Struct):
     starter_battery_state: Optional[HMApiValue[str]] = None
     status: Optional[HMApiValue[str]] = None
     time_to_complete_charge: Optional[HMApiValue[float]] = None
-
+    
+class MercedesBenzUsage(msgspec.Struct):
+    electric_consumption_rate_since_reset: Optional[HMApiValue[float]] = None
+    electric_consumption_rate_since_start: Optional[HMApiValue[float]] = None
+    electric_distance_last_trip: Optional[HMApiValue[DataWithUnit[float]]] = None
+    electric_distance_since_reset: Optional[HMApiValue[DataWithUnit[int]]] = None
+    electric_duration_last_trip: Optional[HMApiValue[DataWithUnit[int]]] = None
+    electric_duration_since_reset: Optional[HMApiValue[DataWithUnit[int]]] = None
 
 @register_brand(rate_limit=36)
 class MercedesBenzInfo(HMApiResponse):
@@ -42,16 +51,21 @@ class MercedesBenzInfo(HMApiResponse):
 
 class MergedMercedesBenzDiagnostics(msgspec.Struct):
     odometer: list[HMApiValue[DataWithUnit[float]]] = []
+    battery_voltage: list[HMApiValue[DataWithUnit[float]]] = []
+    engine_coolant_temperature: list[HMApiValue[DataWithUnit[float]]] = []
 
     @classmethod
     def from_initial(cls, initial: Optional[MercedesBenzDiagnostics]) -> Self:
         ret = cls()
-        if initial is None or initial.odometer is None:
-            ret.odometer = []
-        else:
+        if initial is None:
+            return ret
+        if initial.odometer is not None:
             ret.odometer = [initial.odometer]
+        if initial.battery_voltage is not None:
+            ret.battery_voltage = [initial.battery_voltage]
+        if initial.engine_coolant_temperature is not None:
+            ret.engine_coolant_temperature = [initial.engine_coolant_temperature]
         return ret
-
     def merge(self, other: Optional[MercedesBenzDiagnostics]):
         if other is not None and is_new_value(self.odometer, other.odometer):
             self.odometer.append(cast(HMApiValue[DataWithUnit[float]], other.odometer))
@@ -204,7 +218,66 @@ class MergedMercedesBenzCharging(msgspec.Struct):
                     cast(HMApiValue[float], other.time_to_complete_charge)
                 )
 
+class MergedMercedesBenzUsage(msgspec.Struct):
+    electric_consumption_rate_since_reset: list[HMApiValue[float]] = []
+    electric_consumption_rate_since_start: list[HMApiValue[float]] = []
+    electric_distance_last_trip: list[HMApiValue[DataWithUnit[float]]] = []
+    electric_distance_since_reset: list[HMApiValue[DataWithUnit[int]]] = []
+    electric_duration_last_trip: list[HMApiValue[DataWithUnit[int]]] = []
+    electric_duration_since_reset: list[HMApiValue[DataWithUnit[int]]] = []
 
+    @classmethod
+    def from_initial(cls, initial: Optional[MercedesBenzUsage]) -> Self:
+        ret = cls()
+        if initial is not None:
+            ret.electric_consumption_rate_since_reset = (
+                [initial.electric_consumption_rate_since_reset] if initial.electric_consumption_rate_since_reset is not None else []
+            )
+            ret.electric_consumption_rate_since_start = (
+                [initial.electric_consumption_rate_since_start]
+                if initial.electric_consumption_rate_since_start is not None
+                else []
+            )
+            ret.electric_distance_last_trip = (
+                [initial.electric_distance_last_trip] if initial.electric_distance_last_trip is not None else []
+            )
+            ret.electric_distance_since_reset = (
+                [initial.electric_distance_since_reset] if initial.electric_distance_since_reset is not None else []
+            )
+            ret.electric_duration_last_trip = (
+                [initial.electric_duration_last_trip] if initial.electric_duration_last_trip is not None else []
+            )
+            ret.electric_duration_since_reset = (
+                [initial.electric_duration_since_reset] if initial.electric_duration_since_reset is not None else []
+            )
+        return ret
+
+    def merge(self, other: Optional[MercedesBenzUsage]):
+        if other is not None:
+            if is_new_value(self.electric_consumption_rate_since_reset, other.electric_consumption_rate_since_reset):
+                self.electric_consumption_rate_since_reset.append(cast(HMApiValue[float], other.electric_consumption_rate_since_reset))
+            if is_new_value(
+                self.electric_consumption_rate_since_start, other.electric_consumption_rate_since_start
+            ):
+                self.electric_consumption_rate_since_start.append(
+                    cast(HMApiValue[float], other.electric_consumption_rate_since_start)
+                )
+            if is_new_value(self.electric_distance_last_trip, other.electric_distance_last_trip):
+                self.electric_distance_last_trip.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.electric_distance_last_trip)
+                )
+            if is_new_value(self.electric_distance_since_reset, other.electric_distance_since_reset):
+                self.electric_distance_since_reset.append(
+                    cast(HMApiValue[DataWithUnit[int]], other.electric_distance_since_reset)
+                )
+            if is_new_value(self.electric_duration_last_trip, other.electric_duration_last_trip):
+                self.electric_duration_last_trip.append(
+                    cast(HMApiValue[DataWithUnit[int]], other.electric_duration_last_trip)
+                )
+            if is_new_value(self.electric_duration_since_reset, other.electric_duration_since_reset):
+                self.electric_duration_since_reset.append(
+                    cast(HMApiValue[DataWithUnit[int]], other.electric_duration_since_reset)
+                )
 @register_merged
 class MergedMercedesBenzInfo(msgspec.Struct):
     diagnostics: MergedMercedesBenzDiagnostics
