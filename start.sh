@@ -34,11 +34,9 @@ main() {
     if  [[ $dotenv > 0 ]]; then
       set -a; source .env; set +a;
     fi
-    # To run the test before having a docker container for this part 
-    # python3 src/main.py
 
     # Ajoutez le répertoire `src` au PYTHONPATH
-    export PYTHONPATH="${PYTHONPATH:-}:$(pwd)"
+    export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src"
 
     LOG_LEVEL=${LOG_LEVEL:-INFO}
     MAX_WORKERS=${MAX_WORKERS:-}
@@ -48,7 +46,7 @@ main() {
     # ACCESSLOG=${ACCESSLOG:-true}
     # ERRORLOG=${ERRORLOG:-true}
 
-    chunks=("python3" "-m" "src.ingestion.high_mobility")
+    chunks=("python3" "./src/ingestion/high_mobility")
 
     # [[ "$ACCESSLOG" == "true" ]] && chunks+=("--access-logfile" "-")
     # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")

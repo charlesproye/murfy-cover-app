@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: hm.Dockerfile
-    container_name: hm_ingestion
+    container_name: hm-ingestion
     env_file: 
       - path: ./.env
         required: true
