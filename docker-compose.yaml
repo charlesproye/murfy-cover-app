@@ -13,6 +13,8 @@ services:
         required: true
       - path: ./.args.env
         required: false
+    volumes:
+      - .:/app
   ms_ingestion_service: 
     build:
       context: .

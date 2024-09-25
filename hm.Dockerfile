@@ -2,6 +2,8 @@
 FROM mambaorg/micromamba:latest as conda
 
 # Create environment
+WORKDIR /app
+
 COPY --chown=$MAMBA_USER:$MAMBA_USER ingestion.conda-lock.yaml /tmp/conda-lock.yaml
 RUN micromamba install -y -n base -f /tmp/conda-lock.yaml && \
     micromamba clean --all --yes
