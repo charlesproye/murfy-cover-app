@@ -85,20 +85,17 @@ def make_all_brands() -> dict[str, Brand]:
     files = resources.contents(f"{__package__}.brands")
     brands = [f[:-3] for f in files if f.endswith(".py") and f[0] != "_"]
     for brand in brands:
-        if brand == "ford":
-            import_module(f"{__package__}.brands.{brand}")
-            normalized_brand_name = to_api_name(brand)
-            if not _INFO_CLASSES.get(normalized_brand_name):
-                raise BrandNotRegisteredException(brand)
-            if not _MERGED_INFO_CLASSES.get(normalized_brand_name):
-                raise MergedClassNotRegisteredException(brand)
-            res[normalized_brand_name] = Brand(
-                info_class=_INFO_CLASSES[normalized_brand_name].cls,
-                merged_info_class=_MERGED_INFO_CLASSES[normalized_brand_name],
-                rate_limit=_INFO_CLASSES[normalized_brand_name].rate_limit,
-            )
-        else:
-            continue
+        import_module(f"{__package__}.brands.{brand}")
+        normalized_brand_name = to_api_name(brand)
+        if not _INFO_CLASSES.get(normalized_brand_name):
+            raise BrandNotRegisteredException(brand)
+        if not _MERGED_INFO_CLASSES.get(normalized_brand_name):
+            raise MergedClassNotRegisteredException(brand)
+        res[normalized_brand_name] = Brand(
+            info_class=_INFO_CLASSES[normalized_brand_name].cls,
+            merged_info_class=_MERGED_INFO_CLASSES[normalized_brand_name],
+            rate_limit=_INFO_CLASSES[normalized_brand_name].rate_limit,
+        )
     return res
 
 
