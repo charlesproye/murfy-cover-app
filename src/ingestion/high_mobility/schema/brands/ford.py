@@ -2,8 +2,6 @@ from typing import Annotated, Optional, Self, cast
 
 import msgspec
 
-from ingestion.high_mobility.schema.brands.bmw import BmwCharging, BmwInfo
-
 from .. import (
     DataWithUnit,
     HMApiResponse,
@@ -21,18 +19,15 @@ class FordDiagnostics(msgspec.Struct):
 
 
 class FordCharging(msgspec.Struct):
-    battery_energy: Optional[HMApiValue[float]] = None
+    battery_energy: Optional[HMApiValue[DataWithUnit[float]]] = None
     battery_level: Optional[HMApiValue[float]] = None
     charge_limit: Optional[HMApiValue[float]] = None
     charger_voltage: Optional[HMApiValue[float]] = None
-    time_to_complete_charge: Optional[HMApiValue[float]] = None
+    # time_to_complete_charge: Optional[HMApiValue[float]] = None
     status: Optional[HMApiValue[str]] = None
 
 
 class FordUsage(msgspec.Struct):
-    # last_trip_battery_remaining: Optional[
-    #     HMApiValue[Annotated[float, msgspec.Meta(ge=0.0, le=100.0)]]
-    # ] = None
     last_trip_battery_regenerated: Optional[HMApiValue[DataWithUnit[float]]] = None
     electric_distance_last_trip: Optional[HMApiValue[DataWithUnit[float]]] = None
 
@@ -70,11 +65,11 @@ class MergedFordDiagnostics(msgspec.Struct):
 
 
 class MergedFordCharging(msgspec.Struct):
-    battery_energy: list[HMApiValue[float]] = []
+    battery_energy: list[HMApiValue[DataWithUnit[float]]] = []
     battery_level: list[HMApiValue[float]] = []
     charge_limit: list[HMApiValue[float]] = []
     charger_voltage: list[HMApiValue[float]] = []
-    time_to_complete_charge: list[HMApiValue[float]] = []
+    # time_to_complete_charge: list[HMApiValue[float]] = []
     status: list[HMApiValue[str]] = []
 
     @classmethod
@@ -91,8 +86,8 @@ class MergedFordCharging(msgspec.Struct):
                 ret.charger_voltage = [initial.charger_voltage]
             if initial.status is not None:
                 ret.status = [initial.status]
-            if initial.time_to_complete_charge is not None:
-                ret.time_to_complete_charge = [initial.time_to_complete_charge]
+            # if initial.time_to_complete_charge is not None:
+            #     ret.time_to_complete_charge = [initial.time_to_complete_charge]
         return ret
 
     def merge(self, other: Optional[FordCharging]):
@@ -102,7 +97,7 @@ class MergedFordCharging(msgspec.Struct):
             if is_new_value(self.status, other.status):
                 self.status.append(cast(HMApiValue[str], other.status))
             if is_new_value(self.battery_energy, other.battery_energy):
-                self.battery_energy.append(cast(HMApiValue[float], other.battery_energy))
+                self.battery_energy.append(cast(HMApiValue[DataWithUnit[float]], other.battery_energy))
             if is_new_value(self.charger_voltage, other.charger_voltage):
                 self.charger_voltage.append(cast(HMApiValue[float], other.charger_voltage))
             if is_new_value(self.time_to_complete_charge, other.time_to_complete_charge):
