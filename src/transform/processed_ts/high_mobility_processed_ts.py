@@ -10,7 +10,7 @@ from pandas import DataFrame as DF
 from apscheduler.triggers.interval import IntervalTrigger
 
 from core.s3_utils import S3_Bucket
-from jobs.base_jobs.job_interval import Jobinterval
+from transform.base_jobs.job_interval import Jobinterval
 from core.constants import *
 from core.time_series_processing import preprocess_date, estimate_dummy_soh
 

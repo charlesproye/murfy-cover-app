@@ -14,7 +14,7 @@ from pandas import DataFrame as DF
 from apscheduler.triggers.interval import IntervalTrigger
 
 from core.s3_utils import S3_Bucket
-from jobs.base_jobs.job_interval import Jobinterval
+from transform.base_jobs.job_interval import Jobinterval
 
 class HighMobilityRawTS(Jobinterval):
     """
