@@ -11,8 +11,10 @@ The goal of this package is to handle every step of the data analytics service o
 .
 └── src
     ├── core
-    ├── tesla
-    └── watea
+    ├── analysis
+    └── ingestion
+    ├── processing
+    ├── utils
 ```
 ### Core:
 `core` contains the code that is common to any data provider.
@@ -35,6 +37,25 @@ core
 - `time_series_processing`:
     Implements operation common to the data provider sub packages of time series such as charging and motion periods.  
 The other modules are pretty self explanatory.
+
+### Analysis:
+'analysis' contains the code to analyze the data.
+For each brand we have a specific notebook that analyze the data and compute the performances.
+
+### Ingestion:
+'ingestion' contains the code to ingest the data from the data provider's API.
+Two ways of ingestion are implemented:
+    Through High Mobility API
+
+    Through Mobilisight API
+
+### Transform:
+'transform' contains the code to transform the data.
+To launch the transform of the data use the following command:
+```shell
+dotenv run ./start_transform.sh
+```
+
 
 ### Data provider sub packages:
 The code specific to a certain data provider is put in a separate folder.

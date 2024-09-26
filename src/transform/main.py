@@ -6,11 +6,11 @@ import logging
 
 from rich import print
 
-from jobs.high_mobility.high_mobility_raw_ts import HighMobilityRawTS
-from jobs.high_mobility.high_mobility_processed_ts import HighMobilityProcessedTS
+from transform.raw_ts.high_mobility_raw_ts import HighMobilityRawTS
+from transform.processed_ts.high_mobility_processed_ts import HighMobilityProcessedTS
 from utils.platform import PLATFORM_COLORED, PLATFORM
 from bib_models.utils.log_format import get_handler
-from jobs.high_mobility.constants import *
+from transform.constants import *
 
 handler = get_handler(is_logged=os.getenv("IS_DEPLOY",False), platform=PLATFORM)
 logging.basicConfig(
