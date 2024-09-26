@@ -237,7 +237,7 @@ def plt_time_series_plotly(df:DF, cols:list[str], save_to:str=None, show=True):
     if save_to:
         fig.write_html(save_to)
 
-def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, colorscale='Viridis', size=3, symbol=None) -> Figure:
+def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str=None, colorscale='Viridis', size=3, symbol=None, width=1500, height=1000) -> Figure:
     fig = go.Figure(data=[go.Scatter3d(
         x=df[x],
         y=df[y],
@@ -253,14 +253,12 @@ def plt_3d_df(df: DF, x:str, y:str, z:str, color:str, opacity=0.4, save_path:str
         ),
         
     )])
-    fig = basic_fig_update(fig, x, y, z)
+    fig = basic_fig_update(fig, x, y, z, width, height)
     # fig.update_yaxes(type="log")
 
     if save_path:
         ensure_that_dirs_exist(save_path)
         fig.write_html(save_path)
-
-    fig.show()
 
     return fig
     
@@ -305,12 +303,10 @@ def plot_2d_line(df: pd.DataFrame, x_column: str, y_column: str, line_group_colu
         yaxis_title=y_column,
         legend_title=line_group_column if not color else color
     )
-    
-    # Show the plot
-    fig.show()
+    return fig
 
     
-def basic_fig_update(fig: Figure, x:str, y:str, z:str) -> Figure:
+def basic_fig_update(fig: Figure, x:str, y:str, z:str, width=2000, height=1200) -> Figure:
     return fig.update_layout(
         margin=dict(l=0, r=0, b=0, t=0),
         scene=dict(
@@ -323,6 +319,6 @@ def basic_fig_update(fig: Figure, x:str, y:str, z:str) -> Figure:
                 )
             )
         ),
-        width=2000,  # Adjust width as needed
-        height=1200   # Adjust height as needed
+        width=width,
+        height=height,
     )
