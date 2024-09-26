@@ -56,8 +56,10 @@ def compute_cum_integrals_of_current_vars(vehicle_df: DF) -> DF:
     ### Description:
     Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).
     """
-    vehicle_df["cum_energy"] = cum_integral(vehicle_df["power"], date_series=vehicle_df["date"])
-    vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"], date_series=vehicle_df["date"])
+    if "power" in vehicle_df.columns:
+        vehicle_df["cum_energy"] = cum_integral(vehicle_df["power"], date_series=vehicle_df["date"])
+    if "current" in vehicle_df.columns:
+        vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"], date_series=vehicle_df["date"])
     return vehicle_df
 
 def cum_integral(power_series: Series, date_series=None) -> Series:
@@ -70,7 +72,7 @@ def cum_integral(power_series: Series, date_series=None) -> Series:
     ### Returns:
     df with added column with the name of cum_energy_col in kWh.
     """
-    date_series = date_series or power_series.index.to_series()
+    date_series = power_series.index.to_series() if date_series is None else date_series
     cum_energy_data = integrate.cumulative_trapezoid(
         # Make sure that date time units are in seconds before converting to int
         x=date_series.dt.as_unit("s").astype(int),
@@ -171,7 +173,7 @@ def period_idx_of_mask(vehicle_df:DF, mask_col: str, period_shift:int=1, max_tim
         mask = vehicle_df.eval(f"{mask_col} & sec_time_diff < {max_time_diff.total_seconds()}") 
     else:
         mask = vehicle_df[mask_col]
-    mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False) #| vehicle_df["soc_per_soc"].diff().abs()
+    mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False)
     idx = mask_for_idx.cumsum()
     return idx
 
