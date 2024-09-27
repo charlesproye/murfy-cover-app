@@ -83,4 +83,3 @@ die() {
 
 parse_params "$@"
 main
-
