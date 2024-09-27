@@ -247,7 +247,7 @@ class BMWIngester:
             vehicles.add(Vehicle(
                 vin=clearance.vin,
                 brand=clearance.brand,
-                rate_limit=self.limit_rate,
+                rate_limit=clearance.rate_limit,
                 clearance_status=clearance.clearance_status,
                 licence_plate=clearance.licence_plate,
                 note=clearance.note,
@@ -282,7 +282,7 @@ class BMWIngester:
             Vehicle(
                 vin=clearance.vin,
                 brand=clearance.brand,
-                rate_limit=self.refresh_interval * 60,  # Convert minutes to seconds
+                rate_limit=clearance.rate_limit,
                 clearance_status=clearance.clearance_status,
                 licence_plate=clearance.licence_plate,
                 note=clearance.note,

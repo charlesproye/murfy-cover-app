@@ -1,20 +1,20 @@
 version: '3.8'
 
 services:
-  # bmw_ingestion_service:
-  #   build:
-  #     context: .
-  #     dockerfile: bmw.Dockerfile
-  #   container_name: bmw-ingestion
-  #   env_file:
-  #     - path: ./.env
-  #       required: true
-  #     - path: ./.python.env
-  #       required: true
-  #     - path: ./.args.env
-  #       required: false
-  #   volumes:
-  #     - .:/app
+  bmw_ingestion_service:
+    build:
+      context: .
+      dockerfile: bmw.Dockerfile
+    container_name: bmw-ingestion
+    env_file:
+      - path: ./.env
+        required: true
+      - path: ./.python.env
+        required: true
+      - path: ./.args.env
+        required: false
+    volumes:
+      - .:/app
   hm_ingestion_service:
     build:
       context: .
