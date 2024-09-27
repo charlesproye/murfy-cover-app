@@ -1,25 +1,26 @@
 version: '3.8'
 
 services:
-  hm_ingestion_service: 
-    build: 
-      context: .
-      dockerfile: hm.Dockerfile
-    container_name: hm_ingestion
-    env_file: 
-      - ./.env
-      - ./.python.env
-      # - ./.args.env
-    volumes:
-      - .:/app
-
-  ms_ingestion_service: 
-  hm_ingestion_service: 
+  # bmw_ingestion_service:
+  #   build:
+  #     context: .
+  #     dockerfile: bmw.Dockerfile
+  #   container_name: bmw-ingestion
+  #   env_file:
+  #     - path: ./.env
+  #       required: true
+  #     - path: ./.python.env
+  #       required: true
+  #     - path: ./.args.env
+  #       required: false
+  #   volumes:
+  #     - .:/app
+  hm_ingestion_service:
     build:
       context: .
       dockerfile: hm.Dockerfile
     container_name: hm-ingestion
-    env_file: 
+    env_file:
       - path: ./.env
         required: true
       - path: ./.python.env
@@ -28,14 +29,17 @@ services:
         required: false
     volumes:
       - .:/app
-  ms_ingestion_service: 
+  ms_ingestion_service:
     build:
       context: .
       dockerfile: mobilisights.Dockerfile
     container_name: ms-ingestion
-    env_file: 
-      - ./.env
-      - ./.python.env
-      # - ./.args.env
+    env_file:
+      - path: ./.env
+        required: true
+      - path: ./.python.env
+        required: true
+      - path: ./.args.env
+        required: false
     volumes:
       - .:/app
