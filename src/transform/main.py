@@ -27,8 +27,8 @@ async def main(start_scheduler: bool = True):
     #### Daily
 
     for brand in HANDLED_BRANDS: #each job needs to be run one after the other 
-        # await HighMobilityRawTS(brand).add_to_schedule(scheduler)
-        await HighMobilityProcessedTS(brand).add_to_schedule(scheduler)
+        await HighMobilityRawTS(brand).add_to_schedule(scheduler)
+        # await HighMobilityProcessedTS(brand).add_to_schedule(scheduler)
 
     ## Pour Mobilisight
     # await HighMobilityRawTS("stellantis").add_to_schedule(scheduler)
