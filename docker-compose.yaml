@@ -1,18 +1,25 @@
-version: '3.8'
+# version: '3.8'
 
 services:
+  tesla_ingestion_service:
+    build:
+      context: .
+      dockerfile: tesla.Dockerfile
+    container_name: tesla-ingestion
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
   bmw_ingestion_service:
     build:
       context: .
       dockerfile: bmw.Dockerfile
     container_name: bmw-ingestion
     env_file:
-      - path: ./.env
-        required: true
-      - path: ./.python.env
-        required: true
-      - path: ./.args.env
-        required: false
+      - ./.env
+      - ./.python.env
+      # - ./.args.env
     volumes:
       - .:/app
   hm_ingestion_service:
@@ -21,12 +28,9 @@ services:
       dockerfile: hm.Dockerfile
     container_name: hm-ingestion
     env_file:
-      - path: ./.env
-        required: true
-      - path: ./.python.env
-        required: true
-      - path: ./.args.env
-        required: false
+      - ./.env
+      - ./.python.env
+      # - ./.args.env
     volumes:
       - .:/app
   ms_ingestion_service:
@@ -35,11 +39,13 @@ services:
       dockerfile: mobilisights.Dockerfile
     container_name: ms-ingestion
     env_file:
-      - path: ./.env
-        required: true
-      - path: ./.python.env
-        required: true
-      - path: ./.args.env
-        required: false
+      - ./.env
+      - ./.python.env
+      # - ./.args.env
     volumes:
       - .:/app
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"

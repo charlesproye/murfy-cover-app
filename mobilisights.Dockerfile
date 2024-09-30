@@ -1,16 +1,24 @@
-# Use the latest micromamba image (lighter than miniconda)
-FROM mambaorg/micromamba:latest as conda
+# Utiliser la dernière image Miniconda3
+FROM continuumio/miniconda3:latest
 
+# Définir quelques variables d'environnement
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100
+
+# Copier votre application dans le conteneur
+COPY . /app/
 WORKDIR /app
 
-# Create environment
-COPY --chown=$MAMBA_USER:$MAMBA_USER ingestion.conda-lock.yaml /tmp/conda-lock.yaml
-RUN micromamba install -y -n base -f /tmp/conda-lock.yaml && \
-    micromamba clean --all --yes
+# Installer les dépendances
+RUN conda update -n base -c defaults conda
+RUN conda env update --prune -n base -f ingestion.conda-env.yaml
+RUN chmod +x ./start_tesla.sh
 
-COPY . .
+# Définir le shell par défaut pour utiliser conda
+SHELL ["/bin/bash", "-c"]
 
-ARG MAMBA_DOCKERFILE_ACTIVATE=1  # (otherwise python will not be found)
-# Start the application
+# Démarrer l'application
 CMD ["./start_mobilisights.sh"]
-
