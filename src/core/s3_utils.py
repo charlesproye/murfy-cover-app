@@ -52,14 +52,14 @@ class S3_Bucket():
         #     key += ".parquet"
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
 
-    def list_keys(self, key_prefix:str="") -> list[str]:
+    def list_keys(self, key_prefix:str="") -> Series:
         """
         ### Description:
-        Returns a list of the keys present in the bucket.
+        Returns a pandas Series of the keys present in the bucket.
         ### Parameters:
         key_prefix: A string representing the prefix to filter the keys. If None, all keys will be listed.
         ### Returns:
-        A list of keys present in the bucket.
+        A pandas Series of keys present in the bucket.
         """
         paginator = self._s3_client.get_paginator('list_objects_v2')
         page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=key_prefix)
@@ -75,7 +75,9 @@ class S3_Bucket():
                     if obj["Key"] != key_prefix:
                         keys.append(obj['Key'])
 
-        return keys
+        keys_as_series = Series(keys, dtype="string")
+
+        return keys_as_series
 
     def read_parquet_df(self, key:str) -> DF|Series:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
