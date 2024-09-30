@@ -44,7 +44,7 @@ def main():
 
 def schedule_vehicle_jobs(vehicle_ids, access_token_key, refresh_token_key):
     for vehicle_id in vehicle_ids:
-        schedule.every(10).seconds.do(
+        schedule.every(240).seconds.do(
             job, vehicle_id, access_token_key, refresh_token_key
         ).tag(vehicle_id)
 
