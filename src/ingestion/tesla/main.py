@@ -4,7 +4,7 @@ import time
 import logging
 from dotenv import load_dotenv
 from data_fetcher import fetch_all_vehicle_ids, job
-from utils import setup_logging
+from data_utils import setup_logging
 import json
 from s3_handler import compress_data
 

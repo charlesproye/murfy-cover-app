@@ -3,11 +3,15 @@ import time
 import logging
 import os
 import redis
+import random
 
 # Configuration Redis
 redis_host = os.environ.get('REDIS_HOST', 'redis')
 redis_port = int(os.environ.get('REDIS_PORT', 6379))
 redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+
+MAX_WAKE_UP_ATTEMPTS = 5
+WAKE_UP_WAIT_TIME = 12  # seconds
 
 def setup_logging():
     logging.basicConfig(
@@ -55,18 +59,13 @@ def get_token(token_key):
         logging.error(f"Failed to retrieve token from Redis: {str(e)}")
         return None
 
+def exponential_backoff(attempt, base_delay=5, max_delay=300):
+    delay = min(base_delay * (2 ** attempt), max_delay)
+    return delay + random.uniform(0, delay * 0.1)  # Ajoute un peu de "jitter"
+
 def wake_up_vehicle(access_token, vehicle_id):
-    max_attempts = 3
-    attempt = 0
-    delay = 5  # Délai initial entre les tentatives en secondes
-
-    while attempt < max_attempts:
-        current_time = time.time()
-        if hasattr(wake_up_vehicle, 'last_wake_up_time') and vehicle_id in wake_up_vehicle.last_wake_up_time:
-            if (current_time - wake_up_vehicle.last_wake_up_time[vehicle_id]) < 60:
-                logging.info(f"Vehicle {vehicle_id} was recently woken up. Skipping wake up.")
-                return True
-
+    attempts = 0
+    while attempts < MAX_WAKE_UP_ATTEMPTS:
         url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/wake_up"
         headers = {'Authorization': f'Bearer {access_token}'}
         
@@ -75,25 +74,39 @@ def wake_up_vehicle(access_token, vehicle_id):
             
             if response.status_code == 200:
                 logging.info(f"Vehicle {vehicle_id} woken up successfully.")
-                if not hasattr(wake_up_vehicle, 'last_wake_up_time'):
-                    wake_up_vehicle.last_wake_up_time = {}
-                wake_up_vehicle.last_wake_up_time[vehicle_id] = current_time
                 return True
             elif response.status_code == 408:
-                logging.warning(f"Timeout while waking up vehicle {vehicle_id}. Attempt {attempt + 1}/{max_attempts}")
+                logging.warning(f"Timeout while waking up vehicle {vehicle_id}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")
             elif response.status_code == 429:
-                logging.warning(f"Rate limit exceeded while trying to wake up vehicle {vehicle_id}. Attempt {attempt + 1}/{max_attempts}")
+                logging.warning(f"Rate limit exceeded while trying to wake up vehicle {vehicle_id}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")
                 return 'rate_limit'
             else:
-                logging.error(f"Failed to wake up vehicle {vehicle_id}: HTTP {response.status_code}. Attempt {attempt + 1}/{max_attempts}")
+                logging.error(f"Failed to wake up vehicle {vehicle_id}: HTTP {response.status_code}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")
         
         except requests.exceptions.RequestException as e:
-            logging.error(f"Network error while trying to wake up vehicle {vehicle_id}: {e}. Attempt {attempt + 1}/{max_attempts}")
+            logging.error(f"Network error while trying to wake up vehicle {vehicle_id}: {e}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")
         
-        attempt += 1
-        if attempt < max_attempts:
+        attempts += 1
+        if attempts < MAX_WAKE_UP_ATTEMPTS:
+            delay = exponential_backoff(attempts)
+            logging.info(f"Waiting {delay:.2f} seconds before next wake-up attempt.")
             time.sleep(delay)
-            delay *= 2  # Augmentation exponentielle du délai
 
-    logging.error(f"Failed to wake up vehicle {vehicle_id} after {max_attempts} attempts.")
+    logging.error(f"Failed to wake up vehicle {vehicle_id} after {MAX_WAKE_UP_ATTEMPTS} attempts.")
     return False
+
+def get_vehicle_state(access_token, vehicle_id):
+    url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}"
+    headers = {'Authorization': f'Bearer {access_token}'}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data['response']['state']
+        else:
+            logging.error(f"Failed to get vehicle state: HTTP {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Network error while getting vehicle state: {e}")
+        return None
