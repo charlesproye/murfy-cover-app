@@ -30,3 +30,9 @@ DEFAULT_CHARGING_POINTS_PLT_KWARGS = {
 }
 
 SOH_LOST_PER_KM_DUMMY_RATIO = 0.000028
+
+# Ayvens related *should* be removed.
+KEY_LIST_COLUMN_NAMES = [ "key", "dtype_folder", 'brand', "vin", "file"]
+EMTPY_S3_KEYS_WARNING_MSG = """
+No responses found in {keys_prefix}.
+"""
