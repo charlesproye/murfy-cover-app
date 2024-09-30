@@ -11,7 +11,7 @@ class Vehicle:
     note: Optional[str] = None
     contract_end_date: Optional[str] = None
     added_to_fleet: Optional[str] = None
-    rate_limit: int = 120
+    rate_limit: int = 20
 
     def __eq__(self, value: object, /) -> bool:
         if isinstance(value, Vehicle):
