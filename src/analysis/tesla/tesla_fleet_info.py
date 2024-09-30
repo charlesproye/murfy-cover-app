@@ -41,4 +41,4 @@ def find_in_list_of_dict(raw_vehicle_info_dict: dict, target_key_perfix):
 if __name__ == "__main__":
     main()
 
-fleet_info_df = pd.read_parquet(INITIAL_FLEET_INFO_PATH)
+fleet_info_df = get_fleet_info()
