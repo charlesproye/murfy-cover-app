@@ -1,28 +1,41 @@
-from glob import glob
 import logging
 
 import pandas as pd
 from pandas import DataFrame as DF
+from rich import print
 
-from core.console_utils import main_decorator
-from core.caching_utils import singleton_data_caching
-
-from test import test
+from core.s3_utils import S3_Bucket
 
 logger = logging.getLogger(__name__)
 
+def parse_all_responses_as_raw_tss() -> DF:
+    bucket = S3_Bucket()
+    keys = bucket.list_responses_keys_of_brand("BMW")
+    return pd.concat([parse_response_as_raw_ts(key, bucket) for _, key in keys.iterrows()])
 
-
-def get_raw_tss(api_response: dict) -> DF:
-    raw_tss = DF.from_dict(api_response["data"], ).astype({"unit": "string", "key": "string", })
-    unit_not_none = raw_tss["unit"].notna()
-    # units_with_underscore = 
-    # raw_tss.loc[unit_not_none, "key"] += "_" + raw_tss.loc[unit_not_none, "unit"]
-    return (
-        raw_tss
-        .pipe(pd.pivot_table, columns="key", values="value", index="date_of_value", aggfunc="first")
+def parse_response_as_raw_ts(key:str, bucket:S3_Bucket) -> DF:
+    api_response = bucket.read_json_file(key["key"])                            # The json response contains a "data" key who's values are a list of dicts.
+    raw_ts = DF.from_dict(api_response["data"])                                 # The dicts have a "key" and "value" items.
+    unit_not_none = raw_ts["unit"].notna()                                      # They also have a "unit" item but not all of them are not null.
+    raw_ts.loc[unit_not_none, "key"] += "_" + raw_ts.loc[unit_not_none, "unit"] # So we append that "unit" to the key only if the "unit" is not none.
+    raw_ts = (
+        raw_ts
+        .pipe(
+            pd.pivot_table,                                                     
+            columns="key",
+            values="value",
+            index="date_of_value",
+            aggfunc="first"
+        )
+        .assign(vin=key["vin"])
+        .reset_index(drop=False)
     )
+    
+    return raw_ts
 
-
+    
 if __name__ == "__main__":
-    print(get_raw_tss(test))
+    raw_tss = parse_all_responses_as_raw_tss()
+    print(raw_tss)
+    print(type(raw_tss))
+
