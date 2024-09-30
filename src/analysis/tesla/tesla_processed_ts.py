@@ -33,7 +33,7 @@ def get_processed_tss() -> DF:
             "battery_level": "soc",
         })
         .eval("in_charge = charging_state == 'Charging'")
-        .eval("in_dishcarge = charging_state == 'Disconnected'")
+        .eval("in_discharge = charging_state == 'Disconnected'")
         .groupby("vin")
         .apply(process_ts, include_groups=False)
     )
@@ -55,7 +55,7 @@ def process_ts(raw_ts:DF) -> DF:
         .sort_values(by="date")
         .pipe(compute_cum_integrals_of_current_vars)
         .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_dishcarge")
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
         .assign(energy_diff=lambda df: df["cum_energy"].diff())
     )
 
