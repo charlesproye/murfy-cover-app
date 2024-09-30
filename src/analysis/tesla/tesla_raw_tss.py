@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 def main():
     raw_tss = get_raw_tss(force_update=True)
     print(raw_tss)
-    print("total MB memory usage:", total_MB_memory_usage(raw_tss))
+    print(*raw_tss.columns, sep="\n")
+    print(f"total memory usage: {total_MB_memory_usage(raw_tss):.2f}MB")
 
 @singleton_data_caching(RAW_TSS_PATH)
 def get_raw_tss() -> DF:

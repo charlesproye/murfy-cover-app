@@ -7,6 +7,7 @@ JSON_FLEET_INFO_RESPONSE_PATH = join(dirname(__file__), "data_cache/api_response
 INITIAL_FLEET_INFO_PATH = join(dirname(__file__), "data_cache/initial_fleet_info.parquet")
 TS_RESPONSES_REGEX_PATH = join(dirname(__file__), "data_cache/api_responses/*.csv")
 RAW_TSS_PATH = join(dirname(__file__), "data_cache/raw_tss.parquet")
+PROCESSED_TSS_PATH = join(dirname(__file__), "data_cache/processed_tss.parquet")
 
 CHARGING_POINTS_GRP_BY_SOC_QUANTIZATION = 2
 
