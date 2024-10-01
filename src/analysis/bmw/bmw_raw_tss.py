@@ -1,12 +1,8 @@
-import logging
-
 import pandas as pd
 from pandas import DataFrame as DF
-from rich import print
 
 from core.s3_utils import S3_Bucket
-
-logger = logging.getLogger(__name__)
+from core.console_utils import single_dataframe_script_main
 
 def parse_all_responses_as_raw_tss() -> DF:
     bucket = S3_Bucket()
@@ -35,7 +31,5 @@ def parse_response_as_raw_ts(key:str, bucket:S3_Bucket) -> DF:
 
     
 if __name__ == "__main__":
-    raw_tss = parse_all_responses_as_raw_tss()
-    print(raw_tss)
-    print(type(raw_tss))
+    single_dataframe_script_main(parse_all_responses_as_raw_tss)
 

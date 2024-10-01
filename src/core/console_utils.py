@@ -1,28 +1,14 @@
 from argparse import ArgumentParser, REMAINDER
 import ast
-import logging
+from typing import Callable
 
-# from rich import print
+from pandas import DataFrame as DF
 from rich.traceback import install as install_rich_traceback
+from rich import print
 
-logger = logging.getLogger(__name__)
+from core.pandas_utils import total_MB_memory_usage
 
-def get_src_dst_pairs_args(description: str=""):
-    # arguments parsning
-    parser = ArgumentParser(description=description)
-    parser.add_argument("file_pairs", nargs='+', help="Pairs of read and write file paths. Each pair must consist of a read path followed by a write path.")
-    args = parser.parse_args()
-
-    if len(args.file_pairs) % 2 != 0:
-        parser.error("File paths must be provided in pairs of two: a read file followed by a write file.")
-    if len(args.file_pairs) < 2:
-        parser.error("At least one pair of read and write file paths must be provided.")
-        
-    ext_ref_files = args.file_pairs[::2]
-    dest_files = args.file_pairs[1::2]
-
-    return ext_ref_files, dest_files
-
+# TODO: Remove parse_kwargs
 def parse_kwargs(mandatory_args: list = [], optional_args: dict = {}, **kwargs):
     # Set up argparse to accept known arguments
     parser = ArgumentParser(**kwargs)
@@ -63,17 +49,23 @@ def parse_kwargs(mandatory_args: list = [], optional_args: dict = {}, **kwargs):
     # Combine known_args_dict with parsed_kwargs
     return {**parsed_kwargs, **known_args_dict}
 
-
 def main_decorator(main_func):
     """
     ### Description:
-    This decorator calls the rich.traceback install function to get better looking tracebacks.  
+    This decorator calls the rich.traceback install function to get better looking tracebacks.
     It also catches KeyboardInterrupt exception to quit properly.
     """
-    def wrapper():
+    def wrapper(*args, **kwargs):  # Accept arbitrary positional and keyword arguments
         install_rich_traceback(extra_lines=0, width=130)
         try:
-            main_func()
+            main_func(*args, **kwargs)  # Pass the arguments to the original function
         except KeyboardInterrupt:
-            logger.info("KeyboardInterrupt, exiting...")
+            print("[blue]KeyboardInterrupt, exiting...")
     return wrapper
+
+@main_decorator
+def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], **kwargs):
+    df:DF = dataframe_gen(**kwargs)
+    print(df)
+    print(*df.columns, sep="\n")
+    print(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
