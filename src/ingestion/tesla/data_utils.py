@@ -78,7 +78,7 @@ async def wake_up_vehicle(access_token, vehicle_id):
     attempts = 0
     while attempts < MAX_WAKE_UP_ATTEMPTS:
         url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/wake_up"
-        headers = {'Authorization': f'Bearer {access_token}'}
+        headers = {'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json'}
         
         try:
             async with aiohttp.ClientSession() as session:
