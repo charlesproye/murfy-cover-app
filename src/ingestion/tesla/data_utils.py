@@ -10,7 +10,8 @@ import aiohttp
 # Configuration Redis
 redis_host = os.environ.get('REDIS_HOST', 'redis')
 redis_port = int(os.environ.get('REDIS_PORT', 6379))
-redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+redis_password = os.environ.get('REDIS_PASSWORD')
+redis_client = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
 
 MAX_WAKE_UP_ATTEMPTS = 5
 WAKE_UP_WAIT_TIME = 12  # seconds

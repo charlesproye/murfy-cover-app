@@ -61,6 +61,10 @@ services:
       - redis_data:/data
     ports:
       - "6379:6379"
+    env_file:
+      - ./.env
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     deploy:
       restart_policy:
         condition: on-failure
