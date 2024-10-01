@@ -3,9 +3,11 @@ from pandas import DataFrame as DF
 
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
+from core.caching_utils import singleton_s3_data_caching
+from analysis.bmw.bmw_constants import *
 
-def parse_all_responses_as_raw_tss() -> DF:
-    bucket = S3_Bucket()
+@singleton_s3_data_caching(BMW_RAW_TSS_KEY)
+def get_raw_tss(bucket: S3_Bucket) -> DF:
     keys = bucket.list_responses_keys_of_brand("BMW")
     return pd.concat([parse_response_as_raw_ts(key, bucket) for _, key in keys.iterrows()])
 
@@ -31,5 +33,9 @@ def parse_response_as_raw_ts(key:str, bucket:S3_Bucket) -> DF:
 
     
 if __name__ == "__main__":
-    single_dataframe_script_main(parse_all_responses_as_raw_tss)
+    single_dataframe_script_main(
+        get_raw_tss,
+        bucket=S3_Bucket(),
+        force_update=False,
+    )
 
