@@ -70,8 +70,3 @@ def ensure_that_dirs_exist(path:str):
     if not exists(dir_path):
         makedirs(dir_path)
 
-def iterate_over_data_cache_folder(regex_exp: str, track=True):
-    iterator = track(glob(f"{regex_exp}*")) if track else glob(f"{regex_exp}*")
-    for file in iterator:
-        vin = file.split(".")[0]
-        yield vin, pd.read_parquet(file)
