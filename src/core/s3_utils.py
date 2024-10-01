@@ -11,6 +11,7 @@ import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
 from rich import print
+import botocore
 
 from core.constants import *
 from core.pandas_utils import str_split_and_retain_src
@@ -49,10 +50,28 @@ class S3_Bucket():
     def save_df_as_parquet(self, pandas_obj:Series|DF, key:str):
         out_buffer = BytesIO()
         pandas_obj.to_parquet(out_buffer)
-        # Ensure that key ends with .parquet
-        # if not key.endswith(".parquet"):
-        #     key += ".parquet"
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
+
+    def check_file_exists(self, key: str) -> bool:
+        """
+        Checks if a file (key) exists in the S3 bucket.
+
+        :param key: The S3 key (path) to check.
+        :return: True if the file exists, False otherwise.
+        """
+        try:
+            # Attempt to retrieve metadata of the object
+            self._s3_client.head_object(Bucket=self.bucket_name, Key=key)
+            return True  # If no exception, the key exists
+        except Exception as e:
+            # Check if the error code is 404, which means the key does not exist
+            if e.response['Error']['Code'] == '404':
+                self.logger.info(f"File '{key}' does not exist in bucket '{self.bucket_name}'.")
+                return False
+            else:
+                # Re-raise any other exceptions
+                self.logger.error(f"Error checking if file exists: {e}")
+                raise e
 
     def list_responses_keys_of_brand(self, brand:str="") -> DF:
         """
