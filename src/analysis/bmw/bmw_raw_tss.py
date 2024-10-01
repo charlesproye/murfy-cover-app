@@ -15,7 +15,7 @@ def parse_response_as_raw_ts(key:str, bucket:S3_Bucket) -> DF:
     api_response = bucket.read_json_file(key["key"])                            # The json response contains a "data" key who's values are a list of dicts.
     raw_ts = DF.from_dict(api_response["data"])                                 # The dicts have a "key" and "value" items.
     unit_not_none = raw_ts["unit"].notna()                                      # They also have a "unit" item but not all of them are not null.
-    raw_ts.loc[unit_not_none, "key"] += "_" + raw_ts.loc[unit_not_none, "unit"] # So we append that "unit" to the key only if the "unit" is not none.
+    raw_ts.loc[unit_not_none, "key"] += "_" + raw_ts.loc[unit_not_none, "unit"] # So we append "_" + "unit" to the key only if the "unit" is not none.
     raw_ts = (
         raw_ts
         .pipe(
