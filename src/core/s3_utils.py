@@ -2,7 +2,6 @@ from typing import Any
 import os
 from io import BytesIO, StringIO
 from dotenv import load_dotenv
-import cbor2
 import json
 import logging
 
@@ -144,10 +143,4 @@ class S3_Bucket():
 
         return parsed_object
     
-    def read_cbor(self, key:str):
-        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-        object_content = response["Body"].read()
-        obj = cbor2.loads(object_content)
-
-        return obj
 
