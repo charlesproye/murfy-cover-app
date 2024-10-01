@@ -36,6 +36,6 @@ if __name__ == "__main__":
     single_dataframe_script_main(
         get_raw_tss,
         bucket=S3_Bucket(),
-        force_update=False,
+        force_update=True,
     )
 
