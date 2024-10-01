@@ -1,5 +1,6 @@
 # For now leave BMW in capital as bmw is used for the data provided by high mobility.
 BMW_RAW_TSS_KEY = "raw_ts/BMW/raw_tss.parquet"
+BMW_RAW_TSS_KEY_WITHOUT_UNITS = "raw_ts/BMW/raw_tss_without_units.parquet"
 
 VARIABLES_THAT_WE_ASKED_FOR = [
     {'key_type': 'VEHICLE', 'key_name': 'battery_voltage', 'unit': 'float', 'update_interval': 'CURRENT'},
