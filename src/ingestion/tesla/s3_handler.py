@@ -4,8 +4,13 @@ import boto3
 from botocore.exceptions import ClientError
 import logging
 from datetime import datetime, timedelta
+import asyncio
 
-def save_data_to_s3(data, vehicle_id):
+async def save_data_to_s3(data, vehicle_id):
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _save_data_to_s3, data, vehicle_id)
+
+def _save_data_to_s3(data, vehicle_id):
     s3 = boto3.client(
         's3',
         region_name=os.getenv("S3_REGION"),
@@ -28,7 +33,11 @@ def save_data_to_s3(data, vehicle_id):
     except ClientError as e:
         logging.error(f"Error writing to S3: {e}")
 
-def compress_data():
+async def compress_data():
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _compress_data)
+
+def _compress_data():
     s3 = boto3.client(
         's3',
         region_name=os.getenv("S3_REGION"),

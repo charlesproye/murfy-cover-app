@@ -1,5 +1,5 @@
 import argparse
-import schedule
+import asyncio
 import time
 import os
 import logging
@@ -12,12 +12,12 @@ from s3_handler import compress_data
 # Global variables to store account information
 accounts_info = []
 
-def main():
+async def main():
     setup_logging()
     load_dotenv()
 
     if os.getenv("TESLA_COMPRESS") == "1":
-        compression_task()
+        await compression_task()
         logging.info("Compression task enabled")
     else:
         logging.info("Compression task disabled")
@@ -29,6 +29,7 @@ def main():
     global accounts_info
     accounts_info = json.loads(args.accounts)
 
+    tasks = []
     for account in accounts_info:
         access_token_key = account['access_token_key']
         refresh_token_key = account['refresh_token_key']
@@ -36,34 +37,24 @@ def main():
         vehicle_id = account.get('vehicle_id')
 
         if professional_account:
-            vehicle_ids = fetch_all_vehicle_ids(access_token_key, refresh_token_key)
+            vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key)
         else:
             vehicle_ids = [vehicle_id]
 
         account['vehicle_ids'] = vehicle_ids
-        schedule_vehicle_jobs(vehicle_ids, access_token_key, refresh_token_key)
+        tasks.extend([process_vehicle(vid, access_token_key, refresh_token_key) for vid in vehicle_ids])
 
-    schedule.every().day.at("00:00").do(compression_task)
+    await asyncio.gather(*tasks)
 
+async def process_vehicle(vehicle_id, access_token_key, refresh_token_key):
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        await job(vehicle_id, access_token_key, refresh_token_key)
+        await asyncio.sleep(240)
 
-def schedule_vehicle_jobs(vehicle_ids, access_token_key, refresh_token_key):
-    for vehicle_id in vehicle_ids:
-        schedule.every(240).seconds.do(
-            job, vehicle_id, access_token_key, refresh_token_key
-        ).tag(vehicle_id)
-
-def compression_task():
+async def compression_task():
     logging.info("Starting compression task")
-    schedule.clear()
-    compress_data()
+    await compress_data()
     logging.info("Compression task completed")
-    
-    # Reschedule all vehicle jobs
-    for account in accounts_info:
-        schedule_vehicle_jobs(account['vehicle_ids'], account['access_token_key'], account['refresh_token_key'])
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
