@@ -31,7 +31,6 @@ def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_token_key
         
         if wake_up_result == True:
             logging.info(f"Vehicle {vehicle_id} woken up successfully. Waiting {WAKE_UP_WAIT_TIME} seconds before retrying.")
-            time.sleep(WAKE_UP_WAIT_TIME)
             return 'job_retry'
         elif wake_up_result == 'rate_limit':
             logging.warning(f"Rate limit hit during wake up for vehicle {vehicle_id}.")
