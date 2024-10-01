@@ -11,6 +11,9 @@ services:
       - ./.python.env
     volumes:
       - .:/app
+    depends_on:
+      - redis
+
   bmw_ingestion_service:
     build:
       context: .
@@ -19,9 +22,11 @@ services:
     env_file:
       - ./.env
       - ./.python.env
-      # - ./.args.env
     volumes:
       - .:/app
+    depends_on:
+      - redis
+
   hm_ingestion_service:
     build:
       context: .
@@ -30,9 +35,11 @@ services:
     env_file:
       - ./.env
       - ./.python.env
-      # - ./.args.env
     volumes:
       - .:/app
+    depends_on:
+      - redis
+
   ms_ingestion_service:
     build:
       context: .
@@ -41,11 +48,23 @@ services:
     env_file:
       - ./.env
       - ./.python.env
-      # - ./.args.env
     volumes:
       - .:/app
+    depends_on:
+      - redis
+
   redis:
     image: redis:alpine
-    container_name: redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_data:/data
     ports:
       - "6379:6379"
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  redis_data:
+    driver: local

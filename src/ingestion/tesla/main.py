@@ -1,6 +1,7 @@
 import argparse
 import schedule
 import time
+import os
 import logging
 from dotenv import load_dotenv
 from data_fetcher import fetch_all_vehicle_ids, job
@@ -14,6 +15,12 @@ accounts_info = []
 def main():
     setup_logging()
     load_dotenv()
+
+    if os.getenv("TESLA_COMPRESS") == "1":
+        compression_task()
+        logging.info("Compression task enabled")
+    else:
+        logging.info("Compression task disabled")
 
     parser = argparse.ArgumentParser(description="Fetch and save Tesla vehicle data.")
     parser.add_argument("--accounts", required=True, type=str, help="JSON string containing account information")
