@@ -38,7 +38,7 @@ def instance_data_caching_wrapper(vin: str, path_to_cache: str, data_gen_func: C
 def singleton_s3_data_caching(path: str):
     def decorator(data_gen_func: Callable[..., pd.DataFrame]):
         @wraps(data_gen_func)
-        def wrapper(*args, bucket: S3_Bucket, force_update=False, **kwargs) -> pd.DataFrame:
+        def wrapper(*args, bucket: S3_Bucket=S3_Bucket(), force_update=False, **kwargs) -> pd.DataFrame:
             # Ensure the extension is . 
             assert path.endswith(".parquet"), PATH_DOESNT_END_IN_PARQUET.format(path=path)
             # Check if we need to update the cache or if the cache does not exist
