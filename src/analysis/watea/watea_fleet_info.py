@@ -12,7 +12,7 @@ from rich import print
 from rich.progress import track
 
 from core.caching_utils import save_cache_to
-from watea.watea_constants import *
+from analysis.watea.watea_constants import *
 
 def main():
     fleet_info_df = compute_fleet_info()
@@ -27,7 +27,7 @@ def iterate_over_ids(query_str:str=None, use_progress_track=True, track_kwargs={
         
 
 def compute_fleet_info() -> DF:
-    from watea.processed_watea_ts import process_raw_time_series
+    from analysis.watea.processed_watea_ts import process_raw_time_series
 
     fleet_info_dicts: list[dict] = []
     for file in track(glob(path.join(PATH_TO_RAW_TS_FOLDER, "*.snappy.parquet"))):
@@ -65,8 +65,9 @@ if __name__ == "__main__":
     main()
 
 fleet_info_df: DF
-if path.exists(PATH_TO_FLEET_INFO_DF.format(extension="parquet")):
-    fleet_info_df = pd.read_parquet(PATH_TO_FLEET_INFO_DF.format(extension="parquet"))
+fleet_info_cache_path = path.join(path.dirname(__file__), PATH_TO_FLEET_INFO_DF.format(extension="parquet"))
+if path.exists(fleet_info_cache_path):
+    fleet_info_df = pd.read_parquet(fleet_info_cache_path)
 else:
-    print("[yellow]Warning:", "No fleet info df cached at", f"[blue]{PATH_TO_FLEET_INFO_DF.format(extension='parquet')}")
+    print("[yellow]Warning:", "No fleet info df cached at", f"[blue]{fleet_info_cache_path}")
 

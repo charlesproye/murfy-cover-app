@@ -1,5 +1,5 @@
 from datetime import timedelta as TD
-from os.path import join
+from os.path import join, dirname
 import pandas as pd
 
 import numpy as np
@@ -15,13 +15,13 @@ FORD_ETRANSIT_DEFAULT_RANGE = 317
 FORD_ETRANSIT_DEFAULT_KM_PER_SOC = FORD_ETRANSIT_DEFAULT_RANGE / 100
 
 # paths
-PATH_TO_RAW_TS_FOLDER = "data_cache/raw_time_series"
-PATH_TO_RAW_TS = join(PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
-PATH_TO_PROCESSED_TS = "data_cache/processed_time_series/{id}.parquet"
-PATH_TO_FLEET_INFO_DF = "data_cache/fleet_info/fleet_info_df.{extension}"
-PATH_TO_RAW_FLEET_CHARGING_POINTS = "data_cache/soh_estimation/raw_fleet_charging_points.parquet"
-PATH_TO_PREPROCESSED_FLEET_CHARGING_POINTS = "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet"
-PATH_TO_PROCESSED_CLUSTER = "data_cache/soh_estimation/processed_cluster.parquet"
+PATH_TO_RAW_TS_FOLDER = join(dirname(__file__), "data_cache/raw_time_series")
+PATH_TO_RAW_TS = join(dirname(__file__), PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
+PATH_TO_PROCESSED_TS = join(dirname(__file__), "data_cache/processed_time_series/{id}.parquet")
+PATH_TO_FLEET_INFO_DF = join(dirname(__file__), "data_cache/fleet_info/fleet_info_df.{extension}")
+PATH_TO_RAW_FLEET_CHARGING_POINTS = join(dirname(__file__), "data_cache/soh_estimation/raw_fleet_charging_points.parquet")
+PATH_TO_PREPROCESSED_FLEET_CHARGING_POINTS = join(dirname(__file__), "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet")
+PATH_TO_PROCESSED_CLUSTER = join(dirname(__file__), "data_cache/soh_estimation/processed_cluster.parquet")
 # recording dependant constants
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 
