@@ -114,7 +114,6 @@ async def process_vehicle(account):
             logging.info(f"Processing vehicle {vid}")
             try:
                 await job(vid, access_token_key, refresh_token_key)
-                logging.info(f"Data saved for vehicle {vid}")
             except Exception as e:
                 logging.error(f"Error processing vehicle {vid}: {str(e)}")
             
