@@ -57,22 +57,29 @@ def _compress_data():
         # List all files in temp folder
         temp_files = s3.list_objects_v2(Bucket=bucket_name, Prefix=temp_folder)
         
-        all_data = []
+        data_by_date = {}
         for obj in temp_files.get('Contents', []):
             file_key = obj['Key']
             file_content = s3.get_object(Bucket=bucket_name, Key=file_key)['Body'].read().decode('utf-8')
-            all_data.append(json.loads(file_content))
+            file_data = json.loads(file_content)
+            
+            # Extract readable_date from file content
+            readable_date = file_data.get('readable_date', yesterday)
+            if readable_date not in data_by_date:
+                data_by_date[readable_date] = []
+            data_by_date[readable_date].append(file_data)
             
             # Delete the temp file
             s3.delete_object(Bucket=bucket_name, Key=file_key)
         
-        # Save compressed data
-        compressed_file_key = f"response/tesla/{vehicle_id}/{yesterday}.json"
-        s3.put_object(
-            Bucket=bucket_name,
-            Key=compressed_file_key,
-            Body=json.dumps(all_data, indent=2),
-            ContentType='application/json'
-        )
-        
-        logging.info(f"Data compressed and saved for vehicle {vehicle_id} on {yesterday}")
+        # Save compressed data for each date
+        for date, all_data in data_by_date.items():
+            compressed_file_key = f"response/tesla/{vehicle_id}/{date}.json"
+            s3.put_object(
+                Bucket=bucket_name,
+                Key=compressed_file_key,
+                Body=json.dumps(all_data, indent=2),
+                ContentType='application/json'
+            )
+            
+            logging.info(f"Data compressed and saved for vehicle {vehicle_id} on {date}")
