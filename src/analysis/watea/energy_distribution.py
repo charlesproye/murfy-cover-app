@@ -5,7 +5,6 @@ from pandas import DataFrame as DF
 from pandas import Series
 import pandas as pd
 import numpy as np
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 
@@ -14,8 +13,6 @@ from core.caching_utils import singleton_data_caching
 from analysis.watea.watea_constants import *
 from analysis.watea.watea_fleet_info import fleet_info_df
 from analysis.watea.processed_watea_ts import processed_ts_it
-
-# soh estimation evaluation
 
 # soh estimation
 @singleton_data_caching(PATH_TO_PROCESSED_CLUSTER)
@@ -68,7 +65,7 @@ def get_preprocessed_charging_points(force_update_extraction=True) -> DF:
         .pipe(compute_umap_features)
         .pipe(segment_charing_regimes)
     )
-    
+
 def segment_charing_regimes(charging_points: DF) -> DF:
     dbscan = DBSCAN(eps=0.5, min_samples=5, metric='euclidean', n_jobs=-1)
     umap_feature_cols = charging_points.filter(regex='umap_feature_').columns
