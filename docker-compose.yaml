@@ -1,26 +1,70 @@
-version: '3.8'
+# version: '3.8'
 
 services:
-  hm_ingestion_service: 
-    build: 
+  tesla_ingestion_service:
+    build:
       context: .
-      dockerfile: hm.Dockerfile
-    container_name: hm_ingestion
-    env_file: 
+      dockerfile: tesla.Dockerfile
+    container_name: tesla-ingestion
+    env_file:
       - ./.env
       - ./.python.env
-      # - ./.args.env
     volumes:
       - .:/app
+    depends_on:
+      - redis
 
-  ms_ingestion_service: 
+  bmw_ingestion_service:
+    build:
+      context: .
+      dockerfile: bmw.Dockerfile
+    container_name: bmw-ingestion
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+
+  hm_ingestion_service:
+    build:
+      context: .
+      dockerfile: hm.Dockerfile
+    container_name: hm-ingestion
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+
+  ms_ingestion_service:
     build:
       context: .
       dockerfile: mobilisights.Dockerfile
     container_name: ms-ingestion
-    env_file: 
+    env_file:
       - ./.env
       - ./.python.env
-      # - ./.args.env
     volumes:
       - .:/app
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  redis_data:
+    driver: local
