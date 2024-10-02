@@ -12,7 +12,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from core.s3_utils import S3_Bucket
 from transform.base_jobs.job_interval import Jobinterval
 from core.constants import *
-from core.time_series_processing import preprocess_date, estimate_dummy_soh
+from core.time_series_processing import process_date, estimate_dummy_soh
 
 class HighMobilityProcessedTS(Jobinterval):
 
@@ -92,7 +92,7 @@ class HighMobilityProcessedTS(Jobinterval):
         processed_ts = (
             processed_ts
             .dropna(axis="index")
-            .pipe(preprocess_date, add_sec_time_diff_col=False)
+            .pipe(process_date, add_sec_time_diff_col=False)
             .pipe(estimate_dummy_soh)
         )
 
@@ -113,7 +113,7 @@ class HighMobilityProcessedTS(Jobinterval):
         processed_ts = (
             processed_ts
             .dropna(axis="index")
-            .pipe(preprocess_date, add_sec_time_diff_col=False)
+            .pipe(process_date, add_sec_time_diff_col=False)
             .pipe(estimate_dummy_soh)
         )
 
