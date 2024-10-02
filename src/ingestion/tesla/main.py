@@ -27,12 +27,14 @@ async def main():
 
     compression_queue = asyncio.Queue()
     compression_task = asyncio.create_task(schedule_compression(compression_queue))
-    vehicle_tasks = [process_vehicle(account) for account in accounts_info]
-    
+
     if os.getenv("TESLA_COMPRESS") == "1":
         logging.info("Immediate compression requested")
         await compression_queue.put(True)  # Request immediate compression
+        await compression_task  # Wait for the immediate compression to complete
 
+    vehicle_tasks = [process_vehicle(account) for account in accounts_info]
+    
     await asyncio.gather(compression_task, *vehicle_tasks)
 
 async def process_vehicle(account):
@@ -48,13 +50,25 @@ async def process_vehicle(account):
 
     while True:
         for vid in vehicle_ids:
-            await compression_event.wait()
-            await job(vid, access_token_key, refresh_token_key)
-            await asyncio.sleep(240)
+            await compression_event.wait()  # Attendre si une compression est en cours
+            try:
+                await job(vid, access_token_key, refresh_token_key)
+            except Exception as e:
+                logging.error(f"Error processing vehicle {vid}: {str(e)}")
+            
+            if not compression_event.is_set():
+                break 
+        
+        # Attendre 4 minutes avant le prochain cycle, mais vérifier l'événement toutes les 10 secondes
+        for _ in range(24):  # 24 * 10 secondes = 4 minutes
+            await asyncio.sleep(10)
+            if not compression_event.is_set():
+                break  # Sortir de la boucle d'attente si une compression a commencé
 
 
 async def schedule_compression(compression_queue):
     global compression_event
+    compression_event = asyncio.Event()
     compression_event.set()  # Initially allow vehicle processing
 
     while True:
@@ -83,12 +97,17 @@ async def schedule_compression(compression_queue):
             logging.info("Scheduled compression task completed")
             compression_event.set()  # Resume vehicle processing
 
-        await asyncio.sleep(1) 
+        await asyncio.sleep(1)
 
 async def compression_task():
-    logging.info("Compressing data")
-    await compress_data()
-    logging.info("Compression completed")
+    logging.info("Starting compression task")
+    try:
+        await compress_data()
+        logging.info("Compression completed successfully")
+    except Exception as e:
+        logging.error(f"Error during compression: {str(e)}")
+    finally:
+        logging.info("Compression task finished")
 
 if __name__ == "__main__":
     asyncio.run(main())
