@@ -34,10 +34,13 @@ async def compress_data():
                     file_content = await response['Body'].read()
                     file_data = json.loads(file_content.decode('utf-8'))
                     
+                    # Extract only the date part (YYYY-MM-DD) from readable_date
                     readable_date = file_data.get('readable_date', yesterday)
-                    if readable_date not in data_by_date:
-                        data_by_date[readable_date] = []
-                    data_by_date[readable_date].append(file_data)
+                    file_date = readable_date.split()[0]  # This will take only the date part
+                    
+                    if file_date not in data_by_date:
+                        data_by_date[file_date] = []
+                    data_by_date[file_date].append(file_data)
                     
                     # Delete the temp file
                     await s3.delete_object(Bucket=bucket_name, Key=file_key)
