@@ -8,6 +8,9 @@ import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
 
+from core.s3_utils import S3_Bucket
+from core.constants import *
+
 R = TypeVar('R')
 P = ParamSpec('P')
 
@@ -15,7 +18,7 @@ READ_FUNCTIONS: dict[str, Callable[..., DF]] = {
     "csv": pd.read_csv,
     "parquet": pd.read_parquet,
 }
-
+# TODO: Remove when the watea soh estimation has been merged to main/dev
 def instance_data_caching_wrapper(vin: str, path_to_cache: str, data_gen_func: Callable[P, R], force_update=False, read_kwargs={}, write_kwargs={},  **kwargs: P.kwargs) -> R:
     """
     ### Description:
@@ -31,6 +34,25 @@ def instance_data_caching_wrapper(vin: str, path_to_cache: str, data_gen_func: C
         return data
     
     return READ_FUNCTIONS[extension](path_to_cache, **read_kwargs)
+
+def singleton_s3_data_caching(path: str):
+    def decorator(data_gen_func: Callable[..., pd.DataFrame]):
+        @wraps(data_gen_func)
+        def wrapper(*args, bucket: S3_Bucket=S3_Bucket(), force_update=False, **kwargs) -> pd.DataFrame:
+            # Ensure the extension is . 
+            assert path.endswith(".parquet"), PATH_DOESNT_END_IN_PARQUET.format(path=path)
+            # Check if we need to update the cache or if the cache does not exist
+            if force_update or not bucket.check_file_exists(path):
+                # Generate the data using the wrapped function
+                data: pd.DataFrame = data_gen_func(*args, bucket=bucket, **kwargs)
+                # Save the data to S3 as parquet
+                bucket.save_df_as_parquet(data, path)
+                
+                return data
+            # Read cached data from S3
+            return bucket.read_parquet_df(path)
+        return wrapper
+    return decorator
 
 def singleton_data_caching(path_to_cache: str):
     def decorator(data_gen_func: Callable[P, R]):
@@ -70,8 +92,3 @@ def ensure_that_dirs_exist(path:str):
     if not exists(dir_path):
         makedirs(dir_path)
 
-def iterate_over_data_cache_folder(regex_exp: str, track=True):
-    iterator = track(glob(f"{regex_exp}*")) if track else glob(f"{regex_exp}*")
-    for file in iterator:
-        vin = file.split(".")[0]
-        yield vin, pd.read_parquet(file)

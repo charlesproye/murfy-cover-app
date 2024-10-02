@@ -21,4 +21,4 @@ RUN chmod +x ./start_tesla.sh
 SHELL ["/bin/bash", "-c"]
 
 # Démarrer l'application
-CMD ["./start_mobilisights.sh"]
+CMD ["./start.sh"]

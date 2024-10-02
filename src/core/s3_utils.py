@@ -2,16 +2,19 @@ from typing import Any
 import os
 from io import BytesIO, StringIO
 from dotenv import load_dotenv
-import cbor2
 import json
+import logging
 
 import pyarrow.parquet as pq
-
 import boto3
 import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
 from rich import print
+import botocore
+
+from core.constants import *
+from core.pandas_utils import str_split_and_retain_src
 
 load_dotenv()
 
@@ -28,8 +31,8 @@ class S3_Bucket():
             aws_access_key_id=creds["aws_access_key_id"],
             aws_secret_access_key=creds["aws_secret_access_key"],
         )
-
         self.bucket_name = creds["bucket_name"]
+        self.logger = logging.getLogger("S3_BUCKET")
 
     @classmethod
     def get_creds_from_dot_env(cls) -> dict[str, str]:
@@ -47,26 +50,75 @@ class S3_Bucket():
     def save_df_as_parquet(self, pandas_obj:Series|DF, key:str):
         out_buffer = BytesIO()
         pandas_obj.to_parquet(out_buffer)
-        # Ensure that key ends with .parquet
-        # if not key.endswith(".parquet"):
-        #     key += ".parquet"
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
 
-    def list_keys(self, key_prefix:str="") -> list[str]:
+    def check_file_exists(self, key: str) -> bool:
+        """
+        Checks if a file (key) exists in the S3 bucket.
+
+        :param key: The S3 key (path) to check.
+        :return: True if the file exists, False otherwise.
+        """
+        try:
+            # Attempt to retrieve metadata of the object
+            self._s3_client.head_object(Bucket=self.bucket_name, Key=key)
+            return True  # If no exception, the key exists
+        except Exception as e:
+            # Check if the error code is 404, which means the key does not exist
+            if e.response['Error']['Code'] == '404':
+                self.logger.info(f"File '{key}' does not exist in bucket '{self.bucket_name}'.")
+                return False
+            else:
+                # Re-raise any other exceptions
+                self.logger.error(f"Error checking if file exists: {e}")
+                raise e
+
+    def list_responses_keys_of_brand(self, brand:str="") -> DF:
+        """
+        ### Descriptions:
+        *Warning:Ayvens x BIB POC specific method. This may not work on other projects.*  
+        ### Returns:
+        A dataframe where each row represents the key of a response.  
+        """
+        keys = self.list_keys(f"response/{brand}/")
+        keys = keys[keys.str.endswith(".json")]
+        if len(keys) == 0:
+            self.logger.info(EMTPY_S3_KEYS_WARNING_MSG.format(keys_prefix=brand))
+            return DF(None, columns=KEY_LIST_COLUMN_NAMES)
+        # Only retain .json responses
+        # Reponses are organized as follow response/brand_name/vin/date-of-response.json
+        keys = str_split_and_retain_src(keys, "/")
+        # Remove files in temp directory
+        keys = keys[keys[3] != "temp"]
+        keys = keys.drop(columns=[4])
+        keys.columns = KEY_LIST_COLUMN_NAMES
+        # Check that the file name is a date
+        keys['is_valid_file'] = (
+            keys["file"]
+            .str.split(".", expand=True).loc[:, 0]
+            .str.match(r'^\d{4}-\d{2}-\d{2}$')
+        )
+        keys["is_valid_file"] &= keys["vin"].str.len() != 0
+        keys = keys.query(f"is_valid_file")
+        
+        return keys
+
+    def list_keys(self, key_prefix:str="") -> Series:
         """
         ### Description:
-        Returns a list of the keys present in the bucket.
+        Returns a pandas Series of the keys present in the bucket.
         ### Parameters:
         key_prefix: A string representing the prefix to filter the keys. If None, all keys will be listed.
         ### Returns:
-        A list of keys present in the bucket.
+        A pandas Series of keys present in the bucket.
         """
-        paginator = self._s3_client.get_paginator('list_objects_v2')
-        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=key_prefix)
 
         # Ensure that the key ends with a /
         if not key_prefix.endswith("/"):
             key_prefix += "/"
+
+        paginator = self._s3_client.get_paginator('list_objects_v2')
+        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=key_prefix)
 
         keys = []
         for page in page_iterator:
@@ -75,7 +127,9 @@ class S3_Bucket():
                     if obj["Key"] != key_prefix:
                         keys.append(obj['Key'])
 
-        return keys
+        keys_as_series = Series(keys, dtype="string")
+
+        return keys_as_series
 
     def read_parquet_df(self, key:str) -> DF|Series:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
@@ -108,10 +162,4 @@ class S3_Bucket():
 
         return parsed_object
     
-    def read_cbor(self, key:str):
-        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-        object_content = response["Body"].read()
-        obj = cbor2.loads(object_content)
-
-        return obj
 

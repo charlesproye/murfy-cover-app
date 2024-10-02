@@ -4,7 +4,8 @@ import os
 import textwrap
 
 import dotenv
-from src.ingestion.high_mobility.ingester import HMIngester
+from ingestion.bmw.ingester import BMWIngester
+
 
 def main():
     dotenv.load_dotenv()
@@ -25,12 +26,13 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent("""\
-        Ingest data from the High Mobility API into an S3 bucket
+        Ingest data from the BMW API into an S3 bucket
 
         environment variables:
-          HM_BASE_URL:          HM API base URL
-          HM_CLIENT_ID:         HM OAuth client ID
-          HM_CLIENT_SECRET:     HM OAuth client secret
+          BMW_BASE_URL:          BMW API base URL
+          BMW_USERNAME:         BMW username
+          BMW_PASSWORD:         BMW password
+          BMW_CLIENT_ID:        BMW client ID
           S3_ENDPOINT           S3 base endpoint
           S3_REGION             S3 region
           S3_BUCKET:            S3 bucket to save the info
@@ -39,35 +41,30 @@ def main():
         """),
     )
     parser.add_argument(
-        "--refresh_interval",
+        "--rate_limit",
         type=int,
-        default=120,
-        help="interval (in minutes) at which to refresh the list of clearances",
+        default=36,
+        help="interval (in minutes) at which to query vehicle info",
     )
     parser.add_argument(
         "--max_workers",
         type=int,
         default=8,
-        help="maximum number of threads to fetch the vehicles info (mostly limited by S3)",
+        help="maximum number of threads to process the vehicles info (mostly limited by S3)",
     )
     parser.add_argument(
-        "--compress_interval",
+        "--compress_time",
         type=str,
-        default=12,
-        help="interval (in hours) at which to compress S3 data",
+        default="00:00",
+        help="time of day at which to compress S3 data",
     )
 
-    parser.add_argument(
-        "--compress_threaded",
-        action=argparse.BooleanOptionalAction,
-        help="run the compresser in threaded mode",
-    )
     args = parser.parse_args()
 
-    ingester = HMIngester(
-        refresh_interval=args.refresh_interval,
+    ingester = BMWIngester(
+        # rate_limit=args.rate_limit,
         max_workers=args.max_workers,
-        compress_interval=args.compress_interval,
+        # compress_time=args.compress_time,
     )
 
     ingester.run()
