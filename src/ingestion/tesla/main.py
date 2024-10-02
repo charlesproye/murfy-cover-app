@@ -25,14 +25,13 @@ async def main():
     global accounts_info
     accounts_info = json.loads(args.accounts)
 
-    compression_task = asyncio.create_task(schedule_compression())
+    compression_queue = asyncio.Queue()
+    compression_task = asyncio.create_task(schedule_compression(compression_queue))
     vehicle_tasks = [process_vehicle(account) for account in accounts_info]
     
     if os.getenv("TESLA_COMPRESS") == "1":
         logging.info("Immediate compression requested")
-        compression_event.clear()
-        await compression_task
-        compression_event.set()
+        await compression_queue.put(True)  # Request immediate compression
 
     await asyncio.gather(compression_task, *vehicle_tasks)
 
@@ -53,24 +52,38 @@ async def process_vehicle(account):
             await job(vid, access_token_key, refresh_token_key)
             await asyncio.sleep(240)
 
-async def schedule_compression():
+
+async def schedule_compression(compression_queue):
     global compression_event
     compression_event.set()  # Initially allow vehicle processing
 
     while True:
-        now = datetime.now()
-        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        if now.time() > dt_time(0, 0):
-            midnight = midnight.replace(day=now.day + 1)
-        
-        seconds_until_midnight = (midnight - now).total_seconds()
-        await asyncio.sleep(seconds_until_midnight)
+        try:
+            immediate = await asyncio.wait_for(compression_queue.get(), timeout=1)
+        except asyncio.TimeoutError:
+            immediate = False
 
-        compression_event.clear()  # Stop vehicle processing
-        logging.info("Starting scheduled compression task")
-        await compression_task()
-        logging.info("Scheduled compression task completed")
-        compression_event.set()  # Resume vehicle processing
+        if immediate:
+            logging.info("Performing immediate compression")
+            compression_event.clear()
+            await compression_task()
+            compression_event.set()
+        else:
+            now = datetime.now()
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            if now.time() > dt_time(0, 0):
+                midnight = midnight.replace(day=now.day + 1)
+            
+            seconds_until_midnight = (midnight - now).total_seconds()
+            await asyncio.sleep(seconds_until_midnight)
+
+            compression_event.clear()  # Stop vehicle processing
+            logging.info("Starting scheduled compression task")
+            await compression_task()
+            logging.info("Scheduled compression task completed")
+            compression_event.set()  # Resume vehicle processing
+
+        await asyncio.sleep(1) 
 
 async def compression_task():
     logging.info("Compressing data")
