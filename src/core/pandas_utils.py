@@ -49,3 +49,17 @@ def uniques_as_series(s:Series) -> Series:
     Warp around Series.unique to return another Series instead of an ndarray.
     """
     return Series(s.unique())
+
+def concat(objects:list|dict|Series, **kwargs) -> DF:
+    """
+    Warp around pd.concat to work on Series and not emmit empty object.  
+    Empty objects will be ignored.  
+    If objects is a Series, the index will be ignores.  
+    """
+    if isinstance(objects, Series):
+        return pd.concat([value for _, value in objects.items() if not value.empty], **kwargs)
+    if isinstance(objects, list):
+        return pd.concat([value for value in objects if not value.empty], **kwargs)
+    if isinstance(objects, dict):
+        return pd.concat({key:value for key, value in objects.items()}, **kwargs)
+    raise ValueError(f"pandas_utils.concat recieved inappropriate type: {type(objects)}.")
