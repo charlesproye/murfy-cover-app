@@ -65,8 +65,9 @@ if __name__ == "__main__":
     main()
 
 fleet_info_df: DF
-if path.exists(PATH_TO_FLEET_INFO_DF.format(extension="parquet")):
-    fleet_info_df = pd.read_parquet(PATH_TO_FLEET_INFO_DF.format(extension="parquet"))
+fleet_info_cache_path = path.join(path.dirname(__file__), PATH_TO_FLEET_INFO_DF.format(extension="parquet"))
+if path.exists(fleet_info_cache_path):
+    fleet_info_df = pd.read_parquet(fleet_info_cache_path)
 else:
-    print("[yellow]Warning:", "No fleet info df cached at", f"[blue]{PATH_TO_FLEET_INFO_DF.format(extension='parquet')}")
+    print("[yellow]Warning:", "No fleet info df cached at", f"[blue]{fleet_info_cache_path}")
 
