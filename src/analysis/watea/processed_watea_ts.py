@@ -79,7 +79,7 @@ def pre_process_raw_time_series(raw_vehicle_df: DF) -> DF:
             "battery_hv_current": "current",
             "autonomy_km": "battery_range_km"
         })
-        .pipe(ts.preprocess_date)
+        .pipe(ts.process_date, set_as_index=True, add_sec_time_diff_col=True)
     )
 
 
