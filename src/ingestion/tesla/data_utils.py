@@ -41,8 +41,13 @@ async def refresh_token_and_retry_request(access_token, refresh_token, access_to
                 logging.info("Tokens refreshed successfully.")
                 return {'access_token': access_token, 'refresh_token': refresh_token}
             else:
-                logging.error(f"Failed to refresh token: {response.status}")
-                raise Exception("Token refresh failed")
+                error_body = await response.text()
+                logging.error(f"Failed to refresh token: {response.status}, {error_body}")
+                if response.status == 401:
+                    logging.error("Authentication failed. The refresh token may be invalid or expired.")
+                    # Vous pouvez ajouter ici une logique pour gérer un token invalide,
+                    # comme notifier l'utilisateur ou réinitialiser le processus d'authentification
+                raise Exception(f"Token refresh failed with status {response.status}")
 
 async def update_tokens(access_token, refresh_token, access_token_key, refresh_token_key):
     try:
