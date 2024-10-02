@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas import Series
 from pandas import DataFrame as DF
 
 from core.s3_utils import S3_Bucket
@@ -18,13 +19,13 @@ def get_raw_tss_without_units(bucket: S3_Bucket) -> DF:
     keys = bucket.list_responses_keys_of_brand("BMW")
     return pd.concat([parse_response_as_raw_ts(key, bucket, add_units=False) for _, key in keys.iterrows()])
 
-def parse_response_as_raw_ts(key:str, bucket:S3_Bucket, add_units=True) -> DF:
+def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, add_units=True) -> DF:
     api_response = bucket.read_json_file(key["key"])                                # The json response contains a "data" key who's values are a list of dicts.
     raw_ts = DF.from_dict(api_response["data"])                                     # The dicts have a "key" and "value" items.
     if add_units:
         unit_not_none = raw_ts["unit"].notna()                                      # They also have a "unit" item but not all of them are not null.
         raw_ts.loc[unit_not_none, "key"] += "_" + raw_ts.loc[unit_not_none, "unit"] # So we append "_" + "unit" to the key only if the "unit" is not none.
-    raw_ts = (
+    return (
         raw_ts
         .pipe(
             pd.pivot_table,                                                     
@@ -37,8 +38,6 @@ def parse_response_as_raw_ts(key:str, bucket:S3_Bucket, add_units=True) -> DF:
         .assign(vin=key["vin"])
         .reset_index(drop=False)
     )
-
-    return raw_ts
 
 
 if __name__ == "__main__":
