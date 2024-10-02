@@ -31,7 +31,7 @@ async def main():
     if os.getenv("TESLA_COMPRESS") == "1":
         logging.info("Immediate compression requested")
         compression_event.clear()
-        await compression_task()
+        await compression_task
         compression_event.set()
 
     await asyncio.gather(compression_task, *vehicle_tasks)
