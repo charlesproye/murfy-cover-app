@@ -67,5 +67,6 @@ def main_decorator(main_func):
 def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], **kwargs):
     df:DF = dataframe_gen(**kwargs)
     print(df)
+    print("all columns:")
     print(*df.columns, sep="\n")
     print(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
