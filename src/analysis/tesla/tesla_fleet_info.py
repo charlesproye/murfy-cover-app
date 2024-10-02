@@ -1,59 +1,31 @@
-"""
-This module handles a data frame that holds static data about the vehicles such as model, default capacity and range, ect...
-Each line corresponds to a vehicle.
-"""
-from glob import glob
-from os import path
-from typing import Generator
 import json
 
 import pandas as pd
-from pandas import Series
 from pandas import DataFrame as DF
-# from pandas.api.typing import DataFrameGroupBy as DF_grp_by
 from rich import print
-from rich.progress import track
 
-import core.time_series_processing as ts
-import core.perf_agg_processing as perfs
-from tesla.tesla_constants import *
-from tesla.raw_tesla_ts import raw_ts_of
+from core.console_utils import main_decorator
+from core.caching_utils import singleton_data_caching
+from core.ev_models_info import get_ev_models_infos
+from analysis.tesla.tesla_constants import *
 
+@main_decorator
 def main():
-    fleet_info_df = compute_fleet_info()
+    fleet_info_df = get_fleet_info(force_update=True)
     print(fleet_info_df.to_string(max_rows=None))
-    fleet_info_df.to_csv(path.join(PATH_TO_FLEET_INFO_FOLDER, "fleet_info_df.csv"), index=False)
-    fleet_info_df.to_parquet(path.join(PATH_TO_FLEET_INFO_FOLDER, "fleet_info_df.paruet"))
 
-
-def iterate_over_vins(query_str:str=None, use_progress_track=True, **kwarges    ) -> Generator[str, None, None]:
-    filtered_fleet_info_df = fleet_info_df.query(query_str) if query_str else fleet_info_df
-    return track(filtered_fleet_info_df["vin"]) if use_progress_track else filtered_fleet_info_df["vin"]
-        
-
-def compute_fleet_info() -> DF:
-    with open(path.join(PATH_TO_FLEET_INFO_FOLDER, "raw_fleet_info.json")) as json_fleet_info_file:
+@singleton_data_caching(INITIAL_FLEET_INFO_PATH)
+def get_fleet_info() -> DF:
+    with open(JSON_FLEET_INFO_RESPONSE_PATH) as json_fleet_info_file:
         raw_json_fleet_info: list[dict] = json.load(json_fleet_info_file)
-    model_infos = (
-        pd.read_csv(PATH_TO_MODELS_INFO)
-        .astype({
-            "model": "string",
-            "manufacturer": "string",
-            "kwh_capacity": "float",
-            "default_km_range": "float"
-        })
-        .set_index("model")
-    )
+    models_infos = get_ev_models_infos()
     fleet_info_objs: list[dict] = []
     for raw_dict in raw_json_fleet_info:
         vehicle_info_dict = {
             "vin": raw_dict["vin"],
             "model": find_in_list_of_dict(raw_dict, "$MT"),
         }
-        vehicle_info_dict["default_kwh_energy_capacity"] = model_infos.at[vehicle_info_dict["model"], "kwh_capacity"]
-        vehicle_info_dict["default_kwh_per_soc"] = vehicle_info_dict["default_kwh_energy_capacity"] / 100
-        vehicle_info_dict["default_km_range"] = model_infos.at[vehicle_info_dict["model"], "default_km_range"]
-        vehicle_info_dict["default_km_range_per_soc"] = vehicle_info_dict["default_km_range"] / 100
+        vehicle_info_dict["default_kwh_energy_capacity"] = models_infos.at[vehicle_info_dict["model"], "kwh_capacity"]
         fleet_info_objs.append(vehicle_info_dict)
 
     fleet_info_df = DF.from_dict(fleet_info_objs).set_index("vin", drop=False)
@@ -69,4 +41,4 @@ def find_in_list_of_dict(raw_vehicle_info_dict: dict, target_key_perfix):
 if __name__ == "__main__":
     main()
 
-fleet_info_df = pd.read_parquet(path.join(PATH_TO_FLEET_INFO_FOLDER, "fleet_info_df.paruet"))
+fleet_info_df = get_fleet_info()
