@@ -24,7 +24,6 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger=logging.getLog
     # The responses are first indexed by "capability" (see any high mobility's air table data catalog).
     # We don't really need to know what capability but some variables that belong to different capabilities may have the same name.
     # To differentiate them, we will prepend their correspomding capability to their name.
-    print(key)
     response = bucket.read_json_file(key["key"])
     if response is None:
         logger.info(f"Did not parse key {key['key']} because the object returned by read_json_file was None.")
