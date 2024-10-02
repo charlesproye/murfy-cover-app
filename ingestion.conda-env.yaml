@@ -13,4 +13,5 @@ dependencies:
   - pip:
     - -e .
     - redis
+    - aioboto3
 

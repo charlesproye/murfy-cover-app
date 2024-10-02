@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from data_fetcher import fetch_all_vehicle_ids, job
 from data_utils import setup_logging
 import json
-from s3_handler import compress_data
+from s3_handler import compress_data, save_data_to_s3
 from datetime import datetime, time as dt_time
 
 # Global variables to store account information
@@ -37,38 +37,8 @@ async def main():
     
     await asyncio.gather(compression_task, *vehicle_tasks)
 
-async def process_vehicle(account):
-    access_token_key = account['access_token_key']
-    refresh_token_key = account['refresh_token_key']
-    professional_account = account.get('professional_account', False)
-    vehicle_id = account.get('vehicle_id')
-
-    if professional_account:
-        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key)
-    else:
-        vehicle_ids = [vehicle_id]
-
-    while True:
-        for vid in vehicle_ids:
-            await compression_event.wait()  # Attendre si une compression est en cours
-            try:
-                await job(vid, access_token_key, refresh_token_key)
-            except Exception as e:
-                logging.error(f"Error processing vehicle {vid}: {str(e)}")
-            
-            if not compression_event.is_set():
-                break 
-        
-        # Attendre 4 minutes avant le prochain cycle, mais vérifier l'événement toutes les 10 secondes
-        for _ in range(24):  # 24 * 10 secondes = 4 minutes
-            await asyncio.sleep(10)
-            if not compression_event.is_set():
-                break  # Sortir de la boucle d'attente si une compression a commencé
-
-
 async def schedule_compression(compression_queue):
     global compression_event
-    compression_event = asyncio.Event()
     compression_event.set()  # Initially allow vehicle processing
 
     while True:
@@ -97,7 +67,7 @@ async def schedule_compression(compression_queue):
             logging.info("Scheduled compression task completed")
             compression_event.set()  # Resume vehicle processing
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(1)  # Small delay to prevent tight loop
 
 async def compression_task():
     logging.info("Starting compression task")
@@ -108,6 +78,35 @@ async def compression_task():
         logging.error(f"Error during compression: {str(e)}")
     finally:
         logging.info("Compression task finished")
+
+async def process_vehicle(account):
+    access_token_key = account['access_token_key']
+    refresh_token_key = account['refresh_token_key']
+    professional_account = account.get('professional_account', False)
+    vehicle_id = account.get('vehicle_id')
+
+    if professional_account:
+        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key)
+    else:
+        vehicle_ids = [vehicle_id]
+
+    while True:
+        for vid in vehicle_ids:
+            await compression_event.wait()  # Attendre si une compression est en cours
+            try:
+                data = await job(vid, access_token_key, refresh_token_key)
+                await save_data_to_s3(data, vid)
+            except Exception as e:
+                logging.error(f"Error processing vehicle {vid}: {str(e)}")
+            
+            if not compression_event.is_set():
+                break 
+        
+        # Attendre 4 minutes avant le prochain cycle, mais vérifier l'événement toutes les 10 secondes
+        for _ in range(24):  # 24 * 10 secondes = 4 minutes
+            await asyncio.sleep(10)
+            if not compression_event.is_set():
+                break  # Sortir de la boucle d'attente si une compression a commencé
 
 if __name__ == "__main__":
     asyncio.run(main())
