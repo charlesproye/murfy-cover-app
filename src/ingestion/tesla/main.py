@@ -113,8 +113,7 @@ async def process_vehicle(account):
             
             logging.info(f"Processing vehicle {vid}")
             try:
-                data = await job(vid, access_token_key, refresh_token_key)
-                await save_data_to_s3(data, vid)
+                await job(vid, access_token_key, refresh_token_key)
                 logging.info(f"Data saved for vehicle {vid}")
             except Exception as e:
                 logging.error(f"Error processing vehicle {vid}: {str(e)}")
