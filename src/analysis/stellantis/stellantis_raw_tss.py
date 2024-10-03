@@ -58,6 +58,7 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
     raw_ts = (
         DF.from_dict(flattened_response, orient='index')
         .reset_index(names='date')
+        .assign(vin=key["vin"])
     )
 
     return raw_ts
