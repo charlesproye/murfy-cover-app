@@ -400,7 +400,7 @@ class BMWIngester:
             self.__scheduler_logger.info("Starting scheduler")
             while not self.__shutdown_requested.is_set():
                 now = datetime.now().hour
-                if now >= 6 and now <= 23:
+                if now >= 4 and now <= 23:
                     self.__fetch_scheduler.run_pending()
                 else:
                     self.__compress_scheduler.run_pending()

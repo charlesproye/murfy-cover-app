@@ -8,7 +8,7 @@ from data_fetcher import fetch_all_vehicle_ids, job
 from data_utils import setup_logging
 from datetime import datetime, timedelta
 import json
-from s3_handler import compress_data, save_data_to_s3
+from s3_handler import compress_data, save_data_to_s3, consolidate_all_tesla_files
 
 # Global variables to store account information
 accounts_info = []
@@ -131,3 +131,4 @@ async def process_vehicle(account):
 
 if __name__ == "__main__":
     asyncio.run(main())
+
