@@ -6,25 +6,23 @@ from datetime import timedelta as TD
 import argparse
 import logging.config
 
+from pandas import DataFrame as DF
 from apscheduler.triggers.interval import IntervalTrigger
 
-from utils.platform import PLATFORM_COLORED, PLATFORM
-from bib_models.utils.log_format import get_handler
+from utils.platform import PLATFORM_COLORED
 from transform.config import *
-from core.console_utils import main_decorator
+from core.console_utils import main_decorator, parse_kwargs
 
 @main_decorator
 def main():
-    # Set up logging
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--log-level", default="INFO", help="Set the logging level (e.g., DEBUG, INFO)")
-    args = parser.parse_args()
+    cli_kwargs = parse_kwargs(MAIN_KWARGS)
 
+    # Setup logging
     logging.config.dictConfig({
         'version': 1,
         "loggers": {
             "transform": {
-                "level": args.log_level.upper(),
+                "level": cli_kwargs["log_level"].upper(),
                 'handlers': ['console'],
                 'propagate': False,
             }
@@ -41,16 +39,26 @@ def main():
             },
         },
     })
-
-
     logger = logging.getLogger("apscheduler.scheduler")
     logger.setLevel(logging.INFO)
     logging.info(f"Main process PID: {os.getpid()}, running on {PLATFORM_COLORED}")
-    # Set up scheduler
+
+    # Setup pipelines
+    pipelines = DF.from_dict(BRAND_PIPELINES, orient="index")
+    if "pipelines" in cli_kwargs:
+        if isinstance(cli_kwargs["pipelines"], str):
+            cli_kwargs["pipelines"] = [cli_kwargs["pipelines"]]
+        pipelines:DF = pipelines.loc[cli_kwargs["pipelines"]]
+    if "steps" in cli_kwargs:
+        if isinstance(cli_kwargs["steps"], str):
+            cli_kwargs["steps"] = [cli_kwargs["steps"]]
+        pipelines:DF = pipelines.loc[:, cli_kwargs["steps"]]
+    
+    # Setup scheduler
     scheduler = BlockingScheduler()
-    for brand, pipeline in BRAND_PIPELINES.items():
+    for brand, pipeline in pipelines.iterrows():
         scheduler.add_job(
-            func=lambda : [func(brand=brand, force_update=True) for func in pipeline],
+            func=lambda : [func(brand=brand, force_update=True) for task, func in pipeline.dropna().items()],
             name=brand,
             id=brand,
             trigger=IntervalTrigger(
@@ -59,6 +67,7 @@ def main():
             ),
         )
     # Start
+    print("starting scheduler...")
     scheduler.start()
 
 

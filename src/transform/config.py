@@ -4,8 +4,33 @@ from transform.bmw.bmw_raw_tss import get_raw_tss as bmw_get_raw_tss
 from transform.stellantis.stellantis_raw_tss import get_raw_tss as stellantis_get_raw_tss
 from transform.high_mobility.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
 
-BRAND_PIPELINES:dict[str, list[Callable]] = {
-    "bmw": [bmw_get_raw_tss],
-    "stellantis": [stellantis_get_raw_tss],
-    "kia": [hm_get_raw_tss],
+
+BRAND_PIPELINES:dict[str, dict[str, Callable]] = {
+    "bmw": {
+        "raw_tss":bmw_get_raw_tss,
+    },
+    "stellantis":{
+        "raw_tss":bmw_get_raw_tss,
+    },
+    "kia":{
+        "raw_tss":bmw_get_raw_tss,
+    },
 }
+
+
+MAIN_KWARGS = {
+    "--log-level": {
+        "default": "INFO",
+        "type": str,
+        "help": "Set the logging level (e.g., DEBUG, INFO)",
+    },
+    "--pipelines": {
+        "required": False,
+        "help": "Specifies pipeline or list of pipelines to run."
+    },
+    "--steps": {
+        "required": False,
+        "help": "Specifies pipeline step or list of pipelines steps to run."
+    },
+}
+
