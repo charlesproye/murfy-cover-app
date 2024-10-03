@@ -49,7 +49,7 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, add_un
         .reset_index(drop=False)
     )
 
-    logger.debug(f"\n{raw_ts}")
+    logger.debug(f"Prased {key['key']} with bmw parsing.")
 
     return raw_ts
 

@@ -24,9 +24,6 @@ BRAND_PIPELINES:dict[str, dict[str, Callable]] = {
     "ford":{
         "raw_tss":hm_get_raw_tss,
     },
-    "ford":{
-        "raw_tss":hm_get_raw_tss,
-    },
 }
 
 

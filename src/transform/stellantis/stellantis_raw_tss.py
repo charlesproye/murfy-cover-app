@@ -61,7 +61,7 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
         .assign(vin=key["vin"])
     )
 
-    logger.debug(f"\n{raw_ts}")
+    logger.debug(f"Prased {key['key']} with stellantis parsing.")
 
     return raw_ts
 

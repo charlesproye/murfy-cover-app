@@ -30,7 +30,7 @@ def main():
             id=brand,
             trigger=IntervalTrigger(
                 days=1,
-                start_date=DT.now() + TD(seconds=10)
+                start_date=DT.now() + TD(seconds=3)
             ),
         )
     # Start
