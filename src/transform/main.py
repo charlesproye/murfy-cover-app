@@ -1,12 +1,11 @@
 import os
-from apscheduler.schedulers.blocking import BlockingScheduler
 import logging
 from datetime import datetime as DT
 from datetime import timedelta as TD
-import argparse
 import logging.config
 
 from pandas import DataFrame as DF
+from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from utils.platform import PLATFORM_COLORED
@@ -67,7 +66,6 @@ def main():
             ),
         )
     # Start
-    print("starting scheduler...")
     scheduler.start()
 
 
