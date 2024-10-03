@@ -91,25 +91,6 @@ def cum_integral(power_series: Series, date_series=None) -> Series:
     )
     return Series(cum_energy_data * KJ_TO_KWH, index=power_series.index)
 
-def soh_from_est_battery_range(vehicle_df: DF, range_col: str, stock_km_per_soc: float, **kwargs) -> DF:
-    """
-    ### Description:
-    Computes soh from estimated range of the car.
-    The range column must be in kilometers.
-    """
-    vehicle_df["km_per_soc"] = vehicle_df[range_col] / vehicle_df["soc"]
-    vehicle_df["range_soh"] = 100 * vehicle_df["km_per_soc"] / stock_km_per_soc
-    vehicle_df["range_soh"] = vehicle_df["range_soh"].mask(vehicle_df["soc"].diff().eq(0), np.nan).interpolate(method="time")
-    vehicle_df["smoothed_soh"] = double_rolling_median_smoothing(vehicle_df["range_soh"])
-    
-    return vehicle_df
-
-def double_rolling_median_smoothing(src:Series, window:str|int="3h") -> Series:
-    return (
-        src
-        .rolling(window, center=True).median()
-        .rolling(window, center=True).median()
-    )
 
 def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
