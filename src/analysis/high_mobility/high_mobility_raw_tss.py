@@ -1,5 +1,5 @@
 from dateutil import parser
-import logging
+from logging import Logger, getLogger
 
 import pandas as pd
 from pandas import DataFrame as DF
@@ -13,14 +13,14 @@ from core.pandas_utils import concat
 from analysis.high_mobility.high_mobility_constants import *
 
 @instance_s3_data_caching(HM_RAW_TSS_KEY_FORMAT, ["brand"])
-def get_raw_tss(brand:str, bucket: S3_Bucket) -> DF:
+def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket(), logger=getLogger("HM_raw_tss")) -> DF:
     return (
         bucket.list_responses_keys_of_brand(brand)
-        .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket)
+        .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger)
         .pipe(concat)
     )
 
-def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger=logging.getLogger("HM_raw_tss")) -> DF:
+def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
     # The responses are first indexed by "capability" (see any high mobility's air table data catalog).
     # We don't really need to know what capability but some variables that belong to different capabilities may have the same name.
     # To differentiate them, we will prepend their correspomding capability to their name.
