@@ -1,16 +1,14 @@
-import asyncio
-from asyncio.exceptions import CancelledError
 import os
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 import logging
+from datetime import datetime as DT
+from datetime import timedelta as TD
 
-from rich import print
+from apscheduler.triggers.interval import IntervalTrigger
 
-from transform.raw_ts.high_mobility_raw_ts import HighMobilityRawTS
-from transform.processed_ts.high_mobility_processed_ts import HighMobilityProcessedTS
 from utils.platform import PLATFORM_COLORED, PLATFORM
 from bib_models.utils.log_format import get_handler
-from transform.constants import *
+from transform.config import *
 
 handler = get_handler(is_logged=os.getenv("IS_DEPLOY",False), platform=PLATFORM)
 logging.basicConfig(
@@ -18,39 +16,27 @@ logging.basicConfig(
     handlers=[handler]
 )
 
-async def main(start_scheduler: bool = True):
-    scheduler = AsyncIOScheduler()
-
+def main():
+    # Set up logger
     logger = logging.getLogger("apscheduler.scheduler")
-    logger.setLevel(logging.WARNING)
+    logger.setLevel(logging.INFO)
     logging.info(f"Main process PID: {os.getpid()}, running on {PLATFORM_COLORED}")
-    #### Daily
-
-    for brand in HANDLED_BRANDS: #each job needs to be run one after the other 
-        await HighMobilityRawTS(brand).add_to_schedule(scheduler)
-        # await HighMobilityProcessedTS(brand).add_to_schedule(scheduler)
-
-    ## Pour Mobilisight
-    # await HighMobilityRawTS("stellantis").add_to_schedule(scheduler)
-    # await HighMobilityProcessedTS("stellantis").add_to_schedule(scheduler)
-
-    # Start the scheduler
-    if not start_scheduler:
-        return
+    # Set up scheduler
+    scheduler = BlockingScheduler()
+    for brand, pipeline in BRAND_PIPELINES.items():
+        scheduler.add_job(
+            func=lambda : [func(brand=brand, force_update=True) for func in pipeline],
+            name=brand,
+            id=brand,
+            trigger=IntervalTrigger(
+                days=1,
+                start_date=DT.now() - TD(days=1) + TD(seconds=1)
+            ),
+        )
+    # Start
     scheduler.start()
 
-    logger.setLevel(logging.INFO)
-    try:
-        # Keep the main thread alive
-        while True:
-            await asyncio.sleep(1)
-    except (KeyboardInterrupt, SystemExit, CancelledError):
-        scheduler.shutdown(wait=False)
-        raise
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logging.info("Exiting...")
+    main()
 

@@ -15,7 +15,8 @@ from core.pandas_utils import concat
 from analysis.high_mobility.high_mobility_constants import *
 
 @instance_s3_data_caching(HM_RAW_TSS_KEY_FORMAT, ["brand"])
-def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket(), logger=getLogger("stellantis_raw_tss")) -> DF:
+def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
+    logger = getLogger(f"Stellantins-{brand}-RawTSS")
     return (
         bucket.list_responses_keys_of_brand(brand)
         .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger)
@@ -25,7 +26,7 @@ def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket(), logger=getLogger("stel
 def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
     response = bucket.read_json_file(key["key"])
     if response is None:
-        logger.info(f"Did not parse key {key['key']} because the object returned by read_json_file was None.")
+        logger.debug(f"Did not parse key {key['key']} because the object returned by read_json_file was None.")
         return Series([])
     flattened_response:dict = {}
     def flatten_dict(data, prefix=''):

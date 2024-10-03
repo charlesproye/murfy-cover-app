@@ -8,7 +8,7 @@ from core.caching_utils import singleton_s3_data_caching
 from analysis.bmw.bmw_constants import *
 
 @singleton_s3_data_caching(BMW_RAW_TSS_KEY)
-def get_raw_tss(bucket: S3_Bucket) -> DF:
+def get_raw_tss(bucket: S3_Bucket, **kwargs) -> DF:
     keys = bucket.list_responses_keys_of_brand("BMW")
     return pd.concat([parse_response_as_raw_ts(key, bucket) for _, key in keys.iterrows()])
 
