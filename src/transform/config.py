@@ -10,10 +10,22 @@ BRAND_PIPELINES:dict[str, dict[str, Callable]] = {
         "raw_tss":bmw_get_raw_tss,
     },
     "stellantis":{
-        "raw_tss":bmw_get_raw_tss,
+        "raw_tss":stellantis_get_raw_tss,
     },
     "kia":{
-        "raw_tss":bmw_get_raw_tss,
+        "raw_tss":hm_get_raw_tss,
+    },
+    "mercedes-benz":{
+        "raw_tss":hm_get_raw_tss,
+    },
+    "renault":{
+        "raw_tss":hm_get_raw_tss,
+    },
+    "ford":{
+        "raw_tss":hm_get_raw_tss,
+    },
+    "ford":{
+        "raw_tss":hm_get_raw_tss,
     },
 }
 
