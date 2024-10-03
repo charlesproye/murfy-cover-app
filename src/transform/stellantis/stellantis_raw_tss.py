@@ -1,6 +1,4 @@
 from dateutil import parser
-import logging
-import json
 from datetime import datetime as DT
 
 import pandas as pd
@@ -9,14 +7,15 @@ from pandas import Series
 from logging import Logger, getLogger
 
 from core.s3_utils import S3_Bucket
+from core.constants import *
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import instance_s3_data_caching
 from core.pandas_utils import concat
-from analysis.high_mobility.high_mobility_constants import *
+from transform.config import *
 
-@instance_s3_data_caching(HM_RAW_TSS_KEY_FORMAT, ["brand"])
+@instance_s3_data_caching(S3_RAW_TSS_KEY_FORMAT, ["brand"])
 def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
-    logger = getLogger(f"Stellantins-{brand}-RawTSS")
+    logger = getLogger(f"transform.Stellantins-{brand}-RawTSS")
     return (
         bucket.list_responses_keys_of_brand(brand)
         .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger)
@@ -61,6 +60,8 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
         .reset_index(names='date')
         .assign(vin=key["vin"])
     )
+
+    logger.debug(f"\n{raw_ts}")
 
     return raw_ts
 

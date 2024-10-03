@@ -10,6 +10,10 @@ CSV_EV_MODELS_INFO_PATH = join(dirname(__file__), "data_cache/models_info.csv")
 PARQUET_EV_MODELS_INFO_PATH = join(dirname(__file__), "data_cache/models_info.parquet")
 
 
+S3_RAW_TSS_KEY_FORMAT = "raw_ts/{brand}/time_series/raw_tss.parquet"
+S3_PROCESSED_TSS_KEY_FORMAT = "processed_ts/{brand}/time_series/processed_tss.parquet"
+
+
 # period perfs
 DEFAULT_DIFF_VARS = {
     "soc": "soc_diff",
@@ -17,22 +21,6 @@ DEFAULT_DIFF_VARS = {
     "odometer": "distance",
 }
 
-# plotting
-PERF_VARS_DICT = {
-    "charging_perfs": ["sec_per_soc", "energy_soh", "soh_cum_charger_energy", "battery_range_added_soh"],
-    "motion_perfs": ["km_per_soc", "range_soh"],
-    "self_discharge_perfs": ["secs_per_soc", "range_soh"]
-}
-X_TIME_SERIES_COL_TO_X_PERIOD_COL = {
-    "odometer": "mean_odo",
-    "date": "mean_date",
-}
-DEFAULT_LINE_PLOT_KWARGS = {
-    "marker":".",
-}
-DEFAULT_CHARGING_POINTS_PLT_KWARGS = {
-    "alpha": 0.45,
-}
 
 SOH_LOST_PER_KM_DUMMY_RATIO = 0.000028
 
