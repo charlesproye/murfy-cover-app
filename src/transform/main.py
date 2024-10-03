@@ -8,7 +8,6 @@ from pandas import DataFrame as DF
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from utils.platform import PLATFORM_COLORED
 from transform.config import *
 from core.console_utils import main_decorator, parse_kwargs
 
@@ -40,7 +39,7 @@ def main():
     })
     logger = logging.getLogger("apscheduler.scheduler")
     logger.setLevel(logging.INFO)
-    logging.info(f"Main process PID: {os.getpid()}, running on {PLATFORM_COLORED}")
+    logging.info(f"Main process PID: {os.getpid()}")
 
     # Setup pipelines
     pipelines = DF.from_dict(BRAND_PIPELINES, orient="index")
