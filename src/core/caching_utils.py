@@ -35,7 +35,7 @@ def instance_data_caching_wrapper(vin: str, path_to_cache: str, data_gen_func: C
     
     return READ_FUNCTIONS[extension](path_to_cache, **read_kwargs)
 
-def instance_s3_data_caching(path_template: str, path_params: List[str]):
+def instance_s3_data_caching(path_template: str, path_params: List[str]=[]):
     def decorator(data_gen_func: Callable[..., pd.DataFrame]):
         @wraps(data_gen_func)
         def wrapper(*args, bucket: S3_Bucket = S3_Bucket(), force_update=False, **kwargs) -> pd.DataFrame:

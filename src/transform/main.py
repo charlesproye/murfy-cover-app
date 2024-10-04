@@ -63,7 +63,7 @@ def setup_logging(transform_loggers_level=logging.INFO):
     logging.info(f"Main process PID: {os.getpid()}")
     
 def get_pipelines_to_run(cli_kwargs:dict) -> DF:
-    pipelines = DF.from_dict(BRAND_PIPELINES, orient="index")
+    pipelines = BRAND_PIPELINES.copy(deep=True)
     if "pipelines" in cli_kwargs:
         if isinstance(cli_kwargs["pipelines"], str):
             cli_kwargs["pipelines"] = [cli_kwargs["pipelines"]]
