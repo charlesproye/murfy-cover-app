@@ -1,7 +1,7 @@
 import pandas as pd
-from pandas import Series
 from pandas import DataFrame as DF
 
+from core.console_utils import single_dataframe_script_main
 from core.caching_utils import singleton_data_caching
 from core.constants import *
 
@@ -14,6 +14,9 @@ def get_ev_models_infos() -> DF:
             "manufacturer": "string",
             "kwh_capacity": "float",
         })
-        .set_index("model", drop=False)
     )
 
+if __name__ == "__main__":
+    single_dataframe_script_main(get_ev_models_infos, force_update=True)
+
+models_info = get_ev_models_infos()

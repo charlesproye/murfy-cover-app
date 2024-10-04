@@ -3,6 +3,10 @@ from os import path
 AYVENS_FLEET_INFO_CSV = path.join(path.dirname(__file__), "data_cache/fleet_info.csv")
 AYVENS_FLEET_INFO_PARQUET = path.join(path.dirname(__file__), "data_cache/fleet_info.parquet")
 
+FLEET_INFO_COLS_NAME_MAPPING = {
+    "type": "version"
+}
+
 MODEL_VERSION_NAME_MAPPING = {
     "R90 Life (batterijkoop) 5d": "R90",
     "R135 Edition One (batterijkoop) 5d": "R135",

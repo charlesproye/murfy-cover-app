@@ -18,13 +18,15 @@ def get_fleet_info() -> DF:
     fleet_info = (
         pd.read_csv(AYVENS_FLEET_INFO_CSV)
         .rename(columns=str.lower)
-        .pipe(map_col_to_dict, "type", MODEL_VERSION_NAME_MAPPING)
+        .rename(columns=FLEET_INFO_COLS_NAME_MAPPING)
+        .pipe(map_col_to_dict, "version", MODEL_VERSION_NAME_MAPPING)
         .pipe(map_col_to_dict, "make", MAKE_NAME_MAPPING)
 
     )
-    fleet_info["maker_offset"] = fleet_info.groupby("make")["vin"].transform(lambda vins: random.uniform(-1, 0.1))
-    fleet_info["model_offset"] = fleet_info.groupby(["make", "type"])["vin"].transform(lambda vins: random.uniform(-1, 0.1))
-    fleet_info["model_slope"] = fleet_info.groupby(["make", "type"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
+    fleet_info["dummy_soh_maker_offset"] = fleet_info.groupby("make")["vin"].transform(lambda vins: random.uniform(-1, 0.1))
+    fleet_info["dummy_soh_model_offset"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(-1, 0.1))
+    fleet_info["dummy_soh_model_slope"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
+    fleet_info["dummy_soh_vehicle_offset"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
 
     return fleet_info
 
