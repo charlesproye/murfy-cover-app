@@ -36,6 +36,9 @@ BRAND_PIPELINES_DICT:dict[str, dict[str, Callable]] = {
     'ds': {
         "raw_tss": stellantis_get_raw_tss,
     },
+    'fiat': {
+        "raw_tss": stellantis_get_raw_tss,
+    },
 }
 
 BRAND_PIPELINES = DF.from_dict(BRAND_PIPELINES_DICT, orient="index")
