@@ -14,6 +14,7 @@ MAKE_NAME_MAPPING = {
     "bmw": "BMW",
     # high mobility
     "FORD": "ford",
+    "Mercedes-Benz": "mercedes-benz",
     "MERCEDES-BENZ": "mercedes-benz",
     "Mercedes": "mercedes-benz",
     "KIA": "kia",

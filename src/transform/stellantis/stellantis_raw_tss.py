@@ -20,7 +20,7 @@ def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
     logger = getLogger(f"transform.Stellantins-{brand}-RawTSS")
     vins_to_parse = (
         ayvens_fleet_info
-        .query(f"make == {brand}")
+        .query(f"make == '{brand}'")
         .loc[:, "vin"]
     )
     stellantis_responses = bucket.list_responses_keys_of_brand("stellantis")
