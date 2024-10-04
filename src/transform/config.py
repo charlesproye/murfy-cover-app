@@ -21,7 +21,7 @@ BRAND_PIPELINES_DICT:dict[str, dict[str, Callable]] = {
         "raw_tss":hm_get_raw_tss,
     },
     # stellantis
-    'Opel': {
+    'opel': {
         "raw_tss": stellantis_get_raw_tss,
     },
     'citroën': {
