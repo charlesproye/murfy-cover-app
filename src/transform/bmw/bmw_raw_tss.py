@@ -25,7 +25,7 @@ def get_raw_tss_without_units(bucket: S3_Bucket) -> DF:
     logger = getLogger("BMW-RawTSS")
     return (
         bucket.list_responses_keys_of_brand("BMW")
-        .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger, add_units=True)
+        .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger, add_units=False)
         .pipe(concat)
     )
 
