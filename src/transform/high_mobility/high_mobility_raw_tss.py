@@ -52,7 +52,7 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
         .assign(vin=key["vin"])
     )
 
-    logger.debug(f"Prased {key['key']} with High mobility parsing.")
+    logger.debug(f"Parsed {key['key']} with High mobility parsing.")
 
     return raw_ts
 
