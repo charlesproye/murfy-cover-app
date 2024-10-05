@@ -1,48 +1,32 @@
-from glob import glob
-import logging
+from logging import Logger, getLogger
 
 import pandas as pd
 from pandas import DataFrame as DF
+from pandas import Series
 
-from core.pandas_utils import total_MB_memory_usage, uniques_as_series
-from core.console_utils import main_decorator
-from core.caching_utils import singleton_data_caching
-from analysis.tesla.tesla_constants import *
-from analysis.tesla.tesla_fleet_info import fleet_info_df
+from core.config import *
+from core.s3_utils import S3_Bucket
+from core.console_utils import single_dataframe_script_main
+from core.caching_utils import cache_result_in_s3
+from core.pandas_utils import concat
+from transform.tesla.tesla_config import *
 
-logger = logging.getLogger(__name__)
 
-@main_decorator
-def main():
-    raw_tss = get_raw_tss(force_update=True)
-    print(raw_tss)
-    print(*raw_tss.columns, sep="\n")
-    print(f"total memory usage: {total_MB_memory_usage(raw_tss):.2f}MB")
-
-@singleton_data_caching(RAW_TSS_PATH)
-def get_raw_tss() -> DF:
-    csv_files = glob(TS_RESPONSES_REGEX_PATH)
-    # Read them all into a list
-    df_list = [pd.read_csv(file, parse_dates=["readable_date"]) for file in csv_files]
+@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT.format(brand="tesla"))
+def get_raw_tss(bucket: S3_Bucket = S3_Bucket(), **kwargs) -> DF:
+    logger = getLogger(f"transform.Tesla-RawTSS")
     return (
-        pd.concat(df_list, ignore_index=True, axis="index")
-        .rename(columns={"readable_date": "date"})
-        .astype(DATA_TYPE_RAW_DF_DICT)
-        .drop_duplicates(subset=["vin",  "date"])
-        .sort_values(by=["vin",  "date"])
-        .pipe(filter_out_vins_missing_in_the_fleet_info)
+        bucket.list_responses_keys_of_brand("tesla")
+        .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger)
+        .pipe(concat)
     )
 
-def filter_out_vins_missing_in_the_fleet_info(raw_tss:DF) -> DF:
-    vins = uniques_as_series(raw_tss["vin"])
-    vins_missing_in_fleet_info = vins[~vins.isin(fleet_info_df["vin"])]
-    raw_tss_raws_to_remove_mask = raw_tss["vin"].isin(vins_missing_in_fleet_info)
-    if raw_tss_raws_to_remove_mask.any():
-        logger.warning(VIN_IN_TIME_SERIES_BUT_NOT_IN_FLEET_INFO_WARNING_MSG)
-        for vin in vins_missing_in_fleet_info:
-            logger.warning(vin)
-            
-    return raw_tss[~raw_tss_raws_to_remove_mask]
+def parse_response_as_raw_ts(key: Series, bucket:S3_Bucket, logger:Logger) -> DF:
+    response = bucket.read_json_file(key["key"])
+    if response is None:
+        logger.debug(f"Did not parse key {key['key']} because the object returned by read_json_file was None.")
+        return Series([])
+    return DF.from_records(response)
 
 if __name__ == "__main__":
-    main()
+    single_dataframe_script_main(get_raw_tss, force_update=True)
