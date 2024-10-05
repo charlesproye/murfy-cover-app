@@ -10,7 +10,8 @@ from scipy import integrate
 from rich import print
 import numpy as np
 
-from .constants import *
+from core.config import *
+from core.constants import *
 
 def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY_RATIO) -> DF:
     """

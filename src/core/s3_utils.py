@@ -11,7 +11,7 @@ import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
 
-from core.constants import *
+from core.config import *
 from core.pandas_utils import str_split_and_retain_src
 
 load_dotenv()

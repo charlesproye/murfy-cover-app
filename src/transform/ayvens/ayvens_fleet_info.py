@@ -6,7 +6,7 @@ import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
 
-from core.constants import *
+from core.config import *
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import singleton_data_caching

@@ -21,7 +21,7 @@ import plotly.express as px
 from plotly.graph_objects import Figure
 
 from core.caching_utils import ensure_that_dirs_exist
-from core.constants import *
+from core.config import *
 
 def plt_3d_df(df: DF, x:str, y:str, z:str, color:str=None, opacity=0.4, save_path:str=None, colorscale='Viridis', size=3, symbol=None, width=1500, height=1000) -> Figure:
     fig = go.Figure(data=[go.Scatter3d(
