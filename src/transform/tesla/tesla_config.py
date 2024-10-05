@@ -4,15 +4,13 @@ S3_INITIAL_FLEET_INFO_KEY = "fleet_info/tesla/initial_fleet_info.parquet"
 
 # data types
 DATA_TYPE_RAW_DF_DICT = {
-    # "date": ,
     "vin": "string",
-    # "timestamp": ,
     "power": "float",
     "speed": "float",
     # "battery_heater": pd.CategoricalDtype(),
-    "battery_heater_no_power": bool,
-    "minutes_to_full_charge": int,
-    "battery_level": int,
+    "battery_heater_no_power": "bool",
+    "minutes_to_full_charge": "float",
+    "battery_level": "float",
     "battery_range": "float",
     "charge_current_request": "float",
     "charge_current_request_max": "float",
@@ -32,9 +30,14 @@ DATA_TYPE_RAW_DF_DICT = {
     "charger_voltage": "float",
     # "charging_state": pd.CategoricalDtype(),
     "est_battery_range": "float",
-    "fast_charger_present": bool,
+    "fast_charger_present": "bool",
     # "fast_charger_type": pd.CategoricalDtype(),
     "odometer": "float",
     "inside_temp": "float",
     "outside_temp": "float",
+}
+
+COLUNMS_NAMES_MAPPING = {
+    "battery_level": "soc",
+    "readable_date": "date",
 }
