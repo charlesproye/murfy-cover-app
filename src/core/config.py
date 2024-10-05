@@ -8,7 +8,6 @@ PARQUET_EV_MODELS_INFO_PATH = join(dirname(__file__), "data_cache/models_info.pa
 S3_RAW_TSS_KEY_FORMAT = "raw_ts/{brand}/time_series/raw_tss.parquet"
 S3_PROCESSED_TSS_KEY_FORMAT = "processed_ts/{brand}/time_series/processed_tss.parquet"
 
-
 SOH_LOST_PER_KM_DUMMY_RATIO = 0.000028
 
 # caching
