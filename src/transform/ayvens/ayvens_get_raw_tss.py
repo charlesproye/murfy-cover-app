@@ -15,12 +15,14 @@ from transform.config import *
 
 def get_ayvens_raw_tss(bucket: S3_Bucket=S3_Bucket()) -> dict[str, DF]:
     logger = getLogger(f"transform.Ayvens-RawTSS")
+    print(fleet_info["activated"].unique())
     makers = (
         fleet_info
-        .query("activated == 'Found'")
+        .query("activated == 'activated'")
         .loc[:, "make"]
         .pipe(uniques_as_series)
     )
+    print(makers)
     raw_tss = makers.apply(get_raw_tss_of_brand, bucket=bucket)
     return dict(zip(makers, raw_tss))
 
