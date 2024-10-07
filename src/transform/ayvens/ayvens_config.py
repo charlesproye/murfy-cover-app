@@ -39,3 +39,20 @@ MAKE_NAME_MAPPING = {
     "Citroën": "citroën",
     "DS": "ds",
 }
+
+COL_DTYPES = {
+    "licence plate": "category",
+    "make": "category",
+    "model": "category",
+    "version": "category",
+    # "capacity": "float",
+    # "autonomie": "float",
+    # "end of contract": "object",
+    "country": "category",
+    "category": "category",
+    "activated": "category",
+    "ownership": "category",
+    # "registration_date": "object",
+    # "contract_start_date": "object",
+    "vin": "category",
+}
