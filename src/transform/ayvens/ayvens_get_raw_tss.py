@@ -21,15 +21,21 @@ def get_ayvens_raw_tss(bucket: S3_Bucket=S3_Bucket()) -> dict[str, DF]:
         .loc[:, "make"]
         .pipe(uniques_as_series)
     )
-    raw_tss = makers.apply(get_raw_tss_of_brand, bucket=bucket)
-    return dict(zip(makers, raw_tss))
+    print(makers)
+    # raw_tss = makers.apply(get_raw_tss_of_brand, bucket=bucket)
+    # return dict(zip(makers, raw_tss))
+
+    return {maker: get_raw_tss_of_brand(maker, bucket) for maker in makers}
 
 
 def get_raw_tss_of_brand(brand:str, bucket: S3_Bucket)  -> DF:
-    print(brand)
+    if not brand in BRAND_PIPELINES.index:
+        return DF()
     brand_raw_tss = BRAND_PIPELINES.loc[brand, "raw_tss"](brand=brand, bucket=bucket)
     ayvens_vins_mask = brand_raw_tss["vin"].isin(fleet_info["vin"])
     brand_raw_tss = brand_raw_tss[ayvens_vins_mask]
+
+    print(brand_raw_tss)
 
     return brand_raw_tss
 

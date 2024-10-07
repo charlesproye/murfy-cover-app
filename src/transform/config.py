@@ -8,9 +8,11 @@ from transform.high_mobility.high_mobility_raw_tss import get_raw_tss as hm_get_
 
 
 BRAND_PIPELINES_DICT:dict[str, dict[str, Callable]] = {
+# bmw
     "BMW": {
         "raw_tss":bmw_get_raw_tss,
     },
+# high mobility
     "kia":{
         "raw_tss":hm_get_raw_tss,
     },
@@ -20,13 +22,13 @@ BRAND_PIPELINES_DICT:dict[str, dict[str, Callable]] = {
     "ford":{
         "raw_tss":hm_get_raw_tss,
     },
-    # stellantis
+# stellantis
     'opel': {
         "raw_tss": stellantis_get_raw_tss,
     },
-    'citroën': {
-        "raw_tss": stellantis_get_raw_tss,
-    },
+    # 'citroën': {
+    #     "raw_tss": stellantis_get_raw_tss,
+    # },
     'peugeot': {
         "raw_tss": stellantis_get_raw_tss,
     },
