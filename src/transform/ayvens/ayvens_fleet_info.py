@@ -31,7 +31,7 @@ def get_fleet_info() -> DF:
     fleet_info["in_GLOBAL2"] = fleet_info["vin"].isin(fleet_info_with_registration_and_start_contract["VIN"])
     vins_in_global2 = fleet_info.query("in_GLOBAL2")["vin"]
     car_registrations = fleet_info_with_registration_and_start_contract.loc[vins_in_global2, "Car registration date"]
-    fleet_info.loc[vins_in_global2, "registration date"] = car_registrations
+    fleet_info.loc[vins_in_global2, "registration_date"] = car_registrations
 
     # Add contract start dates from fleet info global NL (NetherLands)
     fleet_info_with_start_contract = pd.read_csv(AYVENS_FLEET_WITH_ONLY_CONTRACT_START_DATE).set_index("VIN", drop=False)
