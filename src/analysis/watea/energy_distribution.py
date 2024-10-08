@@ -5,23 +5,21 @@ from pandas import DataFrame as DF
 from pandas import Series
 import pandas as pd
 import numpy as np
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 
 from core.pandas_utils import floor_to, series_start_end_diff
 from core.caching_utils import singleton_data_caching
-from watea.watea_constants import *
-from watea.watea_fleet_info import fleet_info_df
-from watea.processed_watea_ts import processed_ts_it
-
-# soh estimation evaluation
+from analysis.watea.watea_constants import *
+from analysis.watea.watea_fleet_info import fleet_info_df
+from analysis.watea.processed_watea_ts import processed_ts_it
 
 # soh estimation
 @singleton_data_caching(PATH_TO_PROCESSED_CLUSTER)
 def get_processed_cluster() -> DF:
     return (
         get_preprocessed_charging_points()
+        .query(f"cluster_idx == {MAIN_CHARGING_REGIME_CLUSTER_IDX}")
         .pipe(estimate_soh)
     )
 
@@ -67,7 +65,7 @@ def get_preprocessed_charging_points(force_update_extraction=True) -> DF:
         .pipe(compute_umap_features)
         .pipe(segment_charing_regimes)
     )
-    
+
 def segment_charing_regimes(charging_points: DF) -> DF:
     dbscan = DBSCAN(eps=0.5, min_samples=5, metric='euclidean', n_jobs=-1)
     umap_feature_cols = charging_points.filter(regex='umap_feature_').columns
@@ -75,7 +73,7 @@ def segment_charing_regimes(charging_points: DF) -> DF:
 
     return charging_points
 
-def compute_umap_features(df:DF, n_components=UMAP_N_COMPONENTS, features=UMAP_INPUT_FEATURE_COLS, n_neighbours=120) -> DF:
+def compute_umap_features(df:DF, n_components=UMAP_N_COMPONENTS, features=UMAP_INPUT_FEATURE_COLS, target_feature="energy_added", n_neighbours=120) -> DF:
     import umap # Import umap inside the function because import is slow (because of tensor flow)
     umap_feature_cols = [f"umap_feature_{i}" for i in range(n_components)]
     umap_feature_cols_to_drop = [col for col in umap_feature_cols if col in df.columns] # Drop umap feature columns if they are already in the df
@@ -89,7 +87,7 @@ def compute_umap_features(df:DF, n_components=UMAP_N_COMPONENTS, features=UMAP_I
         ])
         .fit_transform(
             X=df[features].values,
-            y=df["energy_added"],
+            y=df[target_feature],
         )
     )
 

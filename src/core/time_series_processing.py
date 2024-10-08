@@ -10,7 +10,8 @@ from scipy import integrate
 from rich import print
 import numpy as np
 
-from .constants import *
+from core.config import *
+from core.constants import *
 
 def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY_RATIO) -> DF:
     """
@@ -23,84 +24,79 @@ def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY
 
     return ts
 
-def preprocess_date(raw_ts: DF, add_sec_time_diff_col=True) -> DF:
+def process_date(ts: DF, add_sec_time_diff_col=False, original_name="date", set_as_index=False) -> DF:
     """
     ### Description:
     Applies all the boiler plate operation on the "date" column:
-    1. Sets the unit as secondfor easier convertion into timestamps.
+    1. Sets the unit as second for easier convertion into timestamps.
     1. Drops rows with duplicate timestamps.
-    1. Sets the "date" as index without dropping it.
-    1. Sorts the index 
-    1. assigns an int "sec_time_diff" column (optional, set `add_sec_time_diff_col` to False if you don;t want to)
+    1. Sorts the rows 
+    ### Parameters:
+    original_name, str, default="date":   
+        Name of the column that represents the date before parsing, will be renamed to date.    
+        If the original_name is not present in the dataframe, the function returns the dataframe untoched.
+    add_sec_time_diff_col, bool:  
+        Set this to true to add an int "sec_time_diff" column  
+    set_as_index, bool:  
+    Set to True if you want the date to becaome the index, will not drop the column.  
     """
-    raw_ts = (
-        raw_ts
-        .assign(date=pd.to_datetime(raw_ts["date"]).dt.as_unit("s"))
+    if not original_name in ts.columns:
+        return ts
+    ts = (
+        ts
+        .rename(columns={original_name: "date"})
+        .assign(date=pd.to_datetime(ts["date"]).dt.as_unit("s"))
         .drop_duplicates("date")
-        .set_index("date", drop=False)
         .sort_index()
     )
+    if set_as_index:
+        ts = ts.set_index("date", drop=False)
     if add_sec_time_diff_col:
-        raw_ts["sec_time_diff"] = (
-            raw_ts["date"]
+        ts["sec_time_diff"] = (
+            ts["date"]
             .ffill()
             .diff()
             .dt.as_unit("s")
             .astype(int)
         )
 
-    return raw_ts
+    return ts
 
 def compute_cum_integrals_of_current_vars(vehicle_df: DF) -> DF:
     """
     ### Description:
     Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).
     """
-    vehicle_df["cum_energy"] = cum_integral(vehicle_df["power"])
-    vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"])
+    if "power" in vehicle_df.columns:
+        vehicle_df["cum_energy"] = cum_integral(vehicle_df["power"], date_series=vehicle_df["date"])
+    if "current" in vehicle_df.columns:
+        vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"], date_series=vehicle_df["date"])
     return vehicle_df
 
-def cum_integral(power_series: Series) -> Series:
+def cum_integral(power_series: Series, date_series=None) -> Series:
     """
     ### Description:
     Computes the cumulative energy of the time series by using cumulative trapezoid intergrating of the power column.
     ### Parameters:
     power_col: name of the power column, must be in kw.
+    date_series: optional parameter to provide if the series is not indexed by date.
     ### Returns:
     df with added column with the name of cum_energy_col in kWh.
     """
+    date_series = power_series.index.to_series() if date_series is None else date_series
     cum_energy_data = integrate.cumulative_trapezoid(
         # Make sure that date time units are in seconds before converting to int
-        x=power_series.index.to_series().dt.as_unit("s").astype(int),
+        x=date_series.dt.as_unit("s").astype(int),
         y=power_series.fillna(0).values,
         initial=0,
     )
     return Series(cum_energy_data * KJ_TO_KWH, index=power_series.index)
 
-def soh_from_est_battery_range(vehicle_df: DF, range_col: str, stock_km_per_soc: float, **kwargs) -> DF:
-    """
-    ### Description:
-    Computes soh from estimated range of the car.
-    The range column must be in kilometers.
-    """
-    vehicle_df["km_per_soc"] = vehicle_df[range_col] / vehicle_df["soc"]
-    vehicle_df["range_soh"] = 100 * vehicle_df["km_per_soc"] / stock_km_per_soc
-    vehicle_df["range_soh"] = vehicle_df["range_soh"].mask(vehicle_df["soc"].diff().eq(0), np.nan).interpolate(method="time")
-    vehicle_df["smoothed_soh"] = double_rolling_median_smoothing(vehicle_df["range_soh"])
-    
-    return vehicle_df
-
-def double_rolling_median_smoothing(src:Series, window:str|int="3h") -> Series:
-    return (
-        src
-        .rolling(window, center=True).median()
-        .rolling(window, center=True).median()
-    )
 
 def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
         vehicle_df
-        # use interpolate before checking if the odometer increased to composate for missing values
+        # use interpolate before checking if the odometer increased to compensate for missing values
         .assign(in_motion=vehicle_df["odometer"].interpolate(method="time").diff().gt(0))
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
@@ -137,22 +133,6 @@ def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     return vehicle_df
 
 
-def perf_mask_and_idx_from_charge_mask(vehicle_df: DF, max_time_diff:TD|None=None) -> DF:
-    vehicle_df = (
-        vehicle_df
-        .assign(interpolated_soc=vehicle_df["soc"].interpolate(method="time"))
-        .assign(interpolated_soc_diff=vehicle_df["soc"].interpolate(method="time"))
-
-        .eval("sec_per_soc = sec_time_diff / interpolated_soc_diff")
-
-        .eval("in_charge_above_80 = in_charge & interpolated_soc >= 80")
-        .eval("in_charge_bellow_80 = in_charge & interpolated_soc < 80")
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge_above_80", max_time_diff=max_time_diff)
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge_bellow_80", max_time_diff=max_time_diff)
-    )
-
-    return vehicle_df
-
 # TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
 def perf_mask_and_idx_from_condition_mask(vehicle_df: DF, src_mask:str, src_mask_idx_col_name="{src_mask}_idx", perf_mask_col_name="{src_mask}_perf_mask", max_time_diff:TD|None=None) -> DF:
     src_mask_idx_col_name = src_mask_idx_col_name.format(src_mask=src_mask)
@@ -169,7 +149,7 @@ def period_idx_of_mask(vehicle_df:DF, mask_col: str, period_shift:int=1, max_tim
         mask = vehicle_df.eval(f"{mask_col} & sec_time_diff < {max_time_diff.total_seconds()}") 
     else:
         mask = vehicle_df[mask_col]
-    mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False) #| vehicle_df["soc_per_soc"].diff().abs()
+    mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False)
     idx = mask_for_idx.cumsum()
     return idx
 

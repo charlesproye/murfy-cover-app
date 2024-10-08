@@ -13,9 +13,9 @@ from rich.traceback import install as install_rich_traceback
 import core.time_series_processing as ts
 from core.caching_utils import instance_data_caching_wrapper
 from core.console_utils import parse_kwargs
-from watea.watea_constants import *
-from watea.watea_fleet_info import iterate_over_ids
-from watea.raw_watea_ts import raw_ts_of
+from analysis.watea.watea_constants import *
+from analysis.watea.watea_fleet_info import iterate_over_ids
+from analysis.watea.raw_watea_ts import raw_ts_of
 
 def main():
     install_rich_traceback(extra_lines=0, width=130)
@@ -43,7 +43,6 @@ def process_raw_time_series(raw_vehicle_df: DF, **kwargs) -> DF:
     return (
         raw_vehicle_df
         .pipe(pre_process_raw_time_series)
-        .pipe(ts.soh_from_est_battery_range, "battery_range_km", FORD_ETRANSIT_DEFAULT_KM_PER_SOC)
         .pipe(ts.in_motion_mask_from_odo_diff)
         .pipe(ts.in_discharge_and_charge_from_soc_diff)
         .eval("in_charge = in_charge & soc < 99") # Ford E-Transit recordings tend to plateau at 99 of a random amout of time so remove these 
@@ -80,7 +79,7 @@ def pre_process_raw_time_series(raw_vehicle_df: DF) -> DF:
             "battery_hv_current": "current",
             "autonomy_km": "battery_range_km"
         })
-        .pipe(ts.preprocess_date)
+        .pipe(ts.process_date, set_as_index=True, add_sec_time_diff_col=True)
     )
 
 

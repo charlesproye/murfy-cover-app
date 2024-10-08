@@ -1,56 +1,80 @@
-import asyncio
-from asyncio.exceptions import CancelledError
 import os
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
+from datetime import datetime as DT
+from datetime import timedelta as TD
+import logging.config
 
-from rich import print
+from pandas import DataFrame as DF
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
-from transform.raw_ts.high_mobility_raw_ts import HighMobilityRawTS
-from transform.processed_ts.high_mobility_processed_ts import HighMobilityProcessedTS
-from utils.platform import PLATFORM_COLORED, PLATFORM
-from bib_models.utils.log_format import get_handler
-from transform.constants import *
+from transform.config import *
+from core.console_utils import main_decorator, parse_kwargs
 
-handler = get_handler(is_logged=os.getenv("IS_DEPLOY",False), platform=PLATFORM)
-logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    handlers=[handler]
-)
+@main_decorator
+def main():
+    cli_kwargs = parse_kwargs(MAIN_KWARGS)
 
-async def main(start_scheduler: bool = True):
-    scheduler = AsyncIOScheduler()
+    print(cli_kwargs)
 
-    logger = logging.getLogger("apscheduler.scheduler")
-    logger.setLevel(logging.WARNING)
-    logging.info(f"Main process PID: {os.getpid()}, running on {PLATFORM_COLORED}")
-    #### Daily
-
-    for brand in HANDLED_BRANDS: #each job needs to be run one after the other 
-        await HighMobilityRawTS(brand).add_to_schedule(scheduler)
-        # await HighMobilityProcessedTS(brand).add_to_schedule(scheduler)
-
-    ## Pour Mobilisight
-    # await HighMobilityRawTS("stellantis").add_to_schedule(scheduler)
-    # await HighMobilityProcessedTS("stellantis").add_to_schedule(scheduler)
-
-    # Start the scheduler
-    if not start_scheduler:
-        return
+    # Setup logging
+    setup_logging(cli_kwargs["log_level"].upper())
+    # Setup pipelines
+    pipelines = get_pipelines_to_run(cli_kwargs)
+    # Setup scheduler
+    scheduler = BlockingScheduler()
+    for brand, pipeline in pipelines.iterrows():
+        scheduler.add_job(
+        func=lambda brand=brand, pipeline=pipeline: [func(brand=brand, force_update=True) for task, func in pipeline.dropna().items()],
+            name=brand,
+            id=brand,
+            trigger=IntervalTrigger(
+                days=1,
+                start_date=DT.now() + TD(seconds=3)
+            ),
+        )
+    # Start
     scheduler.start()
 
+def setup_logging(transform_loggers_level=logging.INFO):
+    logging.config.dictConfig({
+        'version': 1,
+        "loggers": {
+            "transform": {
+                "level": transform_loggers_level,
+                'handlers': ['console'],
+                'propagate': False,
+            }
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'default',
+            },
+        },
+        'formatters': {
+            'default': {
+                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            },
+        },
+    })
+    logger = logging.getLogger("apscheduler.scheduler")
     logger.setLevel(logging.INFO)
-    try:
-        # Keep the main thread alive
-        while True:
-            await asyncio.sleep(1)
-    except (KeyboardInterrupt, SystemExit, CancelledError):
-        scheduler.shutdown(wait=False)
-        raise
+    logging.info(f"Main process PID: {os.getpid()}")
+    
+def get_pipelines_to_run(cli_kwargs:dict) -> DF:
+    pipelines = BRAND_PIPELINES.copy(deep=True)
+    if "pipelines" in cli_kwargs:
+        if isinstance(cli_kwargs["pipelines"], str):
+            cli_kwargs["pipelines"] = [cli_kwargs["pipelines"]]
+        pipelines:DF = pipelines.loc[cli_kwargs["pipelines"]]
+    if "steps" in cli_kwargs:
+        if isinstance(cli_kwargs["steps"], str):
+            cli_kwargs["steps"] = [cli_kwargs["steps"]]
+        pipelines:DF = pipelines.loc[:, cli_kwargs["steps"]]
+
+    return pipelines
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logging.info("Exiting...")
+    main()
 

@@ -1,5 +1,5 @@
 from datetime import timedelta as TD
-from os.path import join
+from os.path import join, dirname
 import pandas as pd
 
 import numpy as np
@@ -15,13 +15,13 @@ FORD_ETRANSIT_DEFAULT_RANGE = 317
 FORD_ETRANSIT_DEFAULT_KM_PER_SOC = FORD_ETRANSIT_DEFAULT_RANGE / 100
 
 # paths
-PATH_TO_RAW_TS_FOLDER = "data_cache/raw_time_series"
-PATH_TO_RAW_TS = join(PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
-PATH_TO_PROCESSED_TS = "data_cache/processed_time_series/{id}.parquet"
-PATH_TO_FLEET_INFO_DF = "data_cache/fleet_info/fleet_info_df.{extension}"
-PATH_TO_RAW_FLEET_CHARGING_POINTS = "data_cache/soh_estimation/raw_fleet_charging_points.parquet"
-PATH_TO_PREPROCESSED_FLEET_CHARGING_POINTS = "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet"
-PATH_TO_PROCESSED_CLUSTER = "data_cache/soh_estimation/processed_cluster.parquet"
+PATH_TO_RAW_TS_FOLDER = join(dirname(__file__), "data_cache/raw_time_series")
+PATH_TO_RAW_TS = join(dirname(__file__), PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
+PATH_TO_PROCESSED_TS = join(dirname(__file__), "data_cache/processed_time_series/{id}.parquet")
+PATH_TO_FLEET_INFO_DF = join(dirname(__file__), "data_cache/fleet_info/fleet_info_df.{extension}")
+PATH_TO_RAW_FLEET_CHARGING_POINTS = join(dirname(__file__), "data_cache/soh_estimation/raw_fleet_charging_points.parquet")
+PATH_TO_PREPROCESSED_FLEET_CHARGING_POINTS = join(dirname(__file__), "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet")
+PATH_TO_PROCESSED_CLUSTER = join(dirname(__file__), "data_cache/soh_estimation/processed_cluster.parquet")
 # recording dependant constants
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 
@@ -70,93 +70,3 @@ POLYNOMIAL_LINEAR_REGRESSION_PIPELINE = Pipeline([
 ])
 CHARGING_POINTS_GRP_BY_SOC_QUANTIZATION = 0.5
 
-# ========================================================plt constants========================================================
-# plt layouts:
-JUST_ENERGY_SOH = {
-    "perfs_dict": {
-        "energy_soh": ["soh"],
-    },
-}
-ENERGY_SOH = {
-    "perfs_dict": {
-        "energy_soh": ["soh"],
-    },
-    "plt_energy_dist": True,
-}
-
-VOLTAGE_AND_SOC = {
-    "vehicle_df": [
-        {"y":"voltage", "linestyle":"", "marker":"."},
-        {"y":"soc", "linestyle":"", "marker":"."},
-    ]
-}
-
-IN_CHARGE_AND_POWER = {
-    "vehicle_df": [
-        ["soc", "in_charge_perf_mask"],
-        [
-            "power",
-            "twinx",
-            {"y":"temp", "color":"red", "linestyle":"--"}
-        ],
-        [
-            "current",
-            {"y":"window_current_mean", "color":"red", "linestyle":"--", "marker":"."}
-        ],
-            "voltage",
-    ],
-}
-
-DEBUG_CHARGE_MASK = {
-    "vehicle_df": [
-        [
-            "soc",
-            "in_charge_perf_mask",
-            {
-                "y":"in_discharge_perf_mask",
-                "color":"red",
-                "alpha":0.6
-            },
-        ],
-        [
-            {
-                "y":"in_charge_perf_idx",
-                "linestyle":"--",
-                "marker":"x",
-                "color":"red",
-                "alpha":0.4
-            },
-            {
-                "y":"in_charge_idx",
-                "linestyle":"--",
-                "marker":"x",
-                "color":"yellow",
-                "alpha":0.4
-            },
-            "in_charge_perf_mask",
-            "twinx",
-            {
-                "y":"smoothed_soc_dir",
-                "marker":"x",
-                "color":"green",
-                "alpha":0.4
-            },
-        ],
-    ]
-}
-
-POWER_AND_CHARGE = {
-    "vehicle_df": [
-        {"y":"current", "color":"green"},
-        {"y":"voltage", "color":"red"},
-        [
-            "soc",
-            "in_charge",
-        ],
-        [
-            {"y":"cum_energy", "color":"green"},
-            "twinx",
-            {"y":"cum_charge", "color":"red"},
-        ],
-    ]
-}
