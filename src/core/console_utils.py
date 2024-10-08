@@ -8,24 +8,22 @@ from rich import print
 
 from core.pandas_utils import total_MB_memory_usage
 
-# TODO: Remove parse_kwargs
-def parse_kwargs(mandatory_args: list = [], optional_args: dict = {}, **kwargs):
+def parse_kwargs(cli_args: dict[str, dict[str, str]] = [], **kwargs):
     # Set up argparse to accept known arguments
     parser = ArgumentParser(**kwargs)
     
     # Add mandatory arguments
-    for arg in mandatory_args:
-        parser.add_argument(f'--{arg}', required=True)
-    
-    # Add optional arguments
-    for arg, default in optional_args.items():
-        parser.add_argument(f"--{arg}", default=default)
+    for cli_arg_name, cli_arg_properties in cli_args.items():
+        parser.add_argument(cli_arg_name, **cli_arg_properties)
     
     # Parse known arguments
     known_args, unknown_args = parser.parse_known_args()
 
     # Convert known_args (Namespace) to a dictionary
     known_args_dict = vars(known_args)
+
+    # Convert known_args (Namespace) to a dictionary and filter out None values
+    known_args_dict = {k: v for k, v in vars(known_args).items() if v is not None}
 
     # Parse unknown arguments manually
     parsed_kwargs = {}

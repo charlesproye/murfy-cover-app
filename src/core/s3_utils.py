@@ -10,10 +10,8 @@ import boto3
 import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
-from rich import print
-import botocore
 
-from core.constants import *
+from core.config import *
 from core.pandas_utils import str_split_and_retain_src
 
 load_dotenv()
@@ -66,11 +64,8 @@ class S3_Bucket():
         except Exception as e:
             # Check if the error code is 404, which means the key does not exist
             if e.response['Error']['Code'] == '404':
-                self.logger.info(f"File '{key}' does not exist in bucket '{self.bucket_name}'.")
                 return False
             else:
-                # Re-raise any other exceptions
-                self.logger.error(f"Error checking if file exists: {e}")
                 raise e
 
     def list_responses_keys_of_brand(self, brand:str="") -> DF:

@@ -1,32 +1,32 @@
 from dateutil import parser
-import logging
+from logging import Logger, getLogger
 
 import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
-from rich.progress import track
 
+from core.config import *
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import instance_s3_data_caching
+from core.caching_utils import cache_result_in_s3
 from core.pandas_utils import concat
-from analysis.high_mobility.high_mobility_constants import *
 
-@instance_s3_data_caching(HM_RAW_TSS_KEY_FORMAT, ["brand"])
-def get_raw_tss(brand:str, bucket: S3_Bucket) -> DF:
+@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT, ["brand"])
+def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
+    logger = getLogger(f"transform.HighMobility-{brand}-RawTSS")
     return (
         bucket.list_responses_keys_of_brand(brand)
-        .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket)
+        .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger)
         .pipe(concat)
     )
 
-def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger=logging.getLogger("HM_raw_tss")) -> DF:
+def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
     # The responses are first indexed by "capability" (see any high mobility's air table data catalog).
     # We don't really need to know what capability but some variables that belong to different capabilities may have the same name.
     # To differentiate them, we will prepend their correspomding capability to their name.
     response = bucket.read_json_file(key["key"])
     if response is None:
-        logger.info(f"Did not parse key {key['key']} because the object returned by read_json_file was None.")
+        logger.debug(f"Did not parse key {key['key']} because the object returned by read_json_file was None.")
         return Series([])
     flattened_response:dict = {}
     for capability, variables in response.items():
@@ -51,6 +51,8 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger=logging.getLog
         .reset_index(drop=False, names="date")
         .assign(vin=key["vin"])
     )
+
+    logger.debug(f"Parsed {key['key']} with High mobility parsing.")
 
     return raw_ts
 

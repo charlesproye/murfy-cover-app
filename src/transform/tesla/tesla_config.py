@@ -1,0 +1,43 @@
+# path
+S3_JSON_FLEET_INFO_RESPONSE_KEY = "fleet_info/tesla/raw_fleet_info.json"
+S3_INITIAL_FLEET_INFO_KEY = "fleet_info/tesla/initial_fleet_info.parquet"
+
+# data types
+DATA_TYPE_RAW_DF_DICT = {
+    "vin": "string",
+    "power": "float",
+    "speed": "float",
+    # "battery_heater": pd.CategoricalDtype(),
+    "battery_heater_no_power": "bool",
+    "minutes_to_full_charge": "float",
+    "battery_level": "float",
+    "battery_range": "float",
+    "charge_current_request": "float",
+    "charge_current_request_max": "float",
+    "charge_enable_request": "float",
+    "charge_energy_added": "float",
+    "charge_limit_soc": "float",
+    "charge_limit_soc_max": "float",
+    "charge_limit_soc_min": "float",
+    "charge_limit_soc_std": "float",
+    "charge_miles_added_ideal": "float",
+    "charge_miles_added_rated": "float",
+    # "charge_port_cold_weather_mode": pd.CategoricalDtype(),
+    "charge_rate": "float",
+    "charger_actual_current": "float",
+    "charger_pilot_current": "float",
+    "charger_power": "float",
+    "charger_voltage": "float",
+    # "charging_state": pd.CategoricalDtype(),
+    "est_battery_range": "float",
+    "fast_charger_present": "bool",
+    # "fast_charger_type": pd.CategoricalDtype(),
+    "odometer": "float",
+    "inside_temp": "float",
+    "outside_temp": "float",
+}
+
+COLUNMS_NAMES_MAPPING = {
+    "battery_level": "soc",
+    "readable_date": "date",
+}

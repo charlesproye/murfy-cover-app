@@ -63,3 +63,8 @@ def concat(objects:list|dict|Series, **kwargs) -> DF:
     if isinstance(objects, dict):
         return pd.concat({key:value for key, value in objects.items()}, **kwargs)
     raise ValueError(f"pandas_utils.concat recieved inappropriate type: {type(objects)}.")
+
+def map_col_to_dict(df:DF, col:str, dict_map:dict) -> DF:
+    df[col] = df[col].map(dict_map).fillna(df[col])
+    
+    return df
