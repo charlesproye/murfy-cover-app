@@ -1,12 +1,13 @@
 import concurrent.futures
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from queue import Queue
 from typing import Optional
 
 import boto3
 import msgspec
+from datetime import datetime, timedelta
 from botocore.client import ClientError
 from botocore.credentials import threading
 from ingestion.bmw.multithreading import MergedInfoWrapper
@@ -94,9 +95,10 @@ class BMWCompresser:
             encoded = msgspec.json.encode(bmw_info)
 
             try:
+                yesterday = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
                 put_response = self.__s3.put_object(
                     Bucket=self.__bucket,
-                    Key=f"response/BMW/{vin}/{datetime.today().date()}.json",
+                    Key=f"response/BMW/{vin}/{yesterday}.json",
                     Body=encoded,
                 )
             except ClientError as e:
