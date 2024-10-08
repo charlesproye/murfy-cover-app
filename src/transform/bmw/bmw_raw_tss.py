@@ -4,12 +4,12 @@ from pandas import DataFrame as DF
 from logging import Logger, getLogger
 
 from core.s3_utils import S3_Bucket
-from core.constants import S3_RAW_TSS_KEY_FORMAT
+from core.config import S3_RAW_TSS_KEY_FORMAT
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import singleton_s3_data_caching
+from core.caching_utils import cache_result_in_s3
 from core.pandas_utils import concat
 
-@singleton_s3_data_caching(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"))
+@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"))
 def get_raw_tss(bucket: S3_Bucket, **kwargs) -> DF:
     logger = getLogger("transform.BMW-RawTSS")
     return (
@@ -20,7 +20,7 @@ def get_raw_tss(bucket: S3_Bucket, **kwargs) -> DF:
 
 # Small work around for the raw_ts notebook
 # TODO: Remove once we have the processed TS and use processed ts in the notebook (that will be called processed_ts_EDA I guess).
-@singleton_s3_data_caching(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"))
+@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"))
 def get_raw_tss_without_units(bucket: S3_Bucket) -> DF:
     logger = getLogger("BMW-RawTSS")
     return (
@@ -49,7 +49,7 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, add_un
         .reset_index(drop=False)
     )
 
-    logger.debug(f"Prased {key['key']} with bmw parsing.")
+    logger.debug(f"Parsed {key['key']} with bmw parsing.")
 
     return raw_ts
 

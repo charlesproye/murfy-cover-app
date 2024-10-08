@@ -7,15 +7,15 @@ from pandas import Series
 from logging import Logger, getLogger
 
 from core.s3_utils import S3_Bucket
-from core.constants import *
+from core.config import *
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import instance_s3_data_caching
+from core.caching_utils import cache_result_in_s3
 from core.pandas_utils import concat
 from transform.config import *
 # work around to know the vins of the stellantis brand
 from transform.ayvens.ayvens_fleet_info import fleet_info  as ayvens_fleet_info
 
-@instance_s3_data_caching(S3_RAW_TSS_KEY_FORMAT, ['brand'])
+@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT, ['brand'])
 def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
     logger = getLogger(f"transform.Stellantins-{brand}-RawTSS")
     vins_to_parse = (
@@ -72,7 +72,7 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
         .assign(vin=key["vin"])
     )
 
-    logger.debug(f"Prased {key['key']} with stellantis parsing.")
+    logger.debug(f"Parsed {key['key']} with stellantis parsing.")
 
     return raw_ts
 

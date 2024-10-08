@@ -2,23 +2,18 @@ import json
 
 import pandas as pd
 from pandas import DataFrame as DF
-from rich import print
 
-from core.console_utils import main_decorator
-from core.caching_utils import singleton_data_caching
+from core.console_utils import single_dataframe_script_main
+from core.s3_utils import S3_Bucket
+from core.caching_utils import cache_result_in_s3
 from core.ev_models_info import get_ev_models_infos
-from analysis.tesla.tesla_constants import *
+from transform.tesla.tesla_config import *
 
-@main_decorator
-def main():
-    fleet_info_df = get_fleet_info(force_update=True)
-    print(fleet_info_df.to_string(max_rows=None))
-
-@singleton_data_caching(INITIAL_FLEET_INFO_PATH)
-def get_fleet_info() -> DF:
-    with open(JSON_FLEET_INFO_RESPONSE_PATH) as json_fleet_info_file:
-        raw_json_fleet_info: list[dict] = json.load(json_fleet_info_file)
-    models_infos = get_ev_models_infos()
+@cache_result_in_s3(S3_INITIAL_FLEET_INFO_KEY)
+def get_fleet_info(bucket: S3_Bucket=S3_Bucket()) -> DF:
+    raw_json_fleet_info: list[dict] = bucket.read_json_file(S3_JSON_FLEET_INFO_RESPONSE_KEY)
+    models_infos = get_ev_models_infos().set_index('model')
+    print(models_infos)
     fleet_info_objs: list[dict] = []
     for raw_dict in raw_json_fleet_info:
         vehicle_info_dict = {
@@ -39,6 +34,6 @@ def find_in_list_of_dict(raw_vehicle_info_dict: dict, target_key_perfix):
     raise ValueError(f"Could not find object wth key prefix '{target_key_perfix}' in list of dictonnary.")    
 
 if __name__ == "__main__":
-    main()
+    single_dataframe_script_main(get_fleet_info, force_update=True)
 
 fleet_info_df = get_fleet_info()

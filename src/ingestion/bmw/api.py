@@ -83,9 +83,7 @@ class BMWApi:
         )
         return result.status_code, result.json()
 
-    def list_clearances(
-        self,
-    ) -> tuple[int, list[Vehicle] | object]:
+    def list_clearances(self) -> tuple[int, list[Vehicle] | object]:
         """Lists clearances of vehicles activated through the HM API
 
         Returns
@@ -107,13 +105,21 @@ class BMWApi:
                     clearance_status="ACTIVE" if vehicle["added_to_fleet"] else "INACTIVE",
                     licence_plate=vehicle.get("licence_plate"),
                     note=vehicle.get("note"),
-                    contract_end_date=vehicle["contract"]["end_date"],
-                    added_to_fleet=vehicle["added_to_fleet"],
+                    contract_end_date=vehicle.get("contract", {}).get("end_date") if vehicle.get("contract") else None,
+                    added_to_fleet=self.parse_date(vehicle["added_to_fleet"]),
                 )
                 for vehicle in vehicles_data
             ]
         else:
             return result.status_code, result.json()
+
+    def parse_date(self, date_string):
+        if date_string:
+            try:
+                return datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%S.%f%z").date()
+            except ValueError:
+                return None
+        return None
 
     def get_clearance(self, vin: str) -> tuple[int, Vehicle | object]:
         """Get the clearance for a single vehicle
