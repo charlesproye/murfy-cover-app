@@ -2,6 +2,8 @@ from os import path
 
 AYVENS_FLEET_INFO_CSV = path.join(path.dirname(__file__), "data_cache/fleet_info.csv")
 AYVENS_FLEET_INFO_PARQUET = path.join(path.dirname(__file__), "data_cache/fleet_info.parquet")
+AYVENS_FLEET_WITH_ONLY_CONTRACT_START_DATE = path.join(path.dirname(__file__), "data_cache/fleet_info - Global NL.csv")
+AYVENS_FLEET_WITH_CAR_REGISTRATION = path.join(path.dirname(__file__), "data_cache/fleet_info - Global NL 2.csv")
 
 FLEET_INFO_COLS_NAME_MAPPING = {
     "type": "version"
@@ -36,4 +38,21 @@ MAKE_NAME_MAPPING = {
     "Tesla": "tesla",
     "Citroën": "citroën",
     "DS": "ds",
+}
+
+COL_DTYPES = {
+    "licence plate": "category",
+    "make": "category",
+    "model": "category",
+    "version": "category",
+    # "capacity": "float",
+    # "autonomie": "float",
+    # "end of contract": "object",
+    "country": "category",
+    "category": "category",
+    "activated": "category",
+    "ownership": "category",
+    # "registration_date": "object",
+    # "contract_start_date": "object",
+    "vin": "category",
 }
