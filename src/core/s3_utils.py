@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 import json
 import logging
-
+from datetime import datetime
 import pyarrow.parquet as pq
 import boto3
 import pandas as pd
@@ -157,4 +157,31 @@ class S3_Bucket():
 
         return parsed_object
     
+    def get_last_modified(self, key:str) -> datetime:
+        response = self._s3_client.head_object(Bucket=self.bucket_name, Key=key)
+        return response["LastModified"]
+    
+    def list_subfolders(self, prefix: str) -> list[str]:
+        """
+        Lists immediate subfolders of the given prefix.
 
+        :param prefix: The S3 prefix (path) to list subfolders from.
+        :return: A list of subfolder names (without the full path).
+        """
+        # Ensure the prefix ends with a '/'
+        if not prefix.endswith('/'):
+            prefix += '/'
+
+        paginator = self._s3_client.get_paginator('list_objects_v2')
+        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix, Delimiter='/')
+
+        subfolders = []
+        for page in page_iterator:
+            for prefix_dict in page.get('CommonPrefixes', []):
+                # Extract just the folder name from the full path
+                folder_name = prefix_dict['Prefix'][len(prefix):].rstrip('/')
+                if folder_name:  # Ignore empty folder names
+                    subfolders.append(folder_name)
+
+        return subfolders
+    
