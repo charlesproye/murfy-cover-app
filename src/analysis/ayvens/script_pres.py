@@ -154,25 +154,27 @@ tss["soh"] = (
 tss["soh_method"] = "general"
 
 fig = px.scatter(
-    tss.groupby("vin").agg({"odometer": "last", "soh": "mean", "make": "first"}),
+    tss.groupby("vin").agg({"odometer": "last", "soh": "mean", "make": "first"}).reset_index(drop=False),
     x="odometer",
     y="soh",
+    hover_name="vin",
     trendline="ols",
     trendline_scope="overall",
     color="make",
 )
-fig.write_html("data_cache/every_brand_dummy_soh_by_odometer.html")
+fig.write_html("data_cache/every_brand_dummy_soh_over_odometer.html")
 
 
 fig = px.scatter(
-    tss.groupby("vin").agg({"age_in_years": "last", "soh": "mean", "make": "first"}).dropna(how="any"),
+    tss.groupby("vin").agg({"age_in_years": "last", "soh": "mean", "make": "first"}).dropna(how="any").reset_index(drop=False),
     x="age_in_years",
     y="soh",
+    hover_name="vin",
     trendline="ols",
     trendline_scope="overall",
     color="make",
 )
-fig.write_html("data_cache/every_brand_dummy_soh_by_age_in_years.html")
+fig.write_html("data_cache/every_brand_dummy_soh_over_age_in_years.html")
 
 def get_sohs_of_brand(tss:DF) -> DF:
     return (
@@ -218,10 +220,11 @@ fig = px.scatter(
     renault_soh.dropna(subset=["age_in_years", "soh"], how="any"),
     x="age_in_years",
     y="soh",
+    hover_name="vin",
     trendline="ols",
     color="version",
 )
-fig.write_html("data_cache/renault_soh_by_age_in_years.html")
+fig.write_html("data_cache/renault_soh_over_age_in_years.html")
 # Note: The soh for Vitos and Sprinters had very low values when using the official range estimations.  
 # Their default range has been modified to 170 in the models_info.csv  to get a soh value that is coherent.
 
@@ -241,21 +244,23 @@ fig = px.scatter(
     mercedes_soh.query("model != 'Vito' & model != 'Sprinter'"),
     x="odometer",
     y="soh",
+    hover_name="vin",
     trendline="ols",
     trendline_scope="overall",
     color="model",
 )
-fig.write_html("data_cache/mercedes_soh_by_odometer_without_vito_and_sprinters.html")
+fig.write_html("data_cache/mercedes_soh_over_odometer_without_vito_and_sprinters.html")
 # vitos and sprinters
 fig = px.scatter(
     mercedes_soh.query("model == 'Vito' | model == 'Sprinter'"),
     x="odometer",
     y="soh",
+    hover_name="vin",
     trendline="ols",
     trendline_scope="overall",
     color="model",
 )
-fig.write_html("data_cache/vito_and_sprinters_mercedes_soh_by_odometer.html")
+fig.write_html("data_cache/vito_and_sprinters_mercedes_soh_over_odometer.html")
 
 # ##### Plot by age
 
@@ -263,6 +268,7 @@ fig = px.scatter(
     mercedes_soh.dropna(subset=["age_in_years", "soh"], how="any"),
     x="age_in_years",
     y="soh",
+    hover_name="vin",
     # trendline="ols",
     color="model",
 )
@@ -272,6 +278,7 @@ fig = px.scatter(
     mercedes_soh.dropna(subset=["age_in_years", "soh"], how="any"),
     x="odometer",
     y="soh",
+    hover_name="vin",
     # trendline="ols",
     color="model",
 )
@@ -293,6 +300,7 @@ fig = px.scatter(
     y="soh",
     color="model",
     height=600,
+    hover_name="vin",
     trendline="ols",
     trendline_scope="overall",
     hover_data=["vin"]
@@ -307,6 +315,7 @@ fig = px.scatter(
     y="soh",
     color="model",
     height=600,
+    hover_name="vin",
     trendline="ols",
     trendline_scope="overall",
     hover_data=["vin"]
@@ -324,6 +333,7 @@ fig = px.scatter(
     all_sohs,
     x="odometer",
     y="soh",
+    hover_name="vin",
     color="make"
 )
 fig.write_html("data_cache/all_sohs_over_odometer.html")
@@ -332,6 +342,7 @@ fig = px.scatter(
     all_sohs,
     x="age_in_years",
     y="soh",
+    hover_name="vin",
     color="make"
 )
 fig.write_html("data_cache/all_sohs_over_age_in_years.html")
@@ -340,6 +351,7 @@ fig = px.scatter(
     all_sohs.loc[["renault", "ford", "mercedes-benz"]],
     x="odometer",
     y="soh",
+    hover_name="vin",
     color="make"
 )
 fig.write_html("data_cache/all_relialbe_soh_over_odometer.html")
@@ -348,6 +360,7 @@ fig = px.scatter(
     all_sohs.loc[["renault", "ford", "mercedes-benz"]],
     x="age_in_years",
     y="soh",
+    hover_name="vin",
     color="make"
 )
 fig.write_html("data_cache/all_relialbe_soh_over_age_in_years.html")
