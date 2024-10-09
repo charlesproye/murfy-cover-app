@@ -72,6 +72,8 @@ for brand, brand_raw_tss in track(raw_tss.items()):
     tss_dict[brand] = brand_raw_tss.eval("dummy_soh_offset = dummy_soh_maker_offset + dummy_soh_model_offset + dummy_soh_vehicle_offset")
 
 
+print(tss_dict)
+
 tss_dict["renault"]["capacity"] = (
     models_info
     .query("model == 'zoe'")
@@ -143,21 +145,24 @@ tss["soh"] = (
 )
 tss["soh_method"] = "general"
 
-px.scatter(
+fig = px.scatter(
     tss.groupby("vin").agg({"odometer": "last", "soh": "mean", "make": "first"}),
     x="odometer",
     y="soh",
     trendline="ols",
     color="make",
 )
+fig.write_html("data_cache/every_brand_dummy_soh_by_odometer.html")
 
-px.scatter(
+
+fig = px.scatter(
     tss.groupby("vin").agg({"age_in_years": "last", "soh": "mean", "make": "first"}).dropna(how="any"),
     x="age_in_years",
     y="soh",
     # trendline="ols",
     color="make",
 )
+fig.write_html("data_cache/every_brand_dummy_soh_by_age_in_years.html")
 
 def get_sohs_of_brand(tss:DF, brand:str=None) -> DF:
     tss:DF = tss.query(f"make == '{brand}'") if brand else tss
@@ -230,7 +235,7 @@ fig = px.scatter(
     trendline_scope="overall",
     color="model",
 )
-fig.write_html("data_cache/mercedes_soh_by_odometer.html")
+fig.write_html("data_cache/mercedes_soh_by_odometer_without_vito_and_sprinters.html")
 # vitos and sprinters
 fig = px.scatter(
     mercedes_soh.query("model == 'Vito' | model == 'Sprinter'"),
@@ -240,8 +245,7 @@ fig = px.scatter(
     trendline_scope="overall",
     color="model",
 )
-#fig.show()
-fig.write_html("data_cache/mercedes_soh_by_odometer.html")
+fig.write_html("data_cache/vito_and_sprinters_mercedes_soh_by_odometer.html")
 
 # ##### Plot by age
 
@@ -252,7 +256,7 @@ fig = px.scatter(
     # trendline="ols",
     color="model",
 )
-fig.write_html("data_cache/mercedes_soh_over_age_in_years.html")
+fig.write_html("data_cache/all_mercedes_soh_over_age_in_years.html")
 
 ford_tss:DF = (
     tss
@@ -322,37 +326,37 @@ all_sohs = pd.concat({
     )
 })
 
-px.scatter(
+fig = px.scatter(
     all_sohs,
     x="odometer",
     y="soh",
     color="make"
-).show()
+)
 fig.write_html("data_cache/all_sohs_over_odometer.html")
 
-px.scatter(
+fig = px.scatter(
     all_sohs,
     x="age_in_years",
     y="soh",
     color="make"
-).show()
+)
 fig.write_html("data_cache/all_sohs_over_age_in_years.html")
 
-px.scatter(
+fig = px.scatter(
     all_sohs.loc[["renault", "ford", "mercedes"]],
     x="odometer",
     y="soh",
     color="make"
-).show()
-fig.write_html("data_cache/relialbe_soh_over_odometer.html")
+)
+fig.write_html("data_cache/all_relialbe_soh_over_odometer.html")
 
-px.scatter(
+fig = px.scatter(
     all_sohs.loc[["renault", "ford", "mercedes"]],
     x="age_in_years",
     y="soh",
     color="make"
-).show()
-fig.write_html("data_cache/relialbe_soh_over_age_in_years.html")
+)
+fig.write_html("data_cache/all_relialbe_soh_over_age_in_years.html")
 
 # #### Evolutoin of soh over a month
 # Evolution of soh since last presentation.
