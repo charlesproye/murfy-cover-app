@@ -12,6 +12,7 @@ from typing import Callable, Optional
 import boto3
 import dotenv
 import msgspec
+import queue
 import schedule
 from botocore.client import ClientError
 from ingestion.high_mobility.api import HMApi
@@ -101,6 +102,7 @@ class HMIngester:
             self.__ingester_logger.error("S3_SECRET environment variable not found")
             return
         self.__api = HMApi(HM_BASE_URL, HM_CLIENT_ID, HM_CLIENT_SECRET)
+        self.__is_compressing = False
         self.__s3 = boto3.client(
             "s3",
             region_name=S3_REGION,
@@ -311,39 +313,68 @@ class HMIngester:
         self.__compresser.run()
 
     def __process_job_queue(self):
-        self.__ingester_logger.info("Starting processing job queue")
         while not self.__shutdown_requested.is_set():
-            try:
-                job = self.__job_queue.get_nowait()
-                self.__executor.submit(job)
-                self.__job_queue.task_done()
-            except Empty:
-                pass
-        self.__ingester_logger.info("Stopping worker thread")
+            if not self.__is_compressing:
+                try:
+                    job = self.__job_queue.get(timeout=1)
+                    self.__executor.submit(job)
+                    self.__job_queue.task_done()
+                except queue.Empty:
+                    pass
+            else:
+                time.sleep(1)
+
 
     def run(self):
         if os.getenv("COMPRESS_ONLY"):
             self.__compress()
         else:
-            self.__update_vehicles_initial()
+            self.__schedule_tasks()
             self.__worker_thread = threading.Thread(target=self.__process_job_queue)
-            self.__scheduler_logger.info("Starting initial scheduler run")
-            self.__fetch_scheduler.run_all()
-            self.__compress_scheduler.every(self.compress_interval).hours.do(
-                self.__job_queue.put, self.__compress
-            ).tag("compress")
-            self.__scheduler_logger.info(
-                f"Schedule S3 compressing at {self.compress_interval}"
-            )
             self.__ingester_logger.info("Starting worker thread")
             self.__worker_thread.start()
             self.__scheduler_logger.info("Starting scheduler")
+            
+            self.__is_compressing = False
+            
             while not self.__shutdown_requested.is_set():
-                now = datetime.now().hour
-                if now >= 6 and now <= 23:
+                current_time = datetime.now().strftime("%H:%M:%S")
+                print(f"Current time: {current_time}")
+                if not self.__is_compressing:
                     self.__fetch_scheduler.run_pending()
-                else:
-                    self.__compress_scheduler.run_pending()
                 time.sleep(1)
+            
             self.__shutdown()
 
+    def __schedule_tasks(self):
+        self.__update_vehicles_initial()
+        self.__scheduler_logger.info("Starting initial scheduler run")
+        self.__fetch_scheduler.run_all()
+        
+        # Schedule compression at 11:00 every day
+        self.__fetch_scheduler.every().day.at("13:16").do(self.__compress_and_restart)
+
+    def __compress_and_restart(self):
+        current_time = datetime.now().strftime("%H:%M:%S")
+        self.__scheduler_logger.info(f"Starting compression at {current_time}")
+        self.__is_compressing = True
+        
+        # Vider la file d'attente des tâches
+        while not self.__job_queue.empty():
+            try:
+                self.__job_queue.get_nowait()
+                self.__job_queue.task_done()
+            except queue.Empty:
+                break
+
+        # Attendre que toutes les tâches en cours se terminent
+        self.__executor.shutdown(wait=True)
+        
+        self.__compress()
+        current_time = datetime.now().strftime("%H:%M:%S")
+        self.__scheduler_logger.info(f"Compression finished at {current_time}, rescheduling tasks")
+        
+        # Recréer l'executor et reschedule les tâches
+        self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers)
+        self.__schedule_tasks()
+        self.__is_compressing = False
