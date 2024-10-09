@@ -14,8 +14,7 @@ from core.ev_models_info import models_info
 from core.caching_utils import singleton_data_caching
 from transform.ayvens.ayvens_fleet_info import fleet_info
 from transform.ayvens.ayvens_get_raw_tss import get_ayvens_raw_tss
-raw_tss = get_ayvens_raw_tss()
-tss_dict = {}
+
 
 COLS_TO_CPY_FROM_FLEET_INFO = [
     "make",
@@ -68,6 +67,9 @@ COL_DTYPES = {
 
 @singleton_data_caching(path.join(path.dirname(__file__), "data_cache/processed_tss.parquet"))
 def get_processed_tss():
+    raw_tss = get_ayvens_raw_tss()
+    tss_dict = {}
+
     for brand, brand_raw_tss in track(raw_tss.items()):
         # Add model and model version columns
         brand_raw_tss = brand_raw_tss.rename(columns=RENAME_COLS_DICT)
@@ -206,6 +208,7 @@ fig = px.scatter(
     renault_soh,
     x="odometer",
     y="soh",
+    hover_name="vin",
     trendline="ols",
     color="version",
 )
