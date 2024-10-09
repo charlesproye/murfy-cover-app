@@ -351,8 +351,8 @@ class HMIngester:
         self.__scheduler_logger.info("Starting initial scheduler run")
         self.__fetch_scheduler.run_all()
         
-        # Schedule compression at 11:00 every day
-        self.__fetch_scheduler.every().day.at("13:16").do(self.__compress_and_restart)
+        # Schedule compression at 00:00 every day
+        self.__fetch_scheduler.every().day.at("23:00").do(self.__compress_and_restart)
 
     def __compress_and_restart(self):
         current_time = datetime.now().strftime("%H:%M:%S")
