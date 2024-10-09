@@ -338,8 +338,6 @@ class HMIngester:
             self.__is_compressing = False
             
             while not self.__shutdown_requested.is_set():
-                current_time = datetime.now().strftime("%H:%M:%S")
-                print(f"Current time: {current_time}")
                 if not self.__is_compressing:
                     self.__fetch_scheduler.run_pending()
                 time.sleep(1)
