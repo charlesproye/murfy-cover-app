@@ -101,7 +101,7 @@ def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
 
-def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
+def high_freq_in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     soc_diff = vehicle_df["soc"].ffill().diff()
     vehicle_df["soc_dir"] = np.nan
     vehicle_df["soc_dir"] = (
