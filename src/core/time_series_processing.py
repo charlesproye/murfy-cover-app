@@ -92,6 +92,18 @@ def cum_integral(power_series: Series, date_series=None) -> Series:
     )
     return Series(cum_energy_data * KJ_TO_KWH, index=power_series.index)
 
+def low_freq_mask_in_motion_periods(ts:DF) -> DF:
+    if not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex):
+        ts = ts.set_index("date", drop=False)
+    return (
+        ts #
+        .assign(odometer_increase_mask=ts["odometer"].interpolate(method="time").diff().gt(0.0, fill_value=True))
+        .assign(last_notna_odo_date=ts["date"].mask(ts["odometer"].isna(), pd.NaT).ffill())
+        .assign(time_diff_low_enough=lambda ts: ts["last_notna_odo_date"].diff().lt(pd.Timedelta("6h")))
+        .eval("in_motion = odometer_increase_mask & time_diff_low_enough")
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
+    )
+
 
 def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
 
