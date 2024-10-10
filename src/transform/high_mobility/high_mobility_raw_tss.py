@@ -14,8 +14,12 @@ from core.pandas_utils import concat
 @cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT, ["brand"])
 def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
     logger = getLogger(f"transform.HighMobility-{brand}-RawTSS")
+    keys = bucket.list_responses_keys_of_brand(brand)
+    if keys.empty:
+        logger.warning(f"No keys found for brand '{brand}'.\n Returning empty dataframe.")
+        return DF()
     return (
-        bucket.list_responses_keys_of_brand(brand)
+        keys
         .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger)
         .pipe(concat)
     )
@@ -62,6 +66,6 @@ if __name__ == "__main__":
         get_raw_tss,
         bucket=S3_Bucket(),
         force_update=True,
-        brand="kia",
+        brand="asdasd",
     )
 
