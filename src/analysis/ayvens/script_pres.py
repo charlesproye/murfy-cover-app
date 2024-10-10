@@ -373,23 +373,44 @@ new_tss = tss #[tss["date"] > pd.Timestamp("2024-09-17")]
 old_renault_soh = get_sohs_of_brand(old_tss.query("make == 'renault'"))
 new_renault_soh = get_sohs_of_brand(new_tss.query("make == 'renault'"))
 
-yes: dict[str, list] = {}
-for col in old_renault_soh.columns:
-    yes[col] = []
-    for vin in old_renault_soh["vin"].unique():
-        yes[col].append(old_renault_soh.set_index("vin", drop=False).loc[vin, col])
-        yes[col].append(new_renault_soh.set_index("vin", drop=False).loc[vin, col])
-        yes[col].append(None)
-yes = DF(yes)
 
+soh_diffs = {"soh_diff":[], "vin": []}
+
+renault_soh_evolutions: dict[str, list] = {}
+for col in old_renault_soh.columns:
+    renault_soh_evolutions[col] = []
+    for vin in old_renault_soh["vin"].unique():
+        renault_soh_evolutions[col].append(old_renault_soh.set_index("vin", drop=False).loc[vin, col])
+        renault_soh_evolutions[col].append(new_renault_soh.set_index("vin", drop=False).loc[vin, col])
+        renault_soh_evolutions[col].append(None)
+
+        if col == "soh":
+            soh_diffs["soh_diff"].append(new_renault_soh.set_index("vin", drop=False).loc[vin, col] - old_renault_soh.set_index("vin", drop=False).loc[vin, col])
+        if col == "vin":
+            soh_diffs[col].append(vin)
+        
+renault_soh_evolutions:DF = DF(renault_soh_evolutions)
+
+top_5_highest_soh_variations = (
+    DF(soh_diffs)
+    .assign(soh_diff=lambda df: df["soh_diff"].abs())
+    .sort_values(by="soh_diff", ascending=False)
+    # .loc["vin"]
+    .iloc[:5]
+)
+
+print(top_5_highest_soh_variations)
+
+vins_to_keep_from_plot_mask = ~renault_soh_evolutions["vin"].isin(top_5_highest_soh_variations["vin"])
+renault_soh_evolutions = renault_soh_evolutions[vins_to_keep_from_plot_mask]
 
 MARKER_SIZE = 8
 
 fig = go.Figure(
     data=[
         go.Scatter(
-            x=yes["odometer"],
-            y=yes["soh"],
+            x=renault_soh_evolutions["odometer"],
+            y=renault_soh_evolutions["soh"],
             mode="markers+lines",
             marker=dict(
                 symbol="arrow",
@@ -398,16 +419,18 @@ fig = go.Figure(
                 angleref="previous",
                 standoff=MARKER_SIZE / 2,
             ),
+            text=renault_soh_evolutions["vin"],  # Display VIN text on the plot
+            textposition="top right",  # Optional: Position of the text relative to markers
         ),
         go.Scatter(
-            x=yes["odometer"],
-            y=yes["soh"],
+            x=renault_soh_evolutions["odometer"],
+            y=renault_soh_evolutions["soh"],
             # text=yes["years"],
             mode="markers",
-            marker=dict(
-                # color=yes["colors"],
-                size=MARKER_SIZE,
-            ),
+            marker=dict(size=MARKER_SIZE),
+            hovertext=renault_soh_evolutions["vin"],  # Adding the hovertext for VIN
+            text=renault_soh_evolutions["vin"],  # Display VIN text on the plot
+            textposition="top right",  # Optional: Position of the text relative to markers
         ),
     ]
 )
