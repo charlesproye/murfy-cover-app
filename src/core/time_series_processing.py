@@ -93,7 +93,7 @@ def cum_integral(power_series: Series, date_series=None) -> Series:
     return Series(cum_energy_data * KJ_TO_KWH, index=power_series.index)
 
 
-def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
+def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
         vehicle_df
         # use interpolate before checking if the odometer increased to compensate for missing values

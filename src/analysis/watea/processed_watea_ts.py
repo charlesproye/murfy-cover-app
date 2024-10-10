@@ -43,7 +43,7 @@ def process_raw_time_series(raw_vehicle_df: DF, **kwargs) -> DF:
     return (
         raw_vehicle_df
         .pipe(pre_process_raw_time_series)
-        .pipe(ts.in_motion_mask_from_odo_diff)
+        .pipe(ts.high_freq_in_motion_mask_from_odo_diff)
         .pipe(ts.high_freq_in_discharge_and_charge_from_soc_diff)
         .eval("in_charge = in_charge & soc < 99") # Ford E-Transit recordings tend to plateau at 99 of a random amout of time so remove these 
         .eval("power = current * voltage")
