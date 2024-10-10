@@ -106,7 +106,6 @@ class HMCompresser:
         for vin, temp_data in items.items():
             if self.__shutdown_requested.is_set():
                 return
-            self.__logger.info(f"{vin}, {temp_data}")
             info_type = all_brands[brand].info_class
             merged_type = all_brands[brand].merged_info_class
             merged = MergedInfoWrapper[info_type, merged_type](merged_type)

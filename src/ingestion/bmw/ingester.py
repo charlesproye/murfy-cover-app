@@ -382,6 +382,7 @@ class BMWIngester:
         self.__ingester_logger.info("Stopping worker thread")
 
     def run(self):
+        # Vérification de COMPRESS_ONLY déplacée ici
         if os.getenv("COMPRESS_ONLY") and os.getenv("COMPRESS_ONLY") == "1":
             self.__compress()
         else:

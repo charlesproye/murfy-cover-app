@@ -327,22 +327,28 @@ class HMIngester:
 
     def run(self):
         if os.getenv("COMPRESS_ONLY"):
-            self.__compress()
-        else:
-            self.__schedule_tasks()
-            self.__worker_thread = threading.Thread(target=self.__process_job_queue)
-            self.__ingester_logger.info("Starting worker thread")
-            self.__worker_thread.start()
-            self.__scheduler_logger.info("Starting scheduler")
-            
-            self.__is_compressing = False
-            
-            while not self.__shutdown_requested.is_set():
-                if not self.__is_compressing:
-                    self.__fetch_scheduler.run_pending()
-                time.sleep(1)
-            
-            self.__shutdown()
+            self.__ingester_logger.info("COMPRESS_ONLY flag set. Running compression first.")
+            self.__is_compressing = True
+            try:
+                self.__compress()
+            except Exception as e:
+                self.__ingester_logger.error(f"Error during compression: {e}")
+            finally:
+                self.__is_compressing = False
+            self.__ingester_logger.info("Compression completed. Continuing with normal ingestion.")
+        
+        self.__schedule_tasks()
+        self.__worker_thread = threading.Thread(target=self.__process_job_queue)
+        self.__ingester_logger.info("Starting worker thread")
+        self.__worker_thread.start()
+        self.__scheduler_logger.info("Starting scheduler")
+        
+        while not self.__shutdown_requested.is_set():
+            if not self.__is_compressing:
+                self.__fetch_scheduler.run_pending()
+            time.sleep(1)
+        
+        self.__shutdown()
 
     def __schedule_tasks(self):
         self.__update_vehicles_initial()
