@@ -93,6 +93,28 @@ def cum_integral(power_series: Series, date_series=None) -> Series:
     return Series(cum_energy_data * KJ_TO_KWH, index=power_series.index)
 
 
+def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
+
+    MAX_CHARGE_TIME_DIFF = TD(hours=6)
+    ts = (
+        ts
+        .set_index("date", drop=False)
+        .pipe(high_freq_in_discharge_and_charge_from_soc_diff)
+    )
+    ts["last_notna_soc_date"] = ts["date"].mask(ts["soc"].isna(), pd.NaT).ffill()
+    ts["last_notna_soc_diff_low_enough"] = ts.eval("date - last_notna_soc_date").lt(MAX_CHARGE_TIME_DIFF)
+    ts["date_diff_low_enough"] = ts["date"].diff().lt(MAX_CHARGE_TIME_DIFF)
+    ts["in_charge"] = ts.eval("in_charge & last_notna_soc_diff_low_enough & date_diff_low_enough")
+    ts["in_discharge"] = ts.eval("in_discharge & last_notna_soc_diff_low_enough & date_diff_low_enough")
+    ts = (
+        ts
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
+    )
+
+    return ts
+
+
 def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
         vehicle_df
