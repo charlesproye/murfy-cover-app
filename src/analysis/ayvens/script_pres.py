@@ -78,7 +78,6 @@ def get_processed_tss():
         brand_raw_tss[COLS_TO_CPY_FROM_FLEET_INFO] = fleet_info.loc[brand_raw_tss["vin"], COLS_TO_CPY_FROM_FLEET_INFO].values
         tss_dict[brand] = brand_raw_tss.eval("dummy_soh_offset = dummy_soh_maker_offset + dummy_soh_model_offset + dummy_soh_vehicle_offset")
 
-
     tss_dict["renault"]["capacity"] = (
         models_info
         .query("model == 'zoe'")
@@ -212,6 +211,7 @@ fig = px.scatter(
     y="soh",
     hover_name="vin",
     trendline="ols",
+    trendline_scope="overall",
     color="version",
 )
 fig.write_html("data_cache/renault_soh_over_odometer.html")
@@ -222,6 +222,7 @@ fig = px.scatter(
     y="soh",
     hover_name="vin",
     trendline="ols",
+    trendline_scope="overall",
     color="version",
 )
 fig.write_html("data_cache/renault_soh_over_age_in_years.html")
