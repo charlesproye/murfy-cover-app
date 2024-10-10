@@ -350,14 +350,14 @@ class HMIngester:
         self.__fetch_scheduler.run_all()
         
         # Schedule compression at 00:00 every day
-        self.__fetch_scheduler.every().day.at("23:00").do(self.__compress_and_restart)
+        self.__compress_scheduler.every().day.at("00:00").do(self.__compress_and_restart)
 
     def __compress_and_restart(self):
         current_time = datetime.now().strftime("%H:%M:%S")
         self.__scheduler_logger.info(f"Starting compression at {current_time}")
         self.__is_compressing = True
         
-        # Vider la file d'attente des tâches
+        # Clear the job queue
         while not self.__job_queue.empty():
             try:
                 self.__job_queue.get_nowait()
@@ -365,14 +365,15 @@ class HMIngester:
             except queue.Empty:
                 break
 
-        # Attendre que toutes les tâches en cours se terminent
+        # Wait for all ongoing tasks to complete
         self.__executor.shutdown(wait=True)
         
         self.__compress()
         current_time = datetime.now().strftime("%H:%M:%S")
         self.__scheduler_logger.info(f"Compression finished at {current_time}, rescheduling tasks")
         
-        # Recréer l'executor et reschedule les tâches
+        # Recreate the executor and reschedule tasks
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers)
+        self.__fetch_scheduler.clear()
         self.__schedule_tasks()
         self.__is_compressing = False

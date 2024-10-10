@@ -1,7 +1,7 @@
 import concurrent.futures
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from queue import Queue
 from typing import Optional
 
@@ -103,26 +103,6 @@ class HMCompresser:
                             "Cannot compress different vehicle types together"
                         )
                         return
-            try:
-                delete_response = self.__s3.delete_object(
-                    Bucket=self.__bucket, Key=s3_key
-                )
-            except ClientError as e:
-                self.__logger.error(
-                    f"Error deleting temporary datapoint {s3_key} (brand {brand}): {e}"
-                )
-                return
-            match delete_response["ResponseMetadata"]["HTTPStatusCode"]:
-                case 204:
-                    self.__logger.info(
-                        f"Deleted temporary datapoint {s3_key} (brand {brand})"
-                    )
-                case _:
-                    self.__logger.error(
-                        f"Error deleting temporary datapoint {s3_key} (brand {brand}): {delete_response['Error']['Message']}"
-                    )
-                    return
-
         for vin, temp_data in items.items():
             if self.__shutdown_requested.is_set():
                 return
@@ -130,7 +110,7 @@ class HMCompresser:
             info_type = all_brands[brand].info_class
             merged_type = all_brands[brand].merged_info_class
             merged = MergedInfoWrapper[info_type, merged_type](merged_type)
-            today = datetime.today().date()
+            yesterday = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
             job_queue: Queue[Callable] = Queue()
 
             self.__logger.info(f"Compressing data for VIN {vin} (brand {brand})")
@@ -152,7 +132,7 @@ class HMCompresser:
             try:
                 put_response = self.__s3.put_object(
                     Bucket=self.__bucket,
-                    Key=f"response/{brand}/{vin}/{today}.json",
+                    Key=f"response/{brand}/{vin}/{yesterday}.json",
                     Body=encoded,
                 )
             except ClientError as e:
@@ -160,21 +140,34 @@ class HMCompresser:
                     f"Failed to upload compressed data for VIN {vin} (brand {brand}): {e}"
                 )
                 return
-            match put_response["ResponseMetadata"]["HTTPStatusCode"]:
-                case 200:
-                    self.__logger.info(
-                        f"Uploaded compressed data for VIN {vin} (brand {brand}) at location response/{brand}/{vin}/{today}.json"
-                    )
-                case _:
-                    self.__logger.error(
-                        f"Failed to upload compressed data for VIN {vin} (brand {brand}): {put_response['Error']['Message']}"
-                    )
+            if put_response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+                self.__logger.info(
+                    f"Uploaded compressed data for VIN {vin} (brand {brand}) at location response/{brand}/{vin}/{yesterday}.json"
+                )
+                
+                # Suppression de tous les fichiers temporaires pour ce VIN
+                for temp_key in temp_data:
+                    try:
+                        delete_response = self.__s3.delete_object(
+                            Bucket=self.__bucket, Key=temp_key
+                        )
+                        if delete_response['ResponseMetadata']['HTTPStatusCode'] == 204:
+                            self.__logger.info(f"Deleted temporary file: {temp_key}")
+                        else:
+                            self.__logger.warning(f"Failed to delete temporary file: {temp_key}")
+                    except ClientError as e:
+                        self.__logger.error(f"Error deleting temporary file {temp_key}: {e}")
+            else:
+                self.__logger.error(
+                    f"Failed to upload compressed data for VIN {vin} (brand {brand}): {put_response['Error']['Message']}"
+                )
+        else:
+            self.__logger.info(f"VIN {vin} not found in the data for brand {brand}")
 
     def run(self):
-        self.__logger.info("Listing bucket objects")
         self.list_objects()
+        self.__logger.info("Listing bucket objects")
         for brand_name in all_brands.keys():
             if not self.__shutdown_requested.is_set():
                 self.__logger.info(f"Starting {brand_name} data compression")
                 self.__process(self.__s3_keys_by_vin[brand_name], brand_name)
-
