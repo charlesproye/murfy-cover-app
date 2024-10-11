@@ -276,7 +276,6 @@ def plt_evolution_of_soh(brand:str, top_n_variations_to_remove=5):
     renault_soh_evolutions = renault_soh_evolutions[vins_to_keep_from_plot_mask]
 
     MARKER_SIZE = 8
-
     fig = go.Figure(
         data=[
             go.Scatter(
@@ -292,6 +291,7 @@ def plt_evolution_of_soh(brand:str, top_n_variations_to_remove=5):
                 ),
                 text=renault_soh_evolutions["vin"],  # Display VIN text on the plot
                 textposition="top right",  # Optional: Position of the text relative to markers
+                name="SOH Evolution"  # Set custom legend name for arrows
             ),
             go.Scatter(
                 x=renault_soh_evolutions["odometer"],
@@ -301,9 +301,17 @@ def plt_evolution_of_soh(brand:str, top_n_variations_to_remove=5):
                 hovertext=renault_soh_evolutions["vin"],  # Adding the hovertext for VIN
                 text=renault_soh_evolutions["vin"],  # Display VIN text on the plot
                 textposition="top right",  # Optional: Position of the text relative to markers
+                name="SOH"  # Set custom legend name for dots
             ),
         ]
     )
+
+    # Set axis labels using update_layout
+    fig.update_layout(
+        xaxis_title="Mileage (km)",   # Set x-axis label
+        yaxis_title="State of Health (%)"  # Set y-axis label
+    )
+
     fig.write_html(f"data_cache/plots/{brand}_soh_evolution_removed_top_{top_n_variations_to_remove}_variations.html")
 
 
