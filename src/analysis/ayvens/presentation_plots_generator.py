@@ -9,6 +9,7 @@ from pandas import Series
 from pandas import DataFrame as DF
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.graph_objects import Figure
 
 from core.config import *
 from core.ev_models_info import models_info
@@ -173,43 +174,30 @@ def get_sohs_per_vin(tss:DF) -> DF:
         .sort_values(by=["vin", "odometer"])
     )
 
-all_dummy_sohs = get_sohs_per_vin(tss)
+def plt_sohs(sohs:DF, sohs_name:str, x:str, trendline_scope:str="overall", color="make") -> Figure:
+    return (
+        px.scatter(
+            sohs.dropna(subset=[x, "soh"], how="any"),
+            x=x,
+            y="soh",
+            hover_name="vin",
+            trendline="ols",
+            trendline_scope=trendline_scope,
+            color=color,
+            labels={
+                "soh": "Stae.Of.Health (%)",
+                x: {"age_in_years": "Age (years)", "odometer": "Mileage (km)"}[x],
+            },
+        )
+        .update_traces(line={'dash': 'dash', 'color': 'black'})
+        .write_html(f"data_cache/plots/{sohs_name}_soh_over_{x}.html")
+    )
 
-def get_n_scatter_sohs(tss:DF, sohs_name:str):
+def get_n_scatter_sohs(tss:DF, sohs_name:str, **kwargs):
     sohs = get_sohs_per_vin(tss)
-
-    px.scatter(
-        sohs,
-        x="odometer",
-        y="soh",
-        hover_name="vin",
-        trendline="ols",
-        trendline_scope="overall",
-        color="make",
-        labels={
-            "soh": "StaeOfHealth (%)",
-            "odometer": "Mileage (km)",
-        },
-    ).write_html(f"data_cache/plots/{sohs_name}_soh_over_odometer.html")
-
-
-    px.scatter(
-        sohs.dropna(subset=["age_in_years", "soh"], how="any"),
-        x="age_in_years",
-        y="soh",
-        hover_name="vin",
-        trendline="ols",
-        trendline_scope="overall",
-        color="make",
-        labels={
-            "soh": "Stae.Of.Health (%)",
-            "age_in_years": "Age (years)",
-        },
-    ).write_html(f"data_cache/plots/{sohs_name}_soh_over_age_in_years.html")
-
+    plt_sohs(sohs, sohs_name, "age_in_years", **kwargs)
+    plt_sohs(sohs, sohs_name, "odometer", **kwargs)
     sohs.to_csv("data_cache/tables/{sohs}.csv")
-
-    return sohs
 
 get_n_scatter_sohs(tss, "all_dummy_sohs")
 
@@ -222,20 +210,20 @@ tss.loc[renault_soh_mask] = (
     .eval("soh = 100 * battery_energy / expected_battery_energy")
 )
 tss.loc[renault_soh_mask, "soh_method"] = "renault"
-get_n_scatter_sohs(tss.query("make == 'renault'"), "renault")
-
+get_n_scatter_sohs(tss.query("make == 'renault'"), "renault", color="version")
 
 
 # Note: The soh for Vitos and Sprinters had very low values when using the official range estimations.  
 # Their default range has been modified to 170 in the models_info.csv  to get a soh value that is coherent.
 mercedes_soh_mask = tss["make"] == "mercedes-benz"
 tss.loc[mercedes_soh_mask, "soh"] = (
-    tss.loc[mercedes_soh_mask]
+    tss
+    .loc[mercedes_soh_mask]
     .eval("estimated_range / soc / range * 100")
 )
 tss.loc[mercedes_soh_mask, "soh_method"] = "mercedes-benz"
-get_n_scatter_sohs(tss.query("make == 'mercedes-benz'"), "all_mercedes")
-get_n_scatter_sohs(tss.query("make == 'mercedes-benz' & model != 'Vito' & model != 'Sprinter'"), "mercedes_without_vitos_n_sprinters")
+get_n_scatter_sohs(tss.query("make == 'mercedes-benz'"), "all_mercedes", color="model")
+get_n_scatter_sohs(tss.query("make == 'mercedes-benz' & model != 'Vito' & model != 'Sprinter'"), "mercedes_without_vitos_n_sprinters", color="model")
 
 
 ford_mask = tss.eval("make == 'ford'")
@@ -245,9 +233,9 @@ tss.loc[ford_mask, "soh"] = (
     .query("soc > 0.5")
     .eval("battery_energy / soc / capacity * 100")
 )
+get_n_scatter_sohs(tss.query("make == 'ford'"), "ford", trendline_scope="trace", color="model")
 
 
-get_n_scatter_sohs(tss.query("make == 'ford'"), "ford")
 get_n_scatter_sohs(tss, "dummy_and_reliable_sohs")
 get_n_scatter_sohs(tss.query("make == 'ford' | make == 'renault' | make == 'mercedes-benz'"), "reliable_sohs")
 
@@ -308,7 +296,6 @@ def plt_evolution_of_soh(brand:str, top_n_variations_to_remove=5):
             go.Scatter(
                 x=renault_soh_evolutions["odometer"],
                 y=renault_soh_evolutions["soh"],
-                # text=yes["years"],
                 mode="markers",
                 marker=dict(size=MARKER_SIZE),
                 hovertext=renault_soh_evolutions["vin"],  # Adding the hovertext for VIN
@@ -324,3 +311,10 @@ plt_evolution_of_soh("renault")
 plt_evolution_of_soh("renault", top_n_variations_to_remove=0)
 plt_evolution_of_soh("mercedes-benz")
 plt_evolution_of_soh("mercedes-benz", top_n_variations_to_remove=0)
+
+px.scatter(
+    pd.read_csv("data_cache/src/zoes_Charles_study.csv"),
+    x="estimated market value",
+    y="soh",
+).write_html("data_cache/plots/zoes_Charles_study.html")
+
