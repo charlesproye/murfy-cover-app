@@ -1,4 +1,5 @@
 from os import path
+from os import system
 
 from datetime import datetime as DT
 import numpy as np
@@ -15,6 +16,10 @@ from core.caching_utils import singleton_data_caching
 from transform.ayvens.ayvens_fleet_info import fleet_info
 from transform.ayvens.ayvens_get_raw_tss import get_ayvens_raw_tss
 
+
+system("mkdir -p data_cache")
+system("mkdir -p data_cache/plots")
+system("mkdir -p data_cache/tables")
 
 COLS_TO_CPY_FROM_FLEET_INFO = [
     "make",
@@ -120,7 +125,7 @@ fig = px.histogram(
     facet_col_wrap=3,
     height=1000,
 )
-fig.write_html("data_cache/age_in_years_distribuyion.html")
+fig.write_html("data_cache/plots/age_in_years_distribuyion.html")
 
 odometers = (
     tss
@@ -131,17 +136,16 @@ odometers = (
     })
 )
 
-odometers.to_csv("data_cache/odometers.csv")
+odometers.to_csv("data_cache/tables/odometers.csv")
 
-fig = px.histogram(
+px.histogram(
     odometers,
     x="odometer",
     nbins=15,
     color="make",
     facet_col="make",
     title="Distribution of vehicles over odometer"
-)
-fig.write_html("data_cache/odometer_distribution.html")
+).write_html("data_cache/plots/odometer_distribution.html")
 
 tss["soh"] = (
     tss
@@ -150,30 +154,6 @@ tss["soh"] = (
     .transform(lambda soh: soh + np.random.normal(0, 0.02, len(soh)))
     .clip(0, 100)
 )
-tss["soh_method"] = "general"
-
-fig = px.scatter(
-    tss.groupby("vin").agg({"odometer": "last", "soh": "mean", "make": "first"}).reset_index(drop=False),
-    x="odometer",
-    y="soh",
-    hover_name="vin",
-    trendline="ols",
-    trendline_scope="overall",
-    color="make",
-)
-fig.write_html("data_cache/every_brand_dummy_soh_over_odometer.html")
-
-
-fig = px.scatter(
-    tss.groupby("vin").agg({"age_in_years": "last", "soh": "mean", "make": "first"}).dropna(how="any").reset_index(drop=False),
-    x="age_in_years",
-    y="soh",
-    hover_name="vin",
-    trendline="ols",
-    trendline_scope="overall",
-    color="make",
-)
-fig.write_html("data_cache/every_brand_dummy_soh_over_age_in_years.html")
 
 def get_sohs_per_vin(tss:DF) -> DF:
     return (
@@ -193,6 +173,46 @@ def get_sohs_per_vin(tss:DF) -> DF:
         .sort_values(by=["vin", "odometer"])
     )
 
+all_dummy_sohs = get_sohs_per_vin(tss)
+
+def get_n_scatter_sohs(tss:DF, sohs_name:str):
+    sohs = get_sohs_per_vin(tss)
+
+    px.scatter(
+        sohs,
+        x="odometer",
+        y="soh",
+        hover_name="vin",
+        trendline="ols",
+        trendline_scope="overall",
+        color="make",
+        labels={
+            "soh": "StaeOfHealth (%)",
+            "odometer": "Mileage (km)",
+        },
+    ).write_html(f"data_cache/plots/{sohs_name}_soh_over_odometer.html")
+
+
+    px.scatter(
+        sohs.dropna(subset=["age_in_years", "soh"], how="any"),
+        x="age_in_years",
+        y="soh",
+        hover_name="vin",
+        trendline="ols",
+        trendline_scope="overall",
+        color="make",
+        labels={
+            "soh": "Stae.Of.Health (%)",
+            "age_in_years": "Age (years)",
+        },
+    ).write_html(f"data_cache/plots/{sohs_name}_soh_over_age_in_years.html")
+
+    sohs.to_csv("data_cache/tables/{sohs}.csv")
+
+    return sohs
+
+get_n_scatter_sohs(tss, "all_dummy_sohs")
+
 # Renault soh
 # Note soc of renault is between 0 and 1, not 0 and 100.
 renault_soh_mask:Series = tss.eval("make == 'renault'")
@@ -202,88 +222,21 @@ tss.loc[renault_soh_mask] = (
     .eval("soh = 100 * battery_energy / expected_battery_energy")
 )
 tss.loc[renault_soh_mask, "soh_method"] = "renault"
-renault_soh = get_sohs_per_vin(tss.query("make == 'renault'"))
-renault_soh.to_csv("data_cache/renault_soh.csv")
+get_n_scatter_sohs(tss.query("make == 'renault'"), "renault")
 
-fig = px.scatter(
-    renault_soh,
-    x="odometer",
-    y="soh",
-    hover_name="vin",
-    trendline="ols",
-    trendline_scope="overall",
-    color="version",
-)
-fig.write_html("data_cache/renault_soh_over_odometer.html")
 
-fig = px.scatter(
-    renault_soh.dropna(subset=["age_in_years", "soh"], how="any"),
-    x="age_in_years",
-    y="soh",
-    hover_name="vin",
-    trendline="ols",
-    trendline_scope="overall",
-    color="version",
-)
-fig.write_html("data_cache/renault_soh_over_age_in_years.html")
+
 # Note: The soh for Vitos and Sprinters had very low values when using the official range estimations.  
 # Their default range has been modified to 170 in the models_info.csv  to get a soh value that is coherent.
-
 mercedes_soh_mask = tss["make"] == "mercedes-benz"
 tss.loc[mercedes_soh_mask, "soh"] = (
     tss.loc[mercedes_soh_mask]
     .eval("estimated_range / soc / range * 100")
 )
 tss.loc[mercedes_soh_mask, "soh_method"] = "mercedes-benz"
-mercedes_soh = get_sohs_per_vin(tss.query("make == 'mercedes-benz'"))
-mercedes_soh["soh"] = mercedes_soh["soh"] #.clip(70, 99.5)
-mercedes_soh.to_csv("data_cache/mercedes_soh.csv")
+get_n_scatter_sohs(tss.query("make == 'mercedes-benz'"), "all_mercedes")
+get_n_scatter_sohs(tss.query("make == 'mercedes-benz' & model != 'Vito' & model != 'Sprinter'"), "mercedes_without_vitos_n_sprinters")
 
-# ##### Plot soh by odometer
-
-fig = px.scatter(
-    mercedes_soh.query("model != 'Vito' & model != 'Sprinter'"),
-    x="odometer",
-    y="soh",
-    hover_name="vin",
-    trendline="ols",
-    trendline_scope="overall",
-    color="model",
-)
-fig.write_html("data_cache/mercedes_soh_over_odometer_without_vito_and_sprinters.html")
-# vitos and sprinters
-fig = px.scatter(
-    mercedes_soh.query("model == 'Vito' | model == 'Sprinter'"),
-    x="odometer",
-    y="soh",
-    hover_name="vin",
-    trendline="ols",
-    trendline_scope="overall",
-    color="model",
-)
-fig.write_html("data_cache/vito_and_sprinters_mercedes_soh_over_odometer.html")
-
-# ##### Plot by age
-
-fig = px.scatter(
-    mercedes_soh.dropna(subset=["age_in_years", "soh"], how="any"),
-    x="age_in_years",
-    y="soh",
-    hover_name="vin",
-    # trendline="ols",
-    color="model",
-)
-fig.write_html("data_cache/all_mercedes_soh_over_age_in_years.html")
-
-fig = px.scatter(
-    mercedes_soh.dropna(subset=["age_in_years", "soh"], how="any"),
-    x="odometer",
-    y="soh",
-    hover_name="vin",
-    # trendline="ols",
-    color="model",
-)
-fig.write_html("data_cache/all_mercedes_soh_over_odometer.html")
 
 ford_mask = tss.eval("make == 'ford'")
 tss.loc[ford_mask, "soh"] = (
@@ -292,79 +245,11 @@ tss.loc[ford_mask, "soh"] = (
     .query("soc > 0.5")
     .eval("battery_energy / soc / capacity * 100")
 )
-tss.loc[ford_mask, "soh_method"] = "ford"
-ford_soh = get_sohs_per_vin(tss.query("make == 'ford'"))
-
-fig = px.scatter(
-    ford_soh,
-    x="odometer",
-    y="soh",
-    color="model",
-    height=600,
-    hover_name="vin",
-    trendline="ols",
-    trendline_scope="overall",
-    hover_data=["vin"]
-)
-fig.update_traces(line=dict(color='black', dash='dash'))
-
-fig.write_html("data_cache/ford_soh_over_odometer.html")
-
-fig = px.scatter(
-    ford_soh,
-    x="age_in_years",
-    y="soh",
-    color="model",
-    height=600,
-    hover_name="vin",
-    trendline="ols",
-    trendline_scope="overall",
-    hover_data=["vin"]
-)
-fig.update_traces(line=dict(color='black', dash='dash'))
-
-fig.write_html("data_cache/ford_soh_over_age_in_years.html")
-
-dummy_soh = get_sohs_per_vin(tss.query("soh_method == 'general'"))
 
 
-all_sohs = get_sohs_per_vin(tss).set_index("make", drop=False)
-
-fig = px.scatter(
-    all_sohs,
-    x="odometer",
-    y="soh",
-    hover_name="vin",
-    color="make"
-)
-fig.write_html("data_cache/all_sohs_over_odometer.html")
-
-fig = px.scatter(
-    all_sohs,
-    x="age_in_years",
-    y="soh",
-    hover_name="vin",
-    color="make"
-)
-fig.write_html("data_cache/all_sohs_over_age_in_years.html")
-
-fig = px.scatter(
-    all_sohs.loc[["renault", "ford", "mercedes-benz"]],
-    x="odometer",
-    y="soh",
-    hover_name="vin",
-    color="make"
-)
-fig.write_html("data_cache/all_relialbe_soh_over_odometer.html")
-
-fig = px.scatter(
-    all_sohs.loc[["renault", "ford", "mercedes-benz"]],
-    x="age_in_years",
-    y="soh",
-    hover_name="vin",
-    color="make"
-)
-fig.write_html("data_cache/all_relialbe_soh_over_age_in_years.html")
+get_n_scatter_sohs(tss.query("make == 'ford'"), "ford")
+get_n_scatter_sohs(tss, "dummy_and_reliable_sohs")
+get_n_scatter_sohs(tss.query("make == 'ford' | make == 'renault' | make == 'mercedes-benz'"), "reliable_sohs")
 
 # #### Evolutoin of soh over a month
 # Evolution of soh since last presentation.
@@ -432,7 +317,7 @@ def plt_evolution_of_soh(brand:str, top_n_variations_to_remove=5):
             ),
         ]
     )
-    fig.write_html(f"data_cache/{brand}_soh_evolution_removed_top_{top_n_variations_to_remove}_variations.html")
+    fig.write_html(f"data_cache/plots/{brand}_soh_evolution_removed_top_{top_n_variations_to_remove}_variations.html")
 
 
 plt_evolution_of_soh("renault")
