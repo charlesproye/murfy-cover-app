@@ -66,6 +66,6 @@ if __name__ == "__main__":
         get_raw_tss,
         bucket=S3_Bucket(),
         force_update=True,
-        brand="asdasd",
+        brand="ford",
     )
 
