@@ -235,7 +235,7 @@ tss.loc[ford_mask, "soh"] = (
 )
 get_n_scatter_sohs(tss.query("make == 'ford'"), "ford", trendline_scope="trace", color="model")
 
-
+get_n_scatter_sohs(tss.query("(make == 'renault' | make == 'mercedes-benz' | make == 'ford') & (model != 'Sprinter' & model != 'Vito')"), "reliable_sohs_without_Vitos_and_Sprinters")
 get_n_scatter_sohs(tss, "dummy_and_reliable_sohs")
 get_n_scatter_sohs(tss.query("make == 'ford' | make == 'renault' | make == 'mercedes-benz'"), "reliable_sohs")
 
