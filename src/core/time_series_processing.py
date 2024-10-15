@@ -73,24 +73,22 @@ def compute_cum_integrals_of_current_vars(vehicle_df: DF) -> DF:
         vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"], date_series=vehicle_df["date"])
     return vehicle_df
 
-def cum_integral(power_series: Series, date_series=None) -> Series:
+def cum_integral(series: Series, date_series=None) -> Series:
     """
     ### Description:
-    Computes the cumulative energy of the time series by using cumulative trapezoid intergrating of the power column.
+    Computes the cumulative of the time series by using cumulative trapezoid and a date series.
     ### Parameters:
     power_col: name of the power column, must be in kw.
     date_series: optional parameter to provide if the series is not indexed by date.
-    ### Returns:
-    df with added column with the name of cum_energy_col in kWh.
     """
-    date_series = power_series.index.to_series() if date_series is None else date_series
+    date_series = series.index.to_series() if date_series is None else date_series
     cum_energy_data = integrate.cumulative_trapezoid(
         # Make sure that date time units are in seconds before converting to int
         x=date_series.dt.as_unit("s").astype(int),
-        y=power_series.fillna(0).values,
+        y=series.fillna(0).values,
         initial=0,
     )
-    return Series(cum_energy_data * KJ_TO_KWH, index=power_series.index)
+    return Series(cum_energy_data * KJ_TO_KWH, index=series.index)
 
 def low_freq_mask_in_motion_periods(ts:DF) -> DF:
     if not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex):
@@ -168,7 +166,13 @@ def high_freq_in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
 
 
 # TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
-def perf_mask_and_idx_from_condition_mask(vehicle_df: DF, src_mask:str, src_mask_idx_col_name="{src_mask}_idx", perf_mask_col_name="{src_mask}_perf_mask", max_time_diff:TD|None=None) -> DF:
+def perf_mask_and_idx_from_condition_mask(
+        vehicle_df: DF,
+        src_mask:str,
+        src_mask_idx_col_name="{src_mask}_idx",
+        perf_mask_col_name="{src_mask}_perf_mask",
+        max_time_diff:TD|None=None
+    ) -> DF:
     src_mask_idx_col_name = src_mask_idx_col_name.format(src_mask=src_mask)
     perf_mask_col_name = perf_mask_col_name.format(src_mask=src_mask)
     vehicle_df[src_mask_idx_col_name] = period_idx_of_mask(vehicle_df, src_mask, max_time_diff=max_time_diff)
