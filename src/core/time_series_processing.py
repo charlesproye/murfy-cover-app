@@ -92,8 +92,42 @@ def cum_integral(power_series: Series, date_series=None) -> Series:
     )
     return Series(cum_energy_data * KJ_TO_KWH, index=power_series.index)
 
+def low_freq_mask_in_motion_periods(ts:DF) -> DF:
+    if not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex):
+        ts = ts.set_index("date", drop=False)
+    return (
+        ts #
+        .assign(odometer_increase_mask=ts["odometer"].interpolate(method="time").diff().gt(0.0, fill_value=True))
+        .assign(last_notna_odo_date=ts["date"].mask(ts["odometer"].isna(), pd.NaT).ffill())
+        .assign(time_diff_low_enough=lambda ts: ts["last_notna_odo_date"].diff().lt(pd.Timedelta("6h")))
+        .eval("in_motion = odometer_increase_mask & time_diff_low_enough")
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
+    )
 
-def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
+
+def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
+
+    MAX_CHARGE_TIME_DIFF = TD(hours=6)
+    ts = (
+        ts
+        .set_index("date", drop=False)
+        .pipe(high_freq_in_discharge_and_charge_from_soc_diff)
+    )
+    ts["last_notna_soc_date"] = ts["date"].mask(ts["soc"].isna(), pd.NaT).shift().ffill()
+    ts["last_notna_soc_diff_low_enough"] = ts.eval("date - last_notna_soc_date").lt(MAX_CHARGE_TIME_DIFF)
+    ts["date_diff_low_enough"] = ts["date"].diff().lt(MAX_CHARGE_TIME_DIFF)
+    ts["in_charge"] = ts.eval("in_charge & last_notna_soc_diff_low_enough & date_diff_low_enough")
+    ts["in_discharge"] = ts.eval("in_discharge & last_notna_soc_diff_low_enough & date_diff_low_enough")
+    ts = (
+        ts
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
+    )
+
+    return ts
+
+
+def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     return (
         vehicle_df
         # use interpolate before checking if the odometer increased to compensate for missing values
@@ -101,7 +135,7 @@ def in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
 
-def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
+def high_freq_in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     soc_diff = vehicle_df["soc"].ffill().diff()
     vehicle_df["soc_dir"] = np.nan
     vehicle_df["soc_dir"] = (
