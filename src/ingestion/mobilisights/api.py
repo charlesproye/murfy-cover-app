@@ -88,6 +88,5 @@ class MSApi:
             headers={"Authorization": f"Bearer {token}"},
             stream=True,
         )
-        print(result)
         return result.status_code, result.iter_lines()
 
