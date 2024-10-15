@@ -152,10 +152,11 @@ class MobilisightsIngester:
     def __process_vehicle(self, data: Any):
         try:
             car_state = msgspec.json.decode(data, type=CarState)
+            self.__ingester_logger.info(f"CAR STATE DATA: {car_state}, DATA : {data}")
         except (msgspec.ValidationError, msgspec.DecodeError) as e:
             self.__ingester_logger.error(f"Failed to parse car data: {e}")
             return
-        self.__ingester_logger.info(f"Parsed data for VIN {car_state.vin} successfully")
+        # self.__ingester_logger.info(f"Parsed data for VIN {car_state.vin} successfully")
         filename = f"response/stellantis/{car_state.vin}/temp/{int(datetime.now().timestamp())}.json"
         try:
             encoded = msgspec.json.encode(car_state)
@@ -171,7 +172,7 @@ class MobilisightsIngester:
             match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
                 case 200:
                     self.__ingester_logger.info(
-                        f"Uploaded info for vehicle with VIN {car_state.vin} at location {filename}"
+                        # f"Uploaded info for vehicle with VIN {car_state.vin} at location {filename}"
                     )
                 case _:
                     self.__ingester_logger.error(

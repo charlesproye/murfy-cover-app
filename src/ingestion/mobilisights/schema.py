@@ -276,12 +276,13 @@ class ChargingRateUnit(StrEnum):
 class ChargingMode(StrEnum):
     slow = "slow"
     quick = "quick"
+    no = "no" 
 
 
 class Charging(WithTimestamp):
     plugged: bool
     status: ChargingStatus
-    remaining_time: Duration
+    remaining_time: int  # Changez Duration en int
     rate: ValueWithUnit[float, ChargingRateUnit]
     mode: ChargingMode
     planned: dt
@@ -398,6 +399,7 @@ class Engine(
     speed: Optional[TimestampedValueWithUnit[float, EngineSpeedUnit]] = None
     ignition: Optional[TimestampedValue[bool]] = None
     battery: Optional[EngineBattery] = None
+    percentage: Optional[Percentage] = None
     run_time: Optional[TimestampedValue[float]] = None
     coolant: Optional[EngineCoolant] = None
 
