@@ -236,12 +236,16 @@ Mainly:
     power_col: name of the power column, must be in kw.
     date_series: optional parameter to provide if the series is not indexed by date.
 1.  ```python
-    def in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
+    def high_freq_in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     ```
     Computes and adds to the dataframe two boolean columns `in_charge` and `in_discharge`.  
     The reason why there is not just one column is because sometimes we are not sure that the vehicle is in charge nor in discharge.  
     In which case both of them are at `False`.  
     The columns are computed from soc and date.  
+1.  ```python
+    def low_freq_compute_charge_n_discharge_vars(vehicle_df: DF) -> DF:
+    ```
+    Same as the previous version with extra steps to handle time series with data points that have more than 6 hours in between.
 1.  ```python
     def perf_mask_and_idx_from_condition_mask(
             vehicle_df: DF,

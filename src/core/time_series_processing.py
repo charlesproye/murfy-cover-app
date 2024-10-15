@@ -91,6 +91,7 @@ def cum_integral(series: Series, date_series=None) -> Series:
     return Series(cum_energy_data * KJ_TO_KWH, index=series.index)
 
 def low_freq_mask_in_motion_periods(ts:DF) -> DF:
+    """Use for time series where there can be more than 6 hours in between odometer points"""
     if not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex):
         ts = ts.set_index("date", drop=False)
     return (
@@ -104,7 +105,7 @@ def low_freq_mask_in_motion_periods(ts:DF) -> DF:
 
 
 def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
-
+    """Use for time series where there can be more than 6 hours in between soc points"""
     MAX_CHARGE_TIME_DIFF = TD(hours=6)
     ts = (
         ts
@@ -126,6 +127,7 @@ def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
 
 
 def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
+    """If the time series has more than 6 hours in between soc points, use `low_freq_mask_in_motion_periods`."""
     return (
         vehicle_df
         # use interpolate before checking if the odometer increased to compensate for missing values
@@ -134,6 +136,7 @@ def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     )
 
 def high_freq_in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
+    """If the time series has more than 6 hours in between odometer points, use `high_freq_in_discharge_and_charge_from_soc_diff`."""
     soc_diff = vehicle_df["soc"].ffill().diff()
     vehicle_df["soc_dir"] = np.nan
     vehicle_df["soc_dir"] = (
