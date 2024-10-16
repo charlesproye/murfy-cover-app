@@ -2,30 +2,36 @@ from datetime import timedelta as TD
 from os.path import join, dirname
 import pandas as pd
 
-import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures, FunctionTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
 
-# Default vehicle values
-FORD_ETRANSIT_DEFAULT_KWH_CAPACITY = 89
-FORD_ETRANSIT_DEFAULT_KWH_PER_SOC = FORD_ETRANSIT_DEFAULT_KWH_CAPACITY / 100 
-FORD_ETRANSIT_DEFAULT_RANGE = 317
-FORD_ETRANSIT_DEFAULT_KM_PER_SOC = FORD_ETRANSIT_DEFAULT_RANGE / 100
+# Paths:
+# Here we call the time series that watea sent us "watea_responses" in analogy to the responses we get from EV data APIs. 
+WATEA_RESPONSES_REGEX = join(dirname(__file__), "data_cache/bib_export/*/*.parquet")
+RAW_TS_PATH = join(dirname(__file__), "data_cache/raw_tss.parquet")
+PROCESSED_TS_PATH = join(dirname(__file__), "data_cache/processed_tss.parquet")
+FLEET_INFO_DF_PATH = join(dirname(__file__), "data_cache/fleet_info/fleet_info_df.{extension}")
+RAW_FLEET_CHARGING_POINTS_PATH = join(dirname(__file__), "data_cache/soh_estimation/raw_fleet_charging_points.parquet")
+PREPROCESSED_FLEET_CHARGING_POINTS_PATH = join(dirname(__file__), "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet")
+PROCESSED_CLUSTER_PATH = join(dirname(__file__), "data_cache/soh_estimation/processed_cluster.parquet")
 
-# paths
-PATH_TO_RAW_TS_FOLDER = join(dirname(__file__), "data_cache/raw_time_series")
-PATH_TO_RAW_TS = join(dirname(__file__), PATH_TO_RAW_TS_FOLDER, "{id}.snappy.parquet")
-PATH_TO_PROCESSED_TS = join(dirname(__file__), "data_cache/processed_time_series/{id}.parquet")
-PATH_TO_FLEET_INFO_DF = join(dirname(__file__), "data_cache/fleet_info/fleet_info_df.{extension}")
-PATH_TO_RAW_FLEET_CHARGING_POINTS = join(dirname(__file__), "data_cache/soh_estimation/raw_fleet_charging_points.parquet")
-PATH_TO_PREPROCESSED_FLEET_CHARGING_POINTS = join(dirname(__file__), "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet")
-PATH_TO_PROCESSED_CLUSTER = join(dirname(__file__), "data_cache/soh_estimation/processed_cluster.parquet")
-# recording dependant constants
+# Time series processing:
+COLS_TO_DROP = [
+    "autonomy_km",
+    "speed_gps",
+]
+DTYPES = {
+    # "date_translated ": pd.SparseDtype("datetime64[ns]"),
+    "distance_totalizer": pd.SparseDtype("float"),
+    "battery_hv_soc": pd.SparseDtype("float"),
+    "battery_hv_temp": pd.SparseDtype("float"),
+    "battery_hv_voltage": pd.SparseDtype("float"),
+    "battery_hv_current": pd.SparseDtype("float"),
+}
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 
-# soh estimation
+# SOH estimation:
 MAIN_CHARGING_REGIME_CLUSTER_IDX = 8
 UMAP_N_COMPONENTS = 3
 UMAP_INPUT_FEATURE_COLS = [
@@ -36,7 +42,6 @@ UMAP_INPUT_FEATURE_COLS = [
     "soc",
 ]
 UMAP_RANDOM_STATE = 32
-
 CHARGING_POINTS_AGG_OVER_CHARGES_DICT = {
     "odometer":"median",
     "energy_added":"median",
