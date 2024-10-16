@@ -7,12 +7,6 @@ from transform.watea.watea_config import *
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 
-# @cache_result()
-# def get_processed_tss() -> DF:
-#     pass
-            # .drop(columns=COLS_TO_DROP)
-            # .astype(DTYPES, errors="ignore")
-
 @cache_result(RAW_TS_PATH, on="local")
 def get_raw_tss() -> DF:
     print("called")
