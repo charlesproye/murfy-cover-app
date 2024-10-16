@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from pandas import DataFrame as DF
 
-from analysis.watea.watea_constants import *
+from transform.watea.watea_constants import *
 
 def raw_ts_it() -> Generator[tuple[str, DF], None, None]:
     for file in os.listdir("data_cache/raw_time_series"):

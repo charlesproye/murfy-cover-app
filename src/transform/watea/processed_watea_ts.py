@@ -1,5 +1,5 @@
 """
-This module provides the function `processed_time_series_of` to provide a cleaned/processed time series from Watea's data.
+This module provides the function `processed_time_series_of` to provide a cleaned/processed time series from transform.watea's data.
 Can also be used as a script to process the entirety of the watea fleet.
 """
 from typing import Generator
@@ -13,9 +13,9 @@ from rich.traceback import install as install_rich_traceback
 import core.time_series_processing as ts
 from core.caching_utils import instance_data_caching_wrapper
 from core.console_utils import parse_kwargs
-from analysis.watea.watea_constants import *
-from analysis.watea.watea_fleet_info import iterate_over_ids
-from analysis.watea.raw_watea_ts import raw_ts_of
+from transform.watea.watea_constants import *
+from transform.watea.watea_fleet_info import iterate_over_ids
+from transform.watea.raw_watea_ts import raw_ts_of
 
 def main():
     install_rich_traceback(extra_lines=0, width=130)
