@@ -26,10 +26,12 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
 
     Args:
     - path_template (str): Template path for the cache file.
-    - cache_type (str): Either 's3' or 'local', specifying the type of caching.
+    - cache_type (str): Either 's3' or 'local_storage', specifying the type of caching.
     - path_params (List[str]): List of argument names to be used for formatting the path.
+    Function args:
+    force_update (bool): Set to True to generate and cache the result even if it was already cached.  
     """
-    assert on in ["s3", "local"], "cache_type must be 's3' or 'local'"
+    assert on in ["s3", "local_storage"], "cache_type must be 's3' or 'local'"
     def decorator(data_gen_func: Callable[..., pd.DataFrame]):
         @wraps(data_gen_func)
         def wrapper(*args, bucket: S3_Bucket = None, force_update=False, **kwargs) -> pd.DataFrame:
@@ -53,7 +55,7 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
                     return data
                 # Read cached data from S3
                 return data
-            elif on == "local":
+            elif on == "local_storage":
                 # Local cache handling
                 if force_update or not exists(path):
                     # Generate the data using the wrapped function

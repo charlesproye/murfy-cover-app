@@ -23,35 +23,43 @@ Let's go through the modules one by one to summarize what they do:
 ### caching_utils:
 Implements caching decorators:  
 ```python
-@cache_results_to_s3(path_template: str, path_params: List[str]=[])
+@cache_result(path: str, on: str, path_params: List[str] = [])
 ```
-This decorator takes in a path that can be formatted by the arguments of the decoratated function.  
-The function must take in an `S3_Bucket` instance like called `bucket` as parmater.  
-The decorator first checks if the key (file in S3) formatted by the specified arguments exists.  
-If so, the decorator returns the cached result.  
-Otherwise, the decorator calls the wrapped function, caches its output for future calls and then returns the output.  
-You can pass a `force_update` set to `True` to force the decorator to call the wrapped function an cache the result even if it was already cached.  
-The formatting of the key through arguments allows to cache the result of different function inputs.  
-For example we want to store a raw_tss for each EV brand.  
-Sp we declare a key format in `core/confing.py`
+The decorator takes the following steps:
+1.  Creates a dict of path arguments with path_params as keys and their corresponding value passed to the decorated function.  
+1.  Defines the path to result cache as the path formated by this dictionnary.  
+    This gives the possibility to have different cahces for different inputs to the function (see example).  
+    *Note: The path must end in '.parquet'.*  
+1.  If the decorated function received a kwargs `force_update` set to `True` or if there is no file at that path.   
+    1.  The decorated function gets called to generate the data.  
+    1.  The result is stored  
+    Otherwise, the decorated function doesn't get called and the decorator returns the already cached result.  
+
+The decorator can work both on s3 or on local storage.  
+Set the argument `on` to:
+-   `"s3"` to cache results on S3, if the decorated function takes in an arguement called `"bucket"` it will be used as an `S3_Bucket` instance.  
+-   `"local_storage"` to sotre it locally. 
+
+#### S3 storage example:
+We declare a key format:
 ```python
 S3_RAW_TSS_KEY_FORMAT = "raw_ts/{brand}/time_series/raw_tss.parquet"
 ```
 and we dclare our get_raw_tss function as:
 ```python
-@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT, ["brand"])
+@cache_result(S3_RAW_TSS_KEY_FORMAT, on="s3", ["brand"])
 def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
 ```
 If we wanted to store a time series by brand and by vehicle we would, for example, declare the path and the function as:  
 ```python
 S3_RAW_TS_KEY_FORMAT = "raw_ts/{brand}/time_series/{vin}.parquet"
-@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT, ["brand", "vin"])
+@cache_result(S3_RAW_TSS_KEY_FORMAT, on="s3", ["brand", "vin"])
 def get_raw_ts_of_vehicle(brand:str, vin:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
 ```
 On the other hand if there can only be one output to the function don't specify any parameters in the key:
 ```python
 S3_INITIAL_FLEET_INFO_KEY = "fleet_info/tesla/initial_fleet_info.parquet"
-@cache_result_in_s3(S3_INITIAL_FLEET_INFO_KEY)
+@cache_result(S3_INITIAL_FLEET_INFO_KEY, on="s3")
 def get_fleet_info(bucket: S3_Bucket=S3_Bucket()) -> DF:
 ```
 The second one will be for local storage.  
