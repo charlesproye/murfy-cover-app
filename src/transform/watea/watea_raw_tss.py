@@ -19,9 +19,16 @@ def get_raw_tss() -> DF:
             .astype({"id":"string"})
         )
 
-    raw_tss = pd.concat(raw_tss, ignore_index=True)
+    raw_tss = (
+        pd.concat(raw_tss, ignore_index=True)
+        .drop(columns=COLS_TO_DROP)
+        .astype(DTYPES)
+        .rename(columns=RENAMING_MAP)
+
+    )
     
     return raw_tss
 
 if __name__ == '__main__':
-    single_dataframe_script_main(get_raw_tss, force_update=True)
+    raw_tss = single_dataframe_script_main(get_raw_tss, force_update=True)
+    print(raw_tss["id"].value_counts())

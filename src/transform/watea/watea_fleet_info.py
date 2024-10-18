@@ -27,14 +27,14 @@ def iterate_over_ids(query_str:str=None, use_progress_track=True, track_kwargs={
         
 
 def compute_fleet_info() -> DF:
-    from transform.watea.processed_watea_ts import process_raw_time_series
+    from transform.watea.processed_watea_ts import get_processed_tss
 
     fleet_info_dicts: list[dict] = []
     for file in track(glob(path.join(PATH_TO_RAW_TS_FOLDER, "*.snappy.parquet"))):
         print("file", file)
         raw_ts = pd.read_parquet(file)
         print("oooooo", raw_ts)
-        vehicle_df = process_raw_time_series(raw_ts)
+        vehicle_df = get_processed_tss(raw_ts)
         discharge_grps = vehicle_df.query("in_discharge_perf_mask").groupby("in_discharge_perf_idx")
         charge_grps = vehicle_df.query("in_charge_perf_mask").groupby("in_charge_perf_idx")
         fleet_info_dicts.append({

@@ -23,11 +23,20 @@ COLS_TO_DROP = [
 ]
 DTYPES = {
     # "date_translated ": pd.SparseDtype("datetime64[ns]"),
-    "distance_totalizer": pd.SparseDtype("float"),
-    "battery_hv_soc": pd.SparseDtype("float"),
-    "battery_hv_temp": pd.SparseDtype("float"),
-    "battery_hv_voltage": pd.SparseDtype("float"),
-    "battery_hv_current": pd.SparseDtype("float"),
+    "distance_totalizer": "float32",
+    "battery_hv_soc": "float32",
+    "battery_hv_temp": "float32",
+    "battery_hv_voltage": "float32",
+    "battery_hv_current": "float32",
+}
+RENAMING_MAP = {
+    "distance_totalizer": "odometer",
+    "battery_hv_soc": "soc",
+    "date_translated": "date",
+    "battery_hv_temp": "temp",
+    "battery_hv_voltage": "voltage",
+    "battery_hv_current": "current",
+    "autonomy_km": "battery_range_km"
 }
 PERF_MAX_TIME_DIFF = TD(minutes=10)
 

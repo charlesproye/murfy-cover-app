@@ -24,43 +24,6 @@ def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY
 
     return ts
 
-def process_date(ts: DF, add_sec_time_diff_col=False, original_name="date", set_as_index=False) -> DF:
-    """
-    ### Description:
-    Applies all the boiler plate operation on the "date" column:
-    1. Sets the unit as second for easier convertion into timestamps.
-    1. Drops rows with duplicate timestamps.
-    1. Sorts the rows 
-    ### Parameters:
-    original_name, str, default="date":   
-        Name of the column that represents the date before parsing, will be renamed to date.    
-        If the original_name is not present in the dataframe, the function returns the dataframe untoched.
-    add_sec_time_diff_col, bool:  
-        Set this to true to add an int "sec_time_diff" column  
-    set_as_index, bool:  
-    Set to True if you want the date to becaome the index, will not drop the column.  
-    """
-    if not original_name in ts.columns:
-        return ts
-    ts = (
-        ts
-        .rename(columns={original_name: "date"})
-        .assign(date=pd.to_datetime(ts["date"]).dt.as_unit("s"))
-        .drop_duplicates("date")
-        .sort_index()
-    )
-    if set_as_index:
-        ts = ts.set_index("date", drop=False)
-    if add_sec_time_diff_col:
-        ts["sec_time_diff"] = (
-            ts["date"]
-            .ffill()
-            .diff()
-            .dt.as_unit("s")
-            .astype(int)
-        )
-
-    return ts
 
 def compute_cum_integrals_of_current_vars(vehicle_df: DF) -> DF:
     """
