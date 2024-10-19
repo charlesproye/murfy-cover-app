@@ -154,7 +154,7 @@ def period_idx_of_mask(vehicle_df:DF, mask_col: str, period_shift:int=1, max_tim
     else:
         mask = vehicle_df[mask_col]
     mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False)
-    idx = mask_for_idx.cumsum()
+    idx = mask_for_idx.cumsum().astype("uint16")
     return idx
 
 def sanitize_perf_period(soc: Series, min_size=2) -> bool|Series:
