@@ -61,7 +61,6 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
                     # Generate the data using the wrapped function
                     data: pd.DataFrame = data_gen_func(*args, **kwargs)
                     # Save the data locally
-                    print("saving...")
                     save_cache_to(data, path)
                     return data
                 # Read cached data from local file
