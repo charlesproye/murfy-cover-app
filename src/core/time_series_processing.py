@@ -25,15 +25,17 @@ def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY
     return ts
 
 
-def compute_cum_integrals_of_current_vars(vehicle_df: DF) -> DF:
+def compute_cum_energy(vehicle_df: DF) -> DF:
     """
     ### Description:
     Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).
     """
     if "power" in vehicle_df.columns:
-        vehicle_df["cum_energy"] = cum_integral(vehicle_df["power"], date_series=vehicle_df["date"])
-    if "current" in vehicle_df.columns:
-        vehicle_df["cum_charge"] = cum_integral(vehicle_df["current"], date_series=vehicle_df["date"])
+        vehicle_df["cum_energy"] = (
+            vehicle_df["power"]
+            .pipe(cum_integral, date_series=vehicle_df["date"])
+            .astype("float32")
+        )
     return vehicle_df
 
 def cum_integral(series: Series, date_series=None) -> Series:
@@ -122,11 +124,9 @@ def high_freq_in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
     bfilled_dir = vehicle_df["soc_dir"].bfill()
     ffilled_dir = vehicle_df["soc_dir"].ffill()
     vehicle_df["soc_dir"] = vehicle_df["soc_dir"].mask(bfilled_dir == ffilled_dir, ffilled_dir)
-    vehicle_df = (
-        vehicle_df
-        .eval("in_discharge = soc_dir == -1")
-        .eval("in_charge = soc_dir == 1")
-    ) 
+    vehicle_df = vehicle_df.eval("in_discharge = soc_dir == -1")
+    vehicle_df = vehicle_df.eval("in_charge = soc_dir == 1")
+    vehicle_df = vehicle_df.drop(columns=["soc_dir", "smoothed_soc_dir"])
 
     return vehicle_df
 
