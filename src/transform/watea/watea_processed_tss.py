@@ -14,13 +14,11 @@ def get_processed_tss() -> DF:
         tss
         .groupby("id")
         .apply(process_singe_ts, include_groups=False)
-        .reset_index(level=0, drop=False)
     )
-    print("done")
+    tss = tss.reset_index(level=0, drop=False)
     return tss
 
 def process_singe_ts(ts:DF) -> DF:
-    print(ts.name)
     return (
         ts
         .assign(date=pd.to_datetime(ts["date"]).dt.as_unit("s"))
@@ -34,7 +32,7 @@ def process_singe_ts(ts:DF) -> DF:
         .eval("in_charge = in_charge & soc < 99") 
         .pipe(ts_proc.perf_mask_and_idx_from_condition_mask, "in_charge", max_time_diff=PERF_MAX_TIME_DIFF)
         .pipe(ts_proc.perf_mask_and_idx_from_condition_mask, "in_discharge", max_time_diff=PERF_MAX_TIME_DIFF)
-        .pipe(ts_proc.compute_cum_integrals_of_current_vars)
+        .pipe(ts_proc.compute_cum_energy)
     )
 
 def set_sec_tim_diff(ts: DF) -> DF:
@@ -54,4 +52,3 @@ if __name__ == "__main__":
         get_processed_tss,
         force_update=True,
     )
-    print(tss["id"].value_counts())
