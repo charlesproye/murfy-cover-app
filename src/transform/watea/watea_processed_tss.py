@@ -41,7 +41,7 @@ def set_sec_tim_diff(ts: DF) -> DF:
         .ffill()
         .diff()
         .dt.as_unit("s")
-        .astype(int)
+        .astype("int32")
     )
 
     return ts
