@@ -2,72 +2,39 @@
 This module handles a data frame that holds static data about the vehicles such as model, default capacity and range, ect...    
 Each line corresponds to a vehicle.
 """
-from glob import glob
-from os import path
-from typing import Generator
-
-import pandas as pd
 from pandas import DataFrame as DF
-from rich import print
-from rich.progress import track
 
-from core.caching_utils import save_cache_to
-from transform.watea.watea_constants import *
+from core.console_utils import single_dataframe_script_main
+from core.caching_utils import cache_result
+from transform.watea.watea_processed_tss import get_processed_tss
+from transform.watea.watea_config import *
 
-def main():
-    fleet_info_df = compute_fleet_info()
-    print(fleet_info_df)
-    save_cache_to(fleet_info_df, PATH_TO_FLEET_INFO_DF.format(extension="csv"), index=False)
-    save_cache_to(fleet_info_df, PATH_TO_FLEET_INFO_DF.format(extension="parquet"))
+@cache_result(FLEET_INFO_DF_PATH, on="local_storage")
+def get_fleet_info() -> DF:
+    tss = (
+        get_processed_tss()
+        .set_index("id")
+    )
+    fleet_info = {
+        "max_odo": tss.groupby("id")["odometer"].max(),
+        "min_odo": tss.groupby("id")["odometer"].min(),
+    }
+    for period in ["in_charge", "in_discharge"]:
+        period_tss_grpby = tss.query(period).groupby(level=0)
+        for col in COLS_TO_DESCRIBE_IN_FLEET_INFO:
+            col_in_period = period_tss_grpby[col]
+            fleet_info[f"{period}_{col}_notna_ratio"] = col_in_period.count().div(col_in_period.size())
 
-
-def iterate_over_ids(query_str:str=None, use_progress_track=True, track_kwargs={}) -> Generator[str, None, None]:
-    filtered_fleet_info_df = fleet_info_df.query(query_str) if not query_str is None else fleet_info_df
-    return track(filtered_fleet_info_df["id"], **track_kwargs) if use_progress_track else filtered_fleet_info_df["id"]
-        
-
-def compute_fleet_info() -> DF:
-    from transform.watea.processed_watea_ts import get_processed_tss
-
-    fleet_info_dicts: list[dict] = []
-    for file in track(glob(path.join(PATH_TO_RAW_TS_FOLDER, "*.snappy.parquet"))):
-        print("file", file)
-        raw_ts = pd.read_parquet(file)
-        print("oooooo", raw_ts)
-        vehicle_df = get_processed_tss(raw_ts)
-        discharge_grps = vehicle_df.query("in_discharge_perf_mask").groupby("in_discharge_perf_idx")
-        charge_grps = vehicle_df.query("in_charge_perf_mask").groupby("in_charge_perf_idx")
-        fleet_info_dicts.append({
-            "id": path.basename(file.split('.')[0]),
-            "len": len(vehicle_df),
-            **(100 * vehicle_df[["power", "temp"]].count() / len(vehicle_df)).add_suffix("_not_nan_percentage").to_dict(),
-            "min_odo": vehicle_df["odometer"].min(),
-            "max_odo": vehicle_df["odometer"].max(),
-            "power_during_discharge_pct": (100 * discharge_grps["power"].count() / discharge_grps.size()).mean(),
-            "power_during_charge_pct": (100 * charge_grps["power"].count() / charge_grps.size()).mean(),
-        })
-        print(fleet_info_dicts[-1]["power_during_discharge_pct"])
-        print(fleet_info_dicts[-1]["power_during_charge_pct"])
-    
-    if not fleet_info_dicts:
-        raise ValueError("No data was processed. Check if the raw TS folder contains any files.")
-    
-    fleet_info_df = (
-        DF(fleet_info_dicts)
-        .set_index("id", drop=False)
-        .eval("has_power_during_discharge = power_during_discharge_pct > 90")
-        .eval("has_power_during_charge = power_during_charge_pct > 90")
+    fleet_info = (
+        DF(fleet_info)
+        .eval("has_power_during_charge = in_charge_power_notna_ratio > 0.5")
+        .eval("has_power_during_discharge = in_discharge_power_notna_ratio > 0.5")
     )
 
-    return fleet_info_df
-
+    return fleet_info
+    
 if __name__ == "__main__":
-    main()
-
-fleet_info_df: DF
-fleet_info_cache_path = path.join(path.dirname(__file__), PATH_TO_FLEET_INFO_DF.format(extension="parquet"))
-if path.exists(fleet_info_cache_path):
-    fleet_info_df = pd.read_parquet(fleet_info_cache_path)
-else:
-    print("[yellow]Warning:", "No fleet info df cached at", f"[blue]{fleet_info_cache_path}")
-
+    single_dataframe_script_main(
+        get_fleet_info,
+        force_update=True,
+    )

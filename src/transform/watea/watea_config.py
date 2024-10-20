@@ -11,7 +11,7 @@ from sklearn.pipeline import Pipeline
 WATEA_RESPONSES_REGEX = join(dirname(__file__), "data_cache/bib_export/*/*.parquet")
 RAW_TS_PATH = join(dirname(__file__), "data_cache/raw_tss.parquet")
 PROCESSED_TS_PATH = join(dirname(__file__), "data_cache/processed_tss.parquet")
-FLEET_INFO_DF_PATH = join(dirname(__file__), "data_cache/fleet_info/fleet_info_df.{extension}")
+FLEET_INFO_DF_PATH = join(dirname(__file__), "data_cache/fleet_info/fleet_info_df.parquet")
 RAW_FLEET_CHARGING_POINTS_PATH = join(dirname(__file__), "data_cache/soh_estimation/raw_fleet_charging_points.parquet")
 PREPROCESSED_FLEET_CHARGING_POINTS_PATH = join(dirname(__file__), "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet")
 PROCESSED_CLUSTER_PATH = join(dirname(__file__), "data_cache/soh_estimation/processed_cluster.parquet")
@@ -33,12 +33,20 @@ RENAMING_MAP = {
     "distance_totalizer": "odometer",
     "battery_hv_soc": "soc",
     "date_translated": "date",
-    "battery_hv_temp": "temp",
+    "battery_hv_temp": "temperature",
     "battery_hv_voltage": "voltage",
     "battery_hv_current": "current",
     "autonomy_km": "battery_range_km"
 }
 PERF_MAX_TIME_DIFF = TD(minutes=10)
+
+# Fleet info:
+COLS_TO_DESCRIBE_IN_FLEET_INFO = [
+    "power",
+    "current",
+    "voltage",
+    "temperature"
+]
 
 # SOH estimation:
 MAIN_CHARGING_REGIME_CLUSTER_IDX = 8
