@@ -8,13 +8,14 @@ from sklearn.pipeline import Pipeline
 
 # Paths:
 # Here we call the time series that watea sent us "watea_responses" in analogy to the responses we get from EV data APIs. 
-WATEA_RESPONSES_REGEX = join(dirname(__file__), "data_cache/bib_export/*/*.parquet")
-RAW_TS_PATH = join(dirname(__file__), "data_cache/raw_tss.parquet")
-PROCESSED_TS_PATH = join(dirname(__file__), "data_cache/processed_tss.parquet")
-FLEET_INFO_DF_PATH = join(dirname(__file__), "data_cache/fleet_info/fleet_info_df.parquet")
-RAW_FLEET_CHARGING_POINTS_PATH = join(dirname(__file__), "data_cache/soh_estimation/raw_fleet_charging_points.parquet")
-PREPROCESSED_FLEET_CHARGING_POINTS_PATH = join(dirname(__file__), "data_cache/soh_estimation/preprocessed_fleet_charging_points.parquet")
-PROCESSED_CLUSTER_PATH = join(dirname(__file__), "data_cache/soh_estimation/processed_cluster.parquet")
+BASE_DIR = join(dirname(__file__), "data_cache")
+WATEA_RESPONSES_REGEX = join(BASE_DIR, "/bib_export/*/*.parquet")
+RAW_TS_PATH = join(BASE_DIR, "raw_tss.parquet")
+PROCESSED_TS_PATH = join(BASE_DIR, "processed_tss.parquet")
+FLEET_INFO_DF_PATH = join(BASE_DIR, "fleet_info_df.parquet")
+RAW_FLEET_CHARGING_POINTS_PATH = join(BASE_DIR, "raw_fleet_charging_points.parquet")
+PREPROCESSED_FLEET_CHARGING_POINTS_PATH = join(BASE_DIR, "preprocessed_fleet_charging_points.parquet")
+PROCESSED_CLUSTER_PATH = join(BASE_DIR, "processed_cluster.parquet")
 
 # Time series processing:
 COLS_TO_DROP = [
@@ -49,6 +50,7 @@ COLS_TO_DESCRIBE_IN_FLEET_INFO = [
 ]
 
 # SOH estimation:
+MIN_ODO_TO_BECONSIDERED_DEFAULT_SOH = 3000.0
 MAIN_CHARGING_REGIME_CLUSTER_IDX = 8
 UMAP_N_COMPONENTS = 3
 UMAP_INPUT_FEATURE_COLS = [
@@ -58,7 +60,7 @@ UMAP_INPUT_FEATURE_COLS = [
     "temperature",
     "soc",
 ]
-UMAP_RANDOM_STATE = 32
+UMAP_RANDOM_STATE = 15
 CHARGING_POINTS_AGG_OVER_CHARGES_DICT = {
     "odometer":"median",
     "energy_added":"median",

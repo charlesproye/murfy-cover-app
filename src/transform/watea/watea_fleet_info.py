@@ -1,7 +1,3 @@
-"""
-This module handles a data frame that holds static data about the vehicles such as model, default capacity and range, ect...    
-Each line corresponds to a vehicle.
-"""
 from pandas import DataFrame as DF
 
 from core.console_utils import single_dataframe_script_main
@@ -23,10 +19,11 @@ def get_fleet_info() -> DF:
         period_tss_grpby = tss.query(period).groupby(level=0)
         for col in COLS_TO_DESCRIBE_IN_FLEET_INFO:
             col_in_period = period_tss_grpby[col]
-            fleet_info[f"{period}_{col}_notna_ratio"] = col_in_period.count().div(col_in_period.size())
+            fleet_info[f"{period}_{col}_notna_ratio"] = col_in_period.count().div(col_in_period.size(), fill_value=0.0)
 
     fleet_info = (
         DF(fleet_info)
+        .reset_index(drop=False)
         .eval("has_power_during_charge = in_charge_power_notna_ratio > 0.5")
         .eval("has_power_during_discharge = in_discharge_power_notna_ratio > 0.5")
     )
@@ -38,3 +35,5 @@ if __name__ == "__main__":
         get_fleet_info,
         force_update=True,
     )
+
+fleet_info = get_fleet_info()
