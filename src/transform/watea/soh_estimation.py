@@ -1,4 +1,4 @@
-# Currently this is in watea but it's destined to be moved to core when we will use it for tesla
+# Currently this is in watea but it's destined to be moved to core when we will use it for other data pipelines.
 from pandas import DataFrame as DF
 import pandas as pd
 import numpy as np
@@ -10,6 +10,16 @@ from transform.watea.watea_config import *
 from transform.watea.watea_fleet_info import fleet_info
 from transform.watea.watea_processed_tss import get_processed_tss
 
+@cache_result(SOH_PER_CHARGES_PATH, on="local_storage")
+def get_soh_per_charges() -> DF:
+    cluster = get_processed_cluster()
+    agg_dict = {key: value for key, value in CHARGING_POINTS_AGG_OVER_CHARGES_DICT.items() if key in cluster.columns}
+    return (
+        cluster
+        .groupby("charge_id")
+        .agg(agg_dict)
+    )
+
 # soh estimation
 @cache_result(PROCESSED_CLUSTER_PATH, on="local_storage")
 def get_processed_cluster() -> DF:
@@ -18,7 +28,6 @@ def get_processed_cluster() -> DF:
         .query("to_use_for_soh_estimation")
         .pipe(estimate_soh)
     )
-
 
 def estimate_soh(cluster:DF) -> DF:
     x = cluster[["voltage", "temperature", "current"]].values
@@ -91,14 +100,6 @@ def clean_charging_points(charging_points:DF) -> DF:
     )
 
 # Extraction:
-def agg_charging_points_over_charges(charging_points:DF, agg_dict:dict=CHARGING_POINTS_AGG_OVER_CHARGES_DICT) -> DF:
-    agg_dict = {key: value for key, value in agg_dict.items() if key in charging_points.columns}
-    return (
-        charging_points
-        .groupby("charge_id")
-        .agg(agg_dict)
-    )
-
 @cache_result(RAW_FLEET_CHARGING_POINTS_PATH, on="local_storage")
 def get_raw_charging_points() -> DF:
     tss = get_processed_tss()

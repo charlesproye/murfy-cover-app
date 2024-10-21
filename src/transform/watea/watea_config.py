@@ -16,6 +16,7 @@ FLEET_INFO_DF_PATH = join(BASE_DIR, "fleet_info_df.parquet")
 RAW_FLEET_CHARGING_POINTS_PATH = join(BASE_DIR, "raw_fleet_charging_points.parquet")
 PREPROCESSED_FLEET_CHARGING_POINTS_PATH = join(BASE_DIR, "preprocessed_fleet_charging_points.parquet")
 PROCESSED_CLUSTER_PATH = join(BASE_DIR, "processed_cluster.parquet")
+SOH_PER_CHARGES_PATH = join(BASE_DIR, "soh_per_charges.parquet")
 
 # Time series processing:
 COLS_TO_DROP = [
