@@ -7,12 +7,12 @@ from pandas import Series
 from core.config import *
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import cache_result_in_s3
+from core.caching_utils import cache_result
 from core.pandas_utils import concat
 from transform.tesla.tesla_config import *
 
 
-@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT.format(brand="tesla"))
+@cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="tesla"), on="s3")
 def get_raw_tss(bucket: S3_Bucket = S3_Bucket(), **kwargs) -> DF:
     logger = getLogger(f"transform.Tesla-RawTSS")
     return (
