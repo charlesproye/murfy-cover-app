@@ -2,8 +2,6 @@
 from pandas import DataFrame as DF
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import DBSCAN
 
 from core.pandas_utils import floor_to, series_start_end_diff
 from core.caching_utils import cache_result
@@ -59,35 +57,8 @@ def get_preprocessed_charging_points(force_update_extraction=True) -> DF:
         get_raw_charging_points(force_update=force_update_extraction)
         .pipe(clean_charging_points)
         .pipe(compute_regime_seperation_feature)
-        # .pipe(compute_umap_features)
-        # .pipe(segment_charing_regimes)
         .eval("to_use_for_soh_estimation = regime_seperation_feature <= 30 & current <= 98 & energy_added >= 300")
     )
-
-# def segment_charing_regimes(charging_points: DF) -> DF:
-#     dbscan = DBSCAN(eps=0.5, min_samples=5, metric='euclidean', n_jobs=-1)
-#     umap_feature_cols = charging_points.filter(regex='umap_feature_').columns
-#     charging_points['cluster_idx'] = dbscan.fit_predict(charging_points[umap_feature_cols])
-
-#     return charging_points
-
-# def compute_umap_features(df:DF, n_components=UMAP_N_COMPONENTS, features=UMAP_INPUT_FEATURE_COLS, target_feature="energy_added", n_neighbours=120) -> DF:
-#     import umap # Import umap inside the function because import is slow (because of tensor flow)
-#     umap_feature_cols = [f"umap_feature_{i}" for i in range(n_components)]
-#     umap_feature_cols_to_drop = [col for col in umap_feature_cols if col in df.columns] # Drop umap feature columns if they are already in the df
-#     df = df.drop(columns=umap_feature_cols_to_drop)
-#     return (
-#         Pipeline([
-#             ('standar_scalar', StandardScaler()),
-#             ('reducer', umap.UMAP(n_components=n_components, verbose=True, n_neighbors=n_neighbours)), #, random_state=UMAP_RANDOM_STATE)),
-#             ('to_df', FunctionTransformer(lambda X: DF(X, columns=umap_feature_cols))),
-#             ('concat_with_og_df', FunctionTransformer(lambda X: pd.concat((X, df.reset_index(drop=True)), axis="columns"))),
-#         ])
-#         .fit_transform(
-#             X=df[features].values,
-#             y=df[target_feature],
-#         )
-#     )
 
 def compute_regime_seperation_feature(fleet_charging_points:DF) -> DF:
     expected_voltage_from_soc = (
@@ -155,7 +126,7 @@ def get_raw_charging_points() -> DF:
     return charging_points
 
 if __name__ == "__main__":
-    # single_dataframe_script_main(get_raw_charging_points, force_update=True)
+    single_dataframe_script_main(get_raw_charging_points, force_update=True)
     single_dataframe_script_main(get_preprocessed_charging_points, force_update=True)
     single_dataframe_script_main(get_processed_cluster, force_update=True)
 
