@@ -51,16 +51,16 @@ COLS_TO_DESCRIBE_IN_FLEET_INFO = [
 
 # SOH estimation:
 MIN_ODO_TO_BECONSIDERED_DEFAULT_SOH = 3000.0
-MAIN_CHARGING_REGIME_CLUSTER_IDX = 8
-UMAP_N_COMPONENTS = 3
-UMAP_INPUT_FEATURE_COLS = [
-    "current",
-    "voltage",
-    "regime_seperation_feature",
-    "temperature",
-    "soc",
-]
-UMAP_RANDOM_STATE = 15
+# MAIN_CHARGING_REGIME_CLUSTER_IDX = 8
+# UMAP_N_COMPONENTS = 3
+# UMAP_INPUT_FEATURE_COLS = [
+#     "current",
+#     "voltage",
+#     "regime_seperation_feature",
+#     "temperature",
+#     "soc",
+# ]
+# UMAP_RANDOM_STATE = 15
 CHARGING_POINTS_AGG_OVER_CHARGES_DICT = {
     "odometer":"median",
     "energy_added":"median",
