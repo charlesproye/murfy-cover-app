@@ -75,8 +75,18 @@ async def schedule_compression(compression_queue):
             except Exception as e:
                 logging.error(f"Error during scheduled compression: {str(e)}")
             finally:
-                compression_event.set()  # Resume vehicle processing
+                # Don't set compression_event here, we'll do it at 6 AM
                 logging.info("Scheduled compression process completed")
+            
+            # Wait until 6 AM
+            now = datetime.now()
+            six_am = now.replace(hour=6, minute=0, second=0, microsecond=0)
+            if now > six_am:
+                six_am += timedelta(days=1)
+            await asyncio.sleep((six_am - now).total_seconds())
+            
+            compression_event.set()  # Resume vehicle processing at 6 AM
+            logging.info("Resuming vehicle processing at 6 AM")
 
 async def perform_compression():
     logging.info("Starting compression task")
@@ -104,6 +114,12 @@ async def process_vehicle(account):
 
     while True:
         await compression_event.wait()  # Wait if compression is in progress
+
+        now = datetime.now()
+        if now.hour < 6:
+            logging.info("It's between midnight and 6 AM, pausing vehicle processing")
+            await asyncio.sleep((now.replace(hour=6, minute=0, second=0, microsecond=0) - now).total_seconds())
+            continue
         
         logging.info("Starting vehicle processing cycle")
         for vid in vehicle_ids:
