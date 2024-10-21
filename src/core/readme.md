@@ -62,10 +62,6 @@ S3_INITIAL_FLEET_INFO_KEY = "fleet_info/tesla/initial_fleet_info.parquet"
 @cache_result(S3_INITIAL_FLEET_INFO_KEY, on="s3")
 def get_fleet_info(bucket: S3_Bucket=S3_Bucket()) -> DF:
 ```
-The second one will be for local storage.  
-As of writting this readme, the local storage alternatives are `singleton_data_caching` and `instance_data_caching`.  
-They will eventually be replace by a `cache_result_localy` once Wateas code gets refactored or removed.  
-Ideally we would have only one decorator that can cache the result locally or remotly or both.  
 
 ### console_utils:
 Implements functionalities for interacting with the CLI:  
