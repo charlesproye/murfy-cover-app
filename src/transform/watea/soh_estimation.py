@@ -33,7 +33,7 @@ def get_processed_cluster() -> DF:
     )
 
 def estimate_soh(cluster:DF) -> DF:
-    x = cluster[["voltage", "temperature", "current"]].values
+    x = cluster[SOH_ESTIMATION_FEATURES].values
     y = cluster["energy_added"].values
     soh_estimator = (
         Pipeline([

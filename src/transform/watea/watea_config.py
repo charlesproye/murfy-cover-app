@@ -71,12 +71,7 @@ CHARGING_POINTS_AGG_OVER_CHARGES_DICT = {
     "charge_idx":pd.Series.mode,
     "charge_id":pd.Series.mode,
 }
-SOH_ESTIMATION_FEATURES = [
-    "current",
-    "voltage",
-    "energy_added",
-    "regime_seperation_feature",
-]
+SOH_ESTIMATION_FEATURES = ["voltage", "temperature", "current"]
 POLYNOMIAL_LINEAR_REGRESSION_PIPELINE = Pipeline([
     ('reshape', FunctionTransformer(lambda x: x.reshape(-1, 1))),
     ('poly_features', PolynomialFeatures(degree=6)),
