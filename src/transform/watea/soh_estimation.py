@@ -2,6 +2,9 @@
 from pandas import DataFrame as DF
 import pandas as pd
 import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures, FunctionTransformer
+from sklearn.pipeline import Pipeline
 
 from core.pandas_utils import floor_to, series_start_end_diff
 from core.caching_utils import cache_result
@@ -103,8 +106,8 @@ def clean_charging_points(charging_points:DF) -> DF:
 @cache_result(RAW_FLEET_CHARGING_POINTS_PATH, on="local_storage")
 def get_raw_charging_points() -> DF:
     tss = get_processed_tss()
-    tss["odometer"] = tss["odometer"].ffill()
-    tss["soc"] = floor_to(tss["soc"].ffill(), CHARGING_POINTS_GRP_BY_SOC_QUANTIZATION)
+    tss["odometer"] = tss.groupby("id")["odometer"].ffill()
+    tss["soc"] = floor_to(tss.groupby("id")["soc"].ffill(), CHARGING_POINTS_GRP_BY_SOC_QUANTIZATION)
     tss = tss.merge(fleet_info[["id", "has_power_during_charge"]], on="id", how="left")
     tss = tss.query("in_charge_perf_mask & has_power_during_charge")
     charging_points = tss.groupby(["id", "in_charge_perf_idx","soc",])
