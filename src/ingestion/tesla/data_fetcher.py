@@ -5,6 +5,7 @@ import datetime
 import time
 import logging
 import os
+import csv
 from dotenv import load_dotenv
 from data_processor import extract_relevant_data
 from s3_handler import save_data_to_s3
@@ -46,25 +47,42 @@ async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_tok
             
             return await response.json()
 
-async def fetch_all_vehicle_ids(access_token_key, refresh_token_key):
+async def fetch_all_vehicle_ids(access_token_key, refresh_token_key, csv_path: str = None):
     load_dotenv(override=True)
     access_token = await get_token(access_token_key)
     refresh_token = await get_token(refresh_token_key)
     url = "https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles"
     headers = {'Authorization': f'Bearer {access_token}'}
+
+    authorized_vins = set()
+    if csv_path:
+        try:
+            with open(csv_path, 'r') as csvfile:
+                csv_reader = csv.reader(csvfile)
+                next(csv_reader)  # Skip header row if present
+                authorized_vins = set(row[0].strip() for row in csv_reader if row)
+        except Exception as e:
+            logging.error(f"Erreur lors de la lecture du fichier CSV : {e}")
     
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as response:
             if response.status == 200:
                 data = await response.json()
                 vehicles = data['response']
-                return [vehicle['vin'] for vehicle in vehicles]
+                account_vins = [vehicle['vin'] for vehicle in vehicles]
+                
+                if authorized_vins:
+                    authorized_account_vins = [vin for vin in account_vins if vin in authorized_vins]
+                else:
+                    authorized_account_vins = account_vins
+                
+                return authorized_account_vins
             elif response.status == 401 or response.status == 421:  # Token expired
                 logging.warning("Access token expired. Refreshing token.")
                 tokens = await refresh_token_and_retry_request(access_token, refresh_token, access_token_key, refresh_token_key)
                 if tokens:
                     await asyncio.sleep(2)
-                    return await fetch_all_vehicle_ids(access_token_key, refresh_token_key)
+                    return await fetch_all_vehicle_ids(access_token_key, refresh_token_key, csv_path)
                 else:
                     logging.error("Failed to refresh token and fetch vehicle IDs.")
                     return []

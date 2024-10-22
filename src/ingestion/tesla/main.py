@@ -103,10 +103,11 @@ async def process_vehicle(account):
     access_token_key = account['access_token_key']
     refresh_token_key = account['refresh_token_key']
     professional_account = account.get('professional_account', False)
+    excel_url = account.get('excel_url', None)
     vehicle_id = account.get('vehicle_id')
 
     if professional_account:
-        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key)
+        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key, excel_url)
     else:
         vehicle_ids = [vehicle_id]
 
