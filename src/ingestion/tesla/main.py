@@ -80,13 +80,13 @@ async def schedule_compression(compression_queue):
             
             # Wait until 6 AM
             now = datetime.now()
-            six_am = now.replace(hour=6, minute=0, second=0, microsecond=0)
-            if now > six_am:
-                six_am += timedelta(days=1)
-            await asyncio.sleep((six_am - now).total_seconds())
+            five_am = now.replace(hour=5, minute=0, second=0, microsecond=0)
+            if now > five_am:
+                five_am += timedelta(days=1)
+            await asyncio.sleep((five_am - now).total_seconds())
             
-            compression_event.set()  # Resume vehicle processing at 6 AM
-            logging.info("Resuming vehicle processing at 6 AM")
+            compression_event.set()  # Resume vehicle processing at 5 AM
+            logging.info("Resuming vehicle processing at 5 AM")
 
 async def perform_compression():
     logging.info("Starting compression task")
@@ -116,9 +116,9 @@ async def process_vehicle(account):
         await compression_event.wait()  # Wait if compression is in progress
 
         now = datetime.now()
-        if now.hour < 6:
-            logging.info("It's between midnight and 6 AM, pausing vehicle processing")
-            await asyncio.sleep((now.replace(hour=6, minute=0, second=0, microsecond=0) - now).total_seconds())
+        if now.hour < 5:
+            logging.info("It's between midnight and 5 AM, pausing vehicle processing")
+            await asyncio.sleep((now.replace(hour=5, minute=0, second=0, microsecond=0) - now).total_seconds())
             continue
         
         logging.info("Starting vehicle processing cycle")
