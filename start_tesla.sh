@@ -9,7 +9,7 @@ ACCOUNTS_JSON='[
   {
     "access_token_key": "ACCESS_TOKEN_ROADSTER",
     "refresh_token_key": "REFRESH_TOKEN_ROADSTER",
-    "professional_account": true
+    "professional_account": true,
   },
   {
     "access_token_key": "ACCESS_TOKEN_PA",

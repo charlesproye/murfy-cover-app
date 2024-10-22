@@ -85,7 +85,8 @@ class S3_Bucket():
         keys = str_split_and_retain_src(keys, "/")
         # Remove files in temp directory
         keys = keys[keys[3] != "temp"]
-        keys = keys.drop(columns=[4])
+        if len(keys.columns) > 5:
+            keys = keys.drop(columns=[4])
         keys.columns = KEY_LIST_COLUMN_NAMES
         # Check that the file name is a date
         keys['is_valid_file'] = (

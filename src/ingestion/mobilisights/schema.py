@@ -276,12 +276,13 @@ class ChargingRateUnit(StrEnum):
 class ChargingMode(StrEnum):
     slow = "slow"
     quick = "quick"
+    no = "no" 
 
 
 class Charging(WithTimestamp):
     plugged: bool
     status: ChargingStatus
-    remaining_time: Duration
+    remaining_time: int  # Changez Duration en int
     rate: ValueWithUnit[float, ChargingRateUnit]
     mode: ChargingMode
     planned: dt
@@ -296,27 +297,32 @@ class Charging(WithTimestamp):
 
 
 class Electricity(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+    msgspec.Struct, 
+    forbid_unknown_fields=True, 
+    omit_defaults=True, 
+    rename="camel"
 ):
-    instant_consumption: Optional[
-        TimestampedValueWithUnit[float, EnergyConsumptionUnit]
-    ] = None
+    instant_consumption: Optional[TimestampedValueWithUnit[float, EnergyConsumptionUnit]] = None
     level: Optional[EnergyConsumptionLevel] = None
     residual_autonomy: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
-    capacity: Optional[TimestampedValueWithUnit[float, CapacityUnit]] = None
+    battery_capacity: Optional[TimestampedValueWithUnit[float, CapacityUnit]] = None
     charging: Optional[Charging] = None
     engine: Optional[EngineSmall] = None
+
+    @classmethod
+    def __struct_from_dict__(cls, d):
+        if 'capacity' in d:
+            d['battery_capacity'] = d.pop('capacity')
+        return super().__struct_from_dict__(d)
 
 
 class MergedElectricity(
     msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
 ):
-    instant_consumption: list[
-        TimestampedValueWithUnit[float, EnergyConsumptionUnit]
-    ] = []
+    instant_consumption: list[TimestampedValueWithUnit[float, EnergyConsumptionUnit]] = []
     level: list[EnergyConsumptionLevel] = []
     residual_autonomy: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
-    capacity: list[TimestampedValueWithUnit[float, CapacityUnit]] = []
+    battery_capacity: list[TimestampedValueWithUnit[float, CapacityUnit]] = []
     charging: list[Charging] = []
     engine_speed: list[TimestampedValueWithUnit[float, EngineSpeedUnit]] = []
 
@@ -332,8 +338,8 @@ class MergedElectricity(
         res.residual_autonomy = TimestampedValueWithUnit.merge_list(
             [x for x in map(lambda e: e.residual_autonomy, lst) if x is not None]
         )
-        res.capacity = TimestampedValueWithUnit.merge_list(
-            [x for x in map(lambda e: e.capacity, lst) if x is not None]
+        res.battery_capacity = TimestampedValueWithUnit.merge_list(
+            [x for x in map(lambda e: e.battery_capacity, lst) if x is not None]
         )
         res.charging = Charging.merge_list(
             [x for x in map(lambda e: e.charging, lst) if x is not None]
@@ -398,6 +404,7 @@ class Engine(
     speed: Optional[TimestampedValueWithUnit[float, EngineSpeedUnit]] = None
     ignition: Optional[TimestampedValue[bool]] = None
     battery: Optional[EngineBattery] = None
+    percentage: Optional[Percentage] = None
     run_time: Optional[TimestampedValue[float]] = None
     coolant: Optional[EngineCoolant] = None
 

@@ -75,8 +75,18 @@ async def schedule_compression(compression_queue):
             except Exception as e:
                 logging.error(f"Error during scheduled compression: {str(e)}")
             finally:
-                compression_event.set()  # Resume vehicle processing
+                # Don't set compression_event here, we'll do it at 6 AM
                 logging.info("Scheduled compression process completed")
+            
+            # Wait until 6 AM
+            now = datetime.now()
+            five_am = now.replace(hour=5, minute=0, second=0, microsecond=0)
+            if now > five_am:
+                five_am += timedelta(days=1)
+            await asyncio.sleep((five_am - now).total_seconds())
+            
+            compression_event.set()  # Resume vehicle processing at 5 AM
+            logging.info("Resuming vehicle processing at 5 AM")
 
 async def perform_compression():
     logging.info("Starting compression task")
@@ -93,10 +103,11 @@ async def process_vehicle(account):
     access_token_key = account['access_token_key']
     refresh_token_key = account['refresh_token_key']
     professional_account = account.get('professional_account', False)
+    excel_url = account.get('excel_url', None)
     vehicle_id = account.get('vehicle_id')
 
     if professional_account:
-        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key)
+        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key, excel_url)
     else:
         vehicle_ids = [vehicle_id]
 
@@ -104,6 +115,12 @@ async def process_vehicle(account):
 
     while True:
         await compression_event.wait()  # Wait if compression is in progress
+
+        now = datetime.now()
+        if now.hour < 5:
+            logging.info("It's between midnight and 5 AM, pausing vehicle processing")
+            await asyncio.sleep((now.replace(hour=5, minute=0, second=0, microsecond=0) - now).total_seconds())
+            continue
         
         logging.info("Starting vehicle processing cycle")
         for vid in vehicle_ids:
