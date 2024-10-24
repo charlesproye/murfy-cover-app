@@ -27,13 +27,15 @@ transform
     ├── tesla_fleet_info.py
     ├── tesla_processed_tss.py
     └── tesla_raw_tss.py
+ └── utils 
+    ├── merge_prod_and_dev_s3_buckets.py # since we can not run the pipeline on the dev bucket for limits on API we need some way to merge the prod and dev buckets
 ```
 ### Pipelines structure
 The pipelines consist in multiple steps each, ideally, implemented in a single module :
 Here "XX" is the name of the data provider.  
 -  **Raw time series obtention step**:
     - Result should be accessible from a `get_raw_tss` function.  
-    - The implementation should be in a `XX_raw_tss` module.  
+    - The implementation should be in each data group's module.  
     Parse json responses into a single `raw_tss` dataframe where the values are stored as-is.  
 - **Raw fleet info obtention step**:
     - Result should be accessible from an importable `fleet_info` dataframe instance.  
@@ -48,10 +50,14 @@ Here "XX" is the name of the data provider.
     -   Set the dtypes of raw_tss
     -   add missing columns (for ex: in_charge/dishcarge, age of vehicle)
     -   remove the useless ones.  
--  **Soh estimation step**: 
-    This will most likely be different from one pipeline to another This is the aggregation step where we actually compute the soh to ceratin granularity level depending on the quality of the data.  
+-  **Result step**: 
+    - Result should be accessible from a `get_result` function.  
+    - The results are calculated for each brands
+    - Steps :
+        - Calculate the SoH 
+ 
 
-You can launch execute any module as a separate script if you want to run a sepcific step of the  
+You can launch execute any module as a separate script if you want to run a sepcific step of the transform pipeline.  
 
 ### Running the pipelines
 The pipelines are orchestrated by a blocking apscheduler.  
