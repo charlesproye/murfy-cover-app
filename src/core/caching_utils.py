@@ -53,8 +53,9 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
                     # Save the data to S3 as parquet
                     bucket.save_df_as_parquet(data, path)
                     return data
-                # Read cached data from S3
-                return data
+                else:
+                    # Read cached data from S3
+                    return bucket.read_parquet_df(path)
             elif on == "local_storage":
                 # Local cache handling
                 if force_update or not exists(path):
