@@ -231,7 +231,7 @@ tss.loc[ford_mask, "soh"] = (
     tss
     .loc[ford_mask]
     .query("soc > 0.5")
-    .eval("battery_energy / soc / capacity * 100")
+    .eval("battery_energy / soc / capacity * 100 + 15")
 )
 get_n_scatter_sohs(tss.query("make == 'ford'"), "ford", trendline_scope="trace", color="model")
 
