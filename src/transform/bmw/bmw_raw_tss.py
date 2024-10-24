@@ -2,6 +2,7 @@ import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
 from logging import Logger, getLogger
+import logging.config
 
 from core.s3_utils import S3_Bucket
 from core.config import S3_RAW_TSS_KEY_FORMAT
@@ -16,6 +17,8 @@ def get_raw_tss(bucket: S3_Bucket, **kwargs) -> DF:
         bucket.list_responses_keys_of_brand("BMW")
         .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger)
         .pipe(concat)
+        .drop(columns=["mileage"])  # Hot fix to prevent bug in ayvens presentation, for some reason some mileage elements don't have a unit km and are null
+                                    # This in turn creates 2 columns witth the name odometer when we rename cols mileage_km and mileage to odometer...
     )
 
 # Small work around for the raw_ts notebook
@@ -55,6 +58,28 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, add_un
 
 
 if __name__ == "__main__":
+    logging.config.dictConfig({
+        'version': 1,
+        "loggers": {
+            "transform": {
+                "level": logging.DEBUG,
+                'handlers': ['console'],
+                'propagate': False,
+            },
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'default',
+            },
+        },
+        'formatters': {
+            'default': {
+                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            },
+        },
+    })
+
     single_dataframe_script_main(
         get_raw_tss,
         bucket=S3_Bucket(),
