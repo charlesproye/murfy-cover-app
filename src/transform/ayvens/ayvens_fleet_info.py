@@ -7,11 +7,9 @@ from pandas import Series
 from core.config import *
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import singleton_data_caching
 from core.pandas_utils import map_col_to_dict
 from transform.ayvens.ayvens_config import *
 
-@singleton_data_caching(AYVENS_FLEET_INFO_PARQUET)
 def get_fleet_info() -> DF:
     fleet_info = (
         pd.read_csv(AYVENS_FLEET_INFO_CSV)

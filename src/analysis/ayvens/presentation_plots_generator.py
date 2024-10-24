@@ -13,7 +13,7 @@ from plotly.graph_objects import Figure
 
 from core.config import *
 from core.ev_models_info import models_info
-from core.caching_utils import singleton_data_caching
+from core.caching_utils import cache_result
 from transform.ayvens.ayvens_fleet_info import fleet_info
 from transform.ayvens.ayvens_get_raw_tss import get_ayvens_raw_tss
 
@@ -71,7 +71,7 @@ COL_DTYPES = {
     "capacity": "float",
 }
 
-@singleton_data_caching(path.join(path.dirname(__file__), "data_cache/processed_tss.parquet"))
+@cache_result(path.join(path.dirname(__file__), "data_cache/processed_tss.parquet"), on="local_storage")
 def get_processed_tss():
     raw_tss = get_ayvens_raw_tss()
     tss_dict = {}

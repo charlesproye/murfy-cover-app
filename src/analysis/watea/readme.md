@@ -1,45 +1,21 @@
-# Watea
+# SOH estimation improvement recap
 
-## SOH estimation
+## SOH estimation evaluation recap
+The first thing to do to improve the estimation is to actually evaluate the estimation
+### What we have done so far:
+We have established a few ways to visualize:
+-   The soh esitmation over as a 3d surface over two features.
+-   The change in soh estimatoin with an arrow plot
 
-### pipeline with power data
+We have proposed a simple way to programatically evaluate the estimation.  
+We have propoesed a simple way to test this evaluation.   
 
-### Vocabulary:
-- charging point: Aggregated time series samples over `CHARGING_POINTS_GRP_BY_SOC_QUANTIZATION` defined in `watea_constant`.
-- `energy_added`: Energy received during a charging point.
-- `default_100_soh energy_added`: `energy_added` of a battery with 100% soh.
+### We have to do:
+Unfortunatly time is not on our side.  
+We need to test the evaluation method.
 
-### Assumptions:
-Our main assumption is that: *a battery that requires less energy to gain a certain amount of soc than another battery has a lower soh*.  
-Our second assumption is that: *The charges that were made at 3k odometer or less can be used to define the expected energy to gain a certain amount of soc for a 100% soh battery*.  
+## SOH estimation improvement(with evaluation tools)
+Once we can properly evaluate the estimation we can (hopefully) hyper tune our model and improve it.  
 
-### Observations:
-1.  The required energy to gain a certain amount of soc depends on multiple factors*.  
-    **namely**:
-    - voltage/soc
-    - temperature
-    - current
-The relationship between the `energy_added` and the aforementioned factors is discontinous, forming different clusters of charging points.  
-We call these clusters charging regimes as they are most likely representative of different charger types/brands and regimes (AC/DC and so on).
-
-### Main idea:
-We estimate the soh of a charging points as its `energy_added` divided by the `default_100_soh energy_added`.
-The `default_100_soh energy_added` for a given charging point is estimated using Linear Regression.
-Note: Ideally there would be one regressor per charging regime but here we implement only one regressor for one charging regime.
-
-
-### Implementation
-
-1.  Extract all the charging points of vehicles that have power data.
-1.  Clean the charging points, see `energy_distribution` preprocessing section (marked by the "preprocessing" comment).
-    1.  Compute a "regime seperation feature" (this step is a bit random and it will most likely be removed)
-    1.  Compute umap dimensionality reduction features with the energy_added as target.  
-        These features will cluster together points that have the same input feature(soc, temperature, voltage, ect) to target feature (energy_added) relation.  
-        Note: *These clusters correspond to the charging regimes.*  
-    1.  Segment these clusters using DBSCAN.
-    1.  Take the most common charging regime and prune out the rest.
-1.  Train a polynomial LR to predict the `default_100_soh_energy_added`.
-    1.  Train the model on the entirety of the charging points.
-    1.  Adjust the intercept to the < 3k odometer points.
-1.  Predict the `default_100_soh_energy_added`.
-1.  Divide the actual `energy_added` by the predicted `default_100_soh_energy_added`.
+### What we have to do
+Hyper tune the model, duh...
