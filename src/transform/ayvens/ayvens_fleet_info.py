@@ -1,4 +1,5 @@
 import random
+import warnings
 
 import pandas as pd
 from pandas import DataFrame as DF
@@ -29,10 +30,13 @@ def get_fleet_info() -> DF:
     fleet_info["autonomie"] = pd.to_numeric(fleet_info["autonomie"], errors='coerce')
 
     
-    fleet_info["dummy_soh_maker_offset"] = fleet_info.groupby("make")["vin"].transform(lambda vins: random.uniform(-1, 0.1))
-    fleet_info["dummy_soh_model_offset"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(-1, 0.1))
-    fleet_info["dummy_soh_model_slope"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
-    fleet_info["dummy_soh_vehicle_offset"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
+    # We put this section into a warning catch block as it is meant to be removed
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning, message=".*observed=False.*")
+        fleet_info["dummy_soh_maker_offset"] = fleet_info.groupby("make")["vin"].transform(lambda vins: random.uniform(-1, 0.1))
+        fleet_info["dummy_soh_model_offset"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(-1, 0.1))
+        fleet_info["dummy_soh_model_slope"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
+        fleet_info["dummy_soh_vehicle_offset"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
 
     # Add registration dates from fleet info global NL (NetherLands) 2
     fleet_info_with_registration_and_start_contract = pd.read_csv(AYVENS_FLEET_WITH_CAR_REGISTRATION).set_index("VIN", drop=False)
@@ -56,6 +60,6 @@ def get_fleet_info() -> DF:
     return fleet_info
 
 if __name__ == "__main__":
-    single_dataframe_script_main(get_fleet_info, force_update=True)
+    single_dataframe_script_main(get_fleet_info)
     
 fleet_info = get_fleet_info()
