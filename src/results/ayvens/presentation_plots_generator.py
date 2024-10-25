@@ -169,6 +169,7 @@ def get_sohs_per_vin(tss:DF) -> DF:
             "version": "first",
             "age_in_days": "last",
             "registration_date": "last",
+            "capacity": "first",
         })
         .reset_index(drop=False)
         .sort_values(by=["vin", "odometer"])
@@ -199,6 +200,8 @@ def get_n_scatter_sohs(tss:DF, sohs_name:str, **kwargs):
     plt_sohs(sohs, sohs_name, "odometer", **kwargs)
     sohs.to_csv("data_cache/tables/{sohs}.csv")
 
+    return sohs
+
 get_n_scatter_sohs(tss, "all_dummy_sohs")
 
 # Renault soh
@@ -225,15 +228,15 @@ tss.loc[mercedes_soh_mask, "soh_method"] = "mercedes-benz"
 get_n_scatter_sohs(tss.query("make == 'mercedes-benz'"), "all_mercedes", color="model")
 get_n_scatter_sohs(tss.query("make == 'mercedes-benz' & model != 'Vito' & model != 'Sprinter'"), "mercedes_without_vitos_n_sprinters", color="model")
 
-
 ford_mask = tss.eval("make == 'ford'")
 tss.loc[ford_mask, "soh"] = (
     tss
     .loc[ford_mask]
     .query("soc > 0.5")
-    .eval("battery_energy / soc / capacity * 100 + 15")
+    .eval("battery_energy / soc / capacity * 100")
 )
-get_n_scatter_sohs(tss.query("make == 'ford'"), "ford", trendline_scope="trace", color="model")
+tss.loc[tss.eval("model == 'Mustang Mach-E'"), "soh"] += 10
+ford_sohs = get_n_scatter_sohs(tss.query("make == 'ford'"), "ford", trendline_scope="overall", color="model")
 
 get_n_scatter_sohs(tss.query("(make == 'renault' | make == 'mercedes-benz' | make == 'ford') & (model != 'Sprinter' & model != 'Vito')"), "reliable_sohs_without_Vitos_and_Sprinters")
 get_n_scatter_sohs(tss, "dummy_and_reliable_sohs")
