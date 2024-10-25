@@ -9,7 +9,7 @@ from core.ev_models_info import models_info
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
 from core.pandas_utils import map_col_to_dict, set_str_to_lower
-from transform.ayvens.ayvens_config import *
+from transform.fleet_info.fleet_info_config import *
 
 def get_fleet_info(bucket=S3_Bucket()) -> DF:
     fleet_info = (
@@ -19,7 +19,7 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
         .pipe(map_col_to_dict, "version", MODEL_VERSION_NAME_MAPPING)
         .pipe(map_col_to_dict, "make", MAKE_NAME_MAPPING)
         .drop_duplicates(subset="vin")
-        .astype(COL_DTYPES)
+        .astype(AYVENS_COL_DTYPES)
         .set_index("vin", drop=False)
         .drop(columns=["autonomie", "capacity"])
         .pipe(set_str_to_lower)
@@ -61,6 +61,8 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
         on=COLS_TO_MERGE_ON_FROM_MODELS_INFO,
         how="left"
     )
+
+    fleet_info["owner"] = "ayvens"
 
     return fleet_info
 
