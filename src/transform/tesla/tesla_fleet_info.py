@@ -5,11 +5,11 @@ from pandas import DataFrame as DF
 
 from core.console_utils import single_dataframe_script_main
 from core.s3_utils import S3_Bucket
-from core.caching_utils import cache_result_in_s3
+from core.caching_utils import cache_result
 from core.ev_models_info import get_ev_models_infos
 from transform.tesla.tesla_config import *
 
-@cache_result_in_s3(S3_INITIAL_FLEET_INFO_KEY)
+@cache_result(S3_INITIAL_FLEET_INFO_KEY, on="s3")
 def get_fleet_info(bucket: S3_Bucket=S3_Bucket()) -> DF:
     raw_json_fleet_info: list[dict] = bucket.read_json_file(S3_JSON_FLEET_INFO_RESPONSE_KEY)
     models_infos = get_ev_models_infos().set_index('model')

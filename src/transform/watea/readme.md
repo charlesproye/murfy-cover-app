@@ -1,8 +1,31 @@
 # Watea
 
-## SOH estimation
+## Pipeline
+```
+soh_estimation.py
+watea_config.py
+watea_fleet_info.py
+watea_processed_tss.py
+watea_raw_tss.py
+```
+### watea_raw_tss
+This module concatenates the seperate time series into a single one. It also drops useless columns and sets the dtypes for the columns. 
+This module could (or should?) be merged within processed_tss.py as it already does some processing.  
 
-### pipeline with power data
+### watea_processed_tss
+This modules adds all the necessary columns for soh estimation and general EDA of the time series.  
+
+### watea_fleet_info
+This module aggegates information of the time series.  
+This table can be used to report issues in the watea data extraction and to filter out time series that cannot be used in the soh estimation step.  
+
+### soh_estimation
+Implements soh estination see next chapter to understand how it works.  
+
+### watea_config
+Hold all the static variables.   
+
+## SOH estimation
 
 ### Vocabulary:
 - charging point: Aggregated time series samples over `CHARGING_POINTS_GRP_BY_SOC_QUANTIZATION` defined in `watea_constant`.
@@ -27,19 +50,4 @@ We estimate the soh of a charging points as its `energy_added` divided by the `d
 The `default_100_soh energy_added` for a given charging point is estimated using Linear Regression.
 Note: Ideally there would be one regressor per charging regime but here we implement only one regressor for one charging regime.
 
-
-### Implementation
-
-1.  Extract all the charging points of vehicles that have power data.
-1.  Clean the charging points, see `energy_distribution` preprocessing section (marked by the "preprocessing" comment).
-    1.  Compute a "regime seperation feature" (this step is a bit random and it will most likely be removed)
-    1.  Compute umap dimensionality reduction features with the energy_added as target.  
-        These features will cluster together points that have the same input feature(soc, temperature, voltage, ect) to target feature (energy_added) relation.  
-        Note: *These clusters correspond to the charging regimes.*  
-    1.  Segment these clusters using DBSCAN.
-    1.  Take the most common charging regime and prune out the rest.
-1.  Train a polynomial LR to predict the `default_100_soh_energy_added`.
-    1.  Train the model on the entirety of the charging points.
-    1.  Adjust the intercept to the < 3k odometer points.
-1.  Predict the `default_100_soh_energy_added`.
-1.  Divide the actual `energy_added` by the predicted `default_100_soh_energy_added`.
+See the corresponding [notebook](../../analysis/watea/soh_estimation.ipynb) to visualize the soh estimation steps.  

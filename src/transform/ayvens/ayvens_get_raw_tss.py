@@ -8,7 +8,7 @@ from pandas import Series
 from core.config import *
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import cache_result_in_s3
+from core.caching_utils import cache_result
 from core.pandas_utils import concat, uniques_as_series
 from transform.ayvens.ayvens_fleet_info import fleet_info
 from transform.config import *

@@ -8,10 +8,10 @@ from pandas import Series
 from core.config import *
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import cache_result_in_s3
+from core.caching_utils import cache_result
 from core.pandas_utils import concat
 
-@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT, ["brand"])
+@cache_result(S3_RAW_TSS_KEY_FORMAT, path_params=["brand"], on="s3")
 def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
     logger = getLogger(f"transform.HighMobility-{brand}-RawTSS")
     keys = bucket.list_responses_keys_of_brand(brand)

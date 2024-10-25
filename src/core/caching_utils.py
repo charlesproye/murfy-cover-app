@@ -18,68 +18,56 @@ READ_FUNCTIONS: dict[str, Callable[..., DF]] = {
     "csv": pd.read_csv,
     "parquet": pd.read_parquet,
 }
-# TODO: Remove when the watea soh estimation has been merged to main/dev
-def instance_data_caching_wrapper(vin: str, path_to_cache: str, data_gen_func: Callable[P, R], force_update=False, read_kwargs={}, write_kwargs={},  **kwargs: P.kwargs) -> R:
-    """
-    ### Description:
-    Utilitary function to abstract away caching implementation of dataframe.
-    """
-    path_to_cache = path_to_cache.format(vin=vin)
-    extension = path_to_cache.split(".")[-1]
-    if extension != "csv" and extension != "parquet":
-        raise ValueError(f"Extension of path '{path_to_cache}' is must be 'csv' or 'parquet'")
-    if force_update or not exists(path_to_cache):
-        data: DF|Series = data_gen_func(vin, **kwargs)
-        save_cache_to(data, path_to_cache, **write_kwargs)
-        return data
-    
-    return READ_FUNCTIONS[extension](path_to_cache, **read_kwargs)
 
-def cache_result_in_s3(path_template: str, path_params: List[str]=[]):
+
+def cache_result(path_template: str, on: str, path_params: List[str] = []):
+    """
+    Decorator to cache the results either locally or on S3 based on cache_type.
+
+    Args:
+    - path_template (str): Template path for the cache file.
+    - cache_type (str): Either 's3' or 'local_storage', specifying the type of caching.
+    - path_params (List[str]): List of argument names to be used for formatting the path.
+    Function args:
+    force_update (bool): Set to True to generate and cache the result even if it was already cached.  
+    """
+    assert on in ["s3", "local_storage"], "cache_type must be 's3' or 'local'"
     def decorator(data_gen_func: Callable[..., pd.DataFrame]):
         @wraps(data_gen_func)
-        def wrapper(*args, bucket: S3_Bucket = S3_Bucket(), force_update=False, **kwargs) -> pd.DataFrame:
+        def wrapper(*args, bucket: S3_Bucket = None, force_update=False, **kwargs) -> pd.DataFrame:
             # Extract the argument names and their values from args and kwargs
             all_args = data_gen_func.__code__.co_varnames
             arg_values = {**dict(zip(all_args, args)), **kwargs}
-
             # Format the path using the specified parameters
             path = path_template.format(**{param: str(arg_values[param]) for param in path_params})
-
             # Ensure the extension is ".parquet"
             assert path.endswith(".parquet"), PATH_DOESNT_END_IN_PARQUET.format(path=path)
-
-            # Check if we need to update the cache or if the cache does not exist
-            if force_update or not bucket.check_file_exists(path):
-                # Generate the data using the wrapped function
-                data: pd.DataFrame = data_gen_func(*args, bucket=bucket, **kwargs)
-                # Save the data to S3 as parquet
-                bucket.save_df_as_parquet(data, path)
+            if on == "s3":
+                # Instantiate bucket if not provided
+                if bucket is None:
+                    bucket = S3_Bucket()
+                # Check if we need to update the cache or if the cache does not exist
+                if force_update or not bucket.check_file_exists(path):
+                    # Generate the data using the wrapped function
+                    data: pd.DataFrame = data_gen_func(*args, bucket=bucket, **kwargs)
+                    # Save the data to S3 as parquet
+                    bucket.save_df_as_parquet(data, path)
+                    return data
+                # Read cached data from S3
                 return data
-
-            # Read cached data from S3
-            return bucket.read_parquet_df(path)
+            elif on == "local_storage":
+                # Local cache handling
+                if force_update or not exists(path):
+                    # Generate the data using the wrapped function
+                    data: pd.DataFrame = data_gen_func(*args, **kwargs)
+                    # Save the data locally
+                    save_cache_to(data, path)
+                    return data
+                # Read cached data from local file
+                return pd.read_parquet(path)
         return wrapper
     return decorator
 
-def singleton_data_caching(path_to_cache: str):
-    def decorator(data_gen_func: Callable[P, R]):
-        @wraps(data_gen_func)
-        def wrapper(*args: P.args, force_update=False, **kwargs: P.kwargs) -> R:
-            extension = path_to_cache.split(".")[-1]
-            if extension != "csv" and extension != "parquet":
-                raise ValueError(f"Extension of path '{path_to_cache}' must be 'csv' or 'parquet'")
-            
-            if force_update or not exists(path_to_cache):
-                data: Union[DF, Series] = data_gen_func(*args, **kwargs)
-                save_cache_to(data, path_to_cache)
-                return data
-            
-            return READ_FUNCTIONS[extension](path_to_cache)
-        
-        return wrapper
-    
-    return decorator
 
 def save_cache_to(data: DF, path:str, **kwargs):
     """
