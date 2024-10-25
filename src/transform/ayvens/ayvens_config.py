@@ -41,18 +41,18 @@ MAKE_NAME_MAPPING = {
 }
 
 COL_DTYPES = {
-    "licence plate": "category",
-    "make": "category",
-    "model": "category",
-    "version": "category",
+    "licence plate": "string",
+    "make": "string",
+    "model": "string",
+    "version": "string",
     # "capacity": "float",
     # "autonomie": "float",
     # "end of contract": "object",
-    "country": "category",
-    "category": "category",
-    "activated": "category",
-    "ownership": "category",
+    "country": "string",
+    "category": "string",
+    "activated": "string",
+    "ownership": "string",
     # "registration_date": "object",
     # "contract_start_date": "object",
-    "vin": "category",
+    "vin": "string",
 }
