@@ -127,7 +127,7 @@ class S3_Bucket():
 
         return keys_as_series
 
-    def read_parquet_df(self, key:str) -> DF|Series:
+    def read_parquet_df(self, key:str) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
 
         parquet_bytes = response["Body"].read()
@@ -141,6 +141,17 @@ class S3_Bucket():
         df = table.to_pandas()
 
         return df
+    
+    def read_csv_df(self, key:str, **kwargs) -> DF:
+        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
+
+        status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+
+        if status == 200:
+            return pd.read_csv(response.get("Body"), **kwargs)
+        else:
+            raise Exception(f"Unsuccessful S3 get_object response. Status - {status}")
+
     
     def read_key_as_text(self, key:str) -> str:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
