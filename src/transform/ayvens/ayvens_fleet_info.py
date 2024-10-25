@@ -5,12 +5,8 @@ import pandas as pd
 from pandas import DataFrame as DF
 
 from core.config import *
-<<<<<<< HEAD
-from core.ev_models_info import get_ev_models_infos
-=======
 from core.ev_models_info import models_info
 from core.s3_utils import S3_Bucket
->>>>>>> 92db733 (Feat: Added models_info merge into fleet_info.)
 from core.console_utils import single_dataframe_script_main
 from core.pandas_utils import map_col_to_dict, set_str_to_lower
 from transform.ayvens.ayvens_config import *
