@@ -3,12 +3,16 @@ import warnings
 
 import pandas as pd
 from pandas import DataFrame as DF
-from pandas import Series
 
 from core.config import *
+<<<<<<< HEAD
 from core.ev_models_info import get_ev_models_infos
+=======
+from core.ev_models_info import models_info
+from core.s3_utils import S3_Bucket
+>>>>>>> 92db733 (Feat: Added models_info merge into fleet_info.)
 from core.console_utils import single_dataframe_script_main
-from core.pandas_utils import map_col_to_dict
+from core.pandas_utils import map_col_to_dict, set_str_to_lower
 from transform.ayvens.ayvens_config import *
 
 def get_fleet_info(bucket=S3_Bucket()) -> DF:
@@ -21,15 +25,14 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
         .drop_duplicates(subset="vin")
         .astype(COL_DTYPES)
         .set_index("vin", drop=False)
+        .drop(columns=["autonomie", "capacity"])
+        .pipe(set_str_to_lower)
+        .assign(vin=lambda df: df["vin"].str.upper()) # Dirty workaround to leave VINs in upper case
     )
     fleet_info["model"] = fleet_info["model"].str.lower()
     fleet_info["version"] = fleet_info["version"].str.lower()
     fleet_info["make"] = fleet_info["make"].str.lower()
 
-    fleet_info["capacity"] = pd.to_numeric(fleet_info["capacity"], errors='coerce')
-    fleet_info["autonomie"] = pd.to_numeric(fleet_info["autonomie"], errors='coerce')
-
-    
     # We put this section into a warning catch block as it is meant to be removed
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=FutureWarning, message=".*observed=False.*")
@@ -54,8 +57,14 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
     contract_start_dates = fleet_info_with_registration_and_start_contract.loc[vins_in_global2, "Contract start date"]
     fleet_info.loc[vins_in_global2, "contract_start_date"] = contract_start_dates
 
-
-    fleet_info = fleet_info.merge(get_ev_models_infos().drop(columns=["make"]), on=["model", "version"])
+    # Add capacity and range of known models stored in ev models info to the fleet info 
+    COLS_TO_MERGE_FROM_MODELS_INFO = ["capacity", "range"]
+    COLS_TO_MERGE_ON_FROM_MODELS_INFO = ["model", "version"]
+    fleet_info = fleet_info.merge(
+        models_info[COLS_TO_MERGE_ON_FROM_MODELS_INFO + COLS_TO_MERGE_FROM_MODELS_INFO],
+        on=COLS_TO_MERGE_ON_FROM_MODELS_INFO,
+        how="left"
+    )
 
     return fleet_info
 
