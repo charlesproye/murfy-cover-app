@@ -50,6 +50,6 @@ def get_fleet_info() -> DF:
     return fleet_info
 
 if __name__ == "__main__":
-    single_dataframe_script_main(get_fleet_info, force_update=True)
+    single_dataframe_script_main(get_fleet_info)
     
 fleet_info = get_fleet_info()
