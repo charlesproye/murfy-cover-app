@@ -10,7 +10,7 @@ from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 from core.pandas_utils import concat, uniques_as_series
-from transform.ayvens.ayvens_fleet_info import fleet_info
+from transform.fleet_info.ayvens_fleet_info import fleet_info
 from transform.config import *
 
 def get_ayvens_raw_tss(bucket: S3_Bucket=S3_Bucket()) -> dict[str, DF]:

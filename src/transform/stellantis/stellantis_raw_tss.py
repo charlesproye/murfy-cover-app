@@ -13,7 +13,7 @@ from core.caching_utils import cache_result
 from core.pandas_utils import concat
 from transform.config import *
 # work around to know the vins of the stellantis brand
-from transform.ayvens.ayvens_fleet_info import fleet_info  as ayvens_fleet_info
+from transform.fleet_info.ayvens_fleet_info import fleet_info  as ayvens_fleet_info
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT, path_params=['brand'], on="s3")
 def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:

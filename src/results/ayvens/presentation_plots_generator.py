@@ -14,7 +14,7 @@ from plotly.graph_objects import Figure
 from core.config import *
 from core.ev_models_info import models_info
 from core.caching_utils import cache_result
-from transform.ayvens.ayvens_fleet_info import fleet_info
+from transform.fleet_info.ayvens_fleet_info import fleet_info
 from transform.ayvens.ayvens_get_raw_tss import get_ayvens_raw_tss
 
 
