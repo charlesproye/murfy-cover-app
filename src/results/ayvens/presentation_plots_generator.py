@@ -198,7 +198,9 @@ def get_n_scatter_sohs(tss:DF, sohs_name:str, **kwargs):
     sohs = get_sohs_per_vin(tss)
     plt_sohs(sohs, sohs_name, "age_in_years", **kwargs)
     plt_sohs(sohs, sohs_name, "odometer", **kwargs)
-    sohs.to_csv(f"{dirname(__file__)}/data_cache/tables/{sohs_name}.csv", float_format="%.2f")
+    sohs_ts_save = sohs.applymap(lambda x: f"{x:.2f}".rstrip('0').rstrip('.') if isinstance(x, float) else x)
+
+    sohs_ts_save.to_csv(f"{dirname(__file__)}/data_cache/tables/{sohs_name}.csv", float_format="%.2f")
 
     return sohs
 
