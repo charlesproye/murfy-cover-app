@@ -199,7 +199,7 @@ def get_n_scatter_sohs(tss:DF, sohs_name:str, **kwargs):
     plt_sohs(sohs, sohs_name, "age_in_years", **kwargs)
     plt_sohs(sohs, sohs_name, "odometer", **kwargs)
 
-    sohs.to_csv(f"{dirname(__file__)}/data_cache/tables/{sohs_name}.csv", float_format="%.0f")
+    sohs.dropna(subset="soh").to_csv(f"{dirname(__file__)}/data_cache/tables/{sohs_name}.csv", float_format="%.0f")
 
     return sohs
 
