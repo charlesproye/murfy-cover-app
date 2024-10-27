@@ -59,6 +59,7 @@ def main_decorator(main_func):
             main_func(*args, **kwargs)  # Pass the arguments to the original function
         except KeyboardInterrupt:
             print("[blue]KeyboardInterrupt, exiting...")
+            exit()
     return wrapper
 
 @main_decorator
