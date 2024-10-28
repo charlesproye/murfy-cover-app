@@ -44,12 +44,11 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
             assert path.endswith(".parquet"), PATH_DOESNT_END_IN_PARQUET.format(path=path)
             if on == "s3":
                 # Instantiate bucket if not provided
-                if bucket is None:
-                    bucket = S3_Bucket()
+                kwargs["bucket"] = S3_Bucket() if bucket is None else bucket
                 # Check if we need to update the cache or if the cache does not exist
                 if force_update or not bucket.check_file_exists(path):
                     # Generate the data using the wrapped function
-                    data: pd.DataFrame = data_gen_func(*args, bucket=bucket, **kwargs)
+                    data: pd.DataFrame = data_gen_func(*args, **kwargs)
                     # Save the data to S3 as parquet
                     bucket.save_df_as_parquet(data, path)
                     return data
