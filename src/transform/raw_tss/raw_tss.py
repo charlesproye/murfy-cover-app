@@ -7,10 +7,9 @@ from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
-from transform.raw_tss.bmw_raw_tss import get_direct_bmw_raw_tss as bmw_get_raw_tss
+from transform.raw_tss.bmw_raw_tss import get_raw_tss as bmw_get_raw_tss
 from transform.raw_tss.stellantis_raw_tss import get_raw_tss as stellantis_get_raw_tss
 from transform.raw_tss.tesla_raw_tss import get_raw_tss as tesla_get_raw_tss
-
 
 GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3_Bucket], DF]] = {
     "BMW":              bmw_get_raw_tss,
@@ -33,9 +32,12 @@ def get_raw_tss(brand:str, **kwargs) -> DF:
     
     return func(**kwargs)
 
-if __name__ == "__main__":
+def update_all_raw_tss():
     set_level_of_loggers_with_prefix("DEBUG", "transform")
     for brand in list(GET_RAW_TSS_FUNCTIONS.keys()):
         print(brand, ":")
         single_dataframe_script_main(get_raw_tss, brand=brand, force_update=True)
         print("============================")
+
+if __name__ == "__main__":
+    update_all_raw_tss()
