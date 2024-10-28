@@ -75,6 +75,7 @@ class S3_Bucket():
         ### Returns:
         A dataframe where each row represents the key of a response.  
         """
+        self.logger.debug(f"Listing responses keys of {brand}...")
         keys = self.list_keys(f"response/{brand}/")
         keys = keys[keys.str.endswith(".json")]
         if len(keys) == 0:
@@ -83,9 +84,13 @@ class S3_Bucket():
         # Only retain .json responses
         # Reponses are organized as follow response/brand_name/vin/date-of-response.json
         keys = str_split_and_retain_src(keys, "/")
+        self.logger.debug(f"Keys ending in .json:\n{keys}")
         # Remove files in temp directory
         keys = keys[keys[3] != "temp"]
+        self.logger.debug(f"Keys after removing temps:\n{keys}")
+
         if len(keys.columns) > 5:
+            self.logger.debug(f"Keys after last column:\n{keys}")
             keys = keys.drop(columns=[4])
         keys.columns = KEY_LIST_COLUMN_NAMES
         # Check that the file name is a date
@@ -95,8 +100,9 @@ class S3_Bucket():
             .str.match(r'^\d{4}-\d{2}-\d{2}$')
         )
         keys["is_valid_file"] &= keys["vin"].str.len() != 0
+        self.logger.debug(f"set is_valid_file column:\n{keys}")
         keys = keys.query(f"is_valid_file")
-        
+
         return keys
 
     def list_keys(self, key_prefix:str="") -> Series:
