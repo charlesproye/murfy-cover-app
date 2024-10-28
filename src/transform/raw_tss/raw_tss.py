@@ -12,7 +12,7 @@ from transform.raw_tss.stellantis_raw_tss import get_raw_tss as stellantis_get_r
 from transform.raw_tss.tesla_raw_tss import get_raw_tss as tesla_get_raw_tss
 
 GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3_Bucket], DF]] = {
-    "BMW":              bmw_get_raw_tss,
+    "bmw":              bmw_get_raw_tss,
     "tesla":            tesla_get_raw_tss,
     "kia":              hm_get_raw_tss,
     "mercedes-benz":    hm_get_raw_tss,
