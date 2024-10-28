@@ -59,12 +59,15 @@ def main_decorator(main_func):
             main_func(*args, **kwargs)  # Pass the arguments to the original function
         except KeyboardInterrupt:
             print("[blue]KeyboardInterrupt, exiting...")
+            exit()
     return wrapper
 
 @main_decorator
-def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], **kwargs):
+def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], **kwargs) -> DF:
     df:DF = dataframe_gen(**kwargs)
     print(df)
     print("all columns:")
     print(DF({"dtype": df.dtypes, "density": df.count() / len(df)}))
     print(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
+
+    return df

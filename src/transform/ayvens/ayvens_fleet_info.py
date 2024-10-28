@@ -5,13 +5,11 @@ from pandas import DataFrame as DF
 from pandas import Series
 
 from core.config import *
-from core.s3_utils import S3_Bucket
+from core.ev_models_info import get_ev_models_infos
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import singleton_data_caching
 from core.pandas_utils import map_col_to_dict
 from transform.ayvens.ayvens_config import *
 
-@singleton_data_caching(AYVENS_FLEET_INFO_PARQUET)
 def get_fleet_info() -> DF:
     fleet_info = (
         pd.read_csv(AYVENS_FLEET_INFO_CSV)
@@ -23,6 +21,9 @@ def get_fleet_info() -> DF:
         .astype(COL_DTYPES)
         .set_index("vin", drop=False)
     )
+    fleet_info["model"] = fleet_info["model"].str.lower()
+    fleet_info["version"] = fleet_info["version"].str.lower()
+    fleet_info["make"] = fleet_info["make"].str.lower()
 
     fleet_info["capacity"] = pd.to_numeric(fleet_info["capacity"], errors='coerce')
     fleet_info["autonomie"] = pd.to_numeric(fleet_info["autonomie"], errors='coerce')
@@ -48,6 +49,9 @@ def get_fleet_info() -> DF:
     fleet_info.loc[vins_in_global, "contract_start_date"] = contract_start_dates
     contract_start_dates = fleet_info_with_registration_and_start_contract.loc[vins_in_global2, "Contract start date"]
     fleet_info.loc[vins_in_global2, "contract_start_date"] = contract_start_dates
+
+
+    fleet_info = fleet_info.merge(get_ev_models_infos().drop(columns=["make"]), on=["model", "version"])
 
     return fleet_info
 

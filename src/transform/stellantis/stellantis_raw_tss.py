@@ -1,5 +1,7 @@
+import logging
 from dateutil import parser
 from datetime import datetime as DT
+import logging.config
 
 import pandas as pd
 from pandas import DataFrame as DF
@@ -9,15 +11,17 @@ from logging import Logger, getLogger
 from core.s3_utils import S3_Bucket
 from core.config import *
 from core.console_utils import single_dataframe_script_main
-from core.caching_utils import cache_result_in_s3
+from core.caching_utils import cache_result
 from core.pandas_utils import concat
 from transform.config import *
+from transform.stellantis.stellantis_config import *
 # work around to know the vins of the stellantis brand
 from transform.ayvens.ayvens_fleet_info import fleet_info  as ayvens_fleet_info
 
-@cache_result_in_s3(S3_RAW_TSS_KEY_FORMAT, ['brand'])
+@cache_result(S3_RAW_TSS_KEY_FORMAT, path_params=['brand'], on="s3")
 def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
     logger = getLogger(f"transform.Stellantins-{brand}-RawTSS")
+    logger.debug(f"Starting to parse {brand} responses.")
     vins_to_parse = (
         ayvens_fleet_info
         .query(f"make == '{brand}'")
@@ -25,10 +29,17 @@ def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
     )
     stellantis_responses = bucket.list_responses_keys_of_brand("stellantis")
 
-    return (
+    keys_to_parse =  (
         stellantis_responses
         .assign(to_parse=stellantis_responses["vin"].isin(vins_to_parse))
         .query("to_parse")
+    )
+    logger.debug(f"Keys to parse:\n{keys_to_parse}")
+    if keys_to_parse.empty:
+        logger.warning(f"No keys to parse for {brand}")
+        return DF()
+    return (
+        keys_to_parse
         .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger)
         .pipe(concat)
     )
@@ -78,10 +89,38 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
 
 
 if __name__ == "__main__":
-    single_dataframe_script_main(
-        get_raw_tss,
-        bucket=S3_Bucket(),
-        force_update=True,
-        brand="stellantis",
-    )
+    logging.config.dictConfig({
+        'version': 1,
+        "loggers": {
+            "transform": {
+                "level": logging.DEBUG,
+                'handlers': ['console'],
+                'propagate': False,
+            },
+            # "S3_BUCKET": {
+            #     "level": logging.DEBUG,
+            #     'handlers': ['console'],
+            #     'propagate': False,
+            # }
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'default',
+            },
+        },
+        'formatters': {
+            'default': {
+                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            },
+        },
+    })
+
+    for stellantis_make in STELLANTIS_BRANDS:
+        single_dataframe_script_main(
+            get_raw_tss,
+            bucket=S3_Bucket(),
+            force_update=True,
+            brand=stellantis_make,
+        )
 
