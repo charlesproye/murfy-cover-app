@@ -13,7 +13,7 @@ from transform.tesla.tesla_config import *
 
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="tesla"), on="s3")
-def get_raw_tss(bucket: S3_Bucket = S3_Bucket(), **kwargs) -> DF:
+def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
     logger = getLogger(f"transform.Tesla-RawTSS")
     return (
         bucket.list_responses_keys_of_brand("tesla")

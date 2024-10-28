@@ -64,6 +64,8 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
 
     fleet_info["owner"] = "ayvens"
 
+    fleet_info = fleet_info.set_index("vin", drop=False)
+
     return fleet_info
 
 if __name__ == "__main__":
