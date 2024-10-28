@@ -6,29 +6,41 @@
 ### Content:
 ```
 transform
-├── config.py
-├── main.py
-├── merge_prod_and_dev_s3_buckets.py
-├── readme.md
+.
 ├── ayvens
-│   ├── ayvens_config.py
-│   ├── ayvens_fleet_info.py
-│   ├── ayvens_get_raw_tss.py
-│   └── data_cache
+│   └── test.ipynb
 ├── bmw
-│   └── bmw_raw_tss.py
-├── ford_bug
-├── high_mobility
-│   └── high_mobility_raw_tss.py
-├── stellantis
-│   └── stellantis_raw_tss.py
-└── tesla
-    ├── tesla_config.py
-    ├── tesla_fleet_info.py
-    ├── tesla_processed_tss.py
-    └── tesla_raw_tss.py
- └── utils 
-    ├── merge_prod_and_dev_s3_buckets.py # since we can not run the pipeline on the dev bucket for limits on API we need some way to merge the prod and dev buckets
+│   └── test.ipynb
+├── config.py
+├── fleet_info
+│   ├── ayvens_fleet_info.py
+│   ├── fleet_info_config.py
+│   └── test.ipynb
+├── main.py
+├── raw_tss
+│   ├── bmw_raw_tss.py
+│   ├── high_mobility_raw_tss.py
+│   ├── raw_tss.py
+│   ├── stellantis_config.py
+│   ├── stellantis_raw_tss.py
+│   └── tesla_raw_tss.py
+├── readme.md
+├── tesla
+│   ├── tesla_config.py
+│   ├── tesla_fleet_info.py
+│   └── tesla_processed_tss.py
+├── utils
+│   └── merge_prod_and_dev_s3_buckets.py# since we can not run the pipeline on the dev bucket for limits on API we need some way to merge the prod and dev buckets
+└── watea
+    ├── data_cache
+    ├── notes.md
+    ├── readme.md
+    ├── soh_estimation.py
+    ├── test.ipynb
+    ├── watea_config.py
+    ├── watea_fleet_info.py
+    ├── watea_processed_tss.py
+    └── watea_raw_tss.py
 ```
 ### Pipelines structure
 The pipelines consist in multiple steps each, ideally, implemented in a single module :
@@ -61,32 +73,11 @@ You can launch execute any module as a separate script if you want to run a sepc
 
 ### Running the pipelines
 The pipelines are orchestrated by a blocking apscheduler.  
-Note: This is the first version of the scheduler and it is destined to be refactored (it will most likely be replaced by a chrontab).  
 To launch the the data pipelines use the following command:  
 ```shell
 python3 main.py
 ```
-The pipelines are stored as a dataframe in `config`:  
-```python
-BRAND_PIPELINES_DICT:dict[str, dict[str, Callable]] = {
-# bmw
-    "BMW": {
-        "raw_tss":bmw_get_raw_tss,
-    },
-# high mobility
-    "kia":{
-        "raw_tss":hm_get_raw_tss,
-    },
-    ...
-# stellantis
-    'opel': {
-        "raw_tss": stellantis_get_raw_tss,
-    },
-    ...
-    'fiat': {
-        "raw_tss": stellantis_get_raw_tss,
-    },
-}
-
-BRAND_PIPELINES = DF.from_dict(BRAND_PIPELINES_DICT, orient="index")
+to launch only the raw_tss pipeline run:
+```shell
+python3 raw_tss/raw_tss.py
 ```

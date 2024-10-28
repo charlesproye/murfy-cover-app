@@ -1,22 +1,19 @@
-import logging
 from dateutil import parser
 from datetime import datetime as DT
-import logging.config
+from logging import Logger, getLogger
 
-import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
-from logging import Logger, getLogger
 
 from core.s3_utils import S3_Bucket
 from core.config import *
 from core.console_utils import single_dataframe_script_main
+from core.logging_utils import set_level_of_loggers_with_prefix
 from core.caching_utils import cache_result
 from core.pandas_utils import concat
-from transform.config import *
-from transform.stellantis.stellantis_config import *
+from transform.raw_tss.stellantis_config import *
 # work around to know the vins of the stellantis brand
-from transform.ayvens.ayvens_fleet_info import fleet_info  as ayvens_fleet_info
+from transform.fleet_info.ayvens_fleet_info import fleet_info  as ayvens_fleet_info
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT, path_params=['brand'], on="s3")
 def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
@@ -89,33 +86,7 @@ def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger) -> DF:
 
 
 if __name__ == "__main__":
-    logging.config.dictConfig({
-        'version': 1,
-        "loggers": {
-            "transform": {
-                "level": logging.DEBUG,
-                'handlers': ['console'],
-                'propagate': False,
-            },
-            # "S3_BUCKET": {
-            #     "level": logging.DEBUG,
-            #     'handlers': ['console'],
-            #     'propagate': False,
-            # }
-        },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'default',
-            },
-        },
-        'formatters': {
-            'default': {
-                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            },
-        },
-    })
-
+    set_level_of_loggers_with_prefix("DEBUG", "transform")
     for stellantis_make in STELLANTIS_BRANDS:
         single_dataframe_script_main(
             get_raw_tss,
