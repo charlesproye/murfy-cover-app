@@ -44,7 +44,7 @@ def main():
         name="data_ev_pipeline",
         id="data_ev_pipeline",
         trigger=IntervalTrigger(
-            hours=1,
+            minutes=10,
             start_date=DT.now() + TD(seconds=3)
         ),
     )
