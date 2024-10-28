@@ -75,6 +75,7 @@ class S3_Bucket():
         ### Returns:
         A dataframe where each row represents the key of a response.  
         """
+        print("self dtype:", type(self))
         self.logger.debug(f"Listing responses keys of {brand}...")
         keys = self.list_keys(f"response/{brand}/")
         keys = keys[keys.str.endswith(".json")]

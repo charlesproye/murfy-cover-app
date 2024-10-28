@@ -13,7 +13,6 @@ from core.config import *
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 from core.pandas_utils import concat
-from transform.config import *
 from transform.raw_tss.stellantis_config import *
 # work around to know the vins of the stellantis brand
 from transform.fleet_info.ayvens_fleet_info import fleet_info  as ayvens_fleet_info
@@ -97,11 +96,6 @@ if __name__ == "__main__":
                 'handlers': ['console'],
                 'propagate': False,
             },
-            # "S3_BUCKET": {
-            #     "level": logging.DEBUG,
-            #     'handlers': ['console'],
-            #     'propagate': False,
-            # }
         },
         'handlers': {
             'console': {

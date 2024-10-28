@@ -8,6 +8,9 @@ from core.config import S3_RAW_TSS_KEY_FORMAT
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 from core.pandas_utils import concat
+from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
+
+
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
 def get_raw_tss(bucket: S3_Bucket, **kwargs) -> DF:
@@ -22,7 +25,7 @@ def get_raw_tss(bucket: S3_Bucket, **kwargs) -> DF:
 # TODO: Remove once we have the processed TS and use processed ts in the notebook (that will be called processed_ts_EDA I guess).
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
 def get_raw_tss_without_units(bucket: S3_Bucket) -> DF:
-    logger = getLogger("BMW-RawTSS")
+    logger = getLogger("transform.BMW-RawTSS")
     return (
         bucket.list_responses_keys_of_brand("BMW")
         .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger, add_units=False)
