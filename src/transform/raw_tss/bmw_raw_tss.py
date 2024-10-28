@@ -4,6 +4,7 @@ from pandas import DataFrame as DF
 from logging import Logger, getLogger
 
 from core.s3_utils import S3_Bucket
+from core.singleton_s3_bucket import bucket
 from core.config import S3_RAW_TSS_KEY_FORMAT
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
@@ -12,7 +13,7 @@ from core.pandas_utils import concat
 from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
-def get_raw_tss(bucket: S3_Bucket) -> DF:
+def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
     return pd.concat((
         hm_get_raw_tss("bmw", bucket=bucket, force_update=True).assign(data_provider="high_mobility"),
         get_direct_bmw_raw_tss(bucket, append_units_to_col_names=False).assign(data_provider="bmw")
