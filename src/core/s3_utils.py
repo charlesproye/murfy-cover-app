@@ -68,7 +68,7 @@ class S3_Bucket():
             else:
                 raise e
 
-    def ../../core/caching_utils.pylist_responses_keys_of_brand(self, brand:str="") -> DF:
+    def list_responses_keys_of_brand(self, brand:str="") -> DF:
         """
         ### Descriptions:
         *Warning:Ayvens x BIB POC specific method. This may not work on other projects.*  
