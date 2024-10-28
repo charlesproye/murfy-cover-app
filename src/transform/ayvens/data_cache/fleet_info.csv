@@ -65,7 +65,7 @@ VXKUHZKXZL4320106,J059LD,Opel,Corsa-e,100kW Edition 5d,,,01-07-2024,NL,EV,never 
 VR3UHZKXZLT072875,J198JZ,PEUGEOT,208,GT EV 50kWh 136 5d,50,,01-07-2024,NL,EV,never activated,SOLD
 WBY8P210707D68113,G-643-RH,BMW,i3,i3 (120Ah),,,11/14/2024,NL,EV,deactivated,Ayvens
 VXKUHZKXZM4023375,K324PP,Opel,Corsa-e,50kWh Edition 11kW 3 fase 5d,50,,03-07-2024,NL,EV,activated,Ayvens
-WF0TK3SU4MMA37317,x,FORD,Mustang Mach-E,75kWh AWD auto,75,,21.12.2024 00:00:00,Germany,EV,activated,Ayvens
+WF0TK3SU4MMA37317,x,FORD,Mustang Mach-E,98kWh Extended Range RWD auto 5d,98,,21.12.2024 00:00:00,Germany,EV,activated,Ayvens
 WF0TK1E79MMA47996,x,FORD,Mustang Mach-E,98kWh Extended Range RWD auto 5d,98,,21.12.2024 00:00:00,Germany,EV,activated,Ayvens
 WF0TK1E74MMA60901,x,FORD,Mustang Mach-E,98kWh Extended Range RWD auto 5d,98,,21.12.2024 00:00:00,Germany,EV,activated,Ayvens
 WF0TK3SSXMMA51687,x,FORD,Mustang Mach-E,75kWh AWD auto,75,,21.12.2024 00:00:00,Germany,EV,activated,Ayvens
@@ -973,8 +973,8 @@ W1V9106332P337094,,Mercedes,Sprinter,Sprinter,92.8,290,01-03-2021,Ireland,LCV,ac
 W1V9106331P368741,,Mercedes,Sprinter,Sprinter,92.8,290,02-12-2022,Italy,LCV,activated,Ayvens
 W1V9106331P368734,,Mercedes,Sprinter,Sprinter,92.8,290,02-12-2022,Italy,LCV,activated,Ayvens
 W1V9106331P359296,,Mercedes,Sprinter,Sprinter,92.8,290,07-04-2021,France,LCV,activated,Ayvens
-W1V9106331P378162,,Mercedes,Sprinter,Sprinter,92.8,290,07-04-2021,France,LCV,activated,Ayvens
-W1V9106331P373152,,Mercedes,Sprinter,Sprinter,92.8,290,12-12-2022,France,LCV,activated,Ayvens
+W1V9106331P378162,,Mercedes,Sprinter,Sprinter-47kWh,#N/A,#N/A,07-04-2021,France,LCV,activated,Ayvens
+W1V9106331P373152,,Mercedes,Sprinter,Sprinter-47kWh,#N/A,#N/A,12-12-2022,France,LCV,activated,Ayvens
 W1V9106331P362513,,Mercedes,Sprinter,Sprinter,92.8,290,12-12-2022,France,LCV,activated,Ayvens
 W1V9106332P282758,,Mercedes,Sprinter,Sprinter,92.8,290,14-07-2020,United Kingdom,LCV,activated,Ayvens
 W1V9106332P276445,,Mercedes,Sprinter,Sprinter,92.8,290,14-07-2020,United Kingdom,LCV,activated,Ayvens
@@ -990,7 +990,7 @@ W1V9106331P352801,,Mercedes,Sprinter,Sprinter,92.8,290,28-05-2021,Italy,LCV,acti
 W1V9106331P352803,,Mercedes,Sprinter,Sprinter,92.8,290,28-05-2021,Italy,LCV,activated,Ayvens
 W1V9106331P373175,,Mercedes,Sprinter,Sprinter,92.8,290,29-06-2021,Italy,LCV,activated,Ayvens
 W1V9106331P372490,,Mercedes,Sprinter,Sprinter,92.8,290,29-06-2021,Italy,LCV,activated,Ayvens
-W1V44760313791263,,Mercedes,Vito,Vito,90,305,02-12-2022,Italy,LCV,activated,Ayvens
+W1V44760313791263,,Mercedes,Vito,Vito-35kWh,#N/A,#N/A,02-12-2022,Italy,LCV,activated,Ayvens
 W1V44760313781823,,Mercedes,Vito,Vito,90,305,02-12-2022,Italy,LCV,activated,Ayvens
 W1V44760313741562,,Mercedes,Vito,Vito,90,305,09-01-2022,Spain,LCV,activated,Ayvens
 W1V44760313741381,,Mercedes,Vito,Vito,90,305,09-01-2022,Spain,LCV,activated,Ayvens
@@ -998,7 +998,7 @@ W1V44760313793211,,Mercedes,Vito,Vito,90,305,17-02-2023,Germany,LCV,activated,Ay
 W1V44760313781151,,Mercedes,Vito,Vito,90,305,17-02-2023,Germany,LCV,activated,Ayvens
 W1V44760313777734,,Mercedes,Vito,Vito,90,305,02-12-2022,Italy,LCV,activated,Ayvens
 W1V44760313789035,,Mercedes,Vito,Vito,90,305,02-12-2022,Italy,LCV,activated,Ayvens
-W1V44760313740623,,Mercedes,Vito,Vito,90,305,09-01-2022,Spain,LCV,activated,Ayvens
+W1V44760313740623,,Mercedes,Vito,Vito-35kWh,#N/A,#N/A,09-01-2022,Spain,LCV,activated,Ayvens
 W1V44760313741060,,Mercedes,Vito,Vito,90,305,09-01-2022,Spain,LCV,activated,Ayvens
 W1V44760313777574,,Mercedes,Vito,Vito,90,305,17-02-2023,Germany,LCV,activated,Ayvens
 W1V44760313782890,,Mercedes,Vito,Vito,90,305,17-02-2023,Germany,LCV,activated,Ayvens
@@ -1113,3 +1113,103 @@ VF1AG000266627173,,RENAULT,ZOE,R135,,,,,,never activated,Ayvens
 VF1AG000266817233,,RENAULT,ZOE,R135,,,,,,never activated,Ayvens
 VF1AG000X66672393,,RENAULT,ZOE,R135,,,,,,never activated,Ayvens
 VF1AG000066415890,,RENAULT,ZOE,R135,,,,,,activated,Ayvens
+YV1XZEDVEM2473042,K-333-BF,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2475494,K-915-JD,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEN2662399,L-646-TF,VOLVO,XC40 Recharge,Twin Pure Electric Pro,,,,,,,Ayvens
+YV1XZEDVEM2546269,K-968-SX,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XKEFV4P2029745,R-277-HV,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFVXP2029751,R-275-HV,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFV4P2029924,R-276-HV,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XZEDVEM2561664,N-354-KR,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XKEFV5P2029768,R-720-KB,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFV7P2029853,R-672-KF,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFV8P2029943,R-719-KB,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFV9P2029840,R-721-KB,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XZEFV3P2961673,R-581-LP,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEFV4P2961598,R-583-LP,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XKEFV0P2029953,R-580-LP,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFV4P2029972,R-584-LP,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFV1P2029928,R-633-LP,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XZEFV9P2961595,R-983-NP,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEFV6P2961683,R-982-NP,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEFV9P2961662,R-955-NP,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XKEFV4P2029969,R-981-NP,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFV2P2029954,R-972-NP,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XKEFV7P2030694,R-970-NP,VOLVO,C40 Recharge,Pure Electric 170 KW Plus,,,,,,,Ayvens
+YV1XZEFV8P2963404,R-754-PL,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEFV9P2963363,R-752-PL,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEFV9P2961614,R-728-PL,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEDVEM2470274,J-539-XR,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEFV5P2961609,R-016-RK,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEFV0P2963395,R-015-RK,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEDVEM2470168,J-585-XF,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2471751,J-214-ZJ,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2477817,J-213-ZJ,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2476902,J-813-ZL,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2473902,J-518-ZB,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2470661,J-214-ZV,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2470834,J-222-ZV,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2470597,J-195-ZV,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2472193,J-226-ZV,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2477729,J-556-ZR,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2482210,K-895-BH,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2473367,J-709-ZZ,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2482194,K-095-BR,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2477880,K-111-BR,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2484109,K-420-BL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2486354,K-808-DB,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2478472,K-062-BX,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2481492,K-380-BL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2481111,K-439-BL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2464259,K-104-BX,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2475720,K-457-BL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2466294,K-298-DG,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2464820,K-122-DK,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEFVXP2970659,R-648-TK,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEFV9P2970569,R-647-TK,VOLVO,XC40 Recharge,Pure Electric Plus,,,,,,,Ayvens
+YV1XZEDVEM2482575,K-391-DP,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2470764,J-669-XK,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2487712,K-351-DG,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2482401,K-409-BL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2472881,K-019-DZ,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2459380,K-824-FS,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2487115,K-838-FS,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2473348,K-366-FF,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2497756,K-138-FX,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2481144,K-440-BL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2492063,K-096-FX,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2492306,K-288-DP,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2498590,K-115-GB,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2487787,K-893-GF,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2493835,K-870-GF,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2499338,K-923-GF,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2470709,K-242-GJ,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2477542,K-861-BH,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2496274,K-863-GL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2506776,K-870-GL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2481137,K-446-BL,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2493247,K-049-GR,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2507049,K-077-GR,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2496890,K-833-GF,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2510034,K-295-HK,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2512570,K-272-HF,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2507946,K-330-HK,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2507204,K-026-GR,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2482757,K-041-GR,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2496028,K-310-HK,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2487181,K-294-HK,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2496046,K-303-HK,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2501970,K-762-GF,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEFVKN2721155,N-247-TL,VOLVO,XC40 Recharge,Pure Electric Pro,,,,,,,Ayvens
+YV1XZEDVEM2508229,K-216-HR,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2508876,K-299-HF,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2513245,K-200-HR,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2515258,K-858-JD,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2515146,K-846-JD,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEFVKN2719666,N-398-SZ,VOLVO,XC40 Recharge,Twin Pure Electric Pro,,,,,,,Ayvens
+YV1XZEFVKN2718090,N-334-SZ,VOLVO,XC40 Recharge,Pure Electric Pro,,,,,,,Ayvens
+YV1XZEDVEM2515562,K-848-JD,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2475559,K-224-HR,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2518697,K-423-JX,VOLVO,XC40 Recharge,P8 AWD R-Design,,,,,,,Ayvens
+YV1XZEDVEM2514351,K-899-JD,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
+YV1XZEDVEM2514857,K-527-JP,VOLVO,XC40 Recharge,P8 AWD,,,,,,,Ayvens
