@@ -2,6 +2,7 @@ import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
 from logging import Logger, getLogger
+import logging.config
 
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
@@ -31,7 +32,10 @@ def get_direct_bmw_raw_tss(bucket: S3_Bucket, append_units_to_col_names=False) -
             append_units_to_col_names=append_units_to_col_names
         )
         .pipe(concat)
+        .drop(columns=["mileage"])  # Hot fix to prevent bug in ayvens presentation, for some reason some mileage elements don't have a unit km and are null
+                                    # This in turn creates 2 columns witth the name odometer when we rename cols mileage_km and mileage to odometer...
     )
+
 
 def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, append_units_to_col_names=True) -> DF:
     api_response = bucket.read_json_file(key["key"])                                # The json response contains a "data" key who's values are a list of dicts.
