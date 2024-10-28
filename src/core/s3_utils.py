@@ -68,14 +68,13 @@ class S3_Bucket():
             else:
                 raise e
 
-    def list_responses_keys_of_brand(self, brand:str="") -> DF:
+    def ../../core/caching_utils.pylist_responses_keys_of_brand(self, brand:str="") -> DF:
         """
         ### Descriptions:
         *Warning:Ayvens x BIB POC specific method. This may not work on other projects.*  
         ### Returns:
         A dataframe where each row represents the key of a response.  
         """
-        print("self dtype:", type(self))
         self.logger.debug(f"Listing responses keys of {brand}...")
         keys = self.list_keys(f"response/{brand}/")
         keys = keys[keys.str.endswith(".json")]
