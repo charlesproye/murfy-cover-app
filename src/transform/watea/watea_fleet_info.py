@@ -24,11 +24,10 @@ def get_fleet_info() -> DF:
     fleet_info = (
         DF(fleet_info)
         .reset_index(drop=False)
-        .eval("has_power_during_charge = in_charge_power_notna_ratio > 0.5")
-        .eval("has_power_during_discharge = in_discharge_power_notna_ratio > 0.5")
-        .eval("has_temperature_during_charge = in_charge_temperature_notna_ratio > 0.5")
-        .eval("has_temperature_during_discharge = in_discharge_temperature_notna_ratio > 0.5")
     )
+    for period in ["in_charge", "in_discharge"]:
+        for col in COLS_TO_DESCRIBE_IN_FLEET_INFO:
+            fleet_info[f"has_{col}_{period}"] = fleet_info[f"{period}_{col}_notna_ratio"] > 0.5
 
     return fleet_info
     
