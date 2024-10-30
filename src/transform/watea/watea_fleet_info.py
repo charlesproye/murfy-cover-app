@@ -26,6 +26,8 @@ def get_fleet_info() -> DF:
         .reset_index(drop=False)
         .eval("has_power_during_charge = in_charge_power_notna_ratio > 0.5")
         .eval("has_power_during_discharge = in_discharge_power_notna_ratio > 0.5")
+        .eval("has_temperature_during_charge = in_charge_temperature_notna_ratio > 0.5")
+        .eval("has_temperature_during_discharge = in_discharge_temperature_notna_ratio > 0.5")
     )
 
     return fleet_info
