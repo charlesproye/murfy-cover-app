@@ -108,8 +108,8 @@ def get_raw_charging_points() -> DF:
     tss = get_processed_tss()
     tss["odometer"] = tss.groupby("id")["odometer"].ffill()
     tss["soc"] = floor_to(tss.groupby("id")["soc"].ffill(), CHARGING_POINTS_GRP_BY_SOC_QUANTIZATION)
-    tss = tss.merge(fleet_info[["id", "has_power_during_charge"]], on="id", how="left")
-    tss = tss.query("in_charge_perf_mask & has_power_during_charge")
+    tss = tss.merge(fleet_info[["id", "has_power_in_charge"]], on="id", how="left")
+    tss = tss.query("in_charge_perf_mask & has_power_in_charge")
     charging_points = tss.groupby(["id", "in_charge_perf_idx","soc",])
     charging_points = charging_points.agg(
         odometer=pd.NamedAgg("odometer", "mean"),
@@ -121,6 +121,7 @@ def get_raw_charging_points() -> DF:
         date=pd.NamedAgg("date", lambda s: s.iat[0]),
     )
     charging_points = charging_points.reset_index()
+    charging_points["power"] = charging_points["current"] * charging_points["voltage"]
     charging_points["energy_added"] = charging_points["energy_added"].replace(0, np.nan)
     charging_points["charge_id"] =  charging_points["id"] + "_"  + charging_points["in_charge_perf_idx"].astype("string")
     charging_points["energy_added"] *= -1 
