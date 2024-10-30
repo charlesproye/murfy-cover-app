@@ -30,6 +30,7 @@ from transform.watea.soh_estimation import get_processed_cluster, get_soh_per_ch
 from transform.watea.watea_processed_tss import get_processed_tss
 from transform.watea.watea_fleet_info import fleet_info
 from transform.watea.watea_config import POLYNOMIAL_LINEAR_REGRESSION_PIPELINE
+from transform.watea.soh_estimation import get_preprocessed_charging_points
 
 # Monkey patch plotly Figure.show to only show in notebooks
 def notebook_only_show(self):
@@ -47,6 +48,8 @@ go.Figure.notebook_only_show = notebook_only_show
 
 # %%
 system("mkdir -p data_cache")
+system("mkdir -p data_cache/tables")
+system("mkdir -p data_cache/plots")
 
 # %% [markdown]
 # ### Data extraction
@@ -103,20 +106,16 @@ def plt_longest_ts(fleet_info:DF, title:str):
     )
 
     fig.update_layout(
-        yaxis=dict(title="State of Charge (%)"),
-        yaxis2=dict(title="Power", overlaying="y", side="right"),
+        yaxis=dict(title="State of Charge (%) / Power (kW)"),
         title=title,
         xaxis_title="Date"
     )
-    fig.write_html(f"data_cache/{title}.html")
+    fig.write_html(f"data_cache/plots/{title}.html")
     fig.notebook_only_show()
 
 
 # %%
 plt_longest_ts(fleet_info.query("has_power_in_charge"), "Longest time series with power during charge")
-plt_longest_ts(fleet_info.query("has_power_in_discharge & ~has_power_in_charge"), "Longest time series with power during discharge")
-plt_longest_ts(fleet_info.query("has_power_in_charge & has_power_in_discharge"), "Longest time series with power during charge and discharge")
-plt_longest_ts(fleet_info.query("has_temperature_in_charge"), "Longest time series with temperature during charge")
 
 # %% [markdown]
 # ## What vehicles has power during each period(charge/discharge)
@@ -126,7 +125,7 @@ def print_and_save_ids(fleet_info_query:str, title:str):
     ids = fleet_info.query(fleet_info_query).reset_index()["id"]
     print(title)
     print(ids)
-    ids.to_csv(f"data_cache/{title}.csv", index=False)
+    ids.to_csv(f"data_cache/tables/{title}.csv", index=False)
 print_and_save_ids("has_power_in_charge", "Has power during charge")
 print_and_save_ids("has_power_in_discharge", "Has power during discharge")
 print_and_save_ids("has_power_in_charge & has_power_in_discharge", "Has power during charge and discharge")
@@ -145,7 +144,7 @@ fig = px.scatter(
     trendline="ols",
     trendline_scope="overall",
 )
-fig.write_html("data_cache/sohs_per_charge.html")
+fig.write_html("data_cache/plots/sohs_per_charge.html")
 fig.notebook_only_show()
 
 # %%
@@ -156,7 +155,7 @@ fig = px.scatter(
     trendline="ols",
     trendline_scope="overall",
 )
-fig.write_html("data_cache/sohs_per_vehicle.html")
+fig.write_html("data_cache/plots/sohs_per_vehicle.html")
 fig.notebook_only_show()
 
 # %% [markdown]
@@ -179,7 +178,7 @@ fig = px.line(
     color="floored_temperature",
     color_discrete_sequence=px.colors.sequential.Rainbow,
 )
-fig.write_html("data_cache/energy_consumption_per_soc_and_temperature.html")
+fig.write_html("data_cache/plots/energy_consumption_per_soc_and_temperature.html")
 fig.notebook_only_show()
 
 # %%
@@ -190,7 +189,7 @@ fig = px.box(
     color="floored_temperature",
     color_discrete_sequence=px.colors.sequential.Rainbow,
 )
-fig.write_html("data_cache/energy_consumption_per_soc_and_temperature_boxplot.html")
+fig.write_html("data_cache/plots/energy_consumption_per_soc_and_temperature_boxplot.html")
 fig.notebook_only_show()
 
 # %%
@@ -225,7 +224,7 @@ fig = px.box(
     color="floored_temperature",
     color_discrete_sequence=px.colors.sequential.Rainbow,
 )
-fig.write_html("data_cache/box_plot_energy_added_diff.html")
+fig.write_html("data_cache/plots/box_plot_energy_added_diff.html")
 fig.notebook_only_show()
 
 # %%
@@ -240,4 +239,10 @@ ratios.to_csv("data_cache/energy_added_ratios.csv")
 ratios
 
 
+# %%
+fig = plt_3d_df(get_preprocessed_charging_points(), "soc", "power", "energy_added", "temperature")
+fig.write_html("data_cache/plots/3d_plot_preprocessed_charging_points.html")
+fig.notebook_only_show()
+
+# %%
 
