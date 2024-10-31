@@ -107,3 +107,21 @@ def safe_astype(df:DF, col_dtypes:dict) -> DF:
     col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if col in df.columns}
     return df.astype(col_dtypes, errors="ignore")
 
+def sanity_check(df:DF) -> DF:
+    nunique_dict = {}
+    uniques_dict = {}
+    for col in df.columns:
+        try:
+            uniques_dict[col] = df[col].unique()
+            nunique_dict[col] = float(df[col].nunique())
+        except:
+            uniques_dict[col] = []
+            nunique_dict[col] = pd.NA
+            
+    return DF({
+        "dtypes": df.dtypes.astype("string"),
+        "nunique": Series(nunique_dict),
+        "uniques": Series(uniques_dict),
+        "count": df.count(),
+        "density": df.count().div(len(df)),
+    })
