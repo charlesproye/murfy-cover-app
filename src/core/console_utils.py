@@ -6,7 +6,7 @@ from pandas import DataFrame as DF
 from rich.traceback import install as install_rich_traceback
 from rich import print
 
-from core.pandas_utils import total_MB_memory_usage
+from core.pandas_utils import total_MB_memory_usage, sanity_check
 
 def parse_kwargs(cli_args: dict[str, dict[str, str]] = [], **kwargs):
     # Set up argparse to accept known arguments
@@ -67,7 +67,7 @@ def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], **kwargs) 
     df:DF = dataframe_gen(**kwargs)
     print(df)
     print("all columns:")
-    print(DF({"dtype": df.dtypes, "density": df.count() / len(df)}))
+    print(sanity_check(df))
     print(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
 
     return df
