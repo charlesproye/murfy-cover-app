@@ -82,7 +82,7 @@ def get_bucket_from_func_args(func:Callable, *args, **kwargs) -> tuple[S3_Bucket
     # Check if 'bucket' is in the arguments
     bucket_present = 'bucket' in bound_args.arguments
     if not bucket_present:
-        logger.warning(NO_BUCKET_ARG_FOUND.format(func_name=func.__name__))
+        logger.debug(NO_BUCKET_ARG_FOUND.format(func_name=func.__name__))
     bucket_value = bound_args.arguments.get('bucket', bucket)
     
     # Return the bucket value and a bool indicating presence
