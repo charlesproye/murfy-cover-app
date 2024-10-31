@@ -16,11 +16,6 @@ from core.config import *
 R = TypeVar('R')
 P = ParamSpec('P')
 
-READ_FUNCTIONS: dict[str, Callable[..., DF]] = {
-    "csv": pd.read_csv,
-    "parquet": pd.read_parquet,
-}
-
 logger = logging.getLogger("caching_utils")
 
 def cache_result(path_template: str, on: str, path_params: List[str] = []):
@@ -38,53 +33,36 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
     def decorator(data_gen_func: Callable[..., pd.DataFrame]):
         @wraps(data_gen_func)
         def wrapper(*args, force_update=False, **kwargs) -> pd.DataFrame:
-            # Extract the argument names and their values from args and kwargs
-            all_args = data_gen_func.__code__.co_varnames
+            all_args = data_gen_func.__code__.co_varnames                                   # Extract the argument names and their values from args and kwargs 
             arg_values = {**dict(zip(all_args, args)), **kwargs}
-            # Format the path using the specified parameters
-            path = path_template.format(**{param: str(arg_values[param]) for param in path_params})
-            # Ensure the extension is ".parquet"
-            assert path.endswith(".parquet"), PATH_DOESNT_END_IN_PARQUET.format(path=path)
+            format_dict = {param: str(arg_values[param]) for param in path_params}
+            path = path_template.format(**format_dict)                                      # Format the path using the specified parameters
+            assert path.endswith(".parquet"), PATH_DOESNT_END_IN_PARQUET.format(path=path)  # Ensure the extension is ".parquet"
             if on == "s3":
-                # Instantiate bucket if not provided
-                bucket, _ = get_bucket_from_func_args(data_gen_func, *args, **kwargs)
-
-                # Check if we need to update the cache or if the cache does not exist
-                if force_update or not bucket.check_file_exists(path):
-                    # Generate the data using the wrapped function
-                    data: pd.DataFrame = data_gen_func(*args, **kwargs)
-                    # Save the data to S3 as parquet
-                    bucket.save_df_as_parquet(data, path)
+                bucket, _ = get_bucket_from_func_args(data_gen_func, *args, **kwargs)       # Instantiate bucket if not provided
+                if force_update or not bucket.check_file_exists(path):                      # Check if we need to update the cache or if the cache does not exist
+                    data: pd.DataFrame = data_gen_func(*args, **kwargs)                     # Generate the data using the wrapped function
+                    bucket.save_df_as_parquet(data, path)                                   # Save the data to S3 as parquet
                     return data
                 else:
-                    # Read cached data from S3
-                    return bucket.read_parquet_df(path)
+                    return bucket.read_parquet_df(path)                                      # Read cached data from S3
             elif on == "local_storage":
-                # Local cache handling
-                if force_update or not exists(path):
-                    # Generate the data using the wrapped function
-                    data: pd.DataFrame = data_gen_func(*args, **kwargs)
-                    # Save the data locally
-                    save_cache_to(data, path)
+                if force_update or not exists(path):                                         # Check if we need to update the cache or if the cache does not exist
+                    data: pd.DataFrame = data_gen_func(*args, **kwargs)                      # Generate the data using the wrapped function
+                    save_cache_to(data, path)                                                # Save the data locally
                     return data
-                # Read cached data from local file
-                return pd.read_parquet(path)
+                return pd.read_parquet(path)                                                 # Read cached data from local file
         return wrapper
     return decorator
 
 def get_bucket_from_func_args(func:Callable, *args, **kwargs) -> tuple[S3_Bucket, bool]:
-    # Get the function's signature
-    signature = inspect.signature(func)
-    # Map the positional args to the parameter names
-    bound_args = signature.bind_partial(*args, **kwargs)
-    bound_args.apply_defaults()
-    
-    # Check if 'bucket' is in the arguments
-    bucket_present = 'bucket' in bound_args.arguments
+    signature = inspect.signature(func)                                         # Get the function's signature
+    bound_args = signature.bind_partial(*args, **kwargs)                        # Map the positional args to the parameter names
+    bound_args.apply_defaults()                                                 # Apply default values to the bound arguments
+    bucket_present = 'bucket' in bound_args.arguments                           # Check if 'bucket' is in the arguments
     if not bucket_present:
         logger.debug(NO_BUCKET_ARG_FOUND.format(func_name=func.__name__))
     bucket_value = bound_args.arguments.get('bucket', bucket)
-    
     # Return the bucket value and a bool indicating presence
     return bucket_value, bucket_present
 
