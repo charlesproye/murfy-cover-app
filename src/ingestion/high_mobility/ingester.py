@@ -326,7 +326,7 @@ class HMIngester:
 
 
     def run(self):
-            if os.getenv("COMPRESS_ONLY"):
+            if os.getenv("COMPRESS_ONLY") and os.getenv("COMPRESS_ONLY") == "1":
                 self.__ingester_logger.info("COMPRESS_ONLY flag set. Running compression first.")
                 self.__is_compressing = True
                 try:
@@ -336,6 +336,7 @@ class HMIngester:
                 finally:
                     self.__is_compressing = False
                 self.__ingester_logger.info("Compression completed. Continuing with normal ingestion.")
+                return
             
             self.__schedule_tasks()
             self.__worker_thread = threading.Thread(target=self.__process_job_queue)
