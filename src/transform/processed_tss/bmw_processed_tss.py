@@ -7,7 +7,7 @@ from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
 from core.config import *
 from transform.fleet_info.main import fleet_info
-from transform.raw_tss.raw_tss import get_raw_tss
+from transform.raw_tss.main import get_raw_tss
 from transform.processed_tss.high_mobility_processed_tss import process_raw_tss as hm_process_raw_tss
 from transform.processed_tss.config import *
 

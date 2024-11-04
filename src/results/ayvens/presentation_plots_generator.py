@@ -15,7 +15,7 @@ from core.config import *
 from core.ev_models_info import models_info
 from core.caching_utils import cache_result
 from transform.fleet_info.ayvens_fleet_info import fleet_info
-from transform.raw_tss.raw_tss import get_raw_tss
+from transform.raw_tss.main import get_raw_tss
 
 system("mkdir -p data_cache")
 system("mkdir -p data_cache/plots")
