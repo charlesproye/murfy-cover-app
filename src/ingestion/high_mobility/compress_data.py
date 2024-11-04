@@ -85,6 +85,13 @@ class HMCompresser:
                 else:
                     self.__logger.warning(f"No contents found for brand {brand_name}.")
             
+                if "Contents" in obj:
+                    for contents in obj["Contents"]:
+                        key = contents["Key"]
+                        s3_keys.add(key)
+                else:
+                    self.__logger.warning(f"No contents found for brand {brand_name}.")
+            
             self.__logger.info(f"Listed temporary S3 objects for brand {brand_name}")
             
             vins = set(
