@@ -13,7 +13,6 @@ from transform.tesla.tesla_config import *
 def get_fleet_info(bucket: S3_Bucket=S3_Bucket()) -> DF:
     raw_json_fleet_info: list[dict] = bucket.read_json_file(S3_JSON_FLEET_INFO_RESPONSE_KEY)
     models_infos = get_ev_models_infos().set_index('model')
-    print(models_infos)
     fleet_info_objs: list[dict] = []
     for raw_dict in raw_json_fleet_info:
         vehicle_info_dict = {
