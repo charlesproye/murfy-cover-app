@@ -52,13 +52,13 @@ def main_decorator(main_func):
 def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], logger=None, **kwargs) -> DF:
     df:DF = dataframe_gen(**kwargs)
     if logger:
-        logger.debug(f"\n{df}")
-        logger.debug("all columns:")
-        logger.debug(f"\n{sanity_check(df)}")
+        logger.debug(df)
+        logger.debug("sanity check:")
+        logger.debug(sanity_check(df))
         logger.debug(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
     else:
         print(df)
-        print("all columns:")
+        print("sanity check:")
         print(sanity_check(df))
         print(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
 
