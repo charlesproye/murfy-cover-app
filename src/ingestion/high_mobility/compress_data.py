@@ -46,22 +46,34 @@ class HMCompresser:
             )
             s3_keys = set()
             for obj in bucket_iterator:
-                for contents in obj["Contents"]:
-                    key = contents["Key"]
-                    s3_keys.add(key)
+                if "Contents" in obj:
+                    for contents in obj["Contents"]:
+                        key = contents["Key"]
+                        s3_keys.add(key)
+                else:
+                    self.__logger.warning(f"No contents found for brand {brand_name}.")
+            
             self.__logger.info(f"Listed temporary S3 objects for brand {brand_name}")
+            
             vins = set(
                 filter(lambda v: len(v) == 17, map(lambda v: v.split("/")[2], s3_keys))
             )
-            self.__s3_keys_by_vin[brand_name] = {
-                k: set(
-                    filter(
-                        lambda e: e.startswith(f"response/{brand_name}/{k}/temp/"),
-                        s3_keys,
+            
+            if vins:
+                self.__s3_keys_by_vin[brand_name] = {
+                    k: set(
+                        filter(
+                            lambda e: e.startswith(f"response/{brand_name}/{k}/temp/"),
+                            s3_keys,
+                        )
                     )
-                )
-                for k in vins
-            }
+                    for k in vins
+                }
+            else:
+                self.__logger.warning(f"No VINs found for brand {brand_name}.")
+                self.__s3_keys_by_vin[brand_name] = {}
+                continue  # Ajoutez cette ligne pour éviter de continuer le traitement
+
             self.__logger.info(f"Grouped temporary S3 objects for brand {brand_name}")
 
     def __process(self, items, brand: str):
@@ -169,4 +181,6 @@ class HMCompresser:
         for brand_name in all_brands.keys():
             if not self.__shutdown_requested.is_set():
                 self.__logger.info(f"Starting {brand_name} data compression")
-                self.__process(self.__s3_keys_by_vin[brand_name], brand_name)
+                if self.__s3_keys_by_vin[brand_name]:
+                    self.__process(self.__s3_keys_by_vin[brand_name], brand_name)
+
