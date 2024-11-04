@@ -6,7 +6,7 @@ from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
 from core.config import *
-from transform.fleet_info.fleet_info import fleet_info
+from transform.fleet_info.main import fleet_info
 from transform.raw_tss.raw_tss import get_raw_tss
 from transform.processed_tss.high_monility_processed_tss import process_raw_tss as hm_process_raw_tss
 from transform.processed_tss.config import *
@@ -33,7 +33,7 @@ def get_processed_tss() -> DF:
     )
     logger.debug(f"Sanity check for processed TSS from BMW:\n{sanity_check(tss_from_bmw)}")
     logger.debug(f"Sanity check for processed TSS from high mobility:\n{sanity_check(tss_from_high_mobility)}")
-    
+
     return pd.concat((tss_from_bmw, tss_from_high_mobility))
 
 def process_raw_tss_provided_by_bmw(raw_tss:DF) -> DF:
