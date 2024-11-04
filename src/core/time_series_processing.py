@@ -1,17 +1,43 @@
+from core.pandas_utils import *
 from datetime import timedelta as TD
-
+from logging import getLogger
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
-from pandas.api.typing import DataFrameGroupBy as DF_grp_by
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
 from scipy import integrate
-from rich import print
 import numpy as np
-
 from core.config import *
 from core.constants import *
+
+logger = getLogger("core.time_series_processing")
+
+def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None) -> DF:
+    """
+    ### Description:
+    Computes the charging and discharging masks for a time series.
+    Uses the string charging_status column if it exists, otherwise uses the soc difference.
+    ### Parameters:
+    id_col: optional parameter to provide if the dataframe represents multiple time series.
+    charging_status_val_to_mask: dict mapping charging status values to boolean values to create masks.
+    """
+    if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
+        return (
+            tss
+            .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
+            .eval("in_discharge = ~in_charge")
+        )
+    elif "soc" in tss.columns:
+        if id_col in tss.columns:
+            return (
+                tss
+                .groupby(id_col)
+                .apply(low_freq_compute_charge_n_discharge_vars)
+            )
+        else:
+            return low_freq_compute_charge_n_discharge_vars(tss)
+    else:
+        logger.warning("No charging status or soc column found to compute charging and discharging masks, returning original tss.")
+        return tss
 
 def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY_RATIO) -> DF:
     """
