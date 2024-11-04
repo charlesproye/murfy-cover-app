@@ -8,7 +8,7 @@ from core.console_utils import single_dataframe_script_main
 from core.config import *
 from transform.fleet_info.main import fleet_info
 from transform.raw_tss.raw_tss import get_raw_tss
-from transform.processed_tss.high_monility_processed_tss import process_raw_tss as hm_process_raw_tss
+from transform.processed_tss.high_mobility_processed_tss import process_raw_tss as hm_process_raw_tss
 from transform.processed_tss.config import *
 
 logger = getLogger("transform.processed_tss.bmw")
