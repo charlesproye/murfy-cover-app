@@ -1,3 +1,5 @@
+import pandas as pd
+
 # High mobility 
 HIGH_MOBILITY_BRANDS = [
     "kia",
@@ -18,15 +20,8 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "vin",
 ]
 
-KEYS = [
-    "slope",
-    "intercept",
-    "r_value",
-    "p_value",
-    "std_err",
-]
-
 RENAME_COLS_DICT:dict[str, str] = {
+    # High mobility
     "date_of_value": "date",
     "diagnostics.odometer": "odometer",
     "odometer.value": "odometer",
@@ -38,43 +33,48 @@ RENAME_COLS_DICT:dict[str, str] = {
     "charging.battery_level": "soc",
     "soc_hv_header": "soc",
     "charging.battery_energy": "battery_energy",
-    "charging.battery_level": "battery_level",
+    # BMW
+    "charging_ac_ampere": "charging_ac_current",
+    "kombi_remaining_electric_range": "estimated_range",
+    "mileage": "odometer", # Yes, mileage is in km no need to convert it
+    "soc_hv_header": "soc",
+    "capacity": "capacity_according_to_data_provider",
+    "model": "model_according_to_data_provider",
+    # Stellantis
+    'odometer.value': "odometer",
+    'engine.battery.capacity': "soc",
+    'externalTemperature.value': "temperature",
 }
 
-COLS_TO_KEEP = [
-    "date",
-    "soc",
-    "odometer",
-    "estimated_range",
-    "battery_energy",
-    "soc",
-    "vin",
-]
-
+# The keys will be used to determine what columns to keep.
 COL_DTYPES = {
-    "date": "datetime64[s]",
-    "soc": "float",
-    "odometer": "float",
-    "estimated_range": "float",
-    "battery_energy": "float",
-    "soc": "float",
+    # Common
     "vin": "string",
-    "capacity": "float",
-}
-
-# BMW 
-COL_DTYPES_BMW = {
-    "charging_ac_ampere": "float",
+    "soc": "float32",
+    "odometer": "float32",
+    "estimated_range": "float32",
+    # High mobility
+    "date": "datetime64[s]",
+    "battery_energy": "float32",
+    # BMW
+    "charging_ac_current": "float",
     "charging_ac_voltage": "float",
     "charging_method": "category",
-    "charging_plug_connected": "category",
-    "charging_status": "category",
-    "coolant_temperature": "float",
-    "kombi_remaining_electric_range": "float",
-    "mileage": "float",
-    "soc_customer_target": "float",
-    "soc_hv_header": "float",
-    "soc_target_charging_time_forecast": "float",
-    "teleservice_status": "category",
-    "vin": "string",
+    "charging_plug_connected": "bool",
+    "charging_status": "string",
+    "coolant_temperature": "float32",
+    "kombi_remaining_electric_range": "float32",
 }
+
+CHARGING_STATUS_VAL_TO_MASK = {
+    #BMW
+    "CHARGINGACTIVE": True,
+    "<NA>": False,
+    pd.NA: False,
+    "NOCHARGING": False,
+    "CHARGINGENDED": False,
+    "CHARGINGERROR": False,
+    "INITIALIZATION": False,
+    "CHARGINGPAUSED": False,
+}
+
