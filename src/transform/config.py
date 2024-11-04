@@ -12,9 +12,5 @@ MAIN_KWARGS = {
         "required": False,
         "help": "Specifies pipeline step or list of pipelines steps to run."
     },
-    "--print_pipelines": {
-        "default": False,
-        "help": "Flag to print the pipelines that will be executed."
-    },
 }
 
