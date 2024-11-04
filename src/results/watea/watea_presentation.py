@@ -40,9 +40,9 @@ def notebook_only_show(self):
             print("Showing figure")
             self.show()
         else:
-            pass
+            return self
     except NameError:
-        pass
+        return self
 go.Figure.notebook_only_show = notebook_only_show
 
 
@@ -87,31 +87,31 @@ def plt_longest_ts(fleet_info:DF, title:str):
     ts = get_longest_of(fleet_info)
     fig = go.Figure()
 
-    fig.add_trace(
-        go.Scatter(
-            x=ts["date"],
-            y=ts["soc"],
-            name="State of Charge",
-            yaxis="y1"
+    fig = (
+        px.line(
+        ts,
+        x="date",
+        y="soc",
+        title="State of Charge",
+        labels={"soc": "State of Charge", "date": "Date"}
         )
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=ts["date"], 
-            y=ts["power"],
-            name="Power",
-            yaxis="y2"
+        .add_trace(
+            go.Scatter(
+                x=ts["date"], 
+                y=ts["power"],
+                name="Power",
+                yaxis="y2"
+            )
         )
+        .update_layout(
+            yaxis=dict(title="State of Charge (%)"),
+            yaxis2=dict(title="Power (W)", overlaying='y', side='right'),
+            title=title,
+            xaxis_title="Date"
+        )
+        .notebook_only_show()
+        .write_html(f"data_cache/plots/{title}.html")
     )
-
-    fig.update_layout(
-        yaxis=dict(title="State of Charge (%) / Power (kW)"),
-        title=title,
-        xaxis_title="Date"
-    )
-    fig.write_html(f"data_cache/plots/{title}.html")
-    fig.notebook_only_show()
 
 
 # %%
