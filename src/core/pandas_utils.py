@@ -34,10 +34,7 @@ def series_start_end_diff(s: Series) -> Any:
     return s.iat[-1] - s.iat[0]
 
 def str_split_and_retain_src(src: Series, pattern:str, n:int=None, col_names:list[str]=None,) -> DF:
-    """
-    ### Description:
-    Splits the series according to a pattern and returns resulting df concatanated with the src series as the last column.
-    """
+    """Splits the series according to a pattern and returns resulting df concatanated with the src series as the first column."""
     split_df = src.str.split(pattern, n=n, expand=True)
     result = pd.concat((src, split_df), axis="columns")
     if not col_names is None:
@@ -46,9 +43,7 @@ def str_split_and_retain_src(src: Series, pattern:str, n:int=None, col_names:lis
     return result
 
 def uniques_as_series(s:Series) -> Series:
-    """
-    Warp around Series.unique to return another Series instead of an ndarray.
-    """
+    """Warp around Series.unique to return another Series instead of an ndarray."""
     return Series(s.unique())
 
 def concat(objects:list|dict|Series, **kwargs) -> DF:
@@ -98,7 +93,6 @@ def merge_with_columns(df_a:DF, df_b:DF, cols_to_copy:list, merge_on:str, **merg
         df_b = df_b.reset_index(drop=True)
     return df_a.merge(df_b[selected_columns], on=merge_on, how="left")
 
-
 def safe_astype(df:DF, col_dtypes:dict) -> DF:
     """
     Warp around pd.astype to ignore errors.
@@ -120,8 +114,24 @@ def sanity_check(df:DF) -> DF:
             
     return DF({
         "dtypes": df.dtypes.astype("string"),
-        "nunique": Series(nunique_dict),
+        "nuniques": Series(nunique_dict),
         "uniques": Series(uniques_dict),
         "count": df.count(),
         "density": df.count().div(len(df)),
+        "memory_usage_in_MB": df.memory_usage() / 1e6,
     })
+
+def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None) -> DF:
+    if not isinstance(index_loc, pd.Index) and index_loc is not None:
+        index_loc = pd.Index(index_loc)
+    if not isinstance(col_loc, pd.Index) and col_loc is not None:
+        col_loc = pd.Index(col_loc)
+    if index_loc is not None:
+        index_loc = df.index.intersection(index_loc)
+    if col_loc is not None:
+        col_loc = df.columns.intersection(col_loc)
+    return df.loc[index_loc if index_loc is not None else df.index, col_loc if col_loc is not None else df.columns]
+
+def dropna_cols(df:DF) -> DF:
+    return df.loc[:, df.notna().any(axis=0)]
+
