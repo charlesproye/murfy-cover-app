@@ -51,6 +51,6 @@ def process_raw_tss_provided_by_bmw(raw_tss:DF) -> DF:
     return tss
 
 if __name__ == "__main__":
-    set_level_of_loggers_with_prefix("DEBUG", "transform")
+    set_level_of_loggers_with_prefix("DEBUG", "transform.processed_tss")
     single_dataframe_script_main(get_processed_tss, force_update=True)
 
