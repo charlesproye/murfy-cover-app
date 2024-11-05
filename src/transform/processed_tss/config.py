@@ -6,6 +6,11 @@ HIGH_MOBILITY_BRANDS = [
     "mercedes-benz",
     "ford",
     "renault",
+    "opel",
+    "ds",
+    "fiat",
+    "peugeot",
+    "citroen",
 ]
 
 COLS_TO_CPY_FROM_FLEET_INFO = [
