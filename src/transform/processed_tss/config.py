@@ -16,10 +16,6 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "make",
     "model",
     "version",
-    "dummy_soh_maker_offset",
-    "dummy_soh_model_offset",
-    "dummy_soh_model_slope",
-    "dummy_soh_vehicle_offset",
     "capacity",
     "vin",
 ]
