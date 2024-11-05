@@ -59,10 +59,12 @@ processed_cluster = get_processed_cluster()
 charges = get_soh_per_charges()
 
 # %%
-soh_per_vehicle = charges.groupby('id').agg({
-    "soh": "mean",
-    "odometer": "max",
-}).reset_index(drop=False)
+soh_per_vehicle = charges.groupby('id').agg(
+    soh=pd.NamedAgg(column="soh", aggfunc="mean"),
+    soh_min=pd.NamedAgg(column="soh", aggfunc="min"),
+    soh_max=pd.NamedAgg(column="soh", aggfunc="max"),
+    odometer=pd.NamedAgg(column="odometer", aggfunc="max")
+).reset_index(drop=False)
 
 # %%
 @cache_result("data_cache/{id}.parquet", on="local_storage", path_params=["id"])
@@ -143,7 +145,7 @@ id_with_max_dist.to_csv("data_cache/tables/max_travelled_distance_vehicle_info.c
 
 # %%
 fig = px.scatter(
-    charges.assign(soh=charges["soh"].sub(2.5).clip(90, 100)),
+    charges.assign(soh=charges["soh"]),
     x="odometer",
     y="soh",
     color="id",
@@ -155,7 +157,7 @@ fig.notebook_only_show()
 
 # %%
 fig = px.scatter(
-    soh_per_vehicle.assign(soh=soh_per_vehicle["soh"].sub(1.5)),
+    soh_per_vehicle.assign(soh=soh_per_vehicle["soh"]),
     x="odometer",
     y="soh",
     trendline="ols",
