@@ -122,16 +122,22 @@ plt_longest_ts(fleet_info.query("has_power_in_charge"), "Longest time series wit
 
 # %%
 def print_and_save_ids(fleet_info_query:str, title:str):
-    ids = fleet_info.query(fleet_info_query).reset_index()["id"]
+    ids = fleet_info.query(fleet_info_query).reset_index()[["id", "max_odo", "min_odo", "travelled_distance"]]
     print(title)
     print(ids)
-    ids.to_csv(f"data_cache/tables/{title}.csv", index=False)
+    ids.to_csv(f"data_cache/tables/{title}.csv".replace(" ", "_"), index=False)
 print_and_save_ids("has_power_in_charge", "Has power during charge")
 print_and_save_ids("has_power_in_discharge", "Has power during discharge")
 print_and_save_ids("has_power_in_charge & has_power_in_discharge", "Has power during charge and discharge")
 print_and_save_ids("~has_power_in_charge & ~has_power_in_discharge", "Has no power during charge and discharge")
 print_and_save_ids("has_temperature_in_charge", "Has temperature during charge")
 
+id_with_max_dist = (
+    fleet_info
+    .sort_values("travelled_distance", ascending=False)
+    .iloc[0]
+)
+id_with_max_dist.to_csv("data_cache/tables/max_travelled_distance_vehicle_info.csv", index=True)
 # %% [markdown]
 # ## soh results
 

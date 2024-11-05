@@ -24,6 +24,7 @@ def get_fleet_info() -> DF:
     fleet_info = (
         DF(fleet_info)
         .reset_index(drop=False)
+        .eval("travelled_distance = max_odo - min_odo")
     )
     for period in ["in_charge", "in_discharge"]:
         for col in COLS_TO_DESCRIBE_IN_FLEET_INFO:
