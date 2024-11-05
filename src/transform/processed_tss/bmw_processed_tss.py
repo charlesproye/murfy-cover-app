@@ -19,21 +19,25 @@ def get_processed_tss() -> DF:
     raw_tss_from_bmw = raw_tss.query("data_provider == 'bmw'")
     raw_tss_from_high_mobility = raw_tss.query("data_provider == 'high_mobility'")
     logger.debug(f"Sanity check for raw TSS from BMW:\n{sanity_check(raw_tss_from_bmw)}")
-    logger.debug(f"Sanity check for raw TSS from high mobility:\n{sanity_check(raw_tss_from_high_mobility)}")
+    logger.debug("Processing BNW raw TSS from BMW...")
     tss_from_bmw = (
         raw_tss_from_bmw
         .drop(columns=["date_of_value"])
         .pipe(process_raw_tss_provided_by_bmw)
     )
+    logger.debug("Done.")
+    logger.debug("Processing BNW raw TSS from high mobility...")
+    logger.debug(f"Sanity check for raw TSS from high mobility:\n{sanity_check(raw_tss_from_high_mobility)}")
     tss_from_high_mobility = (
         raw_tss_from_high_mobility
         .drop(columns=["date"])
         .pipe(hm_process_raw_tss)
         .pipe(dropna_cols)
     )
+    logger.debug("Done.")
     logger.debug(f"Sanity check for processed TSS from BMW:\n{sanity_check(tss_from_bmw)}")
     logger.debug(f"Sanity check for processed TSS from high mobility:\n{sanity_check(tss_from_high_mobility)}")
-
+    logger.debug("Concatenating processed TSS from BMW and high mobility...")
     return pd.concat((tss_from_bmw, tss_from_high_mobility))
 
 def process_raw_tss_provided_by_bmw(raw_tss:DF) -> DF:
@@ -52,5 +56,5 @@ def process_raw_tss_provided_by_bmw(raw_tss:DF) -> DF:
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "transform.processed_tss")
-    single_dataframe_script_main(get_processed_tss, force_update=True)
+    single_dataframe_script_main(get_processed_tss, force_update=True, logger=logger)
 
