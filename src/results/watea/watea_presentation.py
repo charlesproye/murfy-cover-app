@@ -59,16 +59,31 @@ processed_cluster = get_processed_cluster()
 charges = get_soh_per_charges()
 
 # %%
-soh_per_vehicle = charges.groupby('id').agg(
-    soh=pd.NamedAgg(column="soh", aggfunc="mean"),
-    soh_min=pd.NamedAgg(column="soh", aggfunc="min"),
-    soh_max=pd.NamedAgg(column="soh", aggfunc="max"),
-    odometer=pd.NamedAgg(column="odometer", aggfunc="max")
-).reset_index(drop=False)
+soh_per_vehicle = (
+    charges
+    .groupby('id')
+    .agg(
+        soh=pd.NamedAgg(column="soh", aggfunc="mean"),
+        soh_min=pd.NamedAgg(column="soh", aggfunc="min"),
+        soh_max=pd.NamedAgg(column="soh", aggfunc="max"),
+        odometer=pd.NamedAgg(column="odometer", aggfunc="max")
+    )
+    .eval("soh_diff = soh_max - soh_min")
+    .eval("abs_soh_diff = abs(soh_diff)")
+    .reset_index(drop=False)
+)
+
+(
+    soh_per_vehicle
+    .sort_values("abs_soh_diff", ascending=False)
+    .set_index("id")
+    .iloc[0]
+    .to_csv("data_cache/tables/max_soh_diff_vehicle_info.csv", index=True)
+)
 
 # %%
 @cache_result("data_cache/{id}.parquet", on="local_storage", path_params=["id"])
-def get_ts(id:str ) -> DF:
+def get_ts(id:str) -> DF:
     return get_processed_tss().query(f"id == '{id}'")
 
 # %%
@@ -87,8 +102,6 @@ def get_longest_of(fleet_info:DF) -> DF:
 # %%
 def plt_longest_ts(fleet_info:DF, title:str):
     ts = get_longest_of(fleet_info)
-    fig = go.Figure()
-
     fig = (
         px.line(
         ts,
@@ -157,7 +170,7 @@ fig.notebook_only_show()
 
 # %%
 fig = px.scatter(
-    soh_per_vehicle.assign(soh=soh_per_vehicle["soh"]),
+    soh_per_vehicle,
     x="odometer",
     y="soh",
     trendline="ols",
