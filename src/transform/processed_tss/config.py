@@ -10,7 +10,6 @@ HIGH_MOBILITY_BRANDS = [
     "ds",
     "fiat",
     "peugeot",
-    "citroen",
 ]
 
 COLS_TO_CPY_FROM_FLEET_INFO = [
@@ -45,10 +44,6 @@ RENAME_COLS_DICT:dict[str, str] = {
     "soc_hv_header": "soc",
     "capacity": "capacity_according_to_data_provider",
     "model": "model_according_to_data_provider",
-    # Stellantis
-    'odometer.value': "odometer",
-    'engine.battery.capacity': "soc",
-    'externalTemperature.value': "temperature",
 }
 
 # The keys will be used to determine what columns to keep.
