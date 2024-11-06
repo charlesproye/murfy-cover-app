@@ -20,7 +20,7 @@ def set_level_of_loggers_with_prefix(level, logger_name_prefix:str):
         },
         'handlers': {
             'rich': {
-                'class': 'rich.logging.RichHandler',
+                'class': ['rich.logging.RichHandler'],
                 'formatter': 'rich',
             },
         },
