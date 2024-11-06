@@ -37,7 +37,7 @@ def get_direct_bmw_raw_tss(bucket: S3_Bucket, append_units_to_col_names=False) -
     )
 
 
-def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, append_units_to_col_names=True) -> DF:
+def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, append_units_to_col_names=False) -> DF:
     api_response = bucket.read_json_file(key["key"])                                # The json response contains a "data" key who's values are a list of dicts.
     raw_ts = DF.from_dict(api_response["data"])                                     # The dicts have a "key" and "value" items.
     if append_units_to_col_names:

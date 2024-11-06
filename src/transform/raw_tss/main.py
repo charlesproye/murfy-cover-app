@@ -8,7 +8,6 @@ from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
 from transform.raw_tss.bmw_raw_tss import get_raw_tss as bmw_get_raw_tss
-from transform.raw_tss.stellantis_raw_tss import get_raw_tss as stellantis_get_raw_tss
 from transform.raw_tss.tesla_raw_tss import get_raw_tss as tesla_get_raw_tss
 
 GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3_Bucket], DF]] = {
@@ -18,11 +17,10 @@ GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3_Bucket], DF]] = {
     "mercedes-benz":    hm_get_raw_tss,
     "ford":             hm_get_raw_tss,
     "renault":          hm_get_raw_tss,
-    "opel":             stellantis_get_raw_tss,
-    "citroën":          stellantis_get_raw_tss,
-    "peugeot":          stellantis_get_raw_tss,
-    "ds":               stellantis_get_raw_tss,
-    "fiat":             stellantis_get_raw_tss,
+    "opel":             hm_get_raw_tss,
+    "peugeot":          hm_get_raw_tss,
+    "ds":               hm_get_raw_tss,
+    "fiat":             hm_get_raw_tss,
 }
 
 def get_raw_tss(brand:str, **kwargs) -> DF:
