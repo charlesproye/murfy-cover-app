@@ -1,26 +1,27 @@
-from rich.logging import RichHandler
+import logging
 import logging.config
+from rich.logging import RichHandler
 
 RICH_HANDLER = RichHandler()
 FORMAT = "%(message)s"
-logging.basicConfig(
-    level="WARNING", format=FORMAT, datefmt="[%X]", handlers=[RICH_HANDLER]
-)
 
-def set_level_of_loggers_with_prefix(level, logger_name_prefix:str):
+def set_level_of_loggers_with_prefix(level, logger_name_prefix: str):
+    if not isinstance(logger_name_prefix, str):
+        raise TypeError("Logger name prefix must be a string")
+
     logging.config.dictConfig({
         'version': 1,
-        "loggers": {
-            logger_name_prefix: dict(
-                level=level,
-                datefmt="[%X]",
-                handlers=["rich"],
-                propagate=False,
-            ),
+        'disable_existing_loggers': False,
+        'loggers': {
+            logger_name_prefix: {
+                'level': level,
+                'handlers': ['rich'],
+                'propagate': False,
+            },
         },
         'handlers': {
             'rich': {
-                'class': ['rich.logging.RichHandler'],
+                'class': 'rich.logging.RichHandler',
                 'formatter': 'rich',
             },
         },
@@ -30,3 +31,6 @@ def set_level_of_loggers_with_prefix(level, logger_name_prefix:str):
             },
         },
     })
+
+# Ensure you use a valid logging level constant
+set_level_of_loggers_with_prefix(logging.INFO, "sql_utils")

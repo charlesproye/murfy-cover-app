@@ -11,3 +11,13 @@ EMTPY_S3_KEYS_WARNING_MSG = """
 No responses found in {keys_prefix}.
 """
 
+# SQL
+DB_URI_FORMAT_KEYS = [
+    "DB_USERNAME",
+    "DB_ADRESSE",
+    "DB_PASSWORD",
+    "DB_PORT",
+    "DB_DATA_NAME",
+]
+DB_URI_FORMAT_STR = "postgresql+psycopg2://{DB_USERNAME}:{DB_PASSWORD}@{DB_ADRESSE}:{DB_PORT}/{DB_DATA_NAME}"
+

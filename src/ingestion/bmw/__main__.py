@@ -30,7 +30,7 @@ def main():
 
         environment variables:
           BMW_BASE_URL:          BMW API base URL
-          BMW_USERNAME:         BMW username
+          BMW_USERNAME:         BMW DB_USERNAME
           BMW_PASSWORD:         BMW password
           BMW_CLIENT_ID:        BMW client ID
           S3_ENDPOINT           S3 base endpoint
