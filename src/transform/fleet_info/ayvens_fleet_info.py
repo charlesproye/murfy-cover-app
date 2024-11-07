@@ -1,4 +1,4 @@
-import random
+../../transform/fleet_info/ayvens_fleet_info.pyimport random
 import warnings
 
 import pandas as pd
@@ -9,7 +9,7 @@ from core.ev_models_info import models_info
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main
 from core.pandas_utils import map_col_to_dict, set_str_to_lower
-from transform.fleet_info.fleet_info_config import *
+from transform.fleet_info.config import *
 
 def get_fleet_info(bucket=S3_Bucket()) -> DF:
     fleet_info = (
