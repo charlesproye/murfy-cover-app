@@ -2,7 +2,6 @@ from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
-from core.ev_models_info import models_info
 from transform.fleet_info.config import *
 
 def get_fleet_info(bucket: S3_Bucket=bucket) -> DF:
@@ -17,7 +16,6 @@ def get_fleet_info(bucket: S3_Bucket=bucket) -> DF:
         .astype("string")                                               # We convert the dtype to string.
         .str                                                            # We use the str accessor to extract the model and version from the string.
         .extract(r'^(?P<model>Model \w+) (?P<version>.+)$')             # We extract the model and version from the string.
-        .merge(models_info, on=["model", "version"], how="left")        # We merge with the models_info DF to get the range and capacity of the vehicle.
     )
 
 if __name__ == "__main__":
