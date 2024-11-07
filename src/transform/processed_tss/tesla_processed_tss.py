@@ -1,7 +1,4 @@
-import pandas as pd
-from pandas import DataFrame as DF
-
-from core.pandas_utils import floor_to
+from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 from core.config import *
@@ -25,6 +22,8 @@ def get_processed_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
         .eval("in_discharge = charging_state == 'Disconnected'")
         .groupby("vin")
         .apply(process_ts, include_groups=False)
+        .reset_index(drop=False)
+        .sort_values(by=["vin", "date"])
     )
 
 def process_ts(raw_ts:DF) -> DF:
