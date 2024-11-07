@@ -1,23 +1,19 @@
-import pandas as pd
-from pandas import DataFrame as DF
-
-from core.pandas_utils import floor_to
+from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 from core.config import *
 from core.s3_utils import S3_Bucket
 from core.time_series_processing import compute_cum_energy, perf_mask_and_idx_from_condition_mask
-from transform.tesla.tesla_config import *
+from transform.processed_tss.config import *
 from transform.raw_tss.tesla_raw_tss import get_raw_tss
 from transform.tesla.tesla_fleet_info import fleet_info_df
-
 
 @cache_result(S3_PROCESSED_TSS_KEY_FORMAT.format(brand="tesla"), on="s3")
 def get_processed_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
     return (
         get_raw_tss(bucket=bucket)
-        .astype(DATA_TYPE_RAW_DF_DICT)
-        .rename(columns=COLUNMS_NAMES_MAPPING)
+        .rename(columns=RENAME_COLS_DICT, errors="ignore")
+        .pipe(safe_astype, COL_DTYPES)
         .assign(date=lambda raw_tss: pd.to_datetime(raw_tss["date"]).dt.as_unit("s"))
         .drop_duplicates(subset=["vin",  "date"])
         .sort_values(by=["vin",  "date"])
@@ -25,6 +21,8 @@ def get_processed_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
         .eval("in_discharge = charging_state == 'Disconnected'")
         .groupby("vin")
         .apply(process_ts, include_groups=False)
+        .reset_index(drop=False)
+        .sort_values(by=["vin", "date"])
     )
 
 def process_ts(raw_ts:DF) -> DF:
