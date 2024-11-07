@@ -5,6 +5,9 @@ import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
 
+from core.sql_utils import engine
+
+
 logger = logging.getLogger(__name__)
 
 def flatten_multi_indexed_columns(self: DF) -> DF:
