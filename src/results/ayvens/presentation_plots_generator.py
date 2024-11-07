@@ -14,9 +14,8 @@ from plotly.graph_objects import Figure
 from core.config import *
 from core.ev_models_info import models_info
 from core.caching_utils import cache_result
-from transform.ayvens.ayvens_fleet_info import fleet_info
-from transform.ayvens.ayvens_get_raw_tss import get_ayvens_raw_tss
-
+from transform.fleet_info.ayvens_fleet_info import fleet_info
+from transform.raw_tss.main import get_raw_tss
 
 system("mkdir -p data_cache")
 system("mkdir -p data_cache/plots")
@@ -73,10 +72,23 @@ COL_DTYPES = {
 
 @cache_result(path.join(path.dirname(__file__), "data_cache/processed_tss.parquet"), on="local_storage")
 def get_processed_tss():
-    raw_tss = get_ayvens_raw_tss()
+    raw_tss = {
+        "bmw": get_raw_tss("bmw"),
+        "kia": get_raw_tss("kia"),
+        "mercedes-benz": get_raw_tss("mercedes-benz"),
+        "ford": get_raw_tss("ford"),
+        "renault": get_raw_tss("renault"),
+        "opel": get_raw_tss("opel"),
+        "citroën": get_raw_tss("citroën"),
+        "peugeot": get_raw_tss("peugeot"),
+        "ds": get_raw_tss("ds"),
+        "fiat": get_raw_tss("fiat"),
+    }
+
     tss_dict = {}
 
     for brand, brand_raw_tss in track(raw_tss.items()):
+        print(f"brand::::::{brand}")
         # Add model and model version columns
         brand_raw_tss = brand_raw_tss.rename(columns=RENAME_COLS_DICT)
         cols_to_drop = brand_raw_tss.columns[~brand_raw_tss.columns.isin(COLS_TO_KEEP)]

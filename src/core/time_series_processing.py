@@ -1,17 +1,43 @@
+from core.pandas_utils import *
 from datetime import timedelta as TD
-
+from logging import getLogger
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame as DF
-from pandas.api.typing import DataFrameGroupBy as DF_grp_by
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
 from scipy import integrate
-from rich import print
 import numpy as np
-
 from core.config import *
 from core.constants import *
+
+logger = getLogger("core.time_series_processing")
+
+def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None) -> DF:
+    """
+    ### Description:
+    Computes the charging and discharging masks for a time series.
+    Uses the string charging_status column if it exists, otherwise uses the soc difference.
+    ### Parameters:
+    id_col: optional parameter to provide if the dataframe represents multiple time series.
+    charging_status_val_to_mask: dict mapping charging status values to boolean values to create masks.
+    """
+    if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
+        return (
+            tss
+            .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
+            .eval("in_discharge = ~in_charge")
+        )
+    elif "soc" in tss.columns:
+        if id_col in tss.columns:
+            return (
+                tss
+                .groupby(id_col)
+                .apply(low_freq_compute_charge_n_discharge_vars)
+            )
+        else:
+            return low_freq_compute_charge_n_discharge_vars(tss)
+    else:
+        logger.warning("No charging status or soc column found to compute charging and discharging masks, returning original tss.")
+        return tss
 
 def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY_RATIO) -> DF:
     """
@@ -100,35 +126,35 @@ def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
         .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
     )
 
-def high_freq_in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
+def high_freq_in_discharge_and_charge_from_soc_diff(ts: DF) -> DF:
     """If the time series has more than 6 hours in between odometer points, use `high_freq_in_discharge_and_charge_from_soc_diff`."""
-    soc_diff = vehicle_df["soc"].ffill().diff()
-    vehicle_df["soc_dir"] = np.nan
-    vehicle_df["soc_dir"] = (
-        vehicle_df["soc_dir"] 
+    soc_diff = ts["soc"].ffill().diff()
+    ts["soc_dir"] = np.nan
+    ts["soc_dir"] = (
+        ts["soc_dir"] 
         .mask(soc_diff.gt(0), 1)
         .mask(soc_diff.lt(0), -1)
     )
     # mitigate soc spikes effect on mask
-    prev_dir = vehicle_df["soc_dir"].ffill().shift()
-    next_dir = vehicle_df["soc_dir"].bfill().shift(-1)
-    vehicle_df["value_is_spike"] = (next_dir == prev_dir) & (vehicle_df["soc_dir"] != next_dir) & vehicle_df["soc_dir"].notna()
-    vehicle_df["soc_dir"] = vehicle_df["soc_dir"].mask(vehicle_df["value_is_spike"], np.nan)
-    vehicle_df["smoothed_soc_dir"] = vehicle_df["soc_dir"].rolling(window=TD(minutes=20), center=True).mean()
-    vehicle_df["soc_dir"] = (
-        vehicle_df["soc_dir"]
-        .mask(vehicle_df["smoothed_soc_dir"].gt(0) & vehicle_df["soc_dir"].lt(0), np.nan)
-        .mask(vehicle_df["smoothed_soc_dir"].lt(0) & vehicle_df["soc_dir"].gt(0), np.nan)
+    prev_dir = ts["soc_dir"].ffill().shift()
+    next_dir = ts["soc_dir"].bfill().shift(-1)
+    ts["value_is_spike"] = (next_dir == prev_dir) & (ts["soc_dir"] != next_dir) & ts["soc_dir"].notna()
+    ts["soc_dir"] = ts["soc_dir"].mask(ts["value_is_spike"], np.nan)
+    ts["smoothed_soc_dir"] = ts["soc_dir"].rolling(window=TD(minutes=20), center=True).mean()
+    ts["soc_dir"] = (
+        ts["soc_dir"]
+        .mask(ts["smoothed_soc_dir"].gt(0) & ts["soc_dir"].lt(0), np.nan)
+        .mask(ts["smoothed_soc_dir"].lt(0) & ts["soc_dir"].gt(0), np.nan)
     )
 
-    bfilled_dir = vehicle_df["soc_dir"].bfill()
-    ffilled_dir = vehicle_df["soc_dir"].ffill()
-    vehicle_df["soc_dir"] = vehicle_df["soc_dir"].mask(bfilled_dir == ffilled_dir, ffilled_dir)
-    vehicle_df = vehicle_df.eval("in_discharge = soc_dir == -1")
-    vehicle_df = vehicle_df.eval("in_charge = soc_dir == 1")
-    vehicle_df = vehicle_df.drop(columns=["soc_dir", "smoothed_soc_dir"])
+    bfilled_dir = ts["soc_dir"].bfill()
+    ffilled_dir = ts["soc_dir"].ffill()
+    ts["soc_dir"] = ts["soc_dir"].mask(bfilled_dir == ffilled_dir, ffilled_dir)
+    ts = ts.eval("in_discharge = soc_dir == -1")
+    ts = ts.eval("in_charge = soc_dir == 1")
+    ts = ts.drop(columns=["soc_dir", "smoothed_soc_dir"])
 
-    return vehicle_df
+    return ts
 
 
 # TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False

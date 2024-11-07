@@ -1,14 +1,4 @@
-from os import path
-
-AYVENS_FLEET_INFO_CSV = path.join(path.dirname(__file__), "data_cache/fleet_info.csv")
-AYVENS_FLEET_INFO_PARQUET = path.join(path.dirname(__file__), "data_cache/fleet_info.parquet")
-AYVENS_FLEET_WITH_ONLY_CONTRACT_START_DATE = path.join(path.dirname(__file__), "data_cache/fleet_info - Global NL.csv")
-AYVENS_FLEET_WITH_CAR_REGISTRATION = path.join(path.dirname(__file__), "data_cache/fleet_info - Global NL 2.csv")
-
-FLEET_INFO_COLS_NAME_MAPPING = {
-    "type": "version"
-}
-
+# Global
 MODEL_VERSION_NAME_MAPPING = {
     "R90 Life (batterijkoop) 5d": "R90",
     "R135 Edition One (batterijkoop) 5d": "R135",
@@ -40,7 +30,17 @@ MAKE_NAME_MAPPING = {
     "DS": "ds",
 }
 
-COL_DTYPES = {
+# Ayvens
+AYVENS_FLEET_INFO_CSV_KEY = "fleet_info/ayvens/fleet_info.csv"
+AYVENS_FLEET_WITH_ONLY_CONTRACT_START_DATE_KEY = "fleet_info/ayvens/fleet_info - Global NL.csv"
+AYVENS_FLEET_WITH_CAR_REGISTRATION_KEY = "fleet_info/ayvens/fleet_info - Global NL 2.csv"
+AYVENS_FLEET_INFO_PARQUET_KEY = "fleet_info/ayvens/fleet_info.parquet"
+
+FLEET_INFO_COLS_NAME_MAPPING = {
+    "type": "version"
+}
+
+AYVENS_COL_DTYPES = {
     "licence plate": "string",
     "make": "string",
     "model": "string",
