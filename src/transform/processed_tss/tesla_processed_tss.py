@@ -8,13 +8,12 @@ from transform.processed_tss.config import *
 from transform.raw_tss.tesla_raw_tss import get_raw_tss
 from transform.tesla.tesla_fleet_info import fleet_info_df
 
-
 @cache_result(S3_PROCESSED_TSS_KEY_FORMAT.format(brand="tesla"), on="s3")
 def get_processed_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
     return (
         get_raw_tss(bucket=bucket)
-        .rename(columns=RENAME_COLS_DICT)
-        .astype(COL_DTYPES)
+        .rename(columns=RENAME_COLS_DICT, errors="ignore")
+        .pipe(safe_astype, COL_DTYPES)
         .assign(date=lambda raw_tss: pd.to_datetime(raw_tss["date"]).dt.as_unit("s"))
         .drop_duplicates(subset=["vin",  "date"])
         .sort_values(by=["vin",  "date"])
