@@ -34,7 +34,7 @@ class BMWApi:
             f"{self.auth_url}",
             data=json.dumps({
                 "AuthParameters": {
-                    "DB_USERNAME": self.client_username,
+                    "USERNAME": self.client_username,
                     "PASSWORD": self.client_password
                 },
                 "AuthFlow": "USER_PASSWORD_AUTH",
