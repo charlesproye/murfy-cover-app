@@ -28,12 +28,6 @@ def get_fleet_info() -> DF:
     fleet_info["capacity"] = pd.to_numeric(fleet_info["capacity"], errors='coerce')
     fleet_info["autonomie"] = pd.to_numeric(fleet_info["autonomie"], errors='coerce')
 
-    
-    fleet_info["dummy_soh_maker_offset"] = fleet_info.groupby("make")["vin"].transform(lambda vins: random.uniform(-1, 0.1))
-    fleet_info["dummy_soh_model_offset"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(-1, 0.1))
-    fleet_info["dummy_soh_model_slope"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
-    fleet_info["dummy_soh_vehicle_offset"] = fleet_info.groupby(["make", "version"])["vin"].transform(lambda vins: random.uniform(SOH_LOST_PER_KM_DUMMY_RATIO - 0.00001, SOH_LOST_PER_KM_DUMMY_RATIO + 0.00001))
-
     # Add registration dates from fleet info global NL (NetherLands) 2
     fleet_info_with_registration_and_start_contract = pd.read_csv(AYVENS_FLEET_WITH_CAR_REGISTRATION).set_index("VIN", drop=False)
     fleet_info["in_GLOBAL2"] = fleet_info["vin"].isin(fleet_info_with_registration_and_start_contract["VIN"])
