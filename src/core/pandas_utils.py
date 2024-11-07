@@ -69,7 +69,7 @@ def map_col_to_dict(df:DF, col:str, dict_map:dict) -> DF:
     
     return df
 
-def set_str_to_lower(df: DF) -> DF:
+def set_all_str_cols_to_lower(df: DF) -> DF:
     str_cols = df.select_dtypes(include='string').columns
     df.loc[:, str_cols] = df.loc[:, str_cols].apply(lambda col: col.str.lower())
 
