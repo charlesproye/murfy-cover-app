@@ -1,9 +1,6 @@
-../../transform/fleet_info/ayvens_fleet_info.pyimport random
 import warnings
 
-import pandas as pd
-from pandas import DataFrame as DF
-
+from core.pandas_utils import *
 from core.config import *
 from core.ev_models_info import models_info
 from core.s3_utils import S3_Bucket
@@ -54,9 +51,12 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
         how="left"
     )
 
-    fleet_info["owner"] = "ayvens_fleet_1"
-
-    fleet_info = fleet_info.set_index("vin", drop=False)
+    fleet_info = (
+        fleet_info
+        .assign(owner="ayvens_fleet_1")
+        .set_index("vin", drop=False)
+        .drop(columns=["in_GLOBAL", "in_GLOBAL2"])
+    )
 
     return fleet_info
 

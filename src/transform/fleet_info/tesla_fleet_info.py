@@ -23,4 +23,4 @@ def get_fleet_info(bucket: S3_Bucket=bucket) -> DF:
 if __name__ == "__main__":
     single_dataframe_script_main(get_fleet_info)
 
-fleet_info_df = get_fleet_info()
+fleet_info = get_fleet_info()
