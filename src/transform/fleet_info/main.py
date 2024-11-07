@@ -3,6 +3,7 @@ from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
 from transform.fleet_info.ayvens_fleet_info import fleet_info
 
+
 def get_fleet_info() -> DF:
     # This will eventually turn into a pd.concat call once we have multiple fleet info sources.
     return fleet_info
