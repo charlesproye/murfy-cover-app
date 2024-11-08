@@ -115,65 +115,105 @@ class HMCompresser:
                             "Cannot compress different vehicle types together"
                         )
                         return
+
         for vin, temp_data in items.items():
             if self.__shutdown_requested.is_set():
                 return
+
             info_type = all_brands[brand].info_class
             merged_type = all_brands[brand].merged_info_class
-            merged = MergedInfoWrapper[info_type, merged_type](merged_type)
             yesterday = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-            job_queue: Queue[Callable] = Queue()
+            
+            # Process in smaller batches
+            batch_size = 1000
+            temp_data_list = list(temp_data)
+            
+            for i in range(0, len(temp_data_list), batch_size):
+                if self.__shutdown_requested.is_set():
+                    return
 
-            self.__logger.info(f"Compressing data for VIN {vin} (brand {brand})")
-            for s3_key in temp_data:
-                job_queue.put(lambda s=s3_key, m=merged: process_one(s, m))
-            self.__logger.info("starting thread pool")
-            with concurrent.futures.ThreadPoolExecutor(self.max_workers) as e:
-                while not job_queue.empty() and not self.__shutdown_requested.is_set():
-                    job = job_queue.get()
-                    e.submit(job)
-                    job_queue.task_done()
-            try:
-                encoded = msgspec.json.encode(merged.info)
-            except msgspec.EncodeError as e:
-                self.__logger.error(
-                    f"Failed to encode merged vehicle data for VIN {vin} (brand {brand}): {e}"
-                )
-                return
-            try:
-                put_response = self.__s3.put_object(
-                    Bucket=self.__bucket,
-                    Key=f"response/{brand}/{vin}/{yesterday}.json",
-                    Body=encoded,
-                )
-            except ClientError as e:
-                self.__logger.error(
-                    f"Failed to upload compressed data for VIN {vin} (brand {brand}): {e}"
-                )
-                return
-            if put_response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-                self.__logger.info(
-                    f"Uploaded compressed data for VIN {vin} (brand {brand}) at location response/{brand}/{vin}/{yesterday}.json"
-                )
+                batch = temp_data_list[i:i + batch_size]
+                merged = MergedInfoWrapper[info_type, merged_type](merged_type)
+                successful_processes = []
+
+                self.__logger.info(f"Processing batch {i//batch_size + 1} for VIN {vin} (brand {brand})")
                 
-                # Suppression de tous les fichiers temporaires pour ce VIN
-                for temp_key in temp_data:
+                # Process all files in batch
+                for s3_key in batch:
                     try:
-                        delete_response = self.__s3.delete_object(
-                            Bucket=self.__bucket, Key=temp_key
+                        process_one(s3_key, merged)
+                        successful_processes.append(s3_key)
+                    except Exception as e:
+                        self.__logger.error(f"Error processing {s3_key}: {e}")
+                        continue
+
+                # Skip if no data was processed successfully
+                if not successful_processes:
+                    self.__logger.warning(f"No data processed successfully in batch for VIN {vin}")
+                    continue
+
+                # Verify merged data is not empty
+                if merged.info is None:
+                    self.__logger.error(f"Empty merged data for VIN {vin}, batch {i//batch_size + 1}")
+                    continue
+
+                # Vérifier si les données sont vides en utilisant msgspec
+                try:
+                    encoded = msgspec.json.encode(merged.info)
+                    decoded = msgspec.json.decode(encoded)
+                    
+                    # Vérifier si toutes les listes dans l'objet sont vides
+                    is_empty = True
+                    for value in decoded.values():
+                        if isinstance(value, list) and value:
+                            is_empty = False
+                            break
+                        elif isinstance(value, dict) and any(v for v in value.values() if isinstance(v, list) and v):
+                            is_empty = False
+                            break
+
+                    if is_empty:
+                        self.__logger.error(f"All data lists are empty for VIN {vin}, batch {i//batch_size + 1}")
+                        continue
+
+                except Exception as e:
+                    self.__logger.error(f"Error checking data validity for VIN {vin}: {e}")
+                    continue
+
+                # Try to save compressed data
+                try:
+                    compressed_key = f"response/{brand}/{vin}/{yesterday}.json"
+                    
+                    put_response = self.__s3.put_object(
+                        Bucket=self.__bucket,
+                        Key=compressed_key,
+                        Body=encoded,  # On utilise l'encoded déjà créé
+                    )
+
+                    if put_response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+                        self.__logger.info(
+                            f"Successfully uploaded compressed batch {i//batch_size + 1} for VIN {vin}"
                         )
-                        if delete_response['ResponseMetadata']['HTTPStatusCode'] == 204:
-                            self.__logger.info(f"Deleted temporary file: {temp_key}")
-                        else:
-                            self.__logger.warning(f"Failed to delete temporary file: {temp_key}")
-                    except ClientError as e:
-                        self.__logger.error(f"Error deleting temporary file {temp_key}: {e}")
-            else:
-                self.__logger.error(
-                    f"Failed to upload compressed data for VIN {vin} (brand {brand}): {put_response['Error']['Message']}"
-                )
-        else:
-            self.__logger.info(f"VIN {vin} not found in the data for brand {brand}")
+                        
+                        # Only delete files that were successfully processed and after successful compression
+                        for temp_key in successful_processes:
+                            try:
+                                delete_response = self.__s3.delete_object(
+                                    Bucket=self.__bucket,
+                                    Key=temp_key
+                                )
+                                if delete_response["ResponseMetadata"]["HTTPStatusCode"] == 204:
+                                    self.__logger.info(f"Deleted temporary file: {temp_key}")
+                                else:
+                                    self.__logger.warning(f"Failed to delete temporary file: {temp_key}")
+                            except ClientError as e:
+                                self.__logger.error(f"Error deleting temporary file {temp_key}: {e}")
+                    else:
+                        self.__logger.error(
+                            f"Failed to upload compressed batch {i//batch_size + 1} for VIN {vin}: {put_response}"
+                        )
+                except Exception as e:
+                    self.__logger.error(f"Error during compression for VIN {vin}, batch {i//batch_size + 1}: {e}")
 
     def run(self):
         self.list_objects()

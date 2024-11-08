@@ -65,16 +65,46 @@ async def update_tokens(access_token, refresh_token, access_token_key, refresh_t
 
 async def get_token(token_key):
     try:
+        # Vérifier que token_key n'est pas None
+        if token_key is None:
+            logging.error("Token key is None")
+            return None
         token = await asyncio.get_event_loop().run_in_executor(
             None, 
             lambda: redis_client.get(token_key)
         )
+                
         if token is None:
-            raise Exception(f"Token {token_key} not found in Redis.")
+            logging.warning(f"Token {token_key} not found in Redis")
+            return None
+            
         return token
+        
     except redis.RedisError as e:
         logging.error(f"Failed to retrieve token from Redis: {str(e)}")
         return None
+    
+async def get_token_from_auth_code(code):
+    """Get access token using authorization code."""
+    url = "https://auth.tesla.com/oauth2/v3/token"
+    payload = {
+        'scope': 'user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds',
+        'auth_code': code,
+        'audience': 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
+        'client_secret': 'ta-secret.$AXtiMu2kTU%XdTc',
+        'client_id': '8832277ae4cc-4461-8396-127310129dc6',
+        'grant_type': 'client_credentials'
+    }
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, data=payload, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data.get('access_token')
+            else:
+                logging.error(f"Failed to get token from auth code: {await response.text()}")
+                return None
 
 def exponential_backoff(attempt, base_delay=5, max_delay=300):
     delay = min(base_delay * (2 ** attempt), max_delay)

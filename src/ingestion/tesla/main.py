@@ -101,11 +101,11 @@ async def perform_compression():
 
 async def process_vehicle(account):
     access_token_key = account['access_token_key']
-    refresh_token_key = account['refresh_token_key']
+    refresh_token_key = account.get('refresh_token_key', None)
     professional_account = account.get('professional_account', False)
     excel_url = account.get('excel_url', None)
     vehicle_id = account.get('vehicle_id')
-
+    auth_code = account.get('code', None)
     if professional_account:
         vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key, excel_url)
     else:
@@ -130,7 +130,7 @@ async def process_vehicle(account):
             
             logging.info(f"Processing vehicle {vid}")
             try:
-                await job(vid, access_token_key, refresh_token_key)
+                await job(vid, access_token_key, refresh_token_key, auth_code)
             except Exception as e:
                 logging.error(f"Error processing vehicle {vid}: {str(e)}")
             
