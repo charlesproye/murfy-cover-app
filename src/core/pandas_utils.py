@@ -1,3 +1,4 @@
+import inspect
 from typing import TypeVar, Any
 import logging
 
@@ -66,7 +67,7 @@ def concat(objects:list|dict|Series, **kwargs) -> DF:
 
 def map_col_to_dict(df:DF, col:str, dict_map:dict) -> DF:
     df[col] = df[col].map(dict_map).fillna(df[col])
-    
+
     return df
 
 def set_all_str_cols_to_lower(df: DF) -> DF:
@@ -75,26 +76,40 @@ def set_all_str_cols_to_lower(df: DF) -> DF:
 
     return df
 
-def merge_with_columns(df_a:DF, df_b:DF, cols_to_copy:list, merge_on:str, **merge_kwargs) -> DF:
-    """
-    Merge `df_a` with a subset of `df_b` specified by `cols_to_copy` and `merge_on`.
+def left_merge(
+    lhs: DF,
+    rhs: DF,
+    left_on: str | list[str],
+    right_on: str | list[str],
+    src_dest_cols: list | dict = None,
+) -> DF:
+    right_on = right_on if isinstance(right_on, list) else [right_on]
+    left_on = left_on if isinstance(left_on, list) else [left_on]
 
-    Parameters:
-        df_a (pd.DataFrame): The left DataFrame to merge.
-        df_b (pd.DataFrame): The right DataFrame to merge.
-        cols_to_copy (list): Columns to copy from `df_b`.
-        merge_on (list): Columns to merge on.
-        **merge_kwargs: Additional keyword arguments for pd.merge.
-    
-    Returns:
-        pd.DataFrame: The merged DataFrame.
-    """
-    # Ensure merge_on columns are included in df_b
-    selected_columns = list(set(cols_to_copy + [merge_on]))
+    if src_dest_cols is None:
+        src_cols = [col for col in rhs.columns if col not in right_on]
+        dest_cols = [col for col in rhs.columns if col not in right_on]
+    elif isinstance(src_dest_cols, list):
+        src_cols = src_dest_cols
+        dest_cols = src_dest_cols
+    elif isinstance(src_dest_cols, dict):
+        src_cols = list(src_dest_cols.keys())
+        dest_cols = list(src_dest_cols.values())
+    else:
+        raise ValueError("src_dest_cols must be None, list, or dict")
+    # Create masks for matching keys
+    lhs_keys = lhs[left_on].apply(tuple, axis=1)
+    rhs_keys = rhs[right_on].apply(tuple, axis=1)
+    lhs_mask = lhs_keys.isin(rhs_keys)
+    # Create a MultiIndex from the right_on columns
+    rhs_index = pd.MultiIndex.from_tuples(rhs_keys.values, names=right_on)
+    if rhs_index.has_duplicates:
+        raise ValueError("rhs_index has duplicates!")
+    lhs_index = pd.MultiIndex.from_tuples(lhs_keys[lhs_mask].values, names=left_on)
+    # Merge the lhs and rhs DataFrames
+    lhs.loc[lhs_mask, dest_cols] = rhs.set_index(rhs_index).loc[lhs_index.values, src_cols].values
 
-    if (merge_on in df_b.index.names) and (merge_on in df_b.columns):
-        df_b = df_b.reset_index(drop=True)
-    return df_a.merge(df_b[selected_columns], on=merge_on, how="left")
+    return lhs
 
 def safe_astype(df:DF, col_dtypes:dict) -> DF:
     """
@@ -121,8 +136,10 @@ def sanity_check(df:DF) -> DF:
         "uniques": Series(uniques_dict),
         "count": df.count(),
         "density": df.count().div(len(df)),
-        "memory_usage_in_MB": df.memory_usage() / 1e6,
-    })
+        "memory_usage_in_MB": df.memory_usage().div(1e6),
+        },
+        index=df.columns
+    )
 
 def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None) -> DF:
     if not isinstance(index_loc, pd.Index) and index_loc is not None:
@@ -133,7 +150,7 @@ def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None) -> DF:
         index_loc = df.index.intersection(index_loc)
     if col_loc is not None:
         col_loc = df.columns.intersection(col_loc)
-    return df.loc[index_loc if index_loc is not None else df.index, col_loc if col_loc is not None else df.columns]
+    return df.loc[(index_loc if index_loc is not None else df.index), (col_loc if col_loc is not None else df.columns)]
 
 def dropna_cols(df:DF) -> DF:
     return df.loc[:, df.notna().any(axis=0)]
