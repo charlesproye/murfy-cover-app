@@ -1,4 +1,3 @@
-import inspect
 from typing import TypeVar, Any
 import logging
 
@@ -79,12 +78,11 @@ def set_all_str_cols_to_lower(df: DF) -> DF:
 def left_merge(
     lhs: DF,
     rhs: DF,
-    left_on: str | list[str],
-    right_on: str | list[str],
-    src_dest_cols: list | dict = None,
+    left_on: str|list[str],
+    right_on: str|list[str],
+    src_dest_cols: list|dict|None= None,
 ) -> DF:
-    right_on = right_on if isinstance(right_on, list) else [right_on]
-    left_on = left_on if isinstance(left_on, list) else [left_on]
+    assert isinstance(left_on, type(right_on)), f"left_on and right_on must be of the same type, but got {type(left_on)} and {type(right_on)}"
 
     if src_dest_cols is None:
         src_cols = [col for col in rhs.columns if col not in right_on]
@@ -93,21 +91,57 @@ def left_merge(
         src_cols = src_dest_cols
         dest_cols = src_dest_cols
     elif isinstance(src_dest_cols, dict):
+        src_dest_cols = {key:value for key, value in src_dest_cols.items() if key in rhs.columns}
         src_cols = list(src_dest_cols.keys())
         dest_cols = list(src_dest_cols.values())
     else:
-        raise ValueError("src_dest_cols must be None, list, or dict")
+        raise ValueError(f"src_dest_cols must be None, list, or dict, received: {type(src_dest_cols)}")
     # Create masks for matching keys
+    # Create a MultiIndex from the right_on columns
+    # Merge the lhs and rhs DataFrames
+    if isinstance(left_on, list):
+        if len(left_on) == 1:
+            return multi_idx_left_merge(lhs, rhs, left_on, right_on, src_cols, dest_cols)
+        else:
+            return base_idx_left_merge(lhs, rhs, left_on, right_on, src_cols, dest_cols)
+    else:
+        return multi_idx_left_merge(lhs, rhs, left_on, right_on, src_cols, dest_cols)
+
+def base_idx_left_merge(
+    lhs: DF,
+    rhs: DF,
+    left_on: str,
+    right_on: str,
+    src_cols:list[str],
+    dest_cols:list[str],
+) -> DF:
     lhs_keys = lhs[left_on].apply(tuple, axis=1)
     rhs_keys = rhs[right_on].apply(tuple, axis=1)
     lhs_mask = lhs_keys.isin(rhs_keys)
-    # Create a MultiIndex from the right_on columns
-    rhs_index = pd.MultiIndex.from_tuples(rhs_keys.values, names=right_on)
-    if rhs_index.has_duplicates:
-        raise ValueError("rhs_index has duplicates!")
-    lhs_index = pd.MultiIndex.from_tuples(lhs_keys[lhs_mask].values, names=left_on)
-    # Merge the lhs and rhs DataFrames
-    lhs.loc[lhs_mask, dest_cols] = rhs.set_index(rhs_index).loc[lhs_index.values, src_cols].values
+    lhs_idx = pd.MultiIndex.from_tuples(lhs_keys[lhs_mask])
+    rhs_idx = pd.MultiIndex.from_tuples(rhs_keys)
+    if rhs_idx.has_duplicates:
+        raise ValueError(f"rhs_idx has duplicates! {rhs_idx}")
+    lhs.loc[lhs_mask, dest_cols] = rhs.set_index(right_on).loc[lhs_idx, src_cols]
+
+    return lhs
+
+def multi_idx_left_merge(
+    lhs: DF,
+    rhs: DF,
+    left_on: list[str],
+    right_on: list[str],
+    src_cols:list[str],
+    dest_cols:list[str],
+) -> DF:
+    lhs_keys = lhs[left_on]
+    rhs_keys = rhs[right_on]
+    lhs_mask = lhs_keys.isin(rhs_keys)
+    lhs_idx = pd.Index(lhs_keys[lhs_mask], name=left_on)
+    rhs_idx = pd.Index(rhs_keys, name=right_on)
+    if rhs_idx.has_duplicates:
+        raise ValueError(f"rhs_idx has duplicates! {rhs_idx}")
+    lhs.loc[lhs_mask, dest_cols] = rhs.set_index(right_on).loc[lhs_idx, src_cols]
 
     return lhs
 
