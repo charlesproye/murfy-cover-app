@@ -266,4 +266,8 @@ fig.write_html("data_cache/plots/3d_plot_preprocessed_charging_points.html")
 fig.notebook_only_show()
 
 # %%
+fig = px.histogram(fleet_info, "max_odo", nbins=int(fleet_info["max_odo"].max() // 1000 - fleet_info["max_odo"].min() // 1000 + 1), color_discrete_sequence=['#095224'])
+fig.write_html("data_cache/plots/odometer_histogram.html")
+fig.notebook_only_show()
 
+# %%
