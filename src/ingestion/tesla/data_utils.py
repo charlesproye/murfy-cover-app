@@ -23,6 +23,33 @@ def setup_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
+async def refresh_token_and_retry_request_code(access_token, access_token_key, code):
+    """Get access token using authorization code."""
+    url = "https://auth.tesla.com/oauth2/v3/token"
+    payload = {
+        'scope': 'user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds',
+        'auth_code': code,
+        'audience': 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
+        'client_secret': 'ta-secret.$AXtiMu2kTU%XdTc',
+        'client_id': '8832277ae4cc-4461-8396-127310129dc6',
+        'grant_type': 'client_credentials'
+    }
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, data=payload, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                access_token = data.get('access_token')
+                await update_tokens_code(access_token, access_token_key)
+                logging.info("Tokens refreshed successfully.")
+                return {'access_token': access_token}
+            else:
+                error_body = await response.text()
+                logging.error(f"Failed to refresh token: {response.status}, {error_body}")
+                if response.status == 401:
+                    logging.error("Authentication failed. The refresh token may be invalid or expired.")
+                raise Exception(f"Token refresh failed with status {response.status}")
+
 async def refresh_token_and_retry_request(access_token, refresh_token, access_token_key, refresh_token_key):
     url = "https://auth.tesla.com/oauth2/v3/token"
     headers = {'Content-Type': 'application/json'}
@@ -45,9 +72,17 @@ async def refresh_token_and_retry_request(access_token, refresh_token, access_to
                 logging.error(f"Failed to refresh token: {response.status}, {error_body}")
                 if response.status == 401:
                     logging.error("Authentication failed. The refresh token may be invalid or expired.")
-                    # Vous pouvez ajouter ici une logique pour gérer un token invalide,
-                    # comme notifier l'utilisateur ou réinitialiser le processus d'authentification
                 raise Exception(f"Token refresh failed with status {response.status}")
+
+async def update_tokens_code(access_token, access_token_key):
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, 
+            lambda: redis_client.set(access_token_key, access_token)
+        )
+        logging.info("Tokens updated successfully in Redis.")
+    except redis.RedisError as e:
+        logging.error(f"Failed to update tokens in Redis: {str(e)}")
 
 async def update_tokens(access_token, refresh_token, access_token_key, refresh_token_key):
     try:
