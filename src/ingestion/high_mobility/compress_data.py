@@ -1,11 +1,12 @@
-import concurrent.futures
+import asyncio
 import logging
-from collections.abc import Callable
+import os
 from datetime import datetime, timedelta
-from queue import Queue
-from typing import Optional
+from typing import Optional, List, Dict
 
+import aioboto3
 import boto3
+import dotenv
 import msgspec
 from botocore.client import ClientError
 from botocore.credentials import threading
@@ -15,24 +16,55 @@ from ingestion.high_mobility.schema import all_brands
 
 class HMCompresser:
     __logger: logging.Logger
-
-    __s3 = boto3.client("s3")
-
+    __s3: boto3.client
+    __bucket: str
     __s3_keys_by_vin: dict[str, dict[str, set[str]]] = {}
+    __shutdown_requested: threading.Event
+    __s3_config: Dict[str, str]
 
-    __shutdown_requested = threading.Event()
-
-    threaded: bool = False
-    max_workers: Optional[int] = 8
-
-    def __init__(
-        self, s3, bucket, threaded: bool = False, max_workers: Optional[int] = 8
-    ) -> None:
+    def __init__(self, threaded: bool = True, max_workers: int = 8):
+        """Initialize the compressor with S3 credentials and configuration"""
         self.__logger = logging.getLogger("COMPRESSER")
-        self.__s3 = s3
-        self.__bucket = bucket
+        self.__shutdown_requested = threading.Event()  # Initialize as Event
+        
+        # Load environment variables
+        dotenv.load_dotenv()
+        self.__s3_config = self.__load_s3_config()
+        if not self.__s3_config:
+            raise ValueError("Missing required S3 configuration")
+
+        # Initialize S3 client
+        self.__s3 = boto3.client(
+            "s3",
+            region_name=self.__s3_config['region'],
+            endpoint_url=self.__s3_config['endpoint'],
+            aws_access_key_id=self.__s3_config['key'],
+            aws_secret_access_key=self.__s3_config['secret'],
+        )
+        self.__bucket = self.__s3_config['bucket']
+        
         self.threaded = threaded
-        self.max_workers = max_workers or self.max_workers
+        self.max_workers = max_workers
+
+    def __load_s3_config(self) -> Optional[Dict[str, str]]:
+        """Load S3 configuration from environment variables"""
+        required_vars = {
+            'endpoint': 'S3_ENDPOINT',
+            'region': 'S3_REGION',
+            'bucket': 'S3_BUCKET',
+            'key': 'S3_KEY',
+            'secret': 'S3_SECRET'
+        }
+        
+        config = {}
+        for key, env_var in required_vars.items():
+            value = os.getenv(env_var)
+            if value is None:
+                self.__logger.error(f"{env_var} environment variable not found")
+                return None
+            config[key] = value
+        
+        return config
 
     def shutdown(self):
         self.__logger.info("Shutting down compresser")
@@ -72,38 +104,54 @@ class HMCompresser:
             else:
                 self.__logger.warning(f"No VINs found for brand {brand_name}.")
                 self.__s3_keys_by_vin[brand_name] = {}
-                continue  # Ajoutez cette ligne pour éviter de continuer le traitement
 
-            self.__logger.info(f"Grouped temporary S3 objects for brand {brand_name}")
+    async def __process_brand(self, brand_name: str):
+        """Process a single brand asynchronously"""
+        if not self.__shutdown_requested.is_set():
+            self.__logger.info(f"Starting {brand_name} data compression")
+            if self.__s3_keys_by_vin[brand_name]:
+                await self.__process(self.__s3_keys_by_vin[brand_name], brand_name)
+            else:
+                self.__logger.warning(f"No data to compress for brand {brand_name}")
 
-    def __process(self, items, brand: str):
-        def process_one(s3_key: str, merged: MergedInfoWrapper):
-            self.__logger.info(f"Processing data point {s3_key}")
-            try:
-                get_response = self.__s3.get_object(Bucket=self.__bucket, Key=s3_key)
-            except ClientError as e:
-                self.__logger.error(
-                    f"Failed to fetch temporary data {s3_key} (brand {brand}): {e}"
-                )
-                return
-            match get_response["ResponseMetadata"]["HTTPStatusCode"]:
-                case 200:
-                    self.__logger.info(
-                        f"Fetched temporary data {s3_key} (brand {brand}) successfully"
-                    )
-                    content = get_response["Body"].read().decode("utf-8")
-                case _:
-                    self.__logger.error(
-                        f"Failed to fetch temporary data {s3_key} (brand {brand}): {get_response}"
-                    )
-                    return
-            try:
-                parsed = msgspec.json.decode(content, type=all_brands[brand].info_class)
-            except msgspec.ValidationError as e:
-                self.__logger.error(
-                    f"Failed to parse temporary data {s3_key} (brand {brand}): {e}"
-                )
-                return
+    async def __process_batch_async(self, batch: List[str], vin: str, brand: str, merged: MergedInfoWrapper):
+        session = aioboto3.Session()
+        async with session.client(
+            "s3",
+            region_name=self.__s3_config['region'],
+            endpoint_url=self.__s3_config['endpoint'],
+            aws_access_key_id=self.__s3_config['key'],
+            aws_secret_access_key=self.__s3_config['secret']
+        ) as s3:
+            successful_processes = []
+            tasks = []
+
+            for s3_key in batch:
+                if self.__shutdown_requested.is_set():
+                    return [], None
+                
+                task = asyncio.create_task(self.__process_one_async(s3, s3_key, merged, brand))
+                tasks.append((s3_key, task))
+
+            for s3_key, task in tasks:
+                try:
+                    success = await task
+                    if success:
+                        successful_processes.append(s3_key)
+                except Exception as e:
+                    self.__logger.error(f"Error processing {s3_key}: {e}")
+
+            return successful_processes, merged
+
+    async def __process_one_async(self, s3, s3_key: str, merged: MergedInfoWrapper, brand: str):
+        try:
+            response = await s3.get_object(Bucket=self.__bucket, Key=s3_key)
+            async with response['Body'] as stream:
+                content = await stream.read()
+                content = content.decode('utf-8')
+                
+            parsed = msgspec.json.decode(content, type=all_brands[brand].info_class)
+            
             if parsed is not None:
                 if merged.info is None:
                     merged.set_info(parsed)
@@ -111,116 +159,121 @@ class HMCompresser:
                     if isinstance(merged.info, all_brands[brand].merged_info_class):
                         merged.merge(parsed)
                     else:
-                        self.__logger.error(
-                            "Cannot compress different vehicle types together"
-                        )
-                        return
+                        return False
+                return True
+        except Exception as e:
+            self.__logger.error(f"Error in process_one_async for {s3_key}: {e}")
+            return False
 
+    async def __process(self, items, brand: str):
+        self.__logger.info(f"Starting process_all for brand {brand} with {len(items)} VINs")
+        
         for vin, temp_data in items.items():
             if self.__shutdown_requested.is_set():
+                self.__logger.info("Shutdown requested, stopping processing")
                 return
 
+            self.__logger.info(f"Processing VIN {vin} with {len(temp_data)} files")
             info_type = all_brands[brand].info_class
             merged_type = all_brands[brand].merged_info_class
             yesterday = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
             
-            # Process in smaller batches
+            # Process in parallel batches
             batch_size = 1000
             temp_data_list = list(temp_data)
+            batches = [temp_data_list[i:i + batch_size] 
+                      for i in range(0, len(temp_data_list), batch_size)]
             
-            for i in range(0, len(temp_data_list), batch_size):
+            self.__logger.info(f"Split data into {len(batches)} batches of size {batch_size}")
+            
+            # Process batches concurrently
+            tasks = []
+            for batch_index, batch in enumerate(batches):
                 if self.__shutdown_requested.is_set():
-                    return
-
-                batch = temp_data_list[i:i + batch_size]
+                    self.__logger.info("Shutdown requested during batch creation")
+                    break
+                    
+                self.__logger.debug(f"Creating task for batch {batch_index + 1}/{len(batches)}")
                 merged = MergedInfoWrapper[info_type, merged_type](merged_type)
-                successful_processes = []
+                task = asyncio.create_task(
+                    self.__process_batch_async(batch, vin, brand, merged)
+                )
+                tasks.append(task)
 
-                self.__logger.info(f"Processing batch {i//batch_size + 1} for VIN {vin} (brand {brand})")
-                
-                # Process all files in batch
-                for s3_key in batch:
-                    try:
-                        process_one(s3_key, merged)
-                        successful_processes.append(s3_key)
-                    except Exception as e:
-                        self.__logger.error(f"Error processing {s3_key}: {e}")
-                        continue
-
-                # Skip if no data was processed successfully
-                if not successful_processes:
-                    self.__logger.warning(f"No data processed successfully in batch for VIN {vin}")
-                    continue
-
-                # Verify merged data is not empty
-                if merged.info is None:
-                    self.__logger.error(f"Empty merged data for VIN {vin}, batch {i//batch_size + 1}")
-                    continue
-
-                # Vérifier si les données sont vides en utilisant msgspec
-                try:
-                    encoded = msgspec.json.encode(merged.info)
-                    decoded = msgspec.json.decode(encoded)
-                    
-                    # Vérifier si toutes les listes dans l'objet sont vides
-                    is_empty = True
-                    for value in decoded.values():
-                        if isinstance(value, list) and value:
-                            is_empty = False
-                            break
-                        elif isinstance(value, dict) and any(v for v in value.values() if isinstance(v, list) and v):
-                            is_empty = False
-                            break
-
-                    if is_empty:
-                        self.__logger.error(f"All data lists are empty for VIN {vin}, batch {i//batch_size + 1}")
-                        continue
-
-                except Exception as e:
-                    self.__logger.error(f"Error checking data validity for VIN {vin}: {e}")
-                    continue
-
-                # Try to save compressed data
-                try:
-                    compressed_key = f"response/{brand}/{vin}/{yesterday}.json"
-                    
-                    put_response = self.__s3.put_object(
-                        Bucket=self.__bucket,
-                        Key=compressed_key,
-                        Body=encoded,  # On utilise l'encoded déjà créé
+            # Wait for all batch processing to complete
+            self.__logger.info(f"Waiting for {len(tasks)} batch tasks to complete")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Handle results and save compressed data
+            successful_batches = 0
+            for result_index, (successful_processes, merged) in enumerate(results):
+                if successful_processes and merged and merged.info is not None:
+                    await self.__save_compressed_data(
+                        successful_processes, merged, vin, brand, yesterday
                     )
+                    successful_batches += 1
+                else:
+                    self.__logger.warning(f"Batch {result_index + 1}/{len(results)} had no successful processes or invalid merge result")
+            
+            self.__logger.info(f"Completed processing VIN {vin}: {successful_batches}/{len(batches)} batches processed successfully")
 
-                    if put_response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-                        self.__logger.info(
-                            f"Successfully uploaded compressed batch {i//batch_size + 1} for VIN {vin}"
-                        )
-                        
-                        # Only delete files that were successfully processed and after successful compression
-                        for temp_key in successful_processes:
-                            try:
-                                delete_response = self.__s3.delete_object(
-                                    Bucket=self.__bucket,
-                                    Key=temp_key
-                                )
-                                if delete_response["ResponseMetadata"]["HTTPStatusCode"] == 204:
-                                    self.__logger.info(f"Deleted temporary file: {temp_key}")
-                                else:
-                                    self.__logger.warning(f"Failed to delete temporary file: {temp_key}")
-                            except ClientError as e:
-                                self.__logger.error(f"Error deleting temporary file {temp_key}: {e}")
-                    else:
-                        self.__logger.error(
-                            f"Failed to upload compressed batch {i//batch_size + 1} for VIN {vin}: {put_response}"
-                        )
-                except Exception as e:
-                    self.__logger.error(f"Error during compression for VIN {vin}, batch {i//batch_size + 1}: {e}")
+        self.__logger.info(f"Completed process_all for brand {brand}")
+
+    async def __save_compressed_data(self, successful_processes, merged, vin, brand, yesterday):
+        session = aioboto3.Session()
+        async with session.client(
+            "s3",
+            region_name=self.__s3_config['region'],
+            endpoint_url=self.__s3_config['endpoint'],
+            aws_access_key_id=self.__s3_config['key'],
+            aws_secret_access_key=self.__s3_config['secret']
+        ) as s3:
+            try:
+                encoded = msgspec.json.encode(merged.info)
+                compressed_key = f"response/{brand}/{vin}/{yesterday}.json"
+                
+                await s3.put_object(
+                    Bucket=self.__bucket,
+                    Key=compressed_key,
+                    Body=encoded
+                )
+
+                delete_tasks = []
+                for temp_key in successful_processes:
+                    task = asyncio.create_task(
+                        s3.delete_object(Bucket=self.__bucket, Key=temp_key)
+                    )
+                    delete_tasks.append(task)
+                
+                await asyncio.gather(*delete_tasks)
+                
+            except Exception as e:
+                self.__logger.error(f"Error saving compressed data for VIN {vin}: {e}")
 
     def run(self):
         self.list_objects()
         self.__logger.info("Listing bucket objects")
-        for brand_name in all_brands.keys():
-            if not self.__shutdown_requested.is_set():
-                self.__logger.info(f"Starting {brand_name} data compression")
-                if self.__s3_keys_by_vin[brand_name]:
-                    self.__process(self.__s3_keys_by_vin[brand_name], brand_name)
+        
+        async def process_all_brands():
+            # Create tasks for all brands
+            brand_tasks = []
+            for brand_name in all_brands.keys():
+                self.__logger.info(f"Creating task for brand {brand_name}")
+                task = asyncio.create_task(self.__process_brand(brand_name))
+                brand_tasks.append((brand_name, task))
+            
+            # Wait for all brand processing to complete
+            self.__logger.info(f"Starting parallel processing of {len(brand_tasks)} brands")
+            for brand_name, task in brand_tasks:
+                try:
+                    await task
+                    self.__logger.info(f"Completed processing for brand {brand_name}")
+                except Exception as e:
+                    self.__logger.error(f"Error processing brand {brand_name}: {e}")
+            
+            self.__logger.info("All brands processing completed")
 
+        # Run all brands in parallel
+        self.__logger.info("Starting parallel brand processing")
+        asyncio.run(process_all_brands())
+        self.__logger.info("Finished all brand processing")
