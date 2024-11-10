@@ -126,7 +126,7 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     if len(left_on) == 1:
         lhs_idx = pd.Index(lhs_idx.get_level_values(0), name=left_on[0])
         rhs_idx = pd.Index(rhs_idx.get_level_values(0), name=right_on[0])
-OSINT    if rhs_idx.has_duplicates:
+    if rhs_idx.has_duplicates:
         raise ValueError(f"rhs_idx has duplicates! {rhs_idx}")
     lhs.loc[lhs_mask, dest_cols] = rhs.set_index(rhs_idx).loc[lhs_idx.values, src_cols].values
 
