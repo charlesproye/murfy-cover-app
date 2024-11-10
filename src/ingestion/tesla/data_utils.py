@@ -27,16 +27,23 @@ async def refresh_token_and_retry_request_code(access_token, access_token_key, c
     """Get access token using authorization code."""
     url = "https://auth.tesla.com/oauth2/v3/token"
     payload = {
-        'scope': 'user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds',
-        'auth_code': code,
-        'audience': 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
-        'client_secret': 'ta-secret.$AXtiMu2kTU%XdTc',
+        'grant_type': 'client_credentials',
         'client_id': '8832277ae4cc-4461-8396-127310129dc6',
-        'grant_type': 'client_credentials'
+        'client_secret': 'ta-secret.$AXtiMu2kTU%XdTc',
+        'audience': 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
+        'auth_code': code,
+        'scope': 'user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds'
     }
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        # Important : utiliser aiohttp.FormData pour x-www-form-urlencoded
+    form_data = aiohttp.FormData()
+    for key, value in payload.items():
+        form_data.add_field(key, value)
+
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+    }
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=payload, headers=headers) as response:
+        async with session.post(url, data=form_data, headers=headers) as response:
             if response.status == 200:
                 data = await response.json()
                 access_token = data.get('access_token')
@@ -80,6 +87,7 @@ async def update_tokens_code(access_token, access_token_key):
             None, 
             lambda: redis_client.set(access_token_key, access_token)
         )
+        print(access_token, access_token_key)
         logging.info("Tokens updated successfully in Redis.")
     except redis.RedisError as e:
         logging.error(f"Failed to update tokens in Redis: {str(e)}")
@@ -123,17 +131,24 @@ async def get_token_from_auth_code(code):
     """Get access token using authorization code."""
     url = "https://auth.tesla.com/oauth2/v3/token"
     payload = {
-        'scope': 'user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds',
-        'auth_code': code,
-        'audience': 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
-        'client_secret': 'ta-secret.$AXtiMu2kTU%XdTc',
+        'grant_type': 'client_credentials',
         'client_id': '8832277ae4cc-4461-8396-127310129dc6',
-        'grant_type': 'client_credentials'
+        'client_secret': 'ta-secret.$AXtiMu2kTU%XdTc',
+        'audience': 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
+        'auth_code': code,
+        'scope': 'user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds'
     }
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        # Important : utiliser aiohttp.FormData pour x-www-form-urlencoded
+    form_data = aiohttp.FormData()
+    for key, value in payload.items():
+        form_data.add_field(key, value)
+
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+    }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=payload, headers=headers) as response:
+        async with session.post(url, data=form_data, headers=headers) as response:
             if response.status == 200:
                 data = await response.json()
                 return data.get('access_token')
