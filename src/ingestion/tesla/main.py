@@ -111,7 +111,7 @@ async def process_vehicle(account):
     else:
         vehicle_ids = [vehicle_id]
 
-    logging.info(f"Processing vehicles: {vehicle_ids}")
+    logging.info(f"Processing vehicles: {vehicle_ids} for account {access_token_key}")
 
     while True:
         await compression_event.wait()  # Wait if compression is in progress
@@ -128,7 +128,6 @@ async def process_vehicle(account):
                 logging.info("Compression started, pausing vehicle processing")
                 break
             
-            logging.info(f"Processing vehicle {vid}")
             try:
                 await job(vid, access_token_key, refresh_token_key, auth_code)
             except Exception as e:
@@ -140,7 +139,7 @@ async def process_vehicle(account):
         
         if compression_event.is_set():
             logging.info("Vehicle processing cycle completed, waiting for next cycle")
-            await asyncio.sleep(300)  # Wait for 4 minutes before next cycle
+            await asyncio.sleep(300)  # Wait for 5 minutes before next cycle
         else:
             logging.info("Compression in progress, waiting for it to finish")
             await compression_event.wait()
