@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime as DT
 from psycopg2.extensions import register_adapter, AsIs
 from sqlalchemy.dialects.postgresql import UUID
-
+from rich import print
 #import numpy as np
 #register_adapter(np.int64, AsIs)
 
@@ -50,23 +50,23 @@ def update_db_vehicle_table() -> DF:
     #for col in COLS_TO_LOAD_IN_RDB_VEHICLE_TABLE:
         #if not col in fleet_info.columns:
             #fleet_info[col] = pd.NA
-    
+
     #fleet_info = fleet_info[COLS_TO_LOAD_IN_RDB_VEHICLE_TABLE]
 
     #with pd.option_context('display.max_rows', None):
         #print(fleet_info.isna().all())
         #print(fleet_info.dropna(subset=["fleet_id", "region_id", "vehicle_model_id"], how="any"))
 
-    update_table_with_vin(fleet_info.dropna(subset=[ "vin"], how="any"), "vehicle", "vin")
+    update_table_with_df(fleet_info.dropna(subset=[ "vin"], how="any"), "vehicle", "vin")
     
     return fleet_info
 
-def update_table_with_vin(df:DF, table_name:str, key_col:str):
+def update_table_with_df(df:DF, table_name:str, key_col:str):
     """
-    Update a table using the vin column to align with DataFrame rows.
+    Update a table using the key_col column to align with DataFrame rows.
     
     Parameters:
-        df (pd.DataFrame): DataFrame containing new data and `vin` for updating.
+        df (pd.DataFrame): DataFrame containing new data and `key_col` for updating.
         table_name (str): The name of the table in the database to update.
         
     Returns:
@@ -78,42 +78,49 @@ def update_table_with_vin(df:DF, table_name:str, key_col:str):
         df[col] = pd.to_datetime(df[col]).dt.to_pydatetime()
     rdb_table = pd.read_sql_table(table_name, connection).dropna(subset=[key_col])
     rdb_table_keys = rdb_table[key_col]
-    df = df.set_index(key_col, drop=False).loc[rdb_table_keys]
+    update_src_df = df.set_index(key_col, drop=False).loc[rdb_table_keys]
 
-    # Prepare the column names for the update statement
-
-    #nil_uuid = uuid.UUID('00000000-0000-0000-0000-000000000000')
-    #df["vehicle_model_id"] = df["vehicle_model_id"].fillna(nil_uuid)
-    #df["region_id"] = df["region_id"].fillna(nil_uuid)
-    #df["fleet_id"] = df["fleet_id"].fillna(nil_uuid)
+    columns = update_src_df.columns.drop(key_col).intersection(rdb_table.columns)
+    update_src_df = update_src_df[columns]
     
-    columns = df.columns.drop("vin").intersection(rdb_table.columns)
-    df = df[columns]
-    print(columns)
-    
-    # Open a connection and begin a transaction
-    with engine.connect() as conn:
-        with conn.begin():  # This starts a transaction
-            # Iterate through each row and execute an update based on vin
-            for vin, row in df.iterrows():
-                row = row.dropna()
-                print(row)
-                set_clause = ', '.join([f"{col} = :{col}_value" for col in row.index])
-                update_statement = text(f"""
-                    UPDATE {table_name}
-                    SET {set_clause}
-                    WHERE vin = :vin
-                """)
-                
-                # Prepare the row values for the update statement
-                parameters = {f"{col}_value": row[col] for col in row.index}
-                parameters['vin'] = vin
-                
-                # Execute the update statement
-                conn.execute(update_statement, parameters)
+    # Iterate through each row and execute an update based on key_col
+    for key, row in update_src_df.iterrows():
+        row = row.dropna()
+        set_clause = ', '.join([f"{col} = :{col}_value" for col in row.index])
+        update_statement = text(f"""
+            UPDATE {table_name}
+            SET {set_clause}
+            WHERE {key_col} = :key_col
+        """)
 
-    print(f"Table '{table_name}' successfully updated using `vin`.")
+        # Prepare the row values for the update statement
+        parameters = {f"{col}_value": row[col] for col in row.index}
+        parameters['key_col'] = key
+        
+        print(update_statement)
+        print(parameters)
 
+        # Execute the update statement
+        connection.execute(update_statement, parameters)
+
+    # insert_src_df = df[~df[key_col].isin(rdb_table_keys)][df.columns.intersection(rdb_table.columns)]
+    # for key, row in insert_src_df.iterrows():
+    #     row = row.dropna()
+    #     columns = ', '.join(row.index)
+    #     values = ', '.join([f":{col}_value" for col in row.index])
+    #     insert_statement = text(f"""
+    #         INSERT INTO {table_name} ({columns})
+    #         VALUES ({values})
+    #     """)
+        
+    #     # Prepare the row values for the insert statement
+    #     parameters = {f"{col}_value": row[col] for col in row.index}
+        
+    #     print(insert_statement)
+    #     print(parameters)
+
+    #     # Execute the insert statement
+    #     connection.execute(insert_statement, parameters)
 
 if __name__ == "__main__":
     #single_dataframe_script_main(update_fleet_info)
