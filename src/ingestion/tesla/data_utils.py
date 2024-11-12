@@ -14,7 +14,7 @@ redis_password = os.environ.get('REDIS_PASSWORD')
 redis_client = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
 
 MAX_WAKE_UP_ATTEMPTS = 5
-WAKE_UP_WAIT_TIME = 12  # seconds
+WAKE_UP_WAIT_TIME = 30  # seconds
 
 def setup_logging():
     logging.basicConfig(
