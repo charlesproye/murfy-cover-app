@@ -4,6 +4,19 @@ RDB_TABLES_MERGE_KWARGS = {
     "region": dict(left_on="country", right_on="region_name", src_dest_cols={"id": "region_id"}),
     "fleet": dict(left_on="fleet", right_on="fleet_name", src_dest_cols={"id": "fleet_id"}),
 }
+COLS_TO_LOAD_IN_RDB_VEHICLE_TABLE = [
+    "fleet_id", #
+    "region_id", #
+    "vehicle_model_id", #
+    "purchase_date",
+    "licence_plate", #
+    "end_of_contract_date", #
+    "id",
+    #"updated_at",
+    #"created_at",
+    "activation_status", #
+    "vin", #
+]
 
 #S3
 S3_JSON_FLEET_INFO_RESPONSE_KEY ="fleet_info/tesla/raw_fleet_info.json"
@@ -24,7 +37,9 @@ COLS_TO_MERGE_ON_AYVENS = {
     "Contract start date": "contract_start_date"
 }
 FLEET_INFO_COLS_NAME_MAPPING = {
-    "type": "version"
+    "end_of_contract": "end_of_contract_date",
+    "activated": "activation_status",
+    "type": "version",
 }
 MODEL_VERSION_NAME_MAPPING = {
     "R90 Life (batterijkoop) 5d": "R90",
@@ -66,12 +81,13 @@ AYVENS_COL_DTYPES = {
     "version": "string",
     # "capacity": "float",
     # "autonomie": "float",
-    # "end of contract": "object",
+    "end of contract": "datetime64[ns]",
     "country": "string",
     "category": "string",
     "activated": "string",
     "ownership": "string",
     # "registration_date": "object",
-    # "contract_start_date": "object",
+    "contract_start_date": "datetime64[ns]",
     "vin": "string",
+    "activation_status": "string",
 }

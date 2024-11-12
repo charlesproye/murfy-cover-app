@@ -109,6 +109,8 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
         dest_cols = [col for col in rhs.columns if col not in right_on]
     elif isinstance(src_dest_cols, list):
         src_cols = dest_cols = pd.Index(src_dest_cols).intersection(rhs.columns)
+    elif isinstance(src_dest_cols, pd.Index):
+        src_cols = dest_cols = src_dest_cols
     elif isinstance(src_dest_cols, dict):
         src_dest_cols = {key:value for key, value in src_dest_cols.items() if key in rhs.columns}
         src_cols = list(src_dest_cols.keys())
@@ -118,6 +120,8 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     lhs_keys = lhs[left_on].apply(tuple, axis=1)
     rhs_keys = rhs[right_on].apply(tuple, axis=1)
     lhs_mask = lhs_keys.isin(rhs_keys)
+    if not lhs_mask.any():
+        return lhs
     lhs_idx = pd.MultiIndex.from_tuples(lhs_keys[lhs_mask])
     rhs_idx = pd.MultiIndex.from_tuples(rhs_keys)
     # Ideally we would use a multi index even if left_on and right_on are single columns.
