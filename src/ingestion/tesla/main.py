@@ -140,7 +140,7 @@ async def process_vehicle(account):
         
         if compression_event.is_set():
             logging.info("Vehicle processing cycle completed, waiting for next cycle")
-            await asyncio.sleep(240)  # Wait for 4 minutes before next cycle
+            await asyncio.sleep(300)  # Wait for 4 minutes before next cycle
         else:
             logging.info("Compression in progress, waiting for it to finish")
             await compression_event.wait()

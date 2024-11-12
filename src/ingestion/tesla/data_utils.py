@@ -170,7 +170,6 @@ async def wake_up_vehicle(access_token, vehicle_id):
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, timeout=10) as response:
                     if response.status == 200:
-                        logging.info(f"Vehicle {vehicle_id} woken up successfully.")
                         return True
                     elif response.status == 408:
                         logging.warning(f"Timeout while waking up vehicle {vehicle_id}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")
