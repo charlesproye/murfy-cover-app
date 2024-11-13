@@ -9,7 +9,7 @@ import csv
 from dotenv import load_dotenv
 from data_processor import extract_relevant_data
 from s3_handler import save_data_to_s3
-from data_utils import get_token, wake_up_vehicle, refresh_token_and_retry_request, get_token_from_auth_code, refresh_token_and_retry_request_code, WAKE_UP_WAIT_TIME
+from data_utils import get_token, wake_up_vehicle, refresh_token_and_retry_request, get_token_from_auth_code, refresh_token_and_retry_request_code, WAKE_UP_WAIT_TIME, update_token_from_slack
 
 
 async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_token_key, refresh_token_key, auth_code=None):
@@ -27,9 +27,9 @@ async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_tok
                         return await fetch_vehicle_data(vehicle_id, tokens['access_token'], tokens['refresh_token'], access_token_key, refresh_token_key)
                 elif auth_code:
                     logging.info("Using auth code to get new access token")
-                    tokens = await refresh_token_and_retry_request_code(access_token, access_token_key, auth_code)
+                    tokens = await update_token_from_slack(access_token_key)
                     if tokens:
-                        return await fetch_vehicle_data(vehicle_id, tokens['access_token'], None, access_token_key, refresh_token_key, auth_code)
+                        return await fetch_vehicle_data(vehicle_id, tokens['token'], None, access_token_key, refresh_token_key, auth_code)
                 logging.error("Failed to refresh token.")
                 return False
             elif response.status == 429:
@@ -109,7 +109,7 @@ async def fetch_all_vehicle_ids(access_token_key, refresh_token_key, csv_path: s
                     if refresh_token:
                         tokens = await refresh_token_and_retry_request(access_token, refresh_token, access_token_key, refresh_token_key)
                     else:
-                        tokens = await refresh_token_and_retry_request_code(access_token, access_token_key, auth_code)
+                        tokens = await update_token_from_slack(access_token_key)
                     if tokens:
                         await asyncio.sleep(2)
                         return await fetch_all_vehicle_ids(access_token_key, refresh_token_key, csv_path, auth_code)

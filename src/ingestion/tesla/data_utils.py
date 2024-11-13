@@ -1,11 +1,10 @@
-import requests
-import time
 import logging
 import os
 import redis
 import random
 import asyncio
 import aiohttp
+import json
 
 # Configuration Redis
 redis_host = os.environ.get('REDIS_HOST', 'redis')
@@ -22,6 +21,51 @@ def setup_logging():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+
+async def fetch_slack_messages(channel_id, slack_token):
+    url = f"https://slack.com/api/conversations.history?channel={channel_id}"
+    headers = {
+        'Authorization': f'Bearer {slack_token}',
+        'Content-Type': 'application/json'
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                if data.get('ok'):
+                    return data.get('messages', [])
+                else:
+                    logging.error(f"Error fetching messages: {data.get('error')}")
+                    return []
+            else:
+                logging.error(f"Failed to fetch messages: HTTP {response.status}")
+                return []
+
+async def update_token_from_slack(access_token_key):
+    slack_token = os.getenv('SLACK_TOKEN')
+    channel_id = 'C0816LXFCNL'
+    
+    if not slack_token:
+        logging.error("Slack bot token is not set.")
+        return []
+    
+    messages = await fetch_slack_messages(channel_id, slack_token)
+    
+    try:
+        for i in range(6):
+            message_text = messages[i]['blocks'][0]['elements'][0]['elements'][3]['text']
+            response_key = messages[i]['blocks'][0]['elements'][0]['elements'][0]['text'].split(':')[0]
+            response_data = json.loads(message_text)
+            if response_key == access_token_key:
+                logging.info(f"Found token for {access_token_key} in Slack")
+                await update_tokens_code(response_data['access_token'], access_token_key)
+                return {"key": response_key, "token": response_data['access_token']}
+        logging.warning(f"No token found for {access_token_key} in Slack")
+        return None
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        logging.error(f"Failed to parse message blocks: {e}")
+        return None
 
 async def refresh_token_and_retry_request_code(access_token, access_token_key, code):
     """Get access token using authorization code."""
@@ -87,7 +131,6 @@ async def update_tokens_code(access_token, access_token_key):
             None, 
             lambda: redis_client.set(access_token_key, access_token)
         )
-        print(access_token, access_token_key)
         logging.info("Tokens updated successfully in Redis.")
     except redis.RedisError as e:
         logging.error(f"Failed to update tokens in Redis: {str(e)}")
@@ -158,7 +201,7 @@ async def get_token_from_auth_code(code):
 
 def exponential_backoff(attempt, base_delay=5, max_delay=300):
     delay = min(base_delay * (2 ** attempt), max_delay)
-    return delay + random.uniform(0, delay * 0.1)  # Ajoute un peu de "jitter"
+    return delay + random.uniform(0, delay * 0.1)  # Ajoute un peu de "jitter"  
 
 async def wake_up_vehicle(access_token, vehicle_id):
     attempts = 0
