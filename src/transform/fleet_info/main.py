@@ -1,24 +1,12 @@
-from sqlalchemy import Table, MetaData
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import text
 import uuid
-import csv
-from io import StringIO
-from sqlalchemy import create_engine, Table, MetaData, select, update, insert
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import sessionmaker
 from datetime import datetime as DT
-from psycopg2.extensions import register_adapter, AsIs
-from sqlalchemy.dialects.postgresql import UUID
 from rich import print
-#import numpy as np
-#register_adapter(np.int64, AsIs)
 
 from core.pandas_utils import *
-from core.sql_utils import connection, engine
+from core.sql_utils import connection
 from core.ev_models_info import models_info
 from core.console_utils import single_dataframe_script_main
-from transform.fleet_info.config import COLS_TO_LOAD_IN_RDB_VEHICLE_TABLE
 from transform.fleet_info.ayvens_fleet_info import fleet_info as ayvens_fleet_info
 from transform.fleet_info.tesla_fleet_info import fleet_info as tesla_fleet_info
 from transform.fleet_info.config import RDB_TABLES_MERGE_KWARGS
@@ -26,6 +14,8 @@ from transform.fleet_info.config import RDB_TABLES_MERGE_KWARGS
 def get_fleet_info() -> DF:
     return (
         pd.concat((ayvens_fleet_info, tesla_fleet_info))
+        .eval("model = model.str.lower()")
+        .eval("version = version.str.lower()")
         .pipe(left_merge, models_info, left_on=["model", "version"], right_on=["model", "version"])
     )
 
