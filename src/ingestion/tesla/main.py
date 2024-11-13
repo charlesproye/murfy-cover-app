@@ -107,20 +107,15 @@ async def process_vehicle(account):
     vehicle_id = account.get('vehicle_id')
     auth_code = account.get('code', None)
     
-    # Fetch vehicle IDs only once outside the main loop
     if professional_account:
         vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key, excel_url, auth_code)
     else:
         vehicle_ids = [vehicle_id]
 
     logging.info(f"Processing vehicles: {vehicle_ids} for account {access_token_key}")
-    
-    # Keep track of last processing time for each vehicle
-    last_processed = {vid: datetime.min for vid in vehicle_ids}
-    min_interval = timedelta(minutes=4)  # Minimum time between processing the same vehicle
 
     while True:
-        await compression_event.wait()
+        await compression_event.wait()  # Wait if compression is in progress
 
         now = datetime.now()
         if now.hour < 5:
@@ -134,14 +129,8 @@ async def process_vehicle(account):
                 logging.info("Compression started, pausing vehicle processing")
                 break
             
-            # Check if enough time has passed since last processing
-            if now - last_processed[vid] < min_interval:
-                logging.debug(f"Skipping vehicle {vid} - too soon since last processing")
-                continue
-                
             try:
                 await job(vid, access_token_key, refresh_token_key, auth_code)
-                last_processed[vid] = now
             except Exception as e:
                 logging.error(f"Error processing vehicle {vid}: {str(e)}")
             
