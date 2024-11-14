@@ -18,7 +18,6 @@ def get_processed_tss() -> DF:
     raw_tss = get_raw_tss("bmw")
     raw_tss_from_bmw = raw_tss.query("data_provider == 'bmw'")
     raw_tss_from_high_mobility = raw_tss.query("data_provider == 'high_mobility'")
-    logger.debug(f"Sanity check for raw TSS from BMW:\n{sanity_check(raw_tss_from_bmw)}")
     logger.debug("Processing BNW raw TSS from BMW...")
     tss_from_bmw = (
         raw_tss_from_bmw
@@ -27,7 +26,6 @@ def get_processed_tss() -> DF:
     )
     logger.debug("Done.")
     logger.debug("Processing BNW raw TSS from high mobility...")
-    logger.debug(f"Sanity check for raw TSS from high mobility:\n{sanity_check(raw_tss_from_high_mobility)}")
     tss_from_high_mobility = (
         raw_tss_from_high_mobility
         .drop(columns=["date"])
@@ -47,7 +45,7 @@ def process_raw_tss_provided_by_bmw(raw_tss:DF) -> DF:
         .pipe(safe_locate, col_loc=list(COL_DTYPES.keys()))
         .pipe(safe_astype, COL_DTYPES)
         .sort_values(by=["vin", "date"])
-        .pipe(merge_with_columns, fleet_info, COLS_TO_CPY_FROM_FLEET_INFO, merge_on="vin")
+        .pipe(left_merge, fleet_info, left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO)
         .pipe(compute_charging_n_discharging_masks, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK)
         .pipe(dropna_cols)
     )

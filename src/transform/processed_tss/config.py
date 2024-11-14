@@ -1,5 +1,5 @@
 import pandas as pd
-
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{brand}/time_series/processed_tss.parquet'
 # High mobility 
 HIGH_MOBILITY_BRANDS = [
     "kia",
@@ -17,7 +17,6 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "model",
     "version",
     "capacity",
-    "vin",
 ]
 
 RENAME_COLS_DICT:dict[str, str] = {
