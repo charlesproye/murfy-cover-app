@@ -363,7 +363,7 @@ class HMIngester:
         self.__fetch_scheduler.run_all()
         
         # Schedule compression at 00:00 every day
-        self.__compress_scheduler.every().day.at("00:00").do(self.__compress_and_restart)
+        self.__compress_scheduler.every().day.at("23:00").do(self.__compress_and_restart)
         self.__scheduler_logger.info("Scheduled daily compression at 00:00")
 
     def __compress_and_restart(self):

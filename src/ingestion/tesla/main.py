@@ -8,7 +8,7 @@ from data_fetcher import fetch_all_vehicle_ids, job
 from data_utils import setup_logging
 from datetime import datetime, timedelta
 import json
-from s3_handler import compress_data, save_data_to_s3, consolidate_all_tesla_files
+from s3_handler import compress_data
 
 # Global variables to store account information
 accounts_info = []
@@ -51,8 +51,10 @@ async def main():
 
 async def schedule_compression(compression_queue):
     while True:
-        now = datetime.now()
-        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        now = datetime.now(datetime.UTC)
+        midnight = now.replace(hour=23, minute=0, second=0, microsecond=0) 
+        if now > midnight:
+            midnight += timedelta(days=1)
         seconds_until_midnight = (midnight - now).total_seconds()
 
         try:
