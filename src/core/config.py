@@ -10,6 +10,10 @@ EMTPY_S3_KEYS_WARNING_MSG = """
 No responses found in {keys_prefix}.
 """
 
+# Data caching
+NO_BUCKET_ARG_FOUND = "No bucket argument found in function {func_name}"
+PATH_DOESNT_END_IN_PARQUET = "Path '{path}' doesn't end in '.parquet'"
+
 # SQL
 DB_URI_FORMAT_KEYS = [
     "DB_USERNAME",

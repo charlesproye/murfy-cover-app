@@ -76,7 +76,6 @@ def set_all_str_cols_to_lower(df: DF) -> DF:
 
     return df
 
-# This is either a master piece or a waste of time.
 def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str], src_dest_cols: list|dict|None= None,) -> DF:
     """
     Perform a left merge of two DataFrames based on specified key columns.
@@ -135,6 +134,7 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     lhs.loc[lhs_mask, dest_cols] = rhs.set_index(rhs_idx).loc[lhs_idx.values, src_cols].values
 
     return lhs
+
 
 def safe_astype(df:DF, col_dtypes:dict) -> DF:
     """

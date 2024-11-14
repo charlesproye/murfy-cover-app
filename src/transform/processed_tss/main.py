@@ -23,6 +23,7 @@ GET_PROCESSED_TSS_FUNCTIONS:dict[str, Callable[[], DF]] = {
     "opel":             hm_get_processed_tss,
     "ds":               hm_get_processed_tss,
     "peugeot":          hm_get_processed_tss,
+    "volvo-cars":       hm_get_processed_tss,
 }
 
 def get_processed_tss(brand:str, **kwargs) -> DF:
