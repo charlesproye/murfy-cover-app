@@ -17,7 +17,6 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "model",
     "version",
     "capacity",
-    "vin",
 ]
 
 RENAME_COLS_DICT:dict[str, str] = {
