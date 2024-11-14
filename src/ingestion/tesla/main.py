@@ -51,7 +51,7 @@ async def main():
 
 async def schedule_compression(compression_queue):
     while True:
-        now = datetime.now(datetime.UTC)
+        now = datetime.now()
         midnight = now.replace(hour=23, minute=0, second=0, microsecond=0) 
         if now > midnight:
             midnight += timedelta(days=1)
