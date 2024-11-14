@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 import ast
-from typing import Callable
+from typing import Callable, Union
+from logging import Logger
 
 from pandas import DataFrame as DF
 from rich.traceback import install as install_rich_traceback
@@ -49,13 +50,13 @@ def main_decorator(main_func):
     return wrapper
 
 @main_decorator
-def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], logger=None, **kwargs) -> DF:
+def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], logger:Union[Logger, None]=None, **kwargs) -> DF:
     df:DF = dataframe_gen(**kwargs)
-    if logger:
-        logger.debug(df)
-        logger.debug("sanity check:")
-        logger.debug(sanity_check(df))
-        logger.debug(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
+    if logger is not None:
+        logger.info(df)
+        logger.info("sanity check:")
+        logger.info(sanity_check(df))
+        logger.info(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
     else:
         print(df)
         print("sanity check:")

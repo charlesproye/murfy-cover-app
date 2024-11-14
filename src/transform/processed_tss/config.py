@@ -16,10 +16,6 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "make",
     "model",
     "version",
-    "dummy_soh_maker_offset",
-    "dummy_soh_model_offset",
-    "dummy_soh_model_slope",
-    "dummy_soh_vehicle_offset",
     "capacity",
     "vin",
 ]
@@ -44,6 +40,9 @@ RENAME_COLS_DICT:dict[str, str] = {
     "soc_hv_header": "soc",
     "capacity": "capacity_according_to_data_provider",
     "model": "model_according_to_data_provider",
+    # Tesla
+    "battery_level": "soc",
+    "readable_date": "date",
 }
 
 # The keys will be used to determine what columns to keep.
@@ -64,6 +63,32 @@ COL_DTYPES = {
     "charging_status": "string",
     "coolant_temperature": "float32",
     "kombi_remaining_electric_range": "float32",
+    # Tesla
+    "power": "float32",
+    "speed": "float32",
+    "battery_heater_no_power": "bool",
+    "minutes_to_full_charge": "float32",
+    "battery_level": "float32",
+    "battery_range": "float32",
+    "charge_current_request": "float32",
+    "charge_current_request_max": "float32",
+    "charge_enable_request": "float32",
+    "charge_energy_added": "float32",
+    "charge_limit_soc": "float32",
+    "charge_limit_soc_max": "float32",
+    "charge_limit_soc_min": "float32",
+    "charge_limit_soc_std": "float32",
+    "charge_miles_added_ideal": "float32",
+    "charge_miles_added_rated": "float32",
+    "charge_rate": "float32",
+    "charger_actual_current": "float32",
+    "charger_pilot_current": "float32",
+    "charger_power": "float32",
+    "charger_voltage": "float32",
+    "est_battery_range": "float32",
+    "fast_charger_present": "bool",
+    "inside_temp": "float32",
+    "outside_temp": "float32",
 }
 
 CHARGING_STATUS_VAL_TO_MASK = {

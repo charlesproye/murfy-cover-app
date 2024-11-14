@@ -39,7 +39,7 @@ def setup_logging(transform_loggers_level=logging.INFO):
 
 def run_entire_pipeline():
     update_all_raw_tss()
-    # update_all_processed_tss()
+    update_all_processed_tss()
 
 if __name__ == '__main__':
     main()
