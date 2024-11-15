@@ -29,7 +29,8 @@ def get_processed_tss(bucket: S3_Bucket = bucket) -> DF:
         .apply(process_ts, include_groups=False)
         .reset_index(drop=False)
         .sort_values(by=["vin", "date"])
-        .pipe(left_merge, fleet_info, left_on="vin", right_on="vin", src_dest_cols=["model", "version", "capacity","range"])
+        .pipe(set_all_str_cols_to_lower, but=["vin"])
+        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), left_on="vin", right_on="vin", src_dest_cols=["model", "version", "capacity","range"])
     )
 
 def process_ts(raw_ts:DF) -> DF:

@@ -19,7 +19,16 @@ COLS_TO_LOAD_IN_RDB_VEHICLE_TABLE = [
 ]
 
 #S3
-S3_JSON_FLEET_INFO_RESPONSE_KEY ="fleet_info/tesla/raw_fleet_info.json"
+TEST_TESLA_FLEET_INFO_KEY = "fleet_info/tesla/raw_fleet_info.json"
+S3_JSON_FLEET_INFO_RESPONSE_KEYS = [
+    "fleet_info/tesla/raw_fleet_info.json",
+    "fleet_info/tesla/ayvens-blbv.json",
+    "fleet_info/tesla/ayvens-nv.json",
+    "fleet_info/tesla/ayvens-nva.json",
+    "fleet_info/tesla/ayvens-slbv.json",
+    "fleet_info/tesla/ayvens.json",
+]
+
 S3_INITIAL_FLEET_INFO_KEY = "fleet_info/tesla/initial_fleet_info.parquet"
 
 # Ayvens
@@ -90,4 +99,10 @@ AYVENS_COL_DTYPES = {
     "contract_start_date": "datetime64[ns]",
     "vin": "string",
     "activation_status": "string",
+}
+
+# Tesla
+TESLA_VERSION_MAPPING = {
+    "roof": "roof",
+    "long range plus": "long range plus",
 }

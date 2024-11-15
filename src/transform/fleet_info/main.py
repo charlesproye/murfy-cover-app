@@ -8,14 +8,17 @@ from core.sql_utils import connection
 from core.ev_models_info import models_info
 from core.console_utils import single_dataframe_script_main
 from transform.fleet_info.ayvens_fleet_info import fleet_info as ayvens_fleet_info
-from transform.fleet_info.tesla_fleet_info import fleet_info as tesla_fleet_info
+from transform.fleet_info.tesla_fleet_info import test_tesla_fleet_info
+from transform.fleet_info.tesla_fleet_info import followed_tesla_vehicles_info
 from transform.fleet_info.config import RDB_TABLES_MERGE_KWARGS
 
 def get_fleet_info() -> DF:
     return (
-        pd.concat((ayvens_fleet_info, tesla_fleet_info))
+        pd.concat((ayvens_fleet_info, test_tesla_fleet_info))
         .eval("model = model.str.lower()")
         .eval("version = version.str.lower()")
+        .pipe(set_all_str_cols_to_lower, but=["vin"])
+        .pipe(left_merge, followed_tesla_vehicles_info, left_on=["vin"], right_on=["vin"], src_dest_cols=["model", "version"])
         .pipe(left_merge, models_info, left_on=["model", "version"], right_on=["model", "version"])
     )
 
