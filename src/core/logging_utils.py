@@ -31,6 +31,3 @@ def set_level_of_loggers_with_prefix(level, logger_name_prefix: str):
             },
         },
     })
-
-# Ensure you use a valid logging level constant
-set_level_of_loggers_with_prefix(logging.INFO, "sql_utils")
