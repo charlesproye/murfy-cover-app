@@ -17,11 +17,11 @@ PATH_DOESNT_END_IN_PARQUET = "Path '{path}' doesn't end in '.parquet'"
 
 # SQL
 DB_URI_FORMAT_KEYS = [
-    "DB_USERNAME",
-    "DB_ADRESSE",
-    "DB_PASSWORD",
-    "DB_PORT",
+    "DB_DATA_USER",
+    "DB_DATA_HOST",
+    "DB_DATA_PASSWORD",
+    "DB_DATA_PORT",
     "DB_DATA_NAME",
 ]
-DB_URI_FORMAT_STR = "postgresql+psycopg2://{DB_USERNAME}:{DB_PASSWORD}@{DB_ADRESSE}:{DB_PORT}/{DB_DATA_NAME}"
+DB_URI_FORMAT_STR = "postgresql+psycopg2://{DB_DATA_USER}:{DB_DATA_PASSWORD}@{DB_DATA_HOST}:{DB_DATA_PORT}/{DB_DATA_NAME}"
 
