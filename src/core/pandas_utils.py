@@ -1,4 +1,5 @@
 from typing import TypeVar, Any
+from logging import Logger
 import logging
 
 import pandas as pd
@@ -75,7 +76,7 @@ def set_str_to_lower(df: DF) -> DF:
 
     return df
 
-def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str], src_dest_cols: list|dict|None= None,) -> DF:
+def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str], src_dest_cols: list|dict|None= None, logger:Logger=logger) -> DF:
     """
     Perform a left merge of two DataFrames based on specified key columns.
 
@@ -98,6 +99,7 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     Raises:
     - ValueError: If `src_dest_cols` is not None, list, or dict, or if `rhs` contains duplicate keys.
     """
+    logger.info(f"left_merge called.")
     # Turn right_on and left_on into lists if they are not already.
     left_on = [left_on] if not isinstance(left_on, list) else left_on
     right_on = [right_on] if not isinstance(right_on, list) else right_on
@@ -115,33 +117,47 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
         dest_cols = list(src_dest_cols.values())
     else:
         raise ValueError(f"src_dest_cols must be None, list, or dict, received: {type(src_dest_cols)}")
-    lhs_keys = lhs[left_on].apply(tuple, axis=1)
-    rhs_keys = rhs[right_on].apply(tuple, axis=1)
-    lhs_mask = lhs_keys.isin(rhs_keys)
+    lhs_idx = pd.MultiIndex.from_frame(lhs)
+    rhs_idx = pd.MultiIndex.from_frame(rhs[right_on])
+    lhs_mask = lhs_idx.isin(rhs_idx)
     if not lhs_mask.any():
+        logger.debug("lhs_mask is all False(no lhs[left_on] key is present in rhs[right_on]), returning lhs unchanged.")
         return lhs
-    lhs_idx = pd.MultiIndex.from_tuples(lhs_keys[lhs_mask])
-    rhs_idx = pd.MultiIndex.from_tuples(rhs_keys)
+    lhs_idx = lhs_idx.intersection(rhs_idx)
+    rhs_idx = rhs_idx.intersection(lhs_idx)
     # Ideally we would use a multi index even if left_on and right_on are single columns.
-    # But there seems to be a bug in pandas where if you set the index of rhs with a single level multi index the set_index will default to a base index.
-    # This in turn will break the left merge as the as we will try to index rhs(with a base index) with lhs_idx(with a multi index) and no keys will match.
+    # But there seems to be a bug in pandas: when you set the index of rhs with a single level multi index the set_index will default to a base index.
+    # This in turn will break the left merge as we will try to index rhs(with a base index) with lhs_idx(a multi index) and no keys will match.
     if len(left_on) == 1:
         lhs_idx = pd.Index(lhs_idx.get_level_values(0), name=left_on[0])
         rhs_idx = pd.Index(rhs_idx.get_level_values(0), name=right_on[0])
     if rhs_idx.has_duplicates:
-        raise ValueError(f"rhs_idx has duplicates! {rhs_idx}")
+        raise ValueError(f"Cannot perform left merge as rhs_idx has duplicates! {rhs_idx[rhs_idx.duplicated()]}")
+    logger.debug("Assigning values.")
     lhs.loc[lhs_mask, dest_cols] = rhs.set_index(rhs_idx).loc[lhs_idx.values, src_cols].values
 
     return lhs
 
 
-def safe_astype(df:DF, col_dtypes:dict) -> DF:
+def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     """
     Warp around pd.astype to ignore errors.
     Removes keys from col_dtypes that are not in df.columns.
     """
+    logger.info(f"safe_astype called.")
     col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if col in df.columns}
-    return df.astype(col_dtypes, errors="ignore")
+    datetime_cols = [col for col, dtype in col_dtypes.items() if "datetime" in dtype]
+    col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in dtype}
+    logger.debug(f"dtypes:\n{col_dtypes}")
+    logger.debug(f"datetime_cols:{datetime_cols}")
+    df = df.astype(col_dtypes, errors="ignore")
+    for col in datetime_cols:
+        df[col] = pd.to_datetime(df[col], format='mixed')
+    dtypes_dict = df.dtypes.to_dict()
+    if dtypes_dict != col_dtypes:
+        logger.warning("safe_astype did not succeed in changing all dtypes.")
+        logger.warning(f"final col_dtypes:\n{dtypes_dict}")
+    return df
 
 def sanity_check(df:DF) -> DF:
     nunique_dict = {}
@@ -163,7 +179,8 @@ def sanity_check(df:DF) -> DF:
         "memory_usage_in_MB": df.memory_usage() / 1e6,
     })
 
-def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None) -> DF:
+def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Logger=logger) -> DF:
+    logger.info(f"safe_locate called.")
     if not isinstance(index_loc, pd.Index) and index_loc is not None:
         index_loc = pd.Index(index_loc)
     if not isinstance(col_loc, pd.Index) and col_loc is not None:
@@ -174,6 +191,8 @@ def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None) -> DF:
         col_loc = df.columns.intersection(col_loc)
     return df.loc[index_loc if index_loc is not None else df.index, col_loc if col_loc is not None else df.columns]
 
-def dropna_cols(df:DF) -> DF:
+def dropna_cols(df:DF, logger:Logger=logger) -> DF:
+    logger.info(f"dropna_cols called.")
+    logger.debug(f"all nan cols:\n{df.notna().any(axis=0)}")
     return df.loc[:, df.notna().any(axis=0)]
 
