@@ -39,6 +39,7 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
         .assign(fleet=lambda df: "ayvens_fleet_" + df["fleet"].astype("string"))
         .pipe(safe_astype, AYVENS_COL_DTYPES)
         .eval("activation_status = activation_status.str.lower().eq('activated').fillna(False).astype('bool')")
+        .assign(owner="ayvens")
     )
 
 if __name__ == "__main__":
