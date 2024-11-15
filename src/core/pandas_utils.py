@@ -117,14 +117,16 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
         dest_cols = list(src_dest_cols.values())
     else:
         raise ValueError(f"src_dest_cols must be None, list, or dict, received: {type(src_dest_cols)}")
-    lhs_idx = pd.MultiIndex.from_frame(lhs)
+    lhs_idx = pd.MultiIndex.from_frame(lhs[left_on])
     rhs_idx = pd.MultiIndex.from_frame(rhs[right_on])
     lhs_mask = lhs_idx.isin(rhs_idx)
     if not lhs_mask.any():
         logger.debug("lhs_mask is all False(no lhs[left_on] key is present in rhs[right_on]), returning lhs unchanged.")
         return lhs
+    print(f"lhs_idx:\n{lhs_idx}")
+    print(f"rhs_idx:\n{rhs_idx}")
     lhs_idx = lhs_idx.intersection(rhs_idx)
-    rhs_idx = rhs_idx.intersection(lhs_idx)
+    #rhs_idx = rhs_idx.intersection(lhs_idx)
     # Ideally we would use a multi index even if left_on and right_on are single columns.
     # But there seems to be a bug in pandas: when you set the index of rhs with a single level multi index the set_index will default to a base index.
     # This in turn will break the left merge as we will try to index rhs(with a base index) with lhs_idx(a multi index) and no keys will match.
