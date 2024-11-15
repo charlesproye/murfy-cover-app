@@ -101,6 +101,7 @@ def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
     ts = (
         ts
         .set_index("date", drop=False)
+        .sort_index()
         .pipe(high_freq_in_discharge_and_charge_from_soc_diff)
     )
     ts["last_notna_soc_date"] = ts["date"].mask(ts["soc"].isna(), pd.NaT).shift().ffill()
