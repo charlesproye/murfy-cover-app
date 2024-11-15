@@ -20,7 +20,8 @@ class S3_Bucket():
     def __init__(self, creds: dict[str, str]=None):
 
         assert "S3_ENDPOINT" in os.environ, "S3_ENDPOINT varible is not in the environement."
-        creds = creds or S3_Bucket.get_creds_from_dot_env()
+        if creds is None:
+            creds = S3_Bucket.get_creds_from_dot_env()
 
         self._s3_client = boto3.client(
             "s3",
@@ -45,9 +46,9 @@ class S3_Bucket():
             "bucket_name": os.getenv("S3_BUCKET"),
         }
 
-    def save_df_as_parquet(self, pandas_obj:Series|DF, key:str):
+    def save_df_as_parquet(self, df:DF, key:str):
         out_buffer = BytesIO()
-        pandas_obj.to_parquet(out_buffer)
+        df.to_parquet(out_buffer)
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
 
     def check_file_exists(self, key: str) -> bool:
