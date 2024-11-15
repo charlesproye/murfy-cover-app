@@ -123,8 +123,6 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     if not lhs_mask.any():
         logger.debug("lhs_mask is all False(no lhs[left_on] key is present in rhs[right_on]), returning lhs unchanged.")
         return lhs
-    print(f"lhs_idx:\n{lhs_idx}")
-    print(f"rhs_idx:\n{rhs_idx}")
     lhs_idx = lhs_idx.intersection(rhs_idx)
     #rhs_idx = rhs_idx.intersection(lhs_idx)
     # Ideally we would use a multi index even if left_on and right_on are single columns.
@@ -136,7 +134,9 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     if rhs_idx.has_duplicates:
         raise ValueError(f"Cannot perform left merge as rhs_idx has duplicates! {rhs_idx[rhs_idx.duplicated()]}")
     logger.debug("Assigning values.")
-    lhs.loc[lhs_mask, dest_cols] = rhs.set_index(rhs_idx).loc[lhs_idx.values, src_cols].values
+    rhs = rhs.set_index(rhs_idx)
+    rhs_data = rhs.loc[lhs_idx.values, src_cols]
+    lhs.loc[lhs_mask, dest_cols] = rhs_data
 
     return lhs
 
