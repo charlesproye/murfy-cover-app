@@ -47,9 +47,12 @@ def process_ts(raw_ts:DF) -> DF:
             #model=fleet_info.loc[vin, "model"],
             #default_capacity=fleet_info.loc[vin, "default_kwh_energy_capacity"],
         )
-        .pipe(compute_cum_energy)
+        .pipe(compute_cum_energy, power_col="power", cum_energy_col="cum_energy")
+        .pipe(compute_cum_energy, power_col="charger_power", cum_energy_col="cum_charge_energy_added")
+        .assign(energy_added=lambda tss: tss["cum_charge_energy_added"].diff())
         .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
         .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
+        .sort_values(by="date")
         .assign(energy_diff=lambda df: df["cum_energy"].diff())
     )
 

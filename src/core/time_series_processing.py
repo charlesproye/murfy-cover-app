@@ -39,26 +39,14 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
         logger.warning("No charging status or soc column found to compute charging and discharging masks, returning original tss.")
         return tss
 
-def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY_RATIO) -> DF:
-    """
-    ### Description:
-    Estimates an soh according to the odometer and a soh loss per km ratio.
-    Expects the odometer to be in km.
-    Very inacurrate but very handy when your deadline has been advanced from 3 months to 3 days...
-    """
-    ts["soh"] = 100 - ts["odometer"].mul(soh_lost_per_km_ratio).ffill()
-
-    return ts
-
-
-def compute_cum_energy(vehicle_df: DF) -> DF:
+def compute_cum_energy(vehicle_df: DF, power_col:str="power", cum_energy_col:str="cum_energy") -> DF:
     """
     ### Description:
     Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).
     """
-    if "power" in vehicle_df.columns:
-        vehicle_df["cum_energy"] = (
-            vehicle_df["power"]
+    if power_col in vehicle_df.columns:
+        vehicle_df[cum_energy_col] = (
+            vehicle_df[power_col]
             .pipe(cum_integral, date_series=vehicle_df["date"])
             .astype("float32")
         )
