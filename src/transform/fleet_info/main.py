@@ -117,3 +117,4 @@ if __name__ == "__main__":
     single_dataframe_script_main(update_db_vehicle_table)
 
 fleet_info = get_fleet_info()
+
