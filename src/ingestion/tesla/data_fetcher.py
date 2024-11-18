@@ -57,7 +57,7 @@ async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_poo
             if retry_count < max_retries:
                 await asyncio.sleep(WAKE_UP_WAIT_TIME)
     
-    logging.info(f"Vehicle {vehicle_id} wake up command sent, vehicle will be checked again in 30 minutes")
+    logging.info(f"Vehicle {vehicle_id} wake up command sent, vehicle will be checked again in 10 minutes")
     return False
 
 async def fetch_vehicle_data_with_retry(session, url, headers, max_retries=3, base_delay=1):
