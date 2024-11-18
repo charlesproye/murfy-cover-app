@@ -200,6 +200,6 @@ def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Lo
 
 def dropna_cols(df:DF, logger:Logger=logger) -> DF:
     logger.info(f"dropna_cols called.")
-    logger.debug(f"all nan cols:\n{df.notna().any(axis=0)}")
+    logger.debug(f"notna cols:\n{df.notna().any(axis=0)}")
     return df.loc[:, df.notna().any(axis=0)]
 

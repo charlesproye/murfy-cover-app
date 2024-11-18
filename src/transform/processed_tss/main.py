@@ -15,18 +15,21 @@ from transform.processed_tss.tesla_processed_tss import get_processed_tss as tes
 logger = getLogger("transform.processed_tss.main")
 
 GET_PROCESSED_TSS_FUNCTIONS:dict[str, Callable[[], DF]] = {
-    "bmw":             bmw_get_processed_tss,
+    "renault":          hm_get_processed_tss,
+    "tesla":            tesla_get_processed_tss,
+    "volvo-cars":       hm_get_processed_tss,
+    "ford":             hm_get_processed_tss,
     "kia":              hm_get_processed_tss,
     "mercedes-benz":    hm_get_processed_tss,
-    "ford":             hm_get_processed_tss,
-    "renault":          hm_get_processed_tss,
     "fiat":             hm_get_processed_tss,
     "opel":             hm_get_processed_tss,
     "ds":               hm_get_processed_tss,
     "peugeot":          hm_get_processed_tss,
-    "volvo-cars":       hm_get_processed_tss,
-    "tesla":            tesla_get_processed_tss,
+    "bmw":             bmw_get_processed_tss,
 }
+
+def get_all_processed_tss_as_dict() -> dict[str, DF]:
+    return {brand: get_processed_tss(brand) for brand in GET_PROCESSED_TSS_FUNCTIONS}
 
 def get_processed_tss(brand:str, **kwargs) -> DF:
     func = GET_PROCESSED_TSS_FUNCTIONS[brand]

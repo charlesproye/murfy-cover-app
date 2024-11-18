@@ -30,7 +30,7 @@ def process_raw_tss(tss:DF, logger:Logger=logger) -> DF:
     return tss
 
 if __name__ == "__main__":
-    for brand in HIGH_MOBILITY_BRANDS:
-        print("=================", brand, "=================")
-        single_dataframe_script_main(get_processed_tss, brand=brand, force_update=True)
+#    for brand in HIGH_MOBILITY_BRANDS:
+#        print("=================", brand, "=================")
+    single_dataframe_script_main(get_processed_tss, brand="renault", force_update=True)
 

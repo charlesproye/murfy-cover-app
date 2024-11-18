@@ -17,6 +17,7 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "model",
     "version",
     "capacity",
+    "owner",
 ]
 
 RENAME_COLS_DICT:dict[str, str] = {
@@ -102,4 +103,3 @@ CHARGING_STATUS_VAL_TO_MASK = {
     "INITIALIZATION": False,
     "CHARGINGPAUSED": False,
 }
-
