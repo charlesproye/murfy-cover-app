@@ -1,7 +1,7 @@
 import asyncio
 import aiohttp
 import requests
-import datetime
+from datetime import datetime
 import time
 import logging
 import os
@@ -10,10 +10,21 @@ from dotenv import load_dotenv
 from data_processor import extract_relevant_data
 from s3_handler import save_data_to_s3
 from data_utils import get_token, wake_up_vehicle, refresh_token_and_retry_request, get_token_from_auth_code, refresh_token_and_retry_request_code, WAKE_UP_WAIT_TIME, update_token_from_slack
+from fleet_manager import VehiclePool
 
-async def handle_wake_up(session, headers, vehicle_id, access_token):
+async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_pool):
+    """Gère le réveil d'un véhicule avec le VehiclePool"""
     max_retries = 2
     retry_count = 0
+    
+    # Vérifie si un wake-up est déjà en cours pour ce véhicule
+    if vehicle_id in vehicle_pool.wake_up_tasks:
+        logging.info(f"Wake-up already in progress for vehicle {vehicle_id}")
+        try:
+            await vehicle_pool.wake_up_tasks[vehicle_id]
+            return True
+        except Exception:
+            return False
     
     while retry_count < max_retries:
         wake_up_result = await wake_up_vehicle(access_token, vehicle_id)
@@ -36,32 +47,32 @@ async def handle_wake_up(session, headers, vehicle_id, access_token):
     logging.error(f"Failed to wake up vehicle {vehicle_id} after {max_retries} attempts")
     return False
 
-async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_token_key, refresh_token_key, auth_code=None):
-    url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data?endpoints=charge_state%3Bclimate_state%3Bclosures_state%3Bdrive_state%3Bvehicle_state%3Bvehicle_config"
+async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_token_key, refresh_token_key, vehicle_pool, auth_code=None):
+    url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
     headers = {'Authorization': f'Bearer {access_token}'}
     
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as response:
-            if response.status == 401 or response.status == 421:
+            if response.status == 408:
+                logging.warning(f"Vehicle is asleep. Starting wake up process: {vehicle_id}")
+                return await handle_wake_up(session, headers, vehicle_id, access_token, vehicle_pool)
+            elif response.status == 401 or response.status == 421:
                 logging.warning("Access token expired. Refreshing token.")
                 if refresh_token:
                     logging.info("Using refresh token to get new access token")
                     tokens = await refresh_token_and_retry_request(access_token, refresh_token, access_token_key, refresh_token_key)
                     if tokens:
-                        return await fetch_vehicle_data(vehicle_id, tokens['access_token'], tokens['refresh_token'], access_token_key, refresh_token_key)
+                        return await fetch_vehicle_data(vehicle_id, tokens['access_token'], tokens['refresh_token'], access_token_key, refresh_token_key, vehicle_pool)
                 elif auth_code:
                     logging.info("Using auth code to get new access token")
                     tokens = await update_token_from_slack(access_token_key)
                     if tokens:
-                        return await fetch_vehicle_data(vehicle_id, tokens['token'], None, access_token_key, refresh_token_key, auth_code)
+                        return await fetch_vehicle_data(vehicle_id, tokens['token'], None, access_token_key, refresh_token_key, vehicle_pool, auth_code)
                 logging.error("Failed to refresh token.")
                 return False
             elif response.status == 429:
                 logging.warning(f"Rate limit exceeded for vehicle {vehicle_id}.")
                 return 'rate_limit'
-            elif response.status == 408:
-                logging.warning(f"Vehicle is asleep. Starting wake up process in background: {vehicle_id}")
-                return await handle_wake_up(session, headers, vehicle_id, access_token)
             elif response.status != 200:
                 logging.error(f"Failed to fetch vehicle data: {response.status}", await response.text())
                 return False
@@ -132,26 +143,55 @@ async def fetch_all_vehicle_ids(access_token_key, refresh_token_key, csv_path: s
         
         return authorized_account_vins
 
-async def job(vehicle_id, access_token_key, refresh_token_key, auth_code=None):
-    # Récupérer les tokens une seule fois
-    access_token = await get_token(access_token_key)
-    refresh_token = await get_token(refresh_token_key) if refresh_token_key else None
-
-    if not access_token:
-        logging.error(f"Failed to retrieve tokens for vehicle {vehicle_id}")
-        return
-
+async def job(vehicle_id, access_token_key, refresh_token_key, vehicle_pool, auth_code=None):
+    """
+    Process a single vehicle
+    """
     try:
-        vehicle_data = await fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_token_key, refresh_token_key, auth_code)
-        if vehicle_data == 'rate_limit':
-            logging.warning(f"Rate limit hit for vehicle {vehicle_id}. Skipping data extraction.")
-        elif vehicle_data == 'sleeping':
-            logging.info(f"Vehicle {vehicle_id} is sleeping, wake up process started in background")
-        elif vehicle_data:
-            relevant_data = extract_relevant_data(vehicle_data, vehicle_id)
-            if relevant_data:
-                await save_data_to_s3(relevant_data, vehicle_id)
-        else:
-            logging.error(f"Failed to process data for {vehicle_id}")
-    except Exception as e:
-        logging.error(f"An error occurred in job execution for vehicle {vehicle_id}: {e}")
+        access_token = await get_token(access_token_key)
+        refresh_token = await get_token(refresh_token_key) if refresh_token_key else None
+
+        if not access_token:
+            logging.error(f"Failed to retrieve tokens for vehicle {vehicle_id}")
+            return
+
+        try:
+            # Vérifier si le véhicule est prêt à être traité
+            current_time = datetime.now()
+            if not vehicle_pool._is_vehicle_ready(vehicle_id, current_time):
+                return
+
+            vehicle_data = await fetch_vehicle_data(
+                vehicle_id, 
+                access_token, 
+                refresh_token, 
+                access_token_key, 
+                refresh_token_key,
+                vehicle_pool,
+                auth_code
+            )
+            
+            if vehicle_data == 'rate_limit':
+                logging.warning(f"Rate limit hit for vehicle {vehicle_id}")
+                vehicle_pool.update_vehicle_status(vehicle_id, False)
+            elif vehicle_data == 'sleeping':
+                logging.info(f"Vehicle {vehicle_id} is sleeping")
+                vehicle_pool.update_vehicle_status(vehicle_id, True, is_sleeping=True)
+            elif vehicle_data:
+                relevant_data = extract_relevant_data(vehicle_data, vehicle_id)
+                if relevant_data:
+                    await save_data_to_s3(relevant_data, vehicle_id)
+                    vehicle_pool.update_vehicle_status(vehicle_id, True)
+                else:
+                    vehicle_pool.update_vehicle_status(vehicle_id, False)
+            else:
+                logging.error(f"Failed to process data for {vehicle_id}")
+                vehicle_pool.update_vehicle_status(vehicle_id, False)
+        except Exception as e:
+            logging.error(f"An error occurred in job execution for vehicle {vehicle_id}: {str(e)}")
+            if isinstance(vehicle_pool, VehiclePool):
+                vehicle_pool.update_vehicle_status(vehicle_id, False)
+    finally:
+        # Toujours libérer le véhicule à la fin du traitement
+        vehicle_pool.release_vehicle(vehicle_id)
+

@@ -15,8 +15,7 @@ ACCOUNTS_JSON='[
   {
     "access_token_key": "ACCESS_TOKEN_AYVENS_NV",
     "professional_account": true,
-    "code": "862103da89cdc60dcb9f92774798a0a1b1264a48412a9ee27955993c3b09d884ffc9b94c",
-    "excel_url": "src/ingestion/tesla/excel/ayvens.csv"
+    "code": "862103da89cdc60dcb9f92774798a0a1b1264a48412a9ee27955993c3b09d884ffc9b94c"
   },
    {
     "access_token_key": "ACCESS_TOKEN_AYVENS_NVA",
@@ -71,5 +70,6 @@ ACCOUNTS_JSON='[
     "vehicle_id": "5YJSA7H11EFP63486"
   }
 ]'
+
 # Run the main.py script with the accounts JSON
 python3 src/ingestion/tesla/main.py --accounts "$ACCOUNTS_JSON"
