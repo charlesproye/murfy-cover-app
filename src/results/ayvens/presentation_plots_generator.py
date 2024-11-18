@@ -62,7 +62,7 @@ def get_sohs_per_vin(tss:DF) -> DF:
         .sort_values(by=["vin", "odometer"])
     )
 
-def plt_sohs(sohs:DF, plot_name:str, x:str, trendline_scope:str="overall", color="make") -> Figure:
+def plt_sohs(sohs:DF, plot_name:str, x:str, trendline_scope:str="overall", color="vin") -> Figure:
     logger.debug(f"Plotting soh over for {plot_name}.")
     return (
         px.scatter(
@@ -104,19 +104,44 @@ def get_n_scatter_sohs(tss:DF, plot_name:str="", **kwargs):
 #logger.debug("Done.")
 
 #==========================================Tesla================================================
-tss = get_processed_tss("tesla")
-sohs = (
+from transform.processed_tss.tesla_processed_tss import get_processed_tss as tesla_get_processed_tss
+tss = tesla_get_processed_tss()
+energy_added_in_charge = (
     tss
     .query("in_charge_perf_mask")
     .groupby(["vin", "in_charge_perf_idx"])
     .agg(
         energy_added=pd.NamedAgg("charge_energy_added", series_start_end_diff),
         soc_diff=pd.NamedAgg("soc", series_start_end_diff),
+        soc_start=pd.NamedAgg("soc", "first"),
+        soc_end=pd.NamedAgg("soc", "last"),
+        temp=pd.NamedAgg("inside_temp", "mean"),
+        capacity=pd.NamedAgg("capacity", "first"),
+        odometer=pd.NamedAgg("odometer", "first"),
+        fast_charger_type=pd.NamedAgg("fast_charger_type", Series.mode),
+        size=pd.NamedAgg("soc", "size"),
+        model=pd.NamedAgg("model", "first"),
+        version=pd.NamedAgg("version", "first"),
     )
-    .eval("soh = energy_added / soc_diff / (capacity / 100) * 100")
-    .reset_index()
+    .reset_index(drop=False)
+    .eval("soh = energy_added / (soc_diff / 100 * capacity)")
+    .eval("model_version = model + version")
 )
-plt_sohs(sohs, "tesla", "odometer")
+soh_energy_added_per_vehicle = (
+    energy_added_in_charge
+    .groupby("vin")
+    .agg(
+        soh=pd.NamedAgg("soh", "mean"),
+        odometer=pd.NamedAgg("odometer", "last"),
+        model=pd.NamedAgg("model", "first"),
+        version=pd.NamedAgg("version", "first"),
+    )
+    .reset_index(drop=False)
+    .eval("model_version = model + version")
+    .query("soh < 1.15 & soh > 0.8")
+    .eval("soh = soh.clip(lower=0.8, upper=1) * 100")
+)
+plt_sohs(soh_energy_added_per_vehicle, "tesla", "odometer")
 # # Note: The soh for Vitos and Sprinters had very low values when using the official range estimations.  
 # # Their default range has been modified to 170 in the models_info.csv  to get a soh value that is coherent.
 # all_tss['mercdes-benz']
