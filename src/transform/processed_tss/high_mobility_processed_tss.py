@@ -22,9 +22,9 @@ def get_processed_tss(brand:str, **kwargs) -> DF:
 def process_raw_tss(tss:DF, logger:Logger=logger) -> DF:
     tss = tss.rename(columns=RENAME_COLS_DICT)
     tss = safe_astype(tss, COL_DTYPES, logger=logger)
+    tss = safe_locate(tss, col_loc=list(COL_DTYPES.keys()), logger=logger)
     tss = left_merge(tss, fleet_info, "vin", "vin", COLS_TO_CPY_FROM_FLEET_INFO, logger)
     tss = tss.sort_values(by=["vin", "date"])
-    tss = safe_locate(tss, col_loc=list(COL_DTYPES.keys()), logger=logger)
     tss = compute_charging_n_discharging_masks(tss, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
 
     return tss
