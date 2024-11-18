@@ -1,5 +1,5 @@
 import pandas as pd
-
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{brand}/time_series/processed_tss.parquet'
 # High mobility 
 HIGH_MOBILITY_BRANDS = [
     "kia",
@@ -17,7 +17,6 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "model",
     "version",
     "capacity",
-    "vin",
 ]
 
 RENAME_COLS_DICT:dict[str, str] = {
@@ -34,6 +33,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "soc_hv_header": "soc",
     "charging.battery_energy": "battery_energy",
     # BMW
+    #"date": "date", # renaming is useless but we will use the key to determine what columns to keep
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
     "mileage": "odometer", # Yes, mileage is in km no need to convert it
@@ -53,20 +53,21 @@ COL_DTYPES = {
     "odometer": "float32",
     "estimated_range": "float32",
     # High mobility
-    "date": "datetime64[s]",
+    "date": "datetime64[ns]",
     "battery_energy": "float32",
     # BMW
-    "charging_ac_current": "float",
-    "charging_ac_voltage": "float",
-    "charging_method": "category",
     "charging_plug_connected": "bool",
+    "charging_method": "category",
     "charging_status": "string",
+    "charging_ac_current": "float32",
+    "charging_ac_voltage": "float32",
     "coolant_temperature": "float32",
     "kombi_remaining_electric_range": "float32",
     # Tesla
+    "battery_heater_no_power": "bool",
+    "fast_charger_present": "bool",
     "power": "float32",
     "speed": "float32",
-    "battery_heater_no_power": "bool",
     "minutes_to_full_charge": "float32",
     "battery_level": "float32",
     "battery_range": "float32",
@@ -86,7 +87,6 @@ COL_DTYPES = {
     "charger_power": "float32",
     "charger_voltage": "float32",
     "est_battery_range": "float32",
-    "fast_charger_present": "bool",
     "inside_temp": "float32",
     "outside_temp": "float32",
 }

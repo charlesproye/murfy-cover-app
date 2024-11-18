@@ -1,26 +1,23 @@
 manufacturer,model,version,capacity,range
-Tesla,Model S 2012,,60.0,426.476
-Tesla,Model 3 Rear-Wheel Drive,,57.5,
-Tesla,Model Y Rear-Wheel Drive,,75.0,
-Tesla,Model 3 Long Range All-Wheel Drive,,75.0,584.192
-Tesla,Model S Dual Motor,,95.0,
-Tesla,Model S Plaid,,95.0,
-Tesla,Model X Dual Motor,,95.0,
-Tesla,Model X Plaid,,95.0,
-Tesla,Model Y Long Range Performance,,75.0,
-Tesla,Model Y Long Range Dual Motor,,75.0,
-Tesla,Model 3 Long Range Dual Motor,,75.0,
-Tesla,Model 3 Performance,,75.0,
-Tesla,Model Y,,57.5,
-Tesla,Model Y,,57.5,
-Tesla,Model 3,,57.5,
+
 mercedes-benz,EQA,EQA,,404
 mercedes-benz,EQB,EQB,,404
 mercedes-benz,EQC,EQC,,404
 mercedes-benz,EQS,EQS,,610
 mercedes-benz,Vito,Vito,,160
 mercedes-benz,Sprinter,Sprinter,,160
+
 renault,zoe,R90,41.0,
 renault,zoe,R110,52.0,
 renault,zoe,R135,52.0,
 
+Tesla,model s,long range,95,530
+Tesla,model s,long range plus,98,555
+Tesla,model s,performance,95,515
+Tesla,Model S,2012,60.0,426.476
+Tesla,model s,standard range,72.5,420
+Tesla,Model 3,Rear-Wheel Drive,57.5,702
+Tesla,model 3,long range all-wheel drive,75,545
+Tesla,model x,long range,95,440
+Tesla,model x,long range plus,98,480
+Tesla,model y,long range rear-wheel drive,75,450

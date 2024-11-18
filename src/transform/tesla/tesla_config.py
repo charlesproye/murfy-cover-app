@@ -1,7 +1,3 @@
-# path
-S3_JSON_FLEET_INFO_RESPONSE_KEY = "fleet_info/tesla/raw_fleet_info.json"
-S3_INITIAL_FLEET_INFO_KEY = "fleet_info/tesla/initial_fleet_info.parquet"
-
 # data types
 DATA_TYPE_RAW_DF_DICT = {
     "vin": "string",
