@@ -1,7 +1,7 @@
 import asyncio
 import aiohttp
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import logging
 import os
@@ -26,31 +26,38 @@ async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_poo
         except Exception:
             return False
     
+    wake_up_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/wake_up"
+    
     while retry_count < max_retries:
         try:
-            wake_up_result = await wake_up_vehicle(access_token, vehicle_id)
-            
-            if wake_up_result == True:
-                logging.info(f"Vehicle {vehicle_id} wake up attempt {retry_count + 1}/{max_retries}")
-                wait_time = WAKE_UP_WAIT_TIME * (retry_count + 1)
-                await asyncio.sleep(wait_time)
-                
-                check_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
-                status, data = await fetch_vehicle_data_with_retry(session, check_url, headers)
-                if status == 200:
-                    logging.info(f"Vehicle {vehicle_id} successfully woken up")
-                    return data
-            elif wake_up_result == 'rate_limit':
-                return 'rate_limit'
+            async with session.post(wake_up_url, headers=headers) as response:
+                if response.status == 200:
+                    logging.info(f"Wake up command sent successfully to vehicle {vehicle_id}, waiting for vehicle to wake up")
+                    # Attendre que le véhicule se réveille
+                    await asyncio.sleep(WAKE_UP_WAIT_TIME * (retry_count + 1))
+                    
+                    # Vérifier si le véhicule est réveillé
+                    check_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
+                    async with session.get(check_url, headers=headers) as check_response:
+                        if check_response.status == 200:
+                            logging.info(f"Vehicle {vehicle_id} is now awake")
+                            return True
+                        else:
+                            logging.info(f"Vehicle {vehicle_id} is still waking up (status: {check_response.status})")
+                    
+                elif response.status == 429:
+                    return 'rate_limit'
             
             retry_count += 1
+            if retry_count < max_retries:
+                await asyncio.sleep(WAKE_UP_WAIT_TIME)
         except Exception as e:
             logging.error(f"Error during wake up for vehicle {vehicle_id}: {str(e)}")
             retry_count += 1
             if retry_count < max_retries:
                 await asyncio.sleep(WAKE_UP_WAIT_TIME)
     
-    logging.error(f"Failed to wake up vehicle {vehicle_id} after {max_retries} attempts")
+    logging.info(f"Vehicle {vehicle_id} wake up command sent, vehicle will be checked again in 30 minutes")
     return False
 
 async def fetch_vehicle_data_with_retry(session, url, headers, max_retries=3, base_delay=1):
@@ -93,7 +100,13 @@ async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_tok
             status, data = await fetch_vehicle_data_with_retry(session, url, headers)
             
             if status == 408:
-                logging.info(f"Vehicle {vehicle_id} is sleeping")
+                logging.info(f"Vehicle {vehicle_id} is sleeping, attempting wake up")
+                wake_up_result = await handle_wake_up(session, headers, vehicle_id, access_token, vehicle_pool)
+                if wake_up_result == True:
+                    # Réessayer de récupérer les données après le réveil
+                    status, data = await fetch_vehicle_data_with_retry(session, url, headers)
+                    if status == 200:
+                        return data
                 return 'sleeping'
             elif status == 405:
                 logging.info(f"Vehicle {vehicle_id} is offline or unavailable")
@@ -115,11 +128,12 @@ async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_tok
             elif status == 429:
                 logging.warning(f"Rate limit exceeded for vehicle {vehicle_id}.")
                 return 'rate_limit'
-            elif status != 200 or data is None:
+            elif status == 200 and data:
+                return data
+            else:
                 logging.error(f"Failed to fetch vehicle data: Status {status}")
                 return False
             
-            return data
         except Exception as e:
             logging.error(f"Error fetching data for vehicle {vehicle_id}: {str(e)}")
             return False
@@ -221,6 +235,8 @@ async def job(vehicle_id, access_token_key, refresh_token_key, vehicle_pool, aut
                 vehicle_pool.update_vehicle_status(vehicle_id, False)
             elif vehicle_data == 'sleeping':
                 vehicle_pool.update_vehicle_status(vehicle_id, True, is_sleeping=True)
+                next_check = datetime.now() + timedelta(minutes=10)
+                logging.info(f"Vehicle {vehicle_id} is sleeping, next check at {next_check.strftime('%H:%M:%S')}")
             elif vehicle_data:
                 relevant_data = extract_relevant_data(vehicle_data, vehicle_id)
                 if relevant_data:

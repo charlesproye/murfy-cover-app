@@ -29,7 +29,12 @@ class VehiclePool:
             del self.wake_up_tasks[vehicle_id]
 
     def add_vehicle(self, vehicle):
-        self.vehicles[vehicle['id']] = vehicle
+        """Ajoute un véhicule au pool"""
+        if isinstance(vehicle, dict) and 'id' in vehicle:
+            self.vehicles[vehicle['id']] = vehicle
+        else:
+            # Si on reçoit juste un ID
+            self.vehicles[vehicle] = {'id': vehicle}
 
     def get_next_batch(self, current_time):
         """Get next batch of vehicles that are ready to be processed"""
@@ -43,7 +48,7 @@ class VehiclePool:
             
             if (self._is_vehicle_ready(vehicle_id, current_time) and 
                 vehicle_id not in self.processing):
-                ready_vehicles.append(self.vehicles[vehicle_id])
+                ready_vehicles.append(vehicle_id)  # Envoyer juste l'ID
                 self.processing.add(vehicle_id)
             
             self.current_index = (self.current_index + 1) % len(vehicle_ids)
@@ -75,7 +80,7 @@ class VehiclePool:
             self.last_success[vehicle_id] = current_time
             self.failed_attempts[vehicle_id] = 0
             if is_sleeping:
-                self.sleep_until[vehicle_id] = current_time + timedelta(minutes=30)
+                self.sleep_until[vehicle_id] = current_time + timedelta(minutes=10)
         else:
             self.failed_attempts[vehicle_id] += 1
             if self.failed_attempts[vehicle_id] > 3:

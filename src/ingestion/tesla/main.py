@@ -109,7 +109,7 @@ async def process_vehicle_batch(vehicle_pool, access_token_key, refresh_token_ke
         
         current_time = datetime.now()
         if current_time.hour < 5:
-            await asyncio.sleep(60)  # Attendre 1 minute avant de revérifier
+            await asyncio.sleep(60)
             continue
 
         batch = vehicle_pool.get_next_batch(current_time)
@@ -117,15 +117,12 @@ async def process_vehicle_batch(vehicle_pool, access_token_key, refresh_token_ke
             await asyncio.sleep(1)
             continue
 
-        # Créer un ensemble unique de véhicules basé sur l'ID
-        unique_vehicles = {v['id']: v for v in batch}.values()
-        
         tasks = []
-        for vehicle in unique_vehicles:
+        for vehicle_id in batch:  # batch contient maintenant directement les IDs
             if not compression_event.is_set():
                 break
             task = asyncio.create_task(
-                job(vehicle['id'], access_token_key, refresh_token_key, vehicle_pool, auth_code)
+                job(vehicle_id, access_token_key, refresh_token_key, vehicle_pool, auth_code)
             )
             tasks.append(task)
 
