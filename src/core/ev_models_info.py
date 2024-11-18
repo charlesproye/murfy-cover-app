@@ -1,7 +1,7 @@
 import pandas as pd
 from pandas import DataFrame as DF
 
-from core.pandas_utils import set_str_to_lower
+from core.pandas_utils import set_all_str_cols_to_lower
 from core.console_utils import single_dataframe_script_main
 from core.config import *
 
@@ -14,10 +14,10 @@ def get_ev_models_infos() -> DF:
             "version": "string",
             "capacity": "float",
         })
-        .pipe(set_str_to_lower)
+        .pipe(set_all_str_cols_to_lower)
     )
 
 if __name__ == "__main__":
-    single_dataframe_script_main(get_ev_models_infos, force_update=True)
+    single_dataframe_script_main(get_ev_models_infos)
 
 models_info = get_ev_models_infos()

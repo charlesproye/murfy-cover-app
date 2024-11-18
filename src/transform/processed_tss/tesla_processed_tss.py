@@ -29,7 +29,8 @@ def get_processed_tss(bucket: S3_Bucket = bucket) -> DF:
         .apply(process_ts, include_groups=False)
         .reset_index(drop=False)
         .sort_values(by=["vin", "date"])
-        .pipe(left_merge, fleet_info, left_on="vin", right_on="vin", src_dest_cols=["model", "version", "capacity","range"])
+        .pipe(set_all_str_cols_to_lower, but=["vin"])
+        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), left_on="vin", right_on="vin", src_dest_cols=["model", "version", "capacity","range"])
     )
 
 def process_ts(raw_ts:DF) -> DF:
@@ -47,9 +48,12 @@ def process_ts(raw_ts:DF) -> DF:
             #model=fleet_info.loc[vin, "model"],
             #default_capacity=fleet_info.loc[vin, "default_kwh_energy_capacity"],
         )
-        .pipe(compute_cum_energy)
+        .pipe(compute_cum_energy, power_col="power", cum_energy_col="cum_energy")
+        .pipe(compute_cum_energy, power_col="charger_power", cum_energy_col="cum_charge_energy_added")
+        .assign(energy_added=lambda tss: tss["cum_charge_energy_added"].diff())
         .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
         .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
+        .sort_values(by="date")
         .assign(energy_diff=lambda df: df["cum_energy"].diff())
     )
 
