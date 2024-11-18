@@ -11,13 +11,13 @@ from data_processor import extract_relevant_data
 from s3_handler import save_data_to_s3
 from data_utils import get_token, wake_up_vehicle, refresh_token_and_retry_request, get_token_from_auth_code, refresh_token_and_retry_request_code, WAKE_UP_WAIT_TIME, update_token_from_slack
 from fleet_manager import VehiclePool
+import random
 
 async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_pool):
     """Gère le réveil d'un véhicule avec le VehiclePool"""
     max_retries = 2
     retry_count = 0
     
-    # Vérifie si un wake-up est déjà en cours pour ce véhicule
     if vehicle_id in vehicle_pool.wake_up_tasks:
         logging.info(f"Wake-up already in progress for vehicle {vehicle_id}")
         try:
@@ -27,36 +27,66 @@ async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_poo
             return False
     
     while retry_count < max_retries:
-        wake_up_result = await wake_up_vehicle(access_token, vehicle_id)
-        
-        if wake_up_result == True:
-            logging.info(f"Vehicle {vehicle_id} wake up attempt {retry_count + 1}/{max_retries}")
-            wait_time = WAKE_UP_WAIT_TIME * (retry_count + 1)
-            await asyncio.sleep(wait_time)
+        try:
+            wake_up_result = await wake_up_vehicle(access_token, vehicle_id)
             
-            check_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
-            async with session.get(check_url, headers=headers) as check_response:
-                if check_response.status == 200:
+            if wake_up_result == True:
+                logging.info(f"Vehicle {vehicle_id} wake up attempt {retry_count + 1}/{max_retries}")
+                wait_time = WAKE_UP_WAIT_TIME * (retry_count + 1)
+                await asyncio.sleep(wait_time)
+                
+                check_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
+                status, data = await fetch_vehicle_data_with_retry(session, check_url, headers)
+                if status == 200:
                     logging.info(f"Vehicle {vehicle_id} successfully woken up")
-                    return await check_response.json()
-        elif wake_up_result == 'rate_limit':
-            return 'rate_limit'
-        
-        retry_count += 1
+                    return data
+            elif wake_up_result == 'rate_limit':
+                return 'rate_limit'
+            
+            retry_count += 1
+        except Exception as e:
+            logging.error(f"Error during wake up for vehicle {vehicle_id}: {str(e)}")
+            retry_count += 1
+            if retry_count < max_retries:
+                await asyncio.sleep(WAKE_UP_WAIT_TIME)
     
     logging.error(f"Failed to wake up vehicle {vehicle_id} after {max_retries} attempts")
     return False
+
+async def fetch_vehicle_data_with_retry(session, url, headers, max_retries=3, base_delay=1):
+    """Fonction utilitaire pour les appels API avec retry"""
+    for attempt in range(max_retries):
+        try:
+            async with session.get(url, headers=headers, timeout=30) as response:
+                if response.status == 408:
+                    return response.status, 'sleeping'
+                elif response.status == 429:
+                    return response.status, 'rate_limit'
+                elif response.status in (200, 408, 401, 421):
+                    return response.status, await response.json()
+                else:
+                    logging.error(f"Failed request with status {response.status}")
+                    return response.status, None
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            if attempt == max_retries - 1:
+                raise
+            delay = base_delay * (2 ** attempt) + random.uniform(0, 0.1)
+            logging.warning(f"Connection error, retrying in {delay:.1f}s: {str(e)}")
+            await asyncio.sleep(delay)
+    return None, None  # En cas d'échec après tous les retries
 
 async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_token_key, refresh_token_key, vehicle_pool, auth_code=None):
     url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
     headers = {'Authorization': f'Bearer {access_token}'}
     
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as response:
-            if response.status == 408:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+        try:
+            status, data = await fetch_vehicle_data_with_retry(session, url, headers)
+            
+            if status == 408:
                 logging.warning(f"Vehicle is asleep. Starting wake up process: {vehicle_id}")
                 return await handle_wake_up(session, headers, vehicle_id, access_token, vehicle_pool)
-            elif response.status == 401 or response.status == 421:
+            elif status == 401 or status == 421:
                 logging.warning("Access token expired. Refreshing token.")
                 if refresh_token:
                     logging.info("Using refresh token to get new access token")
@@ -70,14 +100,17 @@ async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_tok
                         return await fetch_vehicle_data(vehicle_id, tokens['token'], None, access_token_key, refresh_token_key, vehicle_pool, auth_code)
                 logging.error("Failed to refresh token.")
                 return False
-            elif response.status == 429:
+            elif status == 429:
                 logging.warning(f"Rate limit exceeded for vehicle {vehicle_id}.")
                 return 'rate_limit'
-            elif response.status != 200:
-                logging.error(f"Failed to fetch vehicle data: {response.status}", await response.text())
+            elif status != 200 or data is None:
+                logging.error(f"Failed to fetch vehicle data: {status}")
                 return False
             
-            return await response.json()
+            return data
+        except Exception as e:
+            logging.error(f"Error fetching data for vehicle {vehicle_id}: {str(e)}")
+            return False
 
 async def fetch_all_vehicle_ids(access_token_key, refresh_token_key, csv_path: str = None, auth_code:str = None):
     load_dotenv(override=True)

@@ -45,6 +45,37 @@ async def compress_data():
             logging.error(f"Error during compression: {str(e)}")
             raise
 
+async def save_data_with_retry(s3, bucket_name, key, data, max_retries=3):
+    """Fonction utilitaire pour sauvegarder des données sur S3 avec retry"""
+    for attempt in range(max_retries):
+        try:
+            await s3.put_object(
+                Bucket=bucket_name,
+                Key=key,
+                Body=json.dumps(data),
+                ContentType='application/json'
+            )
+            return True
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logging.error(f"Failed to save to S3 after {max_retries} attempts. Key: {key}, Error: {str(e)}")
+                raise
+            await asyncio.sleep(random.uniform(0.1, 0.5) * (attempt + 1))
+    return False
+
+async def delete_with_retry(s3, bucket_name, key, max_retries=3):
+    """Fonction utilitaire pour supprimer des fichiers sur S3 avec retry"""
+    for attempt in range(max_retries):
+        try:
+            await s3.delete_object(Bucket=bucket_name, Key=key)
+            return True
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logging.error(f"Failed to delete from S3 after {max_retries} attempts. Key: {key}, Error: {str(e)}")
+                raise
+            await asyncio.sleep(random.uniform(0.1, 0.5) * (attempt + 1))
+    return False
+
 async def compress_vehicle_data(s3, bucket_name, vehicle_id, yesterday):
     temp_folder = f"response/tesla/{vehicle_id}/temp/"
     
@@ -56,7 +87,7 @@ async def compress_vehicle_data(s3, bucket_name, vehicle_id, yesterday):
             return
         
         data_by_date = {}
-        files_to_delete = []  # Liste des fichiers à supprimer
+        files_to_delete = []
         
         for obj in temp_files['Contents']:
             try:
@@ -97,7 +128,7 @@ async def compress_vehicle_data(s3, bucket_name, vehicle_id, yesterday):
                 if file_date not in data_by_date:
                     data_by_date[file_date] = []
                 data_by_date[file_date].append(file_data)
-                files_to_delete.append(file_key)  # Ajouter à la liste des fichiers à supprimer
+                files_to_delete.append(file_key)
                 
             except Exception as e:
                 logging.error(f"Error processing file {obj.get('Key', 'unknown')}, deleting file: {str(e)}")
@@ -106,9 +137,8 @@ async def compress_vehicle_data(s3, bucket_name, vehicle_id, yesterday):
         
         if not data_by_date:
             logging.warning(f"No valid data to compress for vehicle {vehicle_id}")
-            # Supprimer les fichiers invalides même s'il n'y a pas de données valides
             if files_to_delete:
-                delete_tasks = [s3.delete_object(Bucket=bucket_name, Key=key) for key in files_to_delete]
+                delete_tasks = [delete_with_retry(s3, bucket_name, key) for key in files_to_delete]
                 await asyncio.gather(*delete_tasks)
             return
             
@@ -118,22 +148,24 @@ async def compress_vehicle_data(s3, bucket_name, vehicle_id, yesterday):
         # Ajouter les tâches de sauvegarde
         for date, data in data_by_date.items():
             if data:
-                tasks.append(
-                    s3.put_object(
-                        Bucket=bucket_name,
-                        Key=f"response/tesla/{vehicle_id}/{date}.json",
-                        Body=json.dumps(data),
-                        ContentType='application/json'
-                    )
-                )
+                tasks.append(save_data_with_retry(
+                    s3,
+                    bucket_name,
+                    f"response/tesla/{vehicle_id}/{date}.json",
+                    data
+                ))
         
         # Ajouter les tâches de suppression
         for file_key in files_to_delete:
-            tasks.append(s3.delete_object(Bucket=bucket_name, Key=file_key))
+            tasks.append(delete_with_retry(s3, bucket_name, file_key))
         
         if tasks:
-            await asyncio.gather(*tasks)
-            logging.info(f"Successfully compressed data for vehicle {vehicle_id}")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            success = all(r is True for r in results if not isinstance(r, Exception))
+            if success:
+                logging.info(f"Successfully compressed data for vehicle {vehicle_id}")
+            else:
+                logging.error(f"Some operations failed for vehicle {vehicle_id}")
         
     except Exception as e:
         logging.error(f"Error compressing data for vehicle {vehicle_id}: {str(e)}")
