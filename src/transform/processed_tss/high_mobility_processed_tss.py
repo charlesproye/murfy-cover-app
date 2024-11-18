@@ -26,7 +26,7 @@ def process_raw_tss(raw_tss:DF) -> DF:
     )
 
 if __name__ == "__main__":
-    for brand in HIGH_MOBILITY_BRANDS:
-        print("=================", brand, "=================")
-        single_dataframe_script_main(get_processed_tss, brand=brand, force_update=True)
+    # for brand in HIGH_MOBILITY_BRANDS:
+    #     print("=================", brand, "=================")
+    single_dataframe_script_main(get_processed_tss, brand="volvo-cars", force_update=True)
 
