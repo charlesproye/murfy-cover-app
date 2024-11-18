@@ -9,11 +9,6 @@ import numpy as np
 from core.config import *
 from core.constants import *
 
-import tracemalloc
-
-tracemalloc.start()
-
-
 logger = getLogger("core.time_series_processing")
 
 def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
