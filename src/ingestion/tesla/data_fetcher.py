@@ -237,6 +237,11 @@ async def job(vehicle_id, access_token_key, refresh_token_key, vehicle_pool, aut
                 vehicle_pool.update_vehicle_status(vehicle_id, True, is_sleeping=True)
                 next_check = datetime.now() + timedelta(minutes=10)
                 logging.info(f"Vehicle {vehicle_id} is sleeping, next check at {next_check.strftime('%H:%M:%S')}")
+            elif vehicle_data == 'offline':
+                # Traiter les véhicules hors ligne comme endormis
+                vehicle_pool.update_vehicle_status(vehicle_id, True, is_sleeping=True)
+                next_check = datetime.now() + timedelta(minutes=10)
+                logging.info(f"Vehicle {vehicle_id} is offline, next check at {next_check.strftime('%H:%M:%S')}")
             elif vehicle_data:
                 relevant_data = extract_relevant_data(vehicle_data, vehicle_id)
                 if relevant_data:
