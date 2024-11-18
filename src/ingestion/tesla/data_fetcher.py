@@ -58,22 +58,31 @@ async def fetch_vehicle_data_with_retry(session, url, headers, max_retries=3, ba
     for attempt in range(max_retries):
         try:
             async with session.get(url, headers=headers, timeout=30) as response:
+                logging.debug(f"API Response status: {response.status}, URL: {url}")
+                
                 if response.status == 408:
                     return response.status, 'sleeping'
                 elif response.status == 429:
                     return response.status, 'rate_limit'
-                elif response.status in (200, 408, 401, 421):
+                elif response.status == 405:
+                    logging.error(f"Method not allowed (405) - Vehicle might be offline or unavailable")
+                    return response.status, 'offline'
+                elif response.status == 401 or response.status == 421:
+                    return response.status, await response.json()
+                elif response.status == 200:
                     return response.status, await response.json()
                 else:
-                    logging.error(f"Failed request with status {response.status}")
+                    response_text = await response.text()
+                    logging.error(f"Failed request with status {response.status}. Response: {response_text}")
                     return response.status, None
+                    
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             if attempt == max_retries - 1:
                 raise
             delay = base_delay * (2 ** attempt) + random.uniform(0, 0.1)
             logging.warning(f"Connection error, retrying in {delay:.1f}s: {str(e)}")
             await asyncio.sleep(delay)
-    return None, None  # En cas d'échec après tous les retries
+    return None, None
 
 async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_token_key, refresh_token_key, vehicle_pool, auth_code=None):
     url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
@@ -84,8 +93,11 @@ async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_tok
             status, data = await fetch_vehicle_data_with_retry(session, url, headers)
             
             if status == 408:
-                logging.warning(f"Vehicle is asleep. Starting wake up process: {vehicle_id}")
-                return await handle_wake_up(session, headers, vehicle_id, access_token, vehicle_pool)
+                logging.info(f"Vehicle {vehicle_id} is sleeping")
+                return 'sleeping'
+            elif status == 405:
+                logging.info(f"Vehicle {vehicle_id} is offline or unavailable")
+                return 'offline'
             elif status == 401 or status == 421:
                 logging.warning("Access token expired. Refreshing token.")
                 if refresh_token:
@@ -104,7 +116,7 @@ async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_tok
                 logging.warning(f"Rate limit exceeded for vehicle {vehicle_id}.")
                 return 'rate_limit'
             elif status != 200 or data is None:
-                logging.error(f"Failed to fetch vehicle data: {status}")
+                logging.error(f"Failed to fetch vehicle data: Status {status}")
                 return False
             
             return data
@@ -208,7 +220,6 @@ async def job(vehicle_id, access_token_key, refresh_token_key, vehicle_pool, aut
                 logging.warning(f"Rate limit hit for vehicle {vehicle_id}")
                 vehicle_pool.update_vehicle_status(vehicle_id, False)
             elif vehicle_data == 'sleeping':
-                logging.info(f"Vehicle {vehicle_id} is sleeping")
                 vehicle_pool.update_vehicle_status(vehicle_id, True, is_sleeping=True)
             elif vehicle_data:
                 relevant_data = extract_relevant_data(vehicle_data, vehicle_id)
