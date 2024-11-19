@@ -15,6 +15,9 @@ redis_client = redis.Redis(host=redis_host, port=redis_port, password=redis_pass
 MAX_WAKE_UP_ATTEMPTS = 5
 WAKE_UP_WAIT_TIME = 30  # seconds
 
+# Ajout d'un verrou global pour le refresh des tokens
+token_refresh_lock = asyncio.Lock()
+
 def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
@@ -43,87 +46,84 @@ async def fetch_slack_messages(channel_id, slack_token):
                 return []
 
 async def update_token_from_slack(access_token_key):
-    slack_token = os.getenv('SLACK_TOKEN')
-    channel_id = 'C0816LXFCNL'
-    
-    if not slack_token:
-        logging.error("Slack bot token is not set.")
-        return []
-    
-    messages = await fetch_slack_messages(channel_id, slack_token)
-    
-    try:
-        for i in range(6):
-            message_text = messages[i]['blocks'][0]['elements'][0]['elements'][3]['text']
-            response_key = messages[i]['blocks'][0]['elements'][0]['elements'][0]['text'].split(':')[0]
-            response_data = json.loads(message_text)
-            if response_key == access_token_key:
-                logging.info(f"Found token for {access_token_key} in Slack")
-                await update_tokens_code(response_data['access_token'], access_token_key)
-                return {"key": response_key, "token": response_data['access_token']}
-        logging.warning(f"No token found for {access_token_key} in Slack")
-        return None
-    except (KeyError, IndexError, json.JSONDecodeError) as e:
-        logging.error(f"Failed to parse message blocks: {e}")
-        return None
-
-async def refresh_token_and_retry_request_code(access_token, access_token_key, code):
-    """Get access token using authorization code."""
-    url = "https://auth.tesla.com/oauth2/v3/token"
-    payload = {
-        'grant_type': 'client_credentials',
-        'client_id': '8832277ae4cc-4461-8396-127310129dc6',
-        'client_secret': 'ta-secret.$AXtiMu2kTU%XdTc',
-        'audience': 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
-        'auth_code': code,
-        'scope': 'user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds'
-    }
-        # Important : utiliser aiohttp.FormData pour x-www-form-urlencoded
-    form_data = aiohttp.FormData()
-    for key, value in payload.items():
-        form_data.add_field(key, value)
-
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=form_data, headers=headers) as response:
-            if response.status == 200:
-                data = await response.json()
-                access_token = data.get('access_token')
-                await update_tokens_code(access_token, access_token_key)
-                logging.info("Tokens refreshed successfully.")
-                return {'access_token': access_token}
-            else:
-                error_body = await response.text()
-                logging.error(f"Failed to refresh token: {response.status}, {error_body}")
-                if response.status == 401:
-                    logging.error("Authentication failed. The refresh token may be invalid or expired.")
-                raise Exception(f"Token refresh failed with status {response.status}")
+    """Mise à jour du token depuis Slack de manière sécurisée"""
+    async with token_refresh_lock:  # Utilisation du même verrou
+        try:
+            logging.info("Starting Slack token update process...")
+            await asyncio.sleep(1)  # Délai initial
+            
+            slack_token = os.getenv('SLACK_TOKEN')
+            channel_id = 'C0816LXFCNL'
+            
+            if not slack_token:
+                logging.error("Slack bot token is not set.")
+                return None
+            
+            messages = await fetch_slack_messages(channel_id, slack_token)
+            
+            for i in range(6):
+                try:
+                    message_text = messages[i]['blocks'][0]['elements'][0]['elements'][3]['text']
+                    response_key = messages[i]['blocks'][0]['elements'][0]['elements'][0]['text'].split(':')[0]
+                    response_data = json.loads(message_text)
+                    
+                    if response_key == access_token_key:
+                        logging.info(f"Found token for {access_token_key} in Slack")
+                        await update_tokens_code(response_data['access_token'], access_token_key)
+                        await asyncio.sleep(2)  # Attendre avant de retourner
+                        return {"key": response_key, "token": response_data['access_token']}
+                except (KeyError, IndexError, json.JSONDecodeError) as e:
+                    continue
+            
+            logging.warning(f"No token found for {access_token_key} in Slack")
+            await asyncio.sleep(2)
+            return None
+            
+        except Exception as e:
+            logging.error(f"Error updating token from Slack: {str(e)}")
+            await asyncio.sleep(2)
+            return None
 
 async def refresh_token_and_retry_request(access_token, refresh_token, access_token_key, refresh_token_key):
-    url = "https://auth.tesla.com/oauth2/v3/token"
-    headers = {'Content-Type': 'application/json'}
-    payload = {
-        'grant_type': 'refresh_token',
-        'client_id': '8832277ae4cc-4461-8396-127310129dc6',
-        'refresh_token': refresh_token
-    }
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, json=payload) as response:
-            if response.status == 200:
-                new_tokens = await response.json()
-                access_token = new_tokens['access_token']
-                refresh_token = new_tokens['refresh_token']
-                await update_tokens(access_token, refresh_token, access_token_key, refresh_token_key)
-                logging.info("Tokens refreshed successfully.")
-                return {'access_token': access_token, 'refresh_token': refresh_token}
-            else:
-                error_body = await response.text()
-                logging.error(f"Failed to refresh token: {response.status}, {error_body}")
-                if response.status == 401:
-                    logging.error("Authentication failed. The refresh token may be invalid or expired.")
-                raise Exception(f"Token refresh failed with status {response.status}")
+    """Refresh token de manière sécurisée et séquentielle"""
+    async with token_refresh_lock:  # Utilisation du verrou
+        try:
+            logging.info("Starting token refresh process...")
+            await asyncio.sleep(1)  # Petit délai pour s'assurer que tout est calme
+            
+            url = "https://auth.tesla.com/oauth2/v3/token"
+            headers = {'Content-Type': 'application/json'}
+            payload = {
+                'grant_type': 'refresh_token',
+                'client_id': '8832277ae4cc-4461-8396-127310129dc6',
+                'refresh_token': refresh_token
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, json=payload) as response:
+                    if response.status == 200:
+                        new_tokens = await response.json()
+                        access_token = new_tokens['access_token']
+                        refresh_token = new_tokens['refresh_token']
+                        
+                        # Mise à jour des tokens dans Redis
+                        await update_tokens(access_token, refresh_token, access_token_key, refresh_token_key)
+                        logging.info("Tokens refreshed and updated successfully.")
+                        
+                        # Attendre un peu avant de reprendre
+                        await asyncio.sleep(2)
+                        return {'access_token': access_token, 'refresh_token': refresh_token}
+                    else:
+                        error_body = await response.text()
+                        logging.error(f"Failed to refresh token: {response.status}, {error_body}")
+                        if response.status == 401:
+                            logging.error("Authentication failed. The refresh token may be invalid or expired.")
+                        await asyncio.sleep(2)  # Attendre avant de retourner l'erreur
+                        return None
+        except Exception as e:
+            logging.error(f"Error during token refresh: {str(e)}")
+            await asyncio.sleep(2)
+            return None
 
 async def update_tokens_code(access_token, access_token_key):
     try:

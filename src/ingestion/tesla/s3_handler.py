@@ -22,22 +22,59 @@ async def compress_data():
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
         try:
-            vehicle_folders = await s3.list_objects_v2(Bucket=bucket_name, Prefix="response/tesla/", Delimiter='/')
-            if not vehicle_folders.get('CommonPrefixes'):
+            # Liste pour stocker tous les préfixes de véhicules
+            all_prefixes = []
+            continuation_token = None
+
+            while True:
+                # Paramètres de base pour list_objects_v2
+                list_params = {
+                    'Bucket': bucket_name,
+                    'Prefix': "response/tesla/",
+                    'Delimiter': '/'
+                }
+
+                # Ajouter le token de continuation s'il existe
+                if continuation_token:
+                    list_params['ContinuationToken'] = continuation_token
+
+                # Récupérer une page de résultats
+                response = await s3.list_objects_v2(**list_params)
+                
+                # Ajouter les préfixes de cette page
+                if 'CommonPrefixes' in response:
+                    all_prefixes.extend(response['CommonPrefixes'])
+
+                # Vérifier s'il y a d'autres pages
+                if not response.get('IsTruncated'):
+                    break
+                
+                continuation_token = response.get('NextContinuationToken')
+
+            if not all_prefixes:
                 logging.info("No vehicle folders found to compress")
                 return
-                
-            compression_tasks = []
+
+            logging.info(f"Found {len(all_prefixes)} vehicle folders to process")
             
-            for folder in vehicle_folders['CommonPrefixes']:
-                vehicle_id = folder.get('Prefix', '').split('/')[-2]
+            # Créer les tâches de compression
+            compression_tasks = []
+            for prefix in all_prefixes:
+                vehicle_id = prefix.get('Prefix', '').split('/')[-2]
                 if vehicle_id:
                     task = asyncio.create_task(compress_vehicle_data(s3, bucket_name, vehicle_id, yesterday))
                     compression_tasks.append(task)
             
             if compression_tasks:
                 # Exécuter les compressions en parallèle avec une limite de concurrence
-                await asyncio.gather(*compression_tasks)
+                # Utiliser un semaphore pour limiter le nombre de tâches simultanées
+                semaphore = asyncio.Semaphore(50)  # Limiter à 50 tâches simultanées
+                async def compress_with_semaphore(task):
+                    async with semaphore:
+                        return await task
+                
+                await asyncio.gather(*[compress_with_semaphore(task) for task in compression_tasks])
+                logging.info(f"Compression completed for {len(compression_tasks)} vehicles")
             else:
                 logging.info("No compression tasks created")
 
