@@ -4,11 +4,12 @@ from logging import Logger
 from core.pandas_utils import *
 from core.time_series_processing import compute_charging_n_discharging_masks
 from core.caching_utils import cache_result
+from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
 from transform.processed_tss.config import S3_PROCESSED_TSS_KEY_FORMAT
 from transform.processed_tss.config import *
 from transform.raw_tss.main import get_raw_tss
-from transform.fleet_info.ayvens_fleet_info import fleet_info
+from transform.fleet_info.main import fleet_info
 
 logger = getLogger("transform.processed_tss.hm_processed_tss")
 
@@ -33,7 +34,8 @@ def process_raw_tss(tss:DF, logger:Logger=logger) -> DF:
     return tss
 
 if __name__ == "__main__":
-    for brand in HIGH_MOBILITY_BRANDS:
-        print("=================", brand, "=================")
-        single_dataframe_script_main(get_processed_tss, brand=brand, force_update=True)
-
+    set_level_of_loggers_with_prefix("DEBUG", "transform.processed_tss")
+#    for brand in HIGH_MOBILITY_BRANDS:
+#        print("=================", brand, "=================")
+#        single_dataframe_script_main(get_processed_tss, brand=brand, force_update=True)
+    single_dataframe_script_main(get_processed_tss, brand="renault", force_update=True)
