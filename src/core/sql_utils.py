@@ -37,6 +37,7 @@ def update_table_with_df(df: DF, table_name: str, key_col: str):
         for key, row in track(df_to_update.iterrows(), description="Updating existing rows", total=len(df_to_update)):
             row = row[update_columns].dropna()
             if row.empty:
+                logger.warning(f"cannot update row for vin={row.get(key_col, f'no {key_col}')}, row is empty")
                 continue
                 
             set_clause = ', '.join([f"{col} = :{col}" for col in row.index])
@@ -59,8 +60,8 @@ def update_table_with_df(df: DF, table_name: str, key_col: str):
         df_to_insert = df_to_insert[insert_columns]
         
         for _, row in track(df_to_insert.iterrows(), description="Inserting new rows"):
-            if row.isna()["id"]:
-                logger.warning(f"row is empty for vin={row.get('vin', 'no vin')}")
+            if row.isna()[key_col]:
+                logger.warning(f"cannot insert row for {key_col}={row.get(key_col, f'no {key_col}')}.")
                 continue
             row = row.dropna()
             columns = ', '.join(row.index)
