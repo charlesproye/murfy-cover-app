@@ -19,7 +19,8 @@ def get_processed_tss(bucket: S3_Bucket = bucket) -> DF:
     return (
         get_raw_tss(bucket=bucket)
         .rename(columns=RENAME_COLS_DICT, errors="ignore")
-        .pipe(safe_astype, COL_DTYPES)
+        .pipe(safe_locate, col_loc=list(RENAME_COLS_DICT.keys()), logger=logger)
+        .pipe(safe_astype, COL_DTYPES, logger=logger)
         .assign(date=lambda raw_tss: pd.to_datetime(raw_tss["date"]).dt.as_unit("s"))
         .drop_duplicates(subset=["vin",  "date"])
         .sort_values(by=["vin",  "date"])
@@ -30,7 +31,7 @@ def get_processed_tss(bucket: S3_Bucket = bucket) -> DF:
         .reset_index(drop=False)
         .sort_values(by=["vin", "date"])
         .pipe(set_all_str_cols_to_lower, but=["vin"])
-        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO)
+        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO, logger=logger)
     )
 
 def process_ts(raw_ts:DF) -> DF:
