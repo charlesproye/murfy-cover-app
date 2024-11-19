@@ -29,8 +29,6 @@ S3_JSON_FLEET_INFO_RESPONSE_KEYS = [
     "fleet_info/tesla/ayvens.json",
 ]
 
-S3_INITIAL_FLEET_INFO_KEY = "fleet_info/tesla/initial_fleet_info.parquet"
-
 # Ayvens
 AYVENS_FLEET_INFO_CSV_KEY = "fleet_info/ayvens/fleet_info_with_regions.csv"
 AYVENS_FLEET_WITH_ONLY_CONTRACT_START_DATE_KEY = "fleet_info/ayvens/fleet_info - Global NL.csv"
