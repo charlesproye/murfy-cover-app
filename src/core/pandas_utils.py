@@ -118,6 +118,7 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
         dest_cols = list(src_dest_cols.values())
     else:
         raise ValueError(f"src_dest_cols must be None, list, or dict, received: {type(src_dest_cols)}")
+    logger.debug(f"src_cols: {src_cols}, dest_cols: {dest_cols}")
     lhs_keys = lhs[left_on].itertuples(index=False)
     rhs_keys = rhs[right_on].itertuples(index=False)
     lhs_idx = pd.MultiIndex.from_tuples(lhs_keys)
