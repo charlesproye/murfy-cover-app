@@ -1,9 +1,13 @@
+from logging import getLogger
+
 from sqlalchemy import text
 import uuid
 from datetime import datetime as DT
 from rich import print
 
 from core.pandas_utils import *
+from core.logging_utils import set_level_of_loggers_with_prefix
+from rich.progress import track
 from core.sql_utils import connection
 from core.ev_models_info import models_info
 from core.console_utils import single_dataframe_script_main
@@ -11,6 +15,8 @@ from transform.fleet_info.ayvens_fleet_info import fleet_info as ayvens_fleet_in
 from transform.fleet_info.tesla_fleet_info import test_tesla_fleet_info
 from transform.fleet_info.tesla_fleet_info import followed_tesla_vehicles_info
 from transform.fleet_info.config import RDB_TABLES_MERGE_KWARGS
+
+logger = getLogger("transform.fleet_info")
 
 def get_fleet_info() -> DF:
     return (
@@ -40,6 +46,8 @@ def update_db_vehicle_table() -> DF:
     
     # Set purchase date to now for new entries
     fleet_info["purchase_date"] = DT.now()
+
+    fleet_info = fleet_info.dropna(subset=["vin"])
     
     # Generate new UUIDs for new entries
     fleet_info["id"] = Series([str(uuid.uuid4()) for _ in range(len(fleet_info))], dtype="string")
@@ -77,7 +85,7 @@ def update_table_with_df(df: DF, table_name: str, key_col: str):
     # Handle Updates
     if not df_to_update.empty:
         update_columns = df_to_update.columns.drop([key_col, 'id']).intersection(rdb_table.columns)
-        for key, row in df_to_update.iterrows():
+        for key, row in track(df_to_update.iterrows(), description="Updating existing rows", total=len(df_to_update)):
             row = row[update_columns].dropna()
             if row.empty:
                 continue
@@ -88,20 +96,23 @@ def update_table_with_df(df: DF, table_name: str, key_col: str):
                 SET {set_clause}
                 WHERE {key_col} = :key_value
             """)
-            
+
             # Prepare parameters including the key
             parameters = {col: row[col] for col in row.index}
             parameters['key_value'] = df_to_update.loc[key, key_col]
-            
-            print(f"Executing UPDATE for {key_col}={parameters['key_value']}")
+
             connection.execute(update_statement, parameters)
+    connection.commit()
     
     # Handle Inserts
     if not df_to_insert.empty:
         insert_columns = df_to_insert.columns.intersection(rdb_table.columns)
         df_to_insert = df_to_insert[insert_columns]
         
-        for _, row in df_to_insert.iterrows():
+        for _, row in track(df_to_insert.iterrows(), description="Inserting new rows"):
+            if row.isna()["id"]:
+                logger.warning(f"row is empty for vin={row.get('vin', 'no vin')}")
+                continue
             row = row.dropna()
             columns = ', '.join(row.index)
             values = ', '.join([f":{col}" for col in row.index])
@@ -112,14 +123,13 @@ def update_table_with_df(df: DF, table_name: str, key_col: str):
             """)
             
             parameters = {col: row[col] for col in row.index}
-            print(f"Executing INSERT for {key_col}={parameters[key_col]}")
             connection.execute(insert_statement, parameters)
     
     # Commit all changes
     connection.commit()
 
 if __name__ == "__main__":
-    print('ok')
+    set_level_of_loggers_with_prefix("DEBUG", "transform.fleet_info")
     single_dataframe_script_main(update_db_vehicle_table)
 
 fleet_info = get_fleet_info()
