@@ -1,15 +1,13 @@
 from logging import getLogger
 
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, create_engine, text, inspect
 
-from rich.progress import track
 from core.pandas_utils import *
 from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR
 from core.env_utils import get_env_var
 from core.logging_utils import set_level_of_loggers_with_prefix
 
 logger = getLogger(__name__)
-set_level_of_loggers_with_prefix("INFO", "sql_utils")
 
 def get_sqlalchemy_engine() -> Engine:
     db_uri_format_dict = {key: get_env_var(key) for key in DB_URI_FORMAT_KEYS}
@@ -18,69 +16,57 @@ def get_sqlalchemy_engine() -> Engine:
 
     return engine
 
-def update_table_with_df(df: DF, table_name: str, key_col: str):
+def upsert_table_with_df(df: DF, table: str, key_col: str, logger: Logger=logger):
+    logger.info(f"Upserting table {table} with {len(df)} rows")
     # Convert datetime columns in the DataFrame
     for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
         df[col] = pd.to_datetime(df[col]).dt.strftime('%Y-%m-%d %H:%M:%S')
-
     # Get existing records from the table
-    rdb_table = pd.read_sql_table(table_name, connection).dropna(subset=[key_col])
-    existing_keys = set(rdb_table[key_col])
-
+    rdb_table = pd.read_sql_table(table, connection).dropna(subset=[key_col])
+    existing_keys_mask = df[key_col].isin(rdb_table[key_col])
+    insert_columns = df.columns.intersection(rdb_table.columns)
+    # Get metadata of the table to find not-null columns and remove rows with null columns
+    inspector = inspect(engine)
+    columns_info = inspector.get_columns(table)
+    notna_cols = [col['name'] for col in columns_info if not col['nullable']]
+    df = df.dropna(subset=notna_cols, how="any")
     # Split DataFrame into records to update and records to insert
-    df_to_update = df[df[key_col].isin(existing_keys)]
-    df_to_insert = df[~df[key_col].isin(existing_keys)]
-    
-    # Handle Updates
-    if not df_to_update.empty:
-        update_columns = df_to_update.columns.drop([key_col, 'id']).intersection(rdb_table.columns)
-        for key, row in track(df_to_update.iterrows(), description="Updating existing rows", total=len(df_to_update)):
-            row = row[update_columns].dropna()
-            if row.empty:
-                logger.warning(f"cannot update row for vin={row.get(key_col, f'no {key_col}')}, row is empty")
-                continue
-                
-            set_clause = ', '.join([f"{col} = :{col}" for col in row.index])
-            update_statement = text(f"""
-                UPDATE {table_name}
-                SET {set_clause}
-                WHERE {key_col} = :key_value
-            """)
+    df_to_update = df.loc[existing_keys_mask, insert_columns]
+    df_to_insert = df.loc[~existing_keys_mask, insert_columns]
 
-            # Prepare parameters including the key
-            parameters = {col: row[col] for col in row.index}
-            parameters['key_value'] = df_to_update.loc[key, key_col]
+    df_to_update.apply(update_row, axis=1, table=table, key_col=key_col)
+    df_to_insert.apply(insert_row, axis=1, table=table, key_col=key_col)
 
-            connection.execute(update_statement, parameters)
-    connection.commit()
-    
-    # Handle Inserts
-    if not df_to_insert.empty:
-        insert_columns = df_to_insert.columns.intersection(rdb_table.columns)
-        df_to_insert = df_to_insert[insert_columns]
-        
-        for _, row in track(df_to_insert.iterrows(), description="Inserting new rows"):
-            if row.isna()[key_col]:
-                logger.warning(f"cannot insert row for {key_col}={row.get(key_col, f'no {key_col}')}.")
-                continue
-            row = row.dropna()
-            columns = ', '.join(row.index)
-            values = ', '.join([f":{col}" for col in row.index])
-            
-            insert_statement = text(f"""
-                INSERT INTO {table_name} ({columns})
-                VALUES ({values})
-            """)
-            
-            parameters = {col: row[col] for col in row.index}
-            connection.execute(insert_statement, parameters)
-    
-    # Commit all changes
     connection.commit()
 
+def update_row(row: Series, table: str, key_col: str):
+    row = row.dropna()
+    set_clause = ', '.join([f"{col} = :{col}" for col in row.index])
+    update_statement = text(f"""
+        UPDATE {table}
+        SET {set_clause}
+        WHERE {key_col} = :key_value
+    """)
+    parameters = row.to_dict() | {"key_value": row[key_col]}
+    connection.execute(update_statement, parameters)
+
+def insert_row(row: Series, table: str, key_col: str):
+    row = row.dropna()
+    columns = ', '.join(row.index)
+    values = ', '.join([f":{col}" for col in row.index])
+    
+    insert_statement = text(f"""
+        INSERT INTO {table} ({columns})
+        VALUES ({values})
+    """)
+    logger.debug(f"Inserting row for {key_col}={row.get(key_col, f'no {key_col}')}")
+    parameters = {col: row[col] for col in row.index}
+    connection.execute(insert_statement, parameters)
 
 engine = get_sqlalchemy_engine()
 connection = engine.connect()
 
 if __name__ == "__main__":
+    set_level_of_loggers_with_prefix("INFO", "sql_utils")
     print(engine)
+
