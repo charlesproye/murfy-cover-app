@@ -5,7 +5,7 @@ from datetime import datetime as DT
 
 from core.pandas_utils import *
 from core.logging_utils import set_level_of_loggers_with_prefix
-from core.sql_utils import connection, update_table_with_df
+from core.sql_utils import connection, upsert_table_with_df
 from core.ev_models_info import models_info
 from core.console_utils import single_dataframe_script_main
 from transform.fleet_info.ayvens_fleet_info import fleet_info as ayvens_fleet_info
@@ -16,7 +16,7 @@ logger = getLogger("transform.fleet_info")
 
 def update_db_vehicle_table() -> DF:
     fleet_info = get_fleet_info_to_update_rdb_vehicle_table()
-    update_table_with_df(fleet_info, "vehicle", "vin")
+    upsert_table_with_df(fleet_info, "vehicle", "vin", logger=logger)
     
     return fleet_info
 
