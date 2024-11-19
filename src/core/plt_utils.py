@@ -1,7 +1,8 @@
-from pandas import DataFrame as DF
 import plotly.express as px
 from plotly.graph_objects import Figure
+import plotly.graph_objects as go
 
+from core.pandas_utils import *
 from core.config import *
 
 def plt_3d_df(
@@ -42,3 +43,40 @@ def plt_3d_df(
             ),
         )
     )
+
+def plt_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, id_col:str, marker_size:int=8) -> Figure:
+    arrow_df = (
+        df
+        .assign(empty_col=pd.NA)
+        .loc[:, [x, id_col, old_y, new_y, "empty_col"]]
+        .set_index([x, id_col], append=True)
+        .T
+        .unstack()
+        .to_frame()
+        .rename(columns={0: old_y})
+        .reset_index()
+    )
+
+    fig = (
+        px.scatter(
+            arrow_df,
+            "odometer",
+            "soh",
+            color="id",
+        )
+        .add_trace(
+            go.Scatter(
+                x=arrow_df["odometer"],
+                y=arrow_df["soh"],
+                mode="markers+lines",
+                marker=dict(
+                    symbol="arrow",
+                    color="royalblue",
+                    size=marker_size,
+                    angleref="previous",
+                    standoff=marker_size / 2,
+                ),
+            )
+        )
+    )
+    fig.show()
