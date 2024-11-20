@@ -32,7 +32,6 @@ RENAME_COLS_DICT:dict[str, str] = {
     "charging.estimated_range": "estimated_range",
     "charging.battery_level": "soc",
     "soc_hv_header": "soc",
-    "charging.battery_energy": "battery_energy",
     # BMW
     #"date": "date", # renaming is useless but we will use the key to determine what columns to keep
     "charging_ac_ampere": "charging_ac_current",
@@ -90,6 +89,8 @@ COL_DTYPES = {
     "est_battery_range": "float32",
     "inside_temp": "float32",
     "outside_temp": "float32",
+    "charging_state": "string",
+    "fast_charger_type": "string",
 }
 
 CHARGING_STATUS_VAL_TO_MASK = {
