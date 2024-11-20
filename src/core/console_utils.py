@@ -53,8 +53,8 @@ def main_decorator(main_func):
 def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], logger:Union[Logger, None]=None, **kwargs) -> DF:
     df:DF = dataframe_gen(**kwargs)
     show = logger.info if logger is not None else print
+    show(df)
     with pd.option_context("display.max_columns", None, "display.expand_frame_repr", False):
-        show(df)
         show("sanity check:")
         show(sanity_check(df))
         show(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")

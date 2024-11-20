@@ -49,6 +49,7 @@ FLEET_INFO_COLS_NAME_MAPPING = {
     "end_of_contract": "end_of_contract_date",
     "activated": "activation_status",
     "type": "version",
+    "ownership_": "owner",
 }
 MODEL_VERSION_NAME_MAPPING = {
     "R90 Life (batterijkoop) 5d": "R90",
@@ -94,7 +95,7 @@ AYVENS_COL_DTYPES = {
     "country": "string",
     "category": "string",
     "activated": "string",
-    "ownership": "string",
+    "owner": "string",
     # "registration_date": "object",
     "contract_start_date": "datetime64[ns]",
     "vin": "string",

@@ -196,10 +196,18 @@ def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Lo
         index_loc = df.index.intersection(index_loc)
     if col_loc is not None:
         col_loc = df.columns.intersection(col_loc)
-    return df.loc[(index_loc if index_loc is not None else df.index), (col_loc if col_loc is not None else df.columns)]
+
+    if col_loc is None and not index_loc is None:
+        return df.loc[index_loc]
+    if not col_loc is None and index_loc is None:
+        return df.loc[:, col_loc]
+    if not col_loc is None and not index_loc is None:
+        return df.loc[index_loc, col_loc]
+        
+    raise ValueError("col_loc and index_loc cannot both be None.")
 
 def dropna_cols(df:DF, logger:Logger=logger) -> DF:
     logger.info(f"dropna_cols called.")
-    logger.debug(f"all nan cols:\n{df.notna().any(axis=0)}")
+    logger.debug(f"notna cols:\n{df.notna().any(axis=0)}")
     return df.loc[:, df.notna().any(axis=0)]
 
