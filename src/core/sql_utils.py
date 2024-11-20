@@ -45,7 +45,7 @@ def upsert_table_with_df(df: DF, table: str, key_col: str, logger: Logger=logger
 
 def update_row(row: Series, table: str, key_col: str, progress: Progress, task_id: int):
     row = row.dropna()
-    set_clause = ', '.join([f"{col} = :{col}" for col in row.index])
+    set_clause = ', '.join([f"{col} = :{col}" for col in row.index if col != "id"])
     update_statement = text(f"""
         UPDATE {table}
         SET {set_clause}
