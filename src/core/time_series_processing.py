@@ -22,12 +22,14 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
     """
     logger.info(f"compute_charging_n_discharging_masks called.")
     if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
+        logger.debug(f"Computing charging and discharging masks using charging status dictionary.")
         return (
             tss
             .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
             .eval("in_discharge = ~in_charge")
         )
     elif "soc" in tss.columns:
+        logger.debug(f"Computing charging and discharging masks using soc difference.")
         if id_col in tss.columns:
             return (
                 tss
