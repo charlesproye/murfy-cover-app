@@ -601,13 +601,14 @@ class MergedLights(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=Tru
 class RearPassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     left: TimestampedValue[bool | str | None]
     right: TimestampedValue[bool | str | None]
-    central: TimestampedValue[bool | str | None]
+    central: Optional[TimestampedValue[bool | str | None]] = None  # Rendre 'central' optionnel
 
     def __post_init__(self):
         # Convertir les valeurs en booléens
         self.left.value = self._convert_to_bool(self.left.value)
         self.right.value = self._convert_to_bool(self.right.value)
-        self.central.value = self._convert_to_bool(self.central.value)
+        if self.central is not None:
+            self.central.value = self._convert_to_bool(self.central.value)
 
     @staticmethod
     def _convert_to_bool(value):
