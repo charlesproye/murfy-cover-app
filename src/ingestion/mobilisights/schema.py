@@ -618,12 +618,13 @@ class RearPassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_def
 
 
 class PassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    front: TimestampedValue[bool]
-    rear: Optional[RearPassengerSeatbelt] = None  # Rendre 'rear' optionnel
+    front: Optional[TimestampedValue[bool]] = None  # Rendre 'front' optionnel
+    rear: Optional[RearPassengerSeatbelt] = None 
 
     def __post_init__(self):
         # Convertir les valeurs en booléens
-        self.front.value = self._convert_to_bool(self.front.value)
+        if self.front is not None:
+            self.front.value = self._convert_to_bool(self.front.value)
 
     @staticmethod
     def _convert_to_bool(value):

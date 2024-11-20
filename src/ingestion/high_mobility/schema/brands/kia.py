@@ -22,7 +22,7 @@ class KiaCharging(msgspec.Struct):
     plugged_in: Optional[HMApiValue[str]] = None
 
 
-@register_brand(rate_limit=24 * 60 * 60)
+@register_brand(rate_limit=36)
 class KiaInfo(HMApiResponse):
     diagnostics: Optional[KiaDiagnostics] = None
     charging: Optional[KiaCharging] = None
