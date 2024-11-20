@@ -22,17 +22,20 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
     """
     logger.info(f"compute_charging_n_discharging_masks called.")
     if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
+        logger.debug(f"Computing charging and discharging masks using charging status dictionary.")
         return (
             tss
             .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
             .eval("in_discharge = ~in_charge")
         )
     elif "soc" in tss.columns:
+        logger.debug(f"Computing charging and discharging masks using soc difference.")
         if id_col in tss.columns:
             return (
                 tss
                 .groupby(id_col)
                 .apply(low_freq_compute_charge_n_discharge_vars)
+                .reset_index(drop=True)
             )
         else:
             return low_freq_compute_charge_n_discharge_vars(tss)
@@ -86,7 +89,8 @@ def low_freq_mask_in_motion_periods(ts:DF) -> DF:
 def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
     """Use for time series where there can be more than 6 hours in between soc points"""
     MAX_CHARGE_TIME_DIFF = TD(hours=6)
-    if not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex):
+    date_not_index = not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex)
+    if date_not_index:
         ts = ts.set_index("date", drop=False)
         ts = ts.sort_index()
     ts = ts.pipe(high_freq_in_discharge_and_charge_from_soc_diff)
@@ -97,7 +101,8 @@ def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
     ts["in_discharge"] = ts.eval("in_discharge & last_notna_soc_diff_low_enough & date_diff_low_enough")
     ts = perf_mask_and_idx_from_condition_mask(ts, "in_charge")
     ts = perf_mask_and_idx_from_condition_mask(ts, "in_discharge")
-
+    if date_not_index:
+        ts = ts.reset_index(drop=True)
     return ts
 
 
