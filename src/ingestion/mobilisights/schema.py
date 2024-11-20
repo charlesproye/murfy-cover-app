@@ -1,7 +1,7 @@
 import datetime
 from datetime import datetime as dt
 from enum import StrEnum
-from typing import Annotated, Generic, Iterable, Optional, Self, TypeVar
+from typing import Annotated, Optional, Self, TypeVar, Generic, Iterable
 
 import msgspec
 
@@ -9,19 +9,11 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 
-class WithTimestamp(
-    msgspec.Struct,
-    forbid_unknown_fields=True,
-    omit_defaults=True,
-    rename="camel",
-):
+class WithTimestamp(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     datetime: dt
 
 
-class TimestampedValue(
-    WithTimestamp,
-    Generic[T],
-):
+class TimestampedValue(WithTimestamp, Generic[T]):
     value: T
 
     @classmethod
@@ -33,21 +25,12 @@ class TimestampedValue(
         return res
 
 
-class ValueWithUnit(
-    msgspec.Struct,
-    Generic[T, U],
-    forbid_unknown_fields=True,
-    omit_defaults=True,
-    rename="camel",
-):
+class ValueWithUnit(msgspec.Struct, Generic[T, U], forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     value: T
     unit: U
 
 
-class TimestampedValueWithUnit(
-    WithTimestamp,
-    Generic[T, U],
-):
+class TimestampedValueWithUnit(WithTimestamp, Generic[T, U]):
     value: T
     unit: U
 
@@ -60,9 +43,7 @@ class TimestampedValueWithUnit(
         return res
 
 
-class Percentage(
-    msgspec.Struct,
-):
+class Percentage(msgspec.Struct):
     percentage: str | float
 
     def __post_init__(self):
@@ -171,31 +152,21 @@ class EngineSpeedUnit(StrEnum):
     revolutions_per_minute = "rpm"
 
 
-class EngineSmall(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class EngineSmall(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     status: Optional[TimestampedValue[EngineStatus]] = None
     speed: Optional[TimestampedValueWithUnit[float, EngineSpeedUnit]] = None
 
 
-class Fuel(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
-    average_consumption: Optional[
-        TimestampedValueWithUnit[float, FuelConsumptionUnit]
-    ] = None
-    instant_consumption: Optional[
-        TimestampedValueWithUnit[float, FuelConsumptionUnit]
-    ] = None
+class Fuel(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+    average_consumption: Optional[TimestampedValueWithUnit[float, FuelConsumptionUnit]] = None
+    instant_consumption: Optional[TimestampedValueWithUnit[float, FuelConsumptionUnit]] = None
     total_consumption: Optional[TimestampedValueWithUnit[float, VolumeUnit]] = None
     level: Optional[FuelConsumptionLevel] = None
     residual_autonomy: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
     engine: Optional[EngineSmall] = None
 
 
-class MergedFuel(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedFuel(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     average_consumption: list[TimestampedValueWithUnit[float, FuelConsumptionUnit]] = []
     instant_consumption: list[TimestampedValueWithUnit[float, FuelConsumptionUnit]] = []
     total_consumption: list[TimestampedValueWithUnit[float, VolumeUnit]] = []
@@ -241,12 +212,13 @@ class EnergyUnit(StrEnum):
 
 
 class EnergyConsumptionLevel(WithTimestamp):
-    value: float
-    unit: EnergyUnit
-    percentage: str | float
+    value: Optional[float] = None  # Rendre 'value' optionnel
+    unit: Optional[EnergyUnit] = None  # Rendre 'unit' optionnel
+    percentage: Optional[str | float] = None  # Rendre 'percentage' optionnel
 
     def __post_init__(self):
-        self.percentage = float(self.percentage)
+        if self.percentage is not None:
+            self.percentage = float(self.percentage)
 
     @classmethod
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
@@ -282,10 +254,10 @@ class ChargingMode(StrEnum):
 class Charging(WithTimestamp):
     plugged: bool
     status: ChargingStatus
-    remaining_time: int  # Changez Duration en int
-    rate: ValueWithUnit[float, ChargingRateUnit]
+    remaining_time: int
     mode: ChargingMode
     planned: dt
+    rate: int | ValueWithUnit[float, ChargingRateUnit] 
 
     @classmethod
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
@@ -296,18 +268,12 @@ class Charging(WithTimestamp):
         return res
 
 
-class Electricity(
-    msgspec.Struct, 
-    forbid_unknown_fields=True, 
-    omit_defaults=True, 
-    rename="camel"
-):
-    instant_consumption: Optional[TimestampedValueWithUnit[float, EnergyConsumptionUnit]] = None
-    level: Optional[EnergyConsumptionLevel] = None
-    residual_autonomy: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
-    battery_capacity: Optional[TimestampedValueWithUnit[float, CapacityUnit]] = None
+class Electricity(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+    capacity: Optional[TimestampedValueWithUnit[float, CapacityUnit]] = None
     charging: Optional[Charging] = None
     engine: Optional[EngineSmall] = None
+    residual_autonomy: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
+    level: Optional[EnergyConsumptionLevel] = None
 
     @classmethod
     def __struct_from_dict__(cls, d):
@@ -316,9 +282,7 @@ class Electricity(
         return super().__struct_from_dict__(d)
 
 
-class MergedElectricity(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     instant_consumption: list[TimestampedValueWithUnit[float, EnergyConsumptionUnit]] = []
     level: list[EnergyConsumptionLevel] = []
     residual_autonomy: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
@@ -363,9 +327,7 @@ class PressureUnit(StrEnum):
     psi = "psi"
 
 
-class EngineOil(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class EngineOil(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     temperature: Optional[TimestampedValueWithUnit[float, TemperatureUnit]] = None
     pressure: Optional[TimestampedValueWithUnit[float, PressureUnit]] = None
     life_left: Optional[Percentage] = None
@@ -389,15 +351,11 @@ class EngineBattery(WithTimestamp):
         return res
 
 
-class EngineCoolant(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class EngineCoolant(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     temperature: TimestampedValueWithUnit[float, TemperatureUnit]
 
 
-class Engine(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class Engine(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     oil: Optional[EngineOil] = None
     contact: Optional[TimestampedValue[bool]] = None
     status: Optional[TimestampedValue[EngineStatus]] = None
@@ -409,9 +367,7 @@ class Engine(
     coolant: Optional[EngineCoolant] = None
 
 
-class MergedEngine(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedEngine(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     oil_temperature: list[TimestampedValueWithUnit[float, TemperatureUnit]] = []
     oil_pressure: list[TimestampedValueWithUnit[float, PressureUnit]] = []
     contact: list[TimestampedValue[bool]] = []
@@ -469,16 +425,12 @@ class MergedEngine(
         return res
 
 
-class ParkAssistValue(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class ParkAssistValue(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     alarm: TimestampedValue[bool]
     muted: TimestampedValue[bool]
 
 
-class MergedParkAssistValue(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedParkAssistValue(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     alarm: list[TimestampedValue[bool]] = []
     muted: list[TimestampedValue[bool]] = []
 
@@ -494,16 +446,12 @@ class MergedParkAssistValue(
         return res
 
 
-class ParkAssist(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class ParkAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     front: ParkAssistValue
     rear: ParkAssistValue
 
 
-class MergedParkAssist(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedParkAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     front: Optional[MergedParkAssistValue] = None
     rear: Optional[MergedParkAssistValue] = None
 
@@ -519,22 +467,16 @@ class MergedParkAssist(
         return res
 
 
-class KeepAssist(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class KeepAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     right: TimestampedValue[bool]
     left: TimestampedValue[bool]
 
 
-class Lane(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class Lane(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     keep_assist: KeepAssist
 
 
-class MergedLaneKeepAssist(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedLaneKeepAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     right: list[TimestampedValue[bool]] = []
     left: list[TimestampedValue[bool]] = []
 
@@ -562,9 +504,7 @@ class MergedLaneKeepAssist(
         return res
 
 
-class Adas(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class Adas(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     park_assist: Optional[ParkAssist] = None
     lane: Optional[Lane] = None
     esp: Optional[TimestampedValue[bool]] = None
@@ -574,9 +514,7 @@ class Adas(
     sli: Optional[TimestampedValueWithUnit[float, SpeedUnit]] = None
 
 
-class MergedAdas(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedAdas(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     park_assist: Optional[MergedParkAssist] = None
     lane_keep_assist: Optional[MergedLaneKeepAssist] = None
     esp: list[TimestampedValue[bool]] = []
@@ -612,9 +550,7 @@ class MergedAdas(
         return res
 
 
-class FogLights(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class FogLights(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     front: TimestampedValue[bool]
     rear: TimestampedValue[bool]
 
@@ -624,17 +560,13 @@ class Turn(StrEnum):
     right = "right"
 
 
-class Lights(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class Lights(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     fog: Optional[FogLights] = None
     turn: Optional[TimestampedValue[Turn]] = None
     warnings: Optional[TimestampedValue[bool]] = None
 
 
-class MergedLights(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedLights(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     fog_front: list[TimestampedValue[bool]] = []
     fog_rear: list[TimestampedValue[bool]] = []
     turn: list[TimestampedValue[Turn]] = []
@@ -666,31 +598,45 @@ class MergedLights(
         return res
 
 
-class RearPassengerSeatbelt(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
-    left: TimestampedValue[bool]
-    right: TimestampedValue[bool]
-    central: TimestampedValue[bool]
+class RearPassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+    left: TimestampedValue[bool | str | None]
+    right: TimestampedValue[bool | str | None]
+    central: TimestampedValue[bool | str | None]
+
+    def __post_init__(self):
+        # Convertir les valeurs en booléens
+        self.left.value = self._convert_to_bool(self.left.value)
+        self.right.value = self._convert_to_bool(self.right.value)
+        self.central.value = self._convert_to_bool(self.central.value)
+
+    @staticmethod
+    def _convert_to_bool(value):
+        if isinstance(value, str):
+            return value.lower() == 'true'
+        return bool(value)
 
 
-class PassengerSeatbelt(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class PassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     front: TimestampedValue[bool]
-    rear: RearPassengerSeatbelt
+    rear: Optional[RearPassengerSeatbelt] = None  # Rendre 'rear' optionnel
+
+    def __post_init__(self):
+        # Convertir les valeurs en booléens
+        self.front.value = self._convert_to_bool(self.front.value)
+
+    @staticmethod
+    def _convert_to_bool(value):
+        if isinstance(value, str):
+            return value.lower() == 'true'
+        return bool(value)
 
 
-class Seatbelt(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class Seatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     driver: Optional[TimestampedValue[bool]] = None
-    passenger: Optional[PassengerSeatbelt] = None
+    passenger: Optional[PassengerSeatbelt] = None  # Rendre 'passenger' optionnel
 
 
-class MergedSeatbelt(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     driver: list[TimestampedValue[bool]] = []
     passenger_front: list[TimestampedValue[bool]] = []
     passenger_rear_left: list[TimestampedValue[bool]] = []
@@ -740,23 +686,17 @@ class MergedSeatbelt(
         return res
 
 
-class TirePairPressure(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class TirePairPressure(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     left: TimestampedValueWithUnit[float, PressureUnit]
     right: TimestampedValueWithUnit[float, PressureUnit]
 
 
-class TirePressure(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class TirePressure(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     front: Optional[TirePairPressure] = None
     rear: Optional[TirePairPressure] = None
 
 
-class MergedTirePressure(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedTirePressure(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     front_left: list[TimestampedValueWithUnit[float, PressureUnit]] = []
     front_right: list[TimestampedValueWithUnit[float, PressureUnit]] = []
     rear_left: list[TimestampedValueWithUnit[float, PressureUnit]] = []
@@ -815,9 +755,7 @@ class TransmissionGearStateValue(StrEnum):
     sna = "sna"
 
 
-class TransmissionGear(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class TransmissionGear(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     state: TimestampedValue[TransmissionGearStateValue]
 
 
@@ -827,16 +765,12 @@ class PrivacyState(StrEnum):
     full = "full"
 
 
-class SetupAdas(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class SetupAdas(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     lane_keep_assist: TimestampedValue[bool]
     blind_spot_monitoring: TimestampedValue[bool]
 
 
-class Setup(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class Setup(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     privacy: Optional[TimestampedValue[bool]] = None
     privacy_state: Optional[TimestampedValue[PrivacyState]] = None
     requested_privacy: Optional[TimestampedValue[bool]] = None
@@ -844,9 +778,7 @@ class Setup(
     adas: Optional[SetupAdas] = None
 
 
-class MergedSetup(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedSetup(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     privacy: list[TimestampedValue[bool]] = []
     privacy_state: list[TimestampedValue[PrivacyState]] = []
     requested_privacy: list[TimestampedValue[bool]] = []
@@ -888,24 +820,18 @@ class MergedSetup(
         return res
 
 
-class Maintenance(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class Maintenance(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     date: Optional[TimestampedValue[datetime.date]] = None
     odometer: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
 
 
-class Crash(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class Crash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     auto_ecall: Optional[TimestampedValue[bool]] = None
     pedestrian: Optional[TimestampedValue[bool]] = None
     tipped_over: Optional[TimestampedValue[bool]] = None
 
 
-class MergedCrash(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedCrash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     auto_ecall: list[TimestampedValue[bool]] = []
     pedestrian: list[TimestampedValue[bool]] = []
     tipped_over: list[TimestampedValue[bool]] = []
@@ -925,18 +851,12 @@ class MergedCrash(
         return res
 
 
-class CarState(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     _id: Annotated[str, msgspec.Meta(pattern="^[a-z0-9]{24}$")]
     vin: Annotated[str, msgspec.Meta(pattern="^[A-Z0-9]{17}$")]
     datetime: dt
     datetime_sending: dt
-    heading: Optional[
-        TimestampedValueWithUnit[
-            Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit
-        ]
-    ] = None
+    heading: Optional[TimestampedValueWithUnit[Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit]] = None
     geolocation: Optional[Geolocation] = None
     odometer: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
     moving: Optional[TimestampedValue[bool]] = None
@@ -947,9 +867,7 @@ class CarState(
     fuel: Optional[Fuel] = None
     electricity: Optional[Electricity] = None
     engine: Optional[Engine] = None
-    external_temperature: Optional[TimestampedValueWithUnit[float, TemperatureUnit]] = (
-        None
-    )
+    external_temperature: Optional[TimestampedValueWithUnit[float, TemperatureUnit]] = None
     adas: Optional[Adas] = None
     alerts: Optional[TimestampedValue[list[str]]] = None
     lights: Optional[Lights] = None
@@ -961,16 +879,10 @@ class CarState(
     crash: Optional[Crash] = None
 
 
-class MergedCarState(
-    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
-):
+class MergedCarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     _id: Annotated[str, msgspec.Meta(pattern="^[a-z0-9]{24}$")]
     vin: Annotated[str, msgspec.Meta(pattern="^[A-Z0-9]{17}$")]
-    heading: list[
-        TimestampedValueWithUnit[
-            Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit
-        ]
-    ] = []
+    heading: list[TimestampedValueWithUnit[Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit]] = []
     geolocation: list[Geolocation] = []
     odometer: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
     moving: list[TimestampedValue[bool]] = []
@@ -1076,4 +988,3 @@ class MergedCarState(
 class ErrorMesage(msgspec.Struct):
     name: str
     message: str
-
