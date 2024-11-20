@@ -10,11 +10,12 @@ mercedes-benz,Sprinter,Sprinter,,160
 renault,zoe,R90,41.0,
 renault,zoe,R110,52.0,
 renault,zoe,R135,52.0,
-volvo,XC40 Recharge,P8 AWD R-Design,75,418
-volvo,XC40 Recharge,Twin Pure Electric Pro,79,535
-volvo,XC40 Recharge,Pure Electric Plus,75, 414
-volvo,XC40 Recharge,P8 AWD,75,418
-volvo,C40 Recharge,Pure Electric 170 KW Plus,75,418
+
+volvo,xc40 recharge,p8 awd r-design,75,418
+volvo,xc40 recharge,twin pure electric pro,79,535
+volvo,xc40 recharge,pure electric plus,75, 414
+volvo,xc40 recharge,p8 awd,75,418
+volvo,c40 recharge,pure electric 170 KW plus,75,418
 
 Tesla,model s,long range,95,530
 Tesla,model s,long range plus,98,555
