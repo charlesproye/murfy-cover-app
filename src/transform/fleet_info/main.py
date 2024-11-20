@@ -33,8 +33,6 @@ def get_fleet_info_to_update_rdb_vehicle_table() -> DF:
     for table_name, kwargs in RDB_TABLES_MERGE_KWARGS.items():
         db_table = pd.read_sql_table(table_name, connection)
         fleet_info = left_merge(fleet_info, db_table, **kwargs)
-    # Set purchase date to now for new entries
-    fleet_info["purchase_date"] = DT.now()
     fleet_info = fleet_info.dropna(subset=["vin"])
     # Generate new UUIDs for new entries
     uuids_lst = [str(uuid.uuid4()) for _ in range(len(fleet_info))]
