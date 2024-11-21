@@ -50,7 +50,7 @@ class RenaultUsage(msgspec.Struct):
 class RenaultInfo(HMApiResponse):
     diagnostics: Optional[RenaultDiagnostics] = None
     charging: Optional[RenaultCharging] = None
-
+    climate: Optional[RenaultClimate] = None
 
 class MergedRenaultDiagnostics(msgspec.Struct):
     odometer: list[HMApiValue[DataWithUnit[float]]] = []
@@ -244,6 +244,7 @@ class MergedRenaultUsage(msgspec.Struct):
 class MergedRenaultInfo(msgspec.Struct):
     diagnostics: MergedRenaultDiagnostics
     charging: MergedRenaultCharging
+    climate: MergedRenaultClimate
 
     @classmethod
     def new(cls) -> Self:
@@ -254,11 +255,13 @@ class MergedRenaultInfo(msgspec.Struct):
         return cls(
             MergedRenaultDiagnostics.from_initial(initial.diagnostics),
             MergedRenaultCharging.from_initial(initial.charging),
+            MergedRenaultClimate.from_initial(initial.climate),
         )
 
     def merge(self, other: RenaultInfo):
         self.diagnostics.merge(other.diagnostics)
         self.charging.merge(other.charging)
+        self.climate.merge(other.climate)
 
 
 

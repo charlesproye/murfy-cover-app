@@ -253,7 +253,6 @@ class HMIngester:
             f"Starting processing for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
         )
         error, info = self.__api.get_vehicle_info(vehicle.vin)
-
         def log_error(info):
             self.__ingester_logger.error(
                 f"Error getting info for VIN {vehicle.vin} (brand {vehicle.brand}) (request {info['request_id']}): {info['errors'][0]['title']} - {info['errors'][0]['detail']}"
