@@ -1,7 +1,5 @@
-<<<<<<< HEAD
 import plotly.express as px
 from plotly.graph_objects import Figure
-=======
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as DF
@@ -9,7 +7,6 @@ from pandas import Series
 import plotly.express as px
 from plotly.graph_objects import Figure
 from plotly.graph_objects import Trace
->>>>>>> dev
 import plotly.graph_objects as go
 
 from core.pandas_utils import *
