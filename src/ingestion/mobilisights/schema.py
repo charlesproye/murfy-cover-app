@@ -869,7 +869,7 @@ class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, r
     fuel: Optional[Fuel] = None
     electricity: Optional[Electricity] = None
     engine: Optional[Engine] = None
-    external_temperature: Optional[TimestampedValueWithUnit[float, TemperatureUnit]] = None
+    external_temperature: Optional[TimestampedValueWithUnit[float, TemperatureUnit]] = None  # This field will be renamed to externalTemperature
     adas: Optional[Adas] = None
     alerts: Optional[TimestampedValue[list[str]]] = None
     lights: Optional[Lights] = None
