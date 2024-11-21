@@ -1,5 +1,15 @@
+<<<<<<< HEAD
 import plotly.express as px
 from plotly.graph_objects import Figure
+=======
+import numpy as np
+import pandas as pd
+from pandas import DataFrame as DF
+from pandas import Series
+import plotly.express as px
+from plotly.graph_objects import Figure
+from plotly.graph_objects import Trace
+>>>>>>> dev
 import plotly.graph_objects as go
 
 from core.pandas_utils import *
@@ -80,3 +90,4 @@ def plt_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, id_c
         )
     )
     fig.show()
+
