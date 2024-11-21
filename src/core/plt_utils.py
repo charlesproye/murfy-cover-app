@@ -1,3 +1,5 @@
+import plotly.express as px
+from plotly.graph_objects import Figure
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as DF
@@ -7,6 +9,7 @@ from plotly.graph_objects import Figure
 from plotly.graph_objects import Trace
 import plotly.graph_objects as go
 
+from core.pandas_utils import *
 from core.config import *
 
 def plt_3d_df(
@@ -48,29 +51,40 @@ def plt_3d_df(
         )
     )
 
-
-def plotly_axvfill(df:DF, x:str, mask_col:str, bottom:float=0, top:float=1, **kwargs) -> Trace:
-    df = df.set_index(x, drop=False)
-    mask = df[mask_col]
-    mask_changes_index = mask.shift(fill_value=False).ne(mask)[mask].index
-    repeated_values = np.repeat(mask_changes_index.values, 2)
-    x = (
-        pd.DataFrame(repeated_values.reshape(-1, 4))
-        .assign(nan=pd.NA)
+def plt_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, id_col:str, marker_size:int=8) -> Figure:
+    arrow_df = (
+        df
+        .assign(empty_col=pd.NA)
+        .loc[:, [x, id_col, old_y, new_y, "empty_col"]]
+        .set_index([x, id_col], append=True)
         .T
         .unstack()
-        .reset_index(level=1, drop=False)
-        .astype({"level_1": "float"})
-        .rename(columns={"level_1": "y", 0:"x"})
-        .eval(f"y = y // 2 * {top} + {bottom}")
+        .to_frame()
+        .rename(columns={0: old_y})
+        .reset_index()
     )
-    print("done")
 
-    return go.Scatter(
-        x=x["x"].values,
-        y=x["y"].values,
-        fill="toself",
-        mode="none",  # No lines, just fill
-        **kwargs
+    fig = (
+        px.scatter(
+            arrow_df,
+            "odometer",
+            "soh",
+            color="id",
+        )
+        .add_trace(
+            go.Scatter(
+                x=arrow_df["odometer"],
+                y=arrow_df["soh"],
+                mode="markers+lines",
+                marker=dict(
+                    symbol="arrow",
+                    color="royalblue",
+                    size=marker_size,
+                    angleref="previous",
+                    standoff=marker_size / 2,
+                ),
+            )
+        )
     )
+    fig.show()
 
