@@ -5,19 +5,20 @@ import logging
 import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
+from pandas import Index as Idx
+from pandas import MultiIndex as MultiIdx
 import numpy as np
-
-from core.sql_utils import engine
 
 
 logger = logging.getLogger(__name__)
 
-def flatten_multi_indexed_columns(self: DF) -> DF:
-    self.columns = self.columns.map('_'.join).str.strip()
+def debug_df(df: DF, subset: list[str]=None, logger:Logger=logger) -> DF:
+    show = print if logger is None else logger.debug
+    df_to_debug = df if subset is None else df[subset]
+    show(f"{df_to_debug}")
+    show(sanity_check(df_to_debug))
+    return df
 
-    return self
-
-pd.DataFrame.flatten_multi_indexed_columns = flatten_multi_indexed_columns
 
 PD_OBJ = TypeVar('T', pd.DataFrame, pd.Series)
 def print_data(data: PD_OBJ) -> PD_OBJ:
@@ -105,19 +106,7 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     left_on = [left_on] if not isinstance(left_on, list) else left_on
     right_on = [right_on] if not isinstance(right_on, list) else right_on
     assert len(left_on) == len(right_on), f"left_on and right_on must be the same length, left_on is {len(left_on)} and right_on is: {len(right_on)}"
-    if src_dest_cols is None:
-        src_cols = [col for col in rhs.columns if col not in right_on]
-        dest_cols = [col for col in rhs.columns if col not in right_on]
-    elif isinstance(src_dest_cols, list):
-        src_cols = dest_cols = pd.Index(src_dest_cols).intersection(rhs.columns)
-    elif isinstance(src_dest_cols, pd.Index):
-        src_cols = dest_cols = src_dest_cols
-    elif isinstance(src_dest_cols, dict):
-        src_dest_cols = {key:value for key, value in src_dest_cols.items() if key in rhs.columns}
-        src_cols = list(src_dest_cols.keys())
-        dest_cols = list(src_dest_cols.values())
-    else:
-        raise ValueError(f"src_dest_cols must be None, list, or dict, received: {type(src_dest_cols)}")
+    src_cols, dest_cols = src_dest_for_left_merge(lhs, rhs, left_on, right_on, src_dest_cols)
     logger.debug(f"src_cols: {src_cols}, dest_cols: {dest_cols}")
     lhs_keys = lhs[left_on].itertuples(index=False)
     rhs_keys = rhs[right_on].itertuples(index=False)
@@ -128,10 +117,9 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
         logger.debug("lhs_mask is all False(no lhs[left_on] key is present in rhs[right_on]), returning lhs unchanged.")
         return lhs
     lhs_idx = lhs_idx[lhs_mask]
-    #rhs_idx = rhs_idx.intersection(lhs_idx)
     # Ideally we would use a multi index even if left_on and right_on are single columns.
     # But there seems to be a bug in pandas: when you set the index of rhs with a single level multi index the set_index will default to a base index.
-    # This in turn will break the left merge as we will try to index rhs(with a base index) with lhs_idx(a multi index) and no keys will match.
+    # This in turn will break the left merge as we will try to index rhs, with a base index, with lhs_idx, a multi index, and no keys will match.
     if len(left_on) == 1:
         lhs_idx = pd.Index(lhs_idx.get_level_values(0), name=left_on[0])
         rhs_idx = pd.Index(rhs_idx.get_level_values(0), name=right_on[0])
@@ -143,6 +131,22 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     lhs.loc[lhs_mask, dest_cols] = rhs_data.values
 
     return lhs
+
+def src_dest_for_left_merge(lhs:DF, rhs:DF, left_on:list[str], right_on:list[str], src_dest_cols: list|dict|None) -> tuple[list, list]:
+    if src_dest_cols is None:
+        src_cols = [col for col in rhs.columns if col not in right_on]
+        dest_cols = [col for col in rhs.columns if col not in right_on]
+    elif isinstance(src_dest_cols, list):
+        src_cols = dest_cols = pd.Index(src_dest_cols).intersection(rhs.columns).tolist()
+    elif isinstance(src_dest_cols, pd.Index):
+        src_cols = dest_cols = src_dest_cols
+    elif isinstance(src_dest_cols, dict):
+        src_dest_cols = {key:value for key, value in src_dest_cols.items() if key in rhs.columns}
+        src_cols = list(src_dest_cols.keys())
+        dest_cols = list(src_dest_cols.values())
+    else:
+        raise ValueError(f"src_dest_cols must be None, list, or dict, received: {type(src_dest_cols)}")
+    return src_cols, dest_cols
 
 def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     """
@@ -173,11 +177,11 @@ def sanity_check(df:DF) -> DF:
             nunique_dict[col] = float(df[col].nunique())
         except:
             uniques_dict[col] = []
-            nunique_dict[col] = pd.NA
+            nunique_dict[col] = np.nan
             
     return DF({
         "dtypes": df.dtypes.astype("string"),
-        "nuniques": Series(nunique_dict).astype("int"),
+        "nuniques": Series(nunique_dict).astype("float"),
         "uniques": Series(uniques_dict),
         "count": df.count(),
         "density": df.count().div(len(df)),
