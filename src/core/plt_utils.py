@@ -1,15 +1,10 @@
-<<<<<<< HEAD
-import numpy as np
+import plotly.express as px
+from plotly.graph_objects import Figure
 import pandas as pd
 from pandas import DataFrame as DF
-from pandas import Series
 import plotly.express as px
 from plotly.graph_objects import Figure
-from plotly.graph_objects import Trace
-=======
 import plotly.express as px
-from plotly.graph_objects import Figure
->>>>>>> 8f9c9d9 (WIP: First implementation of arrow scatter plot (not tested yet).)
 import plotly.graph_objects as go
 
 from core.pandas_utils import *

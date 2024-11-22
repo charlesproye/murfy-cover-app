@@ -16,21 +16,22 @@ logger = getLogger("transform.processed_tss.tesla")
 
 @cache_result(S3_PROCESSED_TSS_KEY_FORMAT.format(brand="tesla"), on="s3")
 def get_processed_tss(bucket: S3_Bucket = bucket) -> DF:
-    tss = get_raw_tss(bucket=bucket)
-    tss = tss.rename(columns=RENAME_COLS_DICT, errors="ignore")
-    tss = tss.pipe(safe_locate, col_loc=list(COL_DTYPES.keys()), logger=logger)
-    tss = tss.pipe(safe_astype, COL_DTYPES, logger=logger)
-    tss = tss.drop_duplicates(subset=["vin",  "date"])
-    tss = tss.sort_values(by=["vin",  "date"])
-    tss = tss.eval("in_charge = charging_state == 'Charging'")
-    tss = tss.eval("in_discharge = charging_state == 'Disconnected'")
-    tss = tss.groupby("vin")
-    tss = tss.apply(process_ts, include_groups=False)
-    tss = tss.reset_index(drop=False)
-    tss = tss.sort_values(by=["vin", "date"])
-    tss = tss.pipe(set_all_str_cols_to_lower, but=["vin"])
-    tss = tss.pipe(left_merge, fleet_info.dropna(subset=["vin"]), left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO, logger=logger)
-    return tss
+    return (
+        get_raw_tss(bucket=bucket)
+        .rename(columns=RENAME_COLS_DICT, errors="ignore")
+        .pipe(safe_locate, col_loc=list(COL_DTYPES.keys()), logger=logger)
+        .pipe(safe_astype, COL_DTYPES, logger=logger)
+        .drop_duplicates(subset=["vin",  "date"])
+        .sort_values(by=["vin",  "date"])
+        .eval("in_charge = charging_state == 'Charging'")
+        .eval("in_discharge = charging_state == 'Disconnected'")
+        .groupby("vin")
+        .apply(process_ts, include_groups=False)
+        .reset_index(drop=False)
+        .sort_values(by=["vin", "date"])
+        .pipe(set_all_str_cols_to_lower, but=["vin"])
+        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO, logger=logger)
+    )
 
 def process_ts(raw_ts:DF) -> DF:
     vin = raw_ts.name
