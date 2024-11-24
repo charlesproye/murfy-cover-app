@@ -7,8 +7,6 @@ from pandas import DataFrame as DF
 from pandas import Series
 import numpy as np
 
-from core.sql_utils import engine
-
 
 logger = logging.getLogger(__name__)
 
