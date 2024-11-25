@@ -18,19 +18,17 @@ def get_processed_tss() -> DF:
     raw_tss = get_raw_tss("bmw")
     raw_tss_from_bmw = raw_tss.query("data_provider == 'bmw'")
     raw_tss_from_high_mobility = raw_tss.query("data_provider == 'high_mobility'")
-    logger.debug(f"Sanity check for raw TSS from BMW:\n{sanity_check(raw_tss_from_bmw)}")
-    logger.debug("Processing BNW raw TSS from BMW...")
+    logger.info("Processing BMW raw TSS from raw tss provided by BMW...")
     tss_from_bmw = (
         raw_tss_from_bmw
-        .drop(columns=["date_of_value"])
+        .drop(columns=["date"])
         .pipe(process_raw_tss_provided_by_bmw)
     )
     logger.debug("Done.")
-    logger.debug("Processing BNW raw TSS from high mobility...")
-    logger.debug(f"Sanity check for raw TSS from high mobility:\n{sanity_check(raw_tss_from_high_mobility)}")
+    logger.debug("Processing BMW raw TSS from raw tss provided by high mobility...")
     tss_from_high_mobility = (
         raw_tss_from_high_mobility
-        .drop(columns=["date"])
+        .drop(columns=["date_of_value"])
         .pipe(hm_process_raw_tss)
         .pipe(dropna_cols)
     )
@@ -40,17 +38,14 @@ def get_processed_tss() -> DF:
     logger.debug("Concatenating processed TSS from BMW and high mobility...")
     return pd.concat((tss_from_bmw, tss_from_high_mobility))
 
-def process_raw_tss_provided_by_bmw(raw_tss:DF) -> DF:
-    tss = (
-        raw_tss
-        .rename(columns=RENAME_COLS_DICT, errors="ignore")
-        .pipe(safe_locate, col_loc=list(COL_DTYPES.keys()))
-        .pipe(safe_astype, COL_DTYPES)
-        .sort_values(by=["vin", "date"])
-        .pipe(merge_with_columns, fleet_info, COLS_TO_CPY_FROM_FLEET_INFO, merge_on="vin")
-        .pipe(compute_charging_n_discharging_masks, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK)
-        .pipe(dropna_cols)
-    )
+def process_raw_tss_provided_by_bmw(tss:DF) -> DF:
+    tss = tss.rename(columns=RENAME_COLS_DICT, errors="ignore")
+    tss = safe_locate(tss, col_loc=list(COL_DTYPES.keys()), logger=logger)
+    tss = safe_astype(tss, COL_DTYPES, logger=logger)
+    tss = tss.sort_values(by=["vin", "date"])
+    tss = left_merge(tss, fleet_info, left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO, logger=logger)
+    tss = compute_charging_n_discharging_masks(tss, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
+    tss = dropna_cols(tss, logger=logger)
 
     return tss
 

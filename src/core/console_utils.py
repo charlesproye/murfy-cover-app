@@ -3,7 +3,7 @@ import ast
 from typing import Callable, Union
 from logging import Logger
 
-from pandas import DataFrame as DF
+from core.pandas_utils import *
 from rich.traceback import install as install_rich_traceback
 from rich import print
 
@@ -52,15 +52,11 @@ def main_decorator(main_func):
 @main_decorator
 def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], logger:Union[Logger, None]=None, **kwargs) -> DF:
     df:DF = dataframe_gen(**kwargs)
-    if logger is not None:
-        logger.info(df)
-        logger.info("sanity check:")
-        logger.info(sanity_check(df))
-        logger.info(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
-    else:
-        print(df)
-        print("sanity check:")
-        print(sanity_check(df))
-        print(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
+    show = logger.info if logger is not None else print
+    show(df)
+    with pd.option_context("display.max_columns", None, "display.expand_frame_repr", False):
+        show("sanity check:")
+        show(sanity_check(df))
+        show(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
 
     return df

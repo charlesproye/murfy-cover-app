@@ -5,7 +5,7 @@ import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
 
-from core.config import *
+from transform.raw_tss.config import *
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3_utils import S3_Bucket
 from core.console_utils import single_dataframe_script_main

@@ -21,6 +21,7 @@ GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3_Bucket], DF]] = {
     "peugeot":          hm_get_raw_tss,
     "ds":               hm_get_raw_tss,
     "fiat":             hm_get_raw_tss,
+    "volvo-cars":       hm_get_raw_tss,
 }
 
 def get_raw_tss(brand:str, **kwargs) -> DF:

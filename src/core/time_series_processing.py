@@ -11,7 +11,7 @@ from core.constants import *
 
 logger = getLogger("core.time_series_processing")
 
-def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None) -> DF:
+def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
     """
     ### Description:
     Computes the charging and discharging masks for a time series.
@@ -20,18 +20,22 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
     id_col: optional parameter to provide if the dataframe represents multiple time series.
     charging_status_val_to_mask: dict mapping charging status values to boolean values to create masks.
     """
+    logger.info(f"compute_charging_n_discharging_masks called.")
     if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
+        logger.debug(f"Computing charging and discharging masks using charging status dictionary.")
         return (
             tss
             .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
             .eval("in_discharge = ~in_charge")
         )
     elif "soc" in tss.columns:
+        logger.debug(f"Computing charging and discharging masks using soc difference.")
         if id_col in tss.columns:
             return (
                 tss
                 .groupby(id_col)
                 .apply(low_freq_compute_charge_n_discharge_vars)
+                .reset_index(drop=True)
             )
         else:
             return low_freq_compute_charge_n_discharge_vars(tss)
@@ -39,26 +43,14 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
         logger.warning("No charging status or soc column found to compute charging and discharging masks, returning original tss.")
         return tss
 
-def estimate_dummy_soh(ts: DF, soh_lost_per_km_ratio:float=SOH_LOST_PER_KM_DUMMY_RATIO) -> DF:
-    """
-    ### Description:
-    Estimates an soh according to the odometer and a soh loss per km ratio.
-    Expects the odometer to be in km.
-    Very inacurrate but very handy when your deadline has been advanced from 3 months to 3 days...
-    """
-    ts["soh"] = 100 - ts["odometer"].mul(soh_lost_per_km_ratio).ffill()
-
-    return ts
-
-
-def compute_cum_energy(vehicle_df: DF) -> DF:
+def compute_cum_energy(vehicle_df: DF, power_col:str="power", cum_energy_col:str="cum_energy") -> DF:
     """
     ### Description:
     Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).
     """
-    if "power" in vehicle_df.columns:
-        vehicle_df["cum_energy"] = (
-            vehicle_df["power"]
+    if power_col in vehicle_df.columns:
+        vehicle_df[cum_energy_col] = (
+            vehicle_df[power_col]
             .pipe(cum_integral, date_series=vehicle_df["date"])
             .astype("float32")
         )
@@ -85,35 +77,32 @@ def low_freq_mask_in_motion_periods(ts:DF) -> DF:
     """Use for time series where there can be more than 6 hours in between odometer points"""
     if not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex):
         ts = ts.set_index("date", drop=False)
-    return (
-        ts #
-        .assign(odometer_increase_mask=ts["odometer"].interpolate(method="time").diff().gt(0.0, fill_value=True))
-        .assign(last_notna_odo_date=ts["date"].mask(ts["odometer"].isna(), pd.NaT).ffill())
-        .assign(time_diff_low_enough=lambda ts: ts["last_notna_odo_date"].diff().lt(pd.Timedelta("6h")))
-        .eval("in_motion = odometer_increase_mask & time_diff_low_enough")
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
-    )
+    ts["odometer_increase_mask"] = ts["odometer"].interpolate(method="time").diff().gt(0.0, fill_value=True)
+    ts["last_notna_odo_date"] = ts["date"].mask(ts["odometer"].isna(), pd.NaT).ffill()
+    ts["time_diff_low_enough"] = ts["last_notna_odo_date"].diff().lt(pd.Timedelta("6h"))
+    ts["in_motion"] = ts["odometer_increase_mask"] & ts["time_diff_low_enough"]
+    ts = perf_mask_and_idx_from_condition_mask(ts, "in_motion")
+
+    return ts
 
 
 def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
     """Use for time series where there can be more than 6 hours in between soc points"""
     MAX_CHARGE_TIME_DIFF = TD(hours=6)
-    ts = (
-        ts
-        .set_index("date", drop=False)
-        .pipe(high_freq_in_discharge_and_charge_from_soc_diff)
-    )
+    date_not_index = not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex)
+    if date_not_index:
+        ts = ts.set_index("date", drop=False)
+        ts = ts.sort_index()
+    ts = ts.pipe(high_freq_in_discharge_and_charge_from_soc_diff)
     ts["last_notna_soc_date"] = ts["date"].mask(ts["soc"].isna(), pd.NaT).shift().ffill()
     ts["last_notna_soc_diff_low_enough"] = ts.eval("date - last_notna_soc_date").lt(MAX_CHARGE_TIME_DIFF)
     ts["date_diff_low_enough"] = ts["date"].diff().lt(MAX_CHARGE_TIME_DIFF)
     ts["in_charge"] = ts.eval("in_charge & last_notna_soc_diff_low_enough & date_diff_low_enough")
     ts["in_discharge"] = ts.eval("in_discharge & last_notna_soc_diff_low_enough & date_diff_low_enough")
-    ts = (
-        ts
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
-    )
-
+    ts = perf_mask_and_idx_from_condition_mask(ts, "in_charge")
+    ts = perf_mask_and_idx_from_condition_mask(ts, "in_discharge")
+    if date_not_index:
+        ts = ts.reset_index(drop=True)
     return ts
 
 
@@ -198,3 +187,4 @@ def mask_off_leading_soc(soc: Series) -> Series:
     bfilled_soc = soc.bfill()
     bfilled_first = bfilled_soc.iat[0]
     return bfilled_soc.ne(bfilled_first).shift(-1, fill_value=True)
+

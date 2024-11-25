@@ -6,7 +6,7 @@ import logging.config
 
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
-from core.config import S3_RAW_TSS_KEY_FORMAT
+from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
