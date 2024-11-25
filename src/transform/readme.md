@@ -55,10 +55,13 @@ Here "XX" is the name of the data provider.
     Output location: `raw_tss/XX/time_series/raw_tss.parquet` (should just be `raw_tss/XX_raw_tss.parquet`...)  
     How: Parses json responses into DataFrames and concatenates them into a single one.  
 - **raw_tss.main**:   
-    Provides a function to update all the raw time series.   
-    Also provides a function to get the raw time series of a single brand.  
+    goal: Implement a function:
+        - `get_processed_tss(brand)`: provides access to any processed time series.
+        - `update_all_processed_tss()`: updates all the processed time series.
     This module does not perform any extra step on the sub ETLs it orchestrates.  
     So you *could* directly use the output of the sub ETLs, but you *should* not in case a change is done in this main.
+    Import `raw_tss` from this module to get the raw time series dataframe: `from transform.raw_tss.main import get_raw_tss`.
+    Run it as a script to update all the raw time series.
 - **XX_fleet_info.py**:
     goal: Provide a dataframe to get the model, version, capacity and range of the vehicles.  
     Input: (at least one)Table from each client on their fleet.    
@@ -71,6 +74,8 @@ Here "XX" is the name of the data provider.
     Takes care of updating the "vehicle" table in the database.  
     How: Concatenates all the fleet info dataframes into a single one and left merges models_info onto the result.  
     Because of the extra steps performed on the fleet info, you *should* not use the output of the sub ETLs directly but the output of this main.
+    Import `fleet_info` from this module to get the fleet info dataframe: `from transform.fleet_info.main import fleet_info`.
+    Run it as a script to update the vehicle table in the database.
 -  **XX_processed_tss.py**:  
     Input: Raw time series and fleet info.  
     Output: A dataframe that contains processed data time series.  
@@ -83,8 +88,9 @@ Here "XX" is the name of the data provider.
         - add missing columns (for ex: in_charge/dishcarge, age of vehicle)  
         - Merge fleet info into the time series
 - **processed_tss.main**:
-    goal: Implement a function that:
-        - provides access to any processed time series.
-        - updates all the processed time series.
+    goal: Implement a function:
+        - `get_processed_tss(brand)`: provides access to any processed time series.
+        - `update_all_processed_tss()`: updates all the processed time series.
     Input: raw time series and fleet info provided by the previous steps.
     Output: A single processed time series dataframe per brand that can be used to compute the results we want.
+    Run it as a script to update all the processed time series.
