@@ -35,7 +35,6 @@ def process_raw_tss(tss:DF, logger:Logger=logger) -> DF:
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "transform.processed_tss")
-#    for brand in HIGH_MOBILITY_BRANDS:
-#        print("=================", brand, "=================")
-#        single_dataframe_script_main(get_processed_tss, brand=brand, force_update=True)
-    single_dataframe_script_main(get_processed_tss, brand="renault", force_update=True)
+    for brand in HIGH_MOBILITY_BRANDS:
+        print("=================", brand, "=================")
+        single_dataframe_script_main(get_processed_tss, brand=brand, force_update=True)
