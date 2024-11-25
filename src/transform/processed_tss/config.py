@@ -18,6 +18,7 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "version",
     "capacity",
     "owner",
+    "range"
 ]
 
 RENAME_COLS_DICT:dict[str, str] = {
