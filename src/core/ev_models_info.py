@@ -13,6 +13,7 @@ def get_ev_models_infos() -> DF:
             "manufacturer": "string",
             "version": "string",
             "capacity": "float",
+            "range": "float",
         })
         .pipe(set_all_str_cols_to_lower)
     )
