@@ -136,14 +136,13 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
         lhs_idx = pd.Index(lhs_idx.get_level_values(0), name=left_on[0])
         rhs_idx = pd.Index(rhs_idx.get_level_values(0), name=right_on[0])
     if rhs_idx.has_duplicates:
-        raise ValueError(f"Cannot perform left merge as rhs_idx has duplicates! {rhs_idx[rhs_idx.duplicated()]}")
+        raise ValueError(f"Cannot perform left merge as rhs_idx has duplicates!\n{rhs_idx[rhs_idx.duplicated()]}")
     logger.debug("Assigning values.")
     rhs = rhs.set_index(rhs_idx)
     rhs_data = rhs.loc[lhs_idx.values, src_cols]
     lhs.loc[lhs_mask, dest_cols] = rhs_data.values
 
     return lhs
-
 
 def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     """
