@@ -49,8 +49,8 @@ def get_fleet_info() -> DF:
 
 
 if __name__ == "__main__":
+    set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
     set_level_of_loggers_with_prefix("DEBUG", "transform.fleet_info")
-    #single_dataframe_script_main(get_fleet_info)
     single_dataframe_script_main(update_db_vehicle_table) #.to_csv("fleet_info_update.csv")
 
 fleet_info = get_fleet_info()
