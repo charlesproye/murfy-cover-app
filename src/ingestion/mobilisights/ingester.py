@@ -37,7 +37,7 @@ class MobilisightsIngester:
 
     rate_limit: int = 36
     upload_interval: int = 60
-    compress_time: str = "00"
+    compress_time: Optional[str] = "00:00",
     max_workers: int = 8
     compress_threaded: bool = True
 
@@ -118,6 +118,7 @@ class MobilisightsIngester:
 
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
+        self.__is_compressing = False 
 
         signal.signal(signal.SIGTERM, self.__handle_shutdown_signal)
         signal.signal(signal.SIGINT, self.__handle_shutdown_signal)
@@ -209,6 +210,20 @@ class MobilisightsIngester:
             max_workers=self.max_workers,
         )
         compresser.run()
+
+    def __schedule_tasks(self):
+        self.__fetch_scheduler.every(self.rate_limit).seconds.do(
+            self.__job_queue.put, self.__fetch_vehicles
+        ).tag("fetch")
+        self.__scheduler_logger.info(f"Scheduled vehicle fetch every {self.rate_limit} seconds")
+
+        # Schedule compression at specified time
+        self.__compress_scheduler.every().day.at(self.compress_time).do(self.__compress)
+        self.__scheduler_logger.info(f"Scheduled daily compression at {self.compress_time}")
+
+        # Run initial fetch
+        self.__scheduler_logger.info("Starting initial fetch")
+        self.__fetch_vehicles()
 
     def run(self):
         # Check for a forced compression parameter
