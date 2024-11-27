@@ -211,30 +211,32 @@ class MobilisightsIngester:
         compresser.run()
 
     def run(self):
+        # Check for a forced compression parameter
+        compress_only = os.getenv("COMPRESS_ONLY") == "1"
+        
+        if compress_only:
+            self.__ingester_logger.info("COMPRESS_ONLY flag set. Running compression first.")
+            self.__is_compressing = True
+            try:
+                self.__compress()
+            except Exception as e:
+                self.__ingester_logger.error(f"Error during compression: {e}")
+            finally:
+                self.__is_compressing = False
+            self.__ingester_logger.info("Compression completed. Exiting.")
+            return
+
+        self.__schedule_tasks()
         self.__worker_thread = threading.Thread(target=self.__process_job_queue)
-        self.__scheduler_logger.info(
-            f"Scheduling data fetching every {self.rate_limit} seconds"
-        )
-        self.__fetch_scheduler.every(self.rate_limit).seconds.do(
-            self.__job_queue.put, self.__fetch_vehicles
-        )
-        self.__scheduler_logger.info("Running initial scheduled tasks")
-        self.__fetch_scheduler.run_all()
-        self.__compress_scheduler.every().day.at(self.compress_time).do(
-            self.__job_queue.put, self.__compress
-        )
-        self.__scheduler_logger.info(
-            f"Scheduled data compression at {self.compress_time}"
-        )
         self.__ingester_logger.info("Starting worker thread")
         self.__worker_thread.start()
         self.__scheduler_logger.info("Starting scheduler")
+
         while not self.__shutdown_requested.is_set():
-            now = datetime.now().hour
-            if now >= 6 and now <= 23:
+            if not self.__is_compressing:
                 self.__fetch_scheduler.run_pending()
-            else:
-                self.__compress_scheduler.run_pending()
+            self.__compress_scheduler.run_pending()
             time.sleep(1)
+
         self.__shutdown()
 
