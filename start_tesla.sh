@@ -20,8 +20,7 @@ ACCOUNTS_JSON='[
    {
     "access_token_key": "ACCESS_TOKEN_AYVENS_NVA",
     "professional_account": true,
-    "code": "81295e8edfc0c75ccbc99f254198a0a2b6264a49417090e22f51983c69598ad6fe9ebe4c",
-    "excel_url": "src/ingestion/tesla/excel/ayvens.csv"
+    "code": "81295e8edfc0c75ccbc99f254198a0a2b6264a49417090e22f51983c69598ad6fe9ebe4c"
   },
    {
     "access_token_key": "ACCESS_TOKEN_AYVENS_BLBV",
