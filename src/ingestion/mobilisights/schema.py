@@ -38,9 +38,14 @@ class TimestampedValueWithUnit(WithTimestamp, Generic[T, U]):
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
         res: list[Self] = []
         for el in lst:
-            if el.datetime not in set(map(lambda e: e.datetime, res)):
-                res.append(el)
+            if isinstance(el, list):
+                # Si c'est une liste, on l'aplatit
+                res.extend([x for x in el if x is not None])
+            elif el is not None:
+                if el.datetime not in set(map(lambda e: e.datetime, res)):
+                    res.append(el)
         return res
+
 
 
 class Percentage(msgspec.Struct):
@@ -92,11 +97,18 @@ class Geolocation(WithTimestamp):
     @classmethod
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
         res: list[Self] = []
+                
         for el in lst:
-            if el.datetime not in set(map(lambda e: e.datetime, res)):
-                res.append(el)
+            if isinstance(el, list):
+                # Si c'est une liste, on l'aplatit
+                for item in el:
+                    if item and hasattr(item, 'datetime'):
+                        if item.datetime not in set(map(lambda e: e.datetime, res)):
+                            res.append(item)
+            elif el and hasattr(el, 'datetime'):
+                if el.datetime not in set(map(lambda e: e.datetime, res)):
+                    res.append(el)
         return res
-
 
 class SpeedUnit(StrEnum):
     kilometers_per_hour = "km/h"
@@ -640,53 +652,63 @@ class Seatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, r
     passenger: Optional[PassengerSeatbelt] = None  # Rendre 'passenger' optionnel
 
 
-class MergedSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedSeatbelt(msgspec.Struct):
     driver: list[TimestampedValue[bool]] = []
     passenger_front: list[TimestampedValue[bool]] = []
     passenger_rear_left: list[TimestampedValue[bool]] = []
     passenger_rear_right: list[TimestampedValue[bool]] = []
-    passenger_rear_central: list[TimestampedValue[bool]] = []
+    passenger_rear_center: list[TimestampedValue[bool]] = []
 
     @classmethod
-    def from_list(cls, lst: list[Seatbelt]) -> Self:
+    def from_list(cls, lst: Iterable[Seatbelt]) -> Optional[Self]:
+        if not lst:
+            return None
         res = cls()
+        
+        # Gestion du conducteur
         res.driver = TimestampedValue.merge_list(
             [x for x in map(lambda e: e.driver, lst) if x is not None]
         )
+        
+        # Gestion des passagers avant
         res.passenger_front = TimestampedValue.merge_list(
-            [
-                x
-                for x in map(lambda e: e.passenger.front if e.passenger else None, lst)
-                if x is not None
-            ]
+            [x for x in map(lambda e: e.passenger.front if e.passenger else None, lst) if x is not None]
         )
-        res.passenger_rear_left = TimestampedValue.merge_list(
-            [
-                x
-                for x in map(
-                    lambda e: e.passenger.rear.left if e.passenger else None, lst
-                )
-                if x is not None
-            ]
-        )
-        res.passenger_rear_right = TimestampedValue.merge_list(
-            [
-                x
-                for x in map(
-                    lambda e: e.passenger.rear.right if e.passenger else None, lst
-                )
-                if x is not None
-            ]
-        )
-        res.passenger_rear_central = TimestampedValue.merge_list(
-            [
-                x
-                for x in map(
-                    lambda e: e.passenger.rear.central if e.passenger else None, lst
-                )
-                if x is not None
-            ]
-        )
+        
+        # Gestion des passagers arrière avec vérification à chaque niveau
+        res.passenger_rear_left = TimestampedValue.merge_list([
+            x for x in map(
+                lambda e: (
+                    e.passenger.rear.left 
+                    if e.passenger and e.passenger.rear 
+                    else None
+                ), 
+                lst
+            ) if x is not None
+        ])
+        
+        res.passenger_rear_right = TimestampedValue.merge_list([
+            x for x in map(
+                lambda e: (
+                    e.passenger.rear.right 
+                    if e.passenger and e.passenger.rear 
+                    else None
+                ), 
+                lst
+            ) if x is not None
+        ])
+        
+        res.passenger_rear_center = TimestampedValue.merge_list([
+            x for x in map(
+                lambda e: (
+                    e.passenger.rear.center 
+                    if e.passenger and e.passenger.rear 
+                    else None
+                ), 
+                lst
+            ) if x is not None
+        ])
+        
         return res
 
 
@@ -857,8 +879,8 @@ class MergedCrash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True
 
 
 class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    _id: Optional[Annotated[str, msgspec.Meta(pattern="^[a-z0-9]{24}$")]] = None
-    vin: Optional[Annotated[str, msgspec.Meta(pattern="^[A-Z0-9]{17}$")]] = None
+    _id: Optional[str] = None
+    vin: Optional[str] = None
     datetime: Optional[dt] = None
     datetime_sending: Optional[dt] = None
     heading: Optional[TimestampedValueWithUnit[Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit]] = None
@@ -885,8 +907,8 @@ class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, r
 
 
 class MergedCarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    _id: Annotated[str, msgspec.Meta(pattern="^[a-z0-9]{24}$")]
-    vin: Annotated[str, msgspec.Meta(pattern="^[A-Z0-9]{17}$")]
+    _id: str
+    vin: str
     heading: list[TimestampedValueWithUnit[Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit]] = []
     geolocation: list[Geolocation] = []
     odometer: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
