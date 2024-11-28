@@ -83,11 +83,11 @@ class DistanceUnit(StrEnum):
 
 
 class Geolocation(WithTimestamp):
-    latitude: float
-    longitude: float
-    source: GpsSource
-    gps_signal: Annotated[float, msgspec.Meta(ge=0, le=100)]
-    altitude: TimestampedValueWithUnit[float, DistanceUnit]
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    source: Optional[GpsSource] = None
+    gps_signal: Optional[Annotated[float, msgspec.Meta(ge=0, le=100)]] = None
+    altitude: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
 
     @classmethod
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
@@ -428,8 +428,8 @@ class MergedEngine(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=Tru
 
 
 class ParkAssistValue(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    alarm: TimestampedValue[bool]
-    muted: TimestampedValue[bool]
+    alarm: Optional[TimestampedValue[bool]] = None
+    muted: Optional[TimestampedValue[bool]] = None
 
 
 class MergedParkAssistValue(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
@@ -470,12 +470,12 @@ class MergedParkAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults
 
 
 class KeepAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    right: TimestampedValue[bool]
-    left: TimestampedValue[bool]
+    right: Optional[TimestampedValue[bool]] = None
+    left: Optional[TimestampedValue[bool]] = None
 
 
 class Lane(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    keep_assist: KeepAssist
+    keep_assist: Optional[KeepAssist] = None
 
 
 class MergedLaneKeepAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
@@ -691,13 +691,14 @@ class MergedSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=T
 
 
 class TirePairPressure(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    left: TimestampedValueWithUnit[float, PressureUnit]
-    right: TimestampedValueWithUnit[float, PressureUnit]
+    left: Optional[TimestampedValueWithUnit[float, PressureUnit]] = None
+    right: Optional[TimestampedValueWithUnit[float, PressureUnit]] = None
 
 
 class TirePressure(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     front: Optional[TirePairPressure] = None
     rear: Optional[TirePairPressure] = None
+
 
 
 class MergedTirePressure(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
@@ -856,10 +857,10 @@ class MergedCrash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True
 
 
 class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    _id: Annotated[str, msgspec.Meta(pattern="^[a-z0-9]{24}$")]
-    vin: Annotated[str, msgspec.Meta(pattern="^[A-Z0-9]{17}$")]
-    datetime: dt
-    datetime_sending: dt
+    _id: Optional[Annotated[str, msgspec.Meta(pattern="^[a-z0-9]{24}$")]] = None
+    vin: Optional[Annotated[str, msgspec.Meta(pattern="^[A-Z0-9]{17}$")]] = None
+    datetime: Optional[dt] = None
+    datetime_sending: Optional[dt] = None
     heading: Optional[TimestampedValueWithUnit[Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit]] = None
     geolocation: Optional[Geolocation] = None
     odometer: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
@@ -871,7 +872,7 @@ class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, r
     fuel: Optional[Fuel] = None
     electricity: Optional[Electricity] = None
     engine: Optional[Engine] = None
-    external_temperature: Optional[TimestampedValueWithUnit[float, TemperatureUnit]] = None  # This field will be renamed to externalTemperature
+    external_temperature: Optional[TimestampedValueWithUnit[float, TemperatureUnit]] = None
     adas: Optional[Adas] = None
     alerts: Optional[TimestampedValue[list[str]]] = None
     lights: Optional[Lights] = None

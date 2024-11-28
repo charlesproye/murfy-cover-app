@@ -101,7 +101,7 @@ class MobilisightsCompresser:
         try:
             merged = MergedCarState.from_list(temp_car_states)
             encoded = msgspec.json.encode(merged)
-        except msgspec.EncodeError as e:
+        except Exception as e:
             self.__logger.error(
                 f"Failed to encode merged vehicle data for VIN {vin}: {e}"
             )
