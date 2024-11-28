@@ -33,6 +33,8 @@ RENAME_COLS_DICT:dict[str, str] = {
     "charging.estimated_range": "estimated_range",
     "charging.battery_level": "soc",
     "soc_hv_header": "soc",
+    # mercedes-benz
+    "charging.max_range": "max_range",
     # BMW
     #"date": "date", # renaming is useless but we will use the key to determine what columns to keep
     "charging_ac_ampere": "charging_ac_current",
@@ -56,6 +58,8 @@ COL_DTYPES = {
     # High mobility
     "date": "datetime64[ns]",
     "battery_energy": "float32",
+    # mercedes-benz
+    "max_range": "float32",
     # BMW
     "charging_plug_connected": "bool",
     "charging_method": "category",
