@@ -274,6 +274,7 @@ class Electricity(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True
     engine: Optional[EngineSmall] = None
     residual_autonomy: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
     level: Optional[EnergyConsumptionLevel] = None
+    instant_consumption: Optional[TimestampedValueWithUnit[float, EnergyConsumptionUnit]] = None
 
     @classmethod
     def __struct_from_dict__(cls, d):
@@ -293,8 +294,9 @@ class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_default
     @classmethod
     def from_list(cls, lst: list[Electricity]) -> Self:
         res = cls()
+        # Correction ici : on vérifie d'abord si l'objet existe
         res.instant_consumption = TimestampedValueWithUnit.merge_list(
-            [x for x in map(lambda e: e.instant_consumption, lst) if x is not None]
+            [x for x in map(lambda e: getattr(e, 'instant_consumption', None), lst) if x is not None]
         )
         res.level = EnergyConsumptionLevel.merge_list(
             [x for x in map(lambda e: e.level, lst) if x is not None]
@@ -303,7 +305,7 @@ class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_default
             [x for x in map(lambda e: e.residual_autonomy, lst) if x is not None]
         )
         res.battery_capacity = TimestampedValueWithUnit.merge_list(
-            [x for x in map(lambda e: e.battery_capacity, lst) if x is not None]
+            [x for x in map(lambda e: e.capacity, lst) if x is not None]
         )
         res.charging = Charging.merge_list(
             [x for x in map(lambda e: e.charging, lst) if x is not None]

@@ -227,10 +227,10 @@ class MobilisightsIngester:
 
     def run(self):
         # Check for a forced compression parameter
-        compress_only = os.getenv("COMPRESS_ONLY") == "1"
+        compress_only = os.getenv("COMPRESS_ONLY_MS") == "1"
         
         if compress_only:
-            self.__ingester_logger.info("COMPRESS_ONLY flag set. Running compression first.")
+            self.__ingester_logger.info("COMPRESS_ONLY_MS flag set. Running compression first.")
             self.__is_compressing = True
             try:
                 self.__compress()
