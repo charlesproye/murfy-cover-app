@@ -16,17 +16,6 @@ class WithTimestamp(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=Tr
 class TimestampedValue(WithTimestamp, Generic[T]):
     value: T
 
-    def __post_init__(self):
-        # Si le type générique est bool, convertir la valeur si nécessaire
-        if isinstance(self.__orig_class__._type_params[0], type) and self.__orig_class__._type_params[0] == bool:
-            self.value = self._convert_to_bool(self.value)
-
-    @staticmethod
-    def _convert_to_bool(value):
-        if isinstance(value, str):
-            return value.lower() == 'true'
-        return bool(value)
-
     @classmethod
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
         res: list[Self] = []
@@ -628,14 +617,16 @@ class RearPassengerSeatbelt(msgspec.Struct):
     right: Optional[TimestampedValue[bool]] = None
     center: Optional[TimestampedValue[bool]] = None
 
-    def __post_init__(self):
-        # Convertir les valeurs en booléens si nécessaire
-        if self.left:
-            self.left.value = self._convert_to_bool(self.left.value)
-        if self.right:
-            self.right.value = self._convert_to_bool(self.right.value)
-        if self.center:
-            self.center.value = self._convert_to_bool(self.center.value)
+    @classmethod
+    def __struct_from_dict__(cls, d):
+        # Convertir les valeurs en booléens avant la création de l'objet
+        if d.get('left') and isinstance(d['left'].get('value'), str):
+            d['left']['value'] = d['left']['value'].lower() == 'true'
+        if d.get('right') and isinstance(d['right'].get('value'), str):
+            d['right']['value'] = d['right']['value'].lower() == 'true'
+        if d.get('center') and isinstance(d['center'].get('value'), str):
+            d['center']['value'] = d['center']['value'].lower() == 'true'
+        return super().__struct_from_dict__(d)
 
     @staticmethod
     def _convert_to_bool(value):
@@ -645,25 +636,26 @@ class RearPassengerSeatbelt(msgspec.Struct):
 
 
 class PassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
-    front: Optional[TimestampedValue[bool]] = None  # Rendre 'front' optionnel
-    rear: Optional[RearPassengerSeatbelt] = None 
+    front: Optional[TimestampedValue[bool]] = None
+    rear: Optional[RearPassengerSeatbelt] = None
 
-    def __post_init__(self):
-        # Convertir les valeurs en booléens
-        if self.front is not None:
-            self.front.value = self._convert_to_bool(self.front.value)
-
-    @staticmethod
-    def _convert_to_bool(value):
-        if isinstance(value, str):
-            return value.lower() == 'true'
-        return bool(value)
-
+    @classmethod
+    def __struct_from_dict__(cls, d):
+        # Convertir la valeur front en booléen si nécessaire
+        if d.get('front') and isinstance(d['front'].get('value'), str):
+            d['front']['value'] = d['front']['value'].lower() == 'true'
+        return super().__struct_from_dict__(d)
 
 class Seatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     driver: Optional[TimestampedValue[bool]] = None
-    passenger: Optional[PassengerSeatbelt] = None  # Rendre 'passenger' optionnel
+    passenger: Optional[PassengerSeatbelt] = None
 
+    @classmethod
+    def __struct_from_dict__(cls, d):
+        # Convertir la valeur driver en booléen si nécessaire
+        if d.get('driver') and isinstance(d['driver'].get('value'), str):
+            d['driver']['value'] = d['driver']['value'].lower() == 'true'
+        return super().__struct_from_dict__(d)
 
 class MergedSeatbelt(msgspec.Struct):
     driver: list[TimestampedValue[bool]] = []
@@ -891,7 +883,7 @@ class MergedCrash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True
         return res
 
 
-class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class CarState(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     _id: Optional[str] = None
     vin: Optional[str] = None
     datetime: Optional[dt] = None
@@ -911,7 +903,6 @@ class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, r
     adas: Optional[Adas] = None
     alerts: Optional[TimestampedValue[list[str]]] = None
     lights: Optional[Lights] = None
-    seatbelt: Optional[Seatbelt] = None
     tire_pressure: Optional[TirePressure] = None
     transmission_gear: Optional[TransmissionGear] = None
     setup: Optional[Setup] = None
@@ -919,7 +910,7 @@ class CarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, r
     crash: Optional[Crash] = None
 
 
-class MergedCarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedCarState(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     _id: str
     vin: str
     heading: list[TimestampedValueWithUnit[Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit]] = []
@@ -937,7 +928,6 @@ class MergedCarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=T
     adas: Optional[MergedAdas] = None
     alerts: list[TimestampedValue[list[str]]] = []
     lights: Optional[MergedLights] = None
-    seatbelt: Optional[MergedSeatbelt] = None
     tire_pressure: Optional[MergedTirePressure] = None
     transmission_gear_state: list[TimestampedValue[TransmissionGearStateValue]] = []
     setup: Optional[MergedSetup] = None
@@ -997,9 +987,6 @@ class MergedCarState(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=T
         )
         res.lights = MergedLights.from_list(
             [x for x in map(lambda e: e.lights, lst) if x is not None]
-        )
-        res.seatbelt = MergedSeatbelt.from_list(
-            [x for x in map(lambda e: e.seatbelt, lst) if x is not None]
         )
         res.tire_pressure = MergedTirePressure.from_list(
             [x for x in map(lambda e: e.tire_pressure, lst) if x is not None]
