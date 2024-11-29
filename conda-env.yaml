@@ -21,6 +21,7 @@ dependencies:
   - msgspec=0.18.6
   - schedule=1.2.2
   - psycopg2=2.9.9
+  - nbstripout=0.8.1
   
   - pip:
     - git+https://bib-batteries-admin@bitbucket.org/bib-batteries/bib-models.git@main#subdirectory=src
