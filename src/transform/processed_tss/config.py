@@ -33,6 +33,10 @@ RENAME_COLS_DICT:dict[str, str] = {
     "charging.estimated_range": "estimated_range",
     "charging.battery_level": "soc",
     "soc_hv_header": "soc",
+    # Mobilisight
+    "externalTemperature": "outside_temp",
+    "charging.status": "charging_status",
+    "datetime": "date",
     # BMW
     #"date": "date", # renaming is useless but we will use the key to determine what columns to keep
     "charging_ac_ampere": "charging_ac_current",
@@ -53,7 +57,8 @@ COL_DTYPES = {
     "soc": "float32",
     "odometer": "float32",
     "estimated_range": "float32",
-    # High mobility
+    "outside_temp": "float32",
+    "unit": "string",
     "date": "datetime64[ns]",
     "battery_energy": "float32",
     # BMW
@@ -89,7 +94,6 @@ COL_DTYPES = {
     "charger_voltage": "float32",
     "est_battery_range": "float32",
     "inside_temp": "float32",
-    "outside_temp": "float32",
     "charging_state": "string",
     "fast_charger_type": "string",
 }
@@ -104,4 +108,11 @@ CHARGING_STATUS_VAL_TO_MASK = {
     "CHARGINGERROR": False,
     "INITIALIZATION": False,
     "CHARGINGPAUSED": False,
+    # Mobilisight
+    "cable_unplugged": False,
+    "slow_charging": True,
+    "fast_charging": True,
+    "charging_complete": False,
+    "charging_error": False,
 }
+

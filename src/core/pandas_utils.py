@@ -215,3 +215,16 @@ def dropna_cols(df:DF, logger:Logger=logger) -> DF:
     logger.debug(f"notna cols:\n{df.notna().any(axis=0)}")
     return df.loc[:, df.notna().any(axis=0)]
 
+def parse_unstructured_json(json_obj, path:list[str]=[], logger:Logger=logger) -> DF:
+    if isinstance(json_obj, dict):
+        dfs = []
+        for key, value in json_obj.items():
+            col_name = ".".join(path + [key])
+            dfs.append(parse_unstructured_json(value, path=path + [key]).rename(columns={"value": col_name}))
+        return concat(dfs, ignore_index=True) if len(dfs) > 1 else DF()
+    elif isinstance(json_obj, list):
+        logger.debug(f"calling json_normalize with json obj:\n{json_obj}\npath:{path}")
+        return pd.json_normalize(json_obj)
+    else:
+        return DF()
+
