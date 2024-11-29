@@ -113,14 +113,12 @@ def right_union_merge_rdb_table(lhs: DF, table: str, left_on: list[str], right_o
         lhs["id"] = [uuid4() for _ in range(len(lhs))]
     # Split DataFrame into records to update and records to insert
     # Get existing key records from the table to know which ones will be updated
-    print(right_on)
     rdb_table_keys = MultiIdx.from_frame(rhs[right_on])
     df_keys = MultiIdx.from_frame(lhs[right_on]) # Use right_on instead of left_on because the columns are renamed
     existing_keys_mask = df_keys.isin(rdb_table_keys)
     cols = Idx(right_on + dest_cols).drop_duplicates()
     df_to_update = lhs.loc[existing_keys_mask, cols]
     df_to_insert = lhs.loc[~existing_keys_mask, cols]
-    print(df_to_insert)
 
     logger.debug(f"Inserting {len(df_to_insert)}({len(df_to_insert)/len(lhs)*100:.2f}%) rows.")
     logger.debug(f"Updating {len(df_to_update)}({len(df_to_update )/len(lhs)*100:.2f}%) rows.")
