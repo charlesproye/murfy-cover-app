@@ -16,6 +16,17 @@ class WithTimestamp(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=Tr
 class TimestampedValue(WithTimestamp, Generic[T]):
     value: T
 
+    def __post_init__(self):
+        # Si le type générique est bool, convertir la valeur si nécessaire
+        if isinstance(self.__orig_class__._type_params[0], type) and self.__orig_class__._type_params[0] == bool:
+            self.value = self._convert_to_bool(self.value)
+
+    @staticmethod
+    def _convert_to_bool(value):
+        if isinstance(value, str):
+            return value.lower() == 'true'
+        return bool(value)
+
     @classmethod
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
         res: list[Self] = []
