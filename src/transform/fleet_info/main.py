@@ -45,6 +45,7 @@ def get_fleet_info() -> DF:
         .pipe(set_all_str_cols_to_lower, but=["vin"])
         .pipe(left_merge, followed_tesla_vehicles_info, left_on=["vin"], right_on=["vin"], src_dest_cols=["model", "version"])
         .pipe(left_merge, models_info, left_on=["model", "version"], right_on=["model", "version"])
+        .assign(version=lambda df: df["version"].mask(df["version"] == "gt première ev 50kwh 136 7,4kw 5d", "gt première ev 50kwh 136 7;4kw 5d"))
     )
 
 
