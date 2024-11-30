@@ -1,5 +1,13 @@
 manufacturer,model,version,capacity,range
 
+peugeot,2008,gt ev 50kwh 136 5d,46.3,270
+peugeot,2008,allure ev 50kwh 136 5d,46.3,270
+peugeot,2008,gt première ev 50kwh 136 7;4kw 5d,46.3,270
+peugeot,e-2008,gt ev 50kwh 136 5d actieauto,46.3,270
+peugeot,208,allure ev 50kwh 136 5d,46.3,290
+peugeot,208,gt ev 50kwh 136 5d,46.3,290
+peugeot,208,gt ev 50kwh 136 5d actieauto,46.3,290
+
 volvo-cars,XC40,p8 awd r-design,75,305
 
 mercedes-benz,EQA,EQA,,404
