@@ -12,15 +12,10 @@ from transform.fleet_info.main import fleet_info
 
 logger = getLogger("transform.raw_tss.mobilisight_raw_tss")
 
-@cache_result(f"{dirname(__file__)}/data_cache/mobilisight_responses_keys.parquet", on="local_storage")
-def get_mobilisight_responses_keys(bucket:S3_Bucket) -> DF:
-    logger.debug("get_mobilisight_responses_keys called.")
-    return bucket.list_responses_keys_of_brand("stellantis")
-
 @cache_result(S3_RAW_TSS_KEY_FORMAT, "s3", ["brand"])
 def get_raw_tss(brand:str, bucket:S3_Bucket=bucket) -> DF:
     logger.info(f"get_raw_tss called for brand {brand}.")
-    mobilisght_responses_keys = get_mobilisight_responses_keys(bucket)
+    mobilisght_responses_keys = bucket.list_responses_keys_of_brand("stellantis")
     brand_responses_mask = mobilisght_responses_keys["vin"].isin(fleet_info.query(f"make == '{brand}'")["vin"])
     brand_responses_keys = mobilisght_responses_keys[brand_responses_mask]
     return (
@@ -34,8 +29,8 @@ def get_raw_tss(brand:str, bucket:S3_Bucket=bucket) -> DF:
         .pipe(concat)
     )
 
-def parse_mobilisight_response(response_key:str, bucket:S3_Bucket, logger:Logger) -> DF:
-    logger.debug(f"Parsing mobilisight response for key {response_key['key']}.")
+def parse_mobilisight_response(response_key:str, bucket:S3_Bucket, logger:Logger=logger, brand:str="") -> DF:
+    logger.debug(f"Parsing {brand} key {response_key['key']} using mobilisight parsing.")
     response = bucket.read_json_file(response_key['key'])
     return parse_unstructured_json(response, logger=logger).assign(vin=response_key["vin"])
 
