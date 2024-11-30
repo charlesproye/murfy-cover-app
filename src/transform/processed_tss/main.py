@@ -16,10 +16,10 @@ logger = getLogger("transform.processed_tss.main")
 
 GET_PROCESSED_TSS_FUNCTIONS:dict[str, Callable[[], DF]] = {
     # Stellantis brands
-    "fiat":             hm_get_processed_tss,
     "opel":             hm_get_processed_tss,
-    "ds":               hm_get_processed_tss,
     "peugeot":          hm_get_processed_tss,
+    "fiat":             hm_get_processed_tss,
+    "ds":               hm_get_processed_tss,
      # Mercedes-Benz
      "mercedes-benz":    hm_get_processed_tss,
      # Renault
@@ -47,7 +47,7 @@ def get_processed_tss(brand:str, **kwargs) -> DF:
 
 def update_all_processed_tss():
     set_level_of_loggers_with_prefix("DEBUG", "transform.processed_tss")
-    for brand in track(list(GET_PROCESSED_TSS_FUNCTIONS.keys()), description="Updating processed TSSs..."):
+    for brand in track(list(GET_PROCESSED_TSS_FUNCTIONS.keys()), description="Updating processed TSSs...", transient=True):
         logger.debug(f"================={brand}=================")
         single_dataframe_script_main(get_processed_tss, logger=logger, brand=brand, force_update=True)
 
