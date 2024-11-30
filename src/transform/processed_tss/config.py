@@ -34,11 +34,13 @@ RENAME_COLS_DICT:dict[str, str] = {
     "charging.battery_level": "soc",
     "soc_hv_header": "soc",
     # Mobilisight
+    # Mobilisight
+        # peugeot
+    "electricity.batteryCapacity":"battery_energy",
     "externalTemperature": "outside_temp",
     "charging.status": "charging_status",
     "datetime": "date",
     # BMW
-    #"date": "date", # renaming is useless but we will use the key to determine what columns to keep
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
     "mileage": "odometer", # Yes, mileage is in km no need to convert it
