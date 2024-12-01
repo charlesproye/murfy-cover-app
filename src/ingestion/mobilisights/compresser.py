@@ -78,60 +78,108 @@ class MobilisightsCompresser:
         vins = set()
         prefix = "response/stellantis/"
         processing_tasks = []
-        semaphore = asyncio.Semaphore(20)  # Limite à 5 VINs traités simultanément
+        semaphore = asyncio.Semaphore(20)  # Limite à 20 VINs traités simultanément
         
         async def process_vin_complete(vin: str):
             async with semaphore:
-                temp_files = set()
-                temp_prefix = f"response/stellantis/{vin}/temp/"
-                
-                # Liste les fichiers temp pour ce VIN
-                for page in paginator.paginate(
-                    Bucket=self.__bucket,
-                    Prefix=temp_prefix,
-                    PaginationConfig={'PageSize': 3000}
-                ):
-                    if 'Contents' in page:
-                        temp_files.update(obj['Key'] for obj in page['Contents'])
-                
-                if temp_files:
-                    self.__logger.info(f"Found {len(temp_files)} temp files for VIN {vin}")
-                    
-                    # Traitement immédiat des fichiers par lots
-                    batch_size = 3000
-                    temp_data_list = list(temp_files)
-                    batches = [temp_data_list[i:i + batch_size] 
-                              for i in range(0, len(temp_data_list), batch_size)]
-                    
-                    self.__logger.info(f"Processing {len(batches)} batches for VIN {vin}")
-                    
-                    # Lancer tous les batches en parallèle
-                    batch_tasks = []
-                    all_car_states = []
-                    all_successful_processes = []
-                    
-                    for batch_index, batch in enumerate(batches):
-                        if self.__shutdown_requested.is_set():
-                            break
-                        self.__logger.info(f"Starting batch {batch_index + 1}/{len(batches)} for VIN {vin}")
-                        successful_processes, car_states = await self.__process_batch_async(batch, vin)
-                        if car_states:
-                            all_car_states.extend(car_states)
-                            all_successful_processes.extend(successful_processes)
-                        self.__logger.info(f"Completed batch {batch_index + 1}/{len(batches)} for VIN {vin} with {len(car_states)} states processed")
-                    
-                    # Compression et sauvegarde immédiate
-                    if all_car_states:
-                        merged = MergedCarState.from_list(all_car_states)
-                        await self.__save_compressed_data(all_successful_processes, merged, vin)
-                        self.__logger.info(f"Successfully processed and compressed VIN {vin}")
+                session = aioboto3.Session()
+                async with session.client(
+                    "s3",
+                    region_name=self.__s3.meta.region_name,
+                    aws_access_key_id=self.__s3._request_signer._credentials.access_key,
+                    aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
+                    endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
+                ) as s3:
+                    try:
+                        temp_files = set()
+                        temp_prefix = f"response/stellantis/{vin}/temp/"
+                        
+                        # Liste les fichiers temp pour ce VIN
+                        for page in paginator.paginate(
+                            Bucket=self.__bucket,
+                            Prefix=temp_prefix,
+                            PaginationConfig={'PageSize': 3000}
+                        ):
+                            if 'Contents' in page:
+                                temp_files.update(obj['Key'] for obj in page['Contents'])
+                        
+                        if temp_files:
+                            self.__logger.info(f"Found {len(temp_files)} temp files for VIN {vin}")
+                            
+                            # Grouper les fichiers par datetimeSending
+                            files_by_date = {}
+                            
+                            # Traiter tous les fichiers pour les grouper par date
+                            for temp_file in temp_files:
+                                try:
+                                    response = await s3.get_object(Bucket=self.__bucket, Key=temp_file)
+                                    async with response['Body'] as stream:
+                                        content = await stream.read()
+                                        car_state = msgspec.json.decode(content, type=CarState)
+                                        
+                                    if car_state.datetimeSending:
+                                        sending_date = car_state.datetimeSending.date()
+                                        if sending_date not in files_by_date:
+                                            files_by_date[sending_date] = []
+                                        files_by_date[sending_date].append((temp_file, car_state))
+                                except Exception as e:
+                                    self.__logger.error(f"Error processing temp file {temp_file}: {e}")
+                                    continue
+                            
+                            # Traiter chaque groupe de date séparément
+                            for sending_date, file_data in files_by_date.items():
+                                if self.__shutdown_requested.is_set():
+                                    return
+                                    
+                                try:
+                                    temp_files = [f[0] for f in file_data]
+                                    car_states = [f[1] for f in file_data]
+                                    
+                                    self.__logger.info(f"Processing {len(car_states)} states for VIN {vin} date {sending_date}")
+                                    
+                                    # Créer le fichier compressé pour cette date
+                                    merged = MergedCarState.from_list(car_states)
+                                    if merged:
+                                        compressed_key = f"response/stellantis/{vin}/{sending_date}.json"
+                                        encoded = msgspec.json.encode(merged)
+                                        
+                                        # Sauvegarder le fichier compressé
+                                        await s3.put_object(
+                                            Bucket=self.__bucket,
+                                            Key=compressed_key,
+                                            Body=encoded
+                                        )
+                                        
+                                        # Supprimer les fichiers temp de cette date
+                                        chunk_size = 50
+                                        for i in range(0, len(temp_files), chunk_size):
+                                            if self.__shutdown_requested.is_set():
+                                                return
+                                            chunk = temp_files[i:i + chunk_size]
+                                            delete_tasks = [
+                                                s3.delete_object(Bucket=self.__bucket, Key=temp_key)
+                                                for temp_key in chunk
+                                            ]
+                                            await asyncio.gather(*delete_tasks)
+                                            
+                                        self.__logger.info(f"Processed and cleaned up {len(temp_files)} files for VIN {vin} date {sending_date}")
+                                        
+                                except Exception as e:
+                                    self.__logger.error(f"Error processing date group {sending_date} for VIN {vin}: {e}")
+                                    continue
+                    except Exception as e:
+                        self.__logger.error(f"Error processing VIN {vin}: {e}")
         
+        # Lister tous les VINs
         for page in paginator.paginate(
             Bucket=self.__bucket, 
             Prefix=prefix,
             Delimiter='/',
             PaginationConfig={'PageSize': 3000}
         ):
+            if self.__shutdown_requested.is_set():
+                break
+                
             if 'CommonPrefixes' in page:
                 for prefix_obj in page['CommonPrefixes']:
                     vin = prefix_obj['Prefix'].split('/')[2]
@@ -203,9 +251,9 @@ class MobilisightsCompresser:
             endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
         ) as s3:
             try:
-                today = datetime.today().date()
+                sending_date = merged.datetimeSending.date() if merged.datetimeSending else datetime.today().date()
                 encoded = msgspec.json.encode(merged)
-                compressed_key = f"response/stellantis/{vin}/{today}.json"
+                compressed_key = f"response/stellantis/{vin}/{sending_date}.json"
                 
                 await s3.put_object(
                     Bucket=self.__bucket,

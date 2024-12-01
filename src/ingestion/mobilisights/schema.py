@@ -887,7 +887,7 @@ class CarState(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, 
     _id: Optional[str] = None
     vin: Optional[str] = None
     datetime: Optional[dt] = None
-    datetime_sending: Optional[dt] = None
+    datetimeSending: Optional[dt] = None
     heading: Optional[TimestampedValueWithUnit[Annotated[float, msgspec.Meta(ge=0, le=360)], AzimuthUnit]] = None
     geolocation: Optional[Geolocation] = None
     odometer: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
