@@ -17,9 +17,9 @@ logger = getLogger("transform.processed_tss.main")
 GET_PROCESSED_TSS_FUNCTIONS:dict[str, Callable[[], DF]] = {
     # Stellantis brands
     "opel":             hm_get_processed_tss,
-    "peugeot":          hm_get_processed_tss,
     "fiat":             hm_get_processed_tss,
     "ds":               hm_get_processed_tss,
+    "peugeot":          hm_get_processed_tss,
      # Mercedes-Benz
      "mercedes-benz":    hm_get_processed_tss,
      # Renault
