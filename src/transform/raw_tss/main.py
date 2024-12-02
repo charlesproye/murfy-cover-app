@@ -51,7 +51,7 @@ def update_all_raw_tss():
             print(f"[red]Error updating {brand}:[/red] {e}")
             from rich.console import Console
             console = Console()
-            console.print_exception(show_locals=True)
+            console.print_exception(show_locals=False)
         print("============================")
 
 if __name__ == "__main__":
