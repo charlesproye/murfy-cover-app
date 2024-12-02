@@ -48,8 +48,13 @@ def update_all_raw_tss():
             print(brand, ":")
             single_dataframe_script_main(get_raw_tss, brand=brand, force_update=True)
         except Exception as e:
-            print(f"Error updating {brand}: {e}")
+            print(f"[red]Error updating {brand}:[/red] {e}")
+            from rich.console import Console
+            console = Console()
+            console.print_exception(show_locals=True)
         print("============================")
 
 if __name__ == "__main__":
+    from rich.traceback import install
+    install(extra_lines=1)
     update_all_raw_tss()
