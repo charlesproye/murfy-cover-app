@@ -1,4 +1,5 @@
 import pandas as pd
+
 S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{brand}/time_series/processed_tss.parquet'
 # High mobility 
 HIGH_MOBILITY_BRANDS = [

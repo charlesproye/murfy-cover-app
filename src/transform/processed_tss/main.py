@@ -20,20 +20,13 @@ GET_PROCESSED_TSS_FUNCTIONS:dict[str, Callable[[], DF]] = {
     "fiat":             hm_get_processed_tss,
     "ds":               hm_get_processed_tss,
     "peugeot":          hm_get_processed_tss,
-     # Mercedes-Benz
-     "mercedes-benz":    hm_get_processed_tss,
-     # Renault
-     "renault":          hm_get_processed_tss,
-     # Tesla
-     "tesla":            tesla_get_processed_tss,
-     # Volvo
-     "volvo-cars":       hm_get_processed_tss,
-     # Ford
-     "ford":             hm_get_processed_tss,
-     # Kia
-     "kia":              hm_get_processed_tss,
-     # BMW
-     "bmw":              bmw_get_processed_tss,
+    "mercedes-benz":    hm_get_processed_tss,
+    "renault":          hm_get_processed_tss,
+    "volvo-cars":       hm_get_processed_tss,
+    "ford":             hm_get_processed_tss,
+    "kia":              hm_get_processed_tss,
+    "bmw":              bmw_get_processed_tss,
+    "tesla":            tesla_get_processed_tss,
 }
 
 def get_all_processed_tss_as_dict() -> dict[str, DF]:
