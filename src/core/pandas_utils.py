@@ -227,7 +227,7 @@ def parse_unstructured_json(json_obj, no_prefix_path:list[str]=[], no_suffix_pat
         for key, value in json_obj.items():
             item_df = parse_unstructured_json(value, no_prefix_path, no_suffix_path, path + [key])
             if "datetime" in item_df.columns:
-                item_df["datetime"] = pd.to_datetime(item_df["datetime"]).dt.tz_localize(None)
+                item_df["datetime"] = pd.to_datetime(item_df["datetime"], format="mixed").dt.tz_localize(None)
             logger.debug("item_df:")
             logger.debug(item_df)
             logger.debug(item_df.dtypes)
