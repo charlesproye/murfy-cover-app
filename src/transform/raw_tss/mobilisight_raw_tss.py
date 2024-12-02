@@ -24,7 +24,8 @@ def get_raw_tss(brand:str, bucket:S3_Bucket=bucket) -> DF:
             parse_mobilisight_response,
             axis="columns",
             bucket=bucket,
-            logger=logger
+            logger=logger,
+            brand=brand,
         )
         .pipe(concat)
     )
@@ -32,7 +33,7 @@ def get_raw_tss(brand:str, bucket:S3_Bucket=bucket) -> DF:
 def parse_mobilisight_response(response_key:str, bucket:S3_Bucket, logger:Logger=logger, brand:str="") -> DF:
     logger.debug(f"Parsing {brand} key {response_key['key']} using mobilisight parsing.")
     response = bucket.read_json_file(response_key['key'])
-    return parse_unstructured_json(response, logger=logger).assign(vin=response_key["vin"])
+    return parse_unstructured_json(response, no_prefix_path=["datetime"], no_suffix_path=["value"]).assign(vin=response_key["vin"])
 
 
 if __name__ == "__main__":
