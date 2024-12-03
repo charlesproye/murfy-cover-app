@@ -15,8 +15,8 @@ logger:Logger = getLogger("transform.raw_tss.bmw_raw_tss")
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
 def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
     return pd.concat((
-        get_direct_bmw_raw_tss(bucket).assign(data_provider="bmw"),
-        hm_get_raw_tss("bmw", bucket=bucket, force_update=True).assign(data_provider="high_mobility"),
+       get_direct_bmw_raw_tss(bucket).assign(data_provider="bmw"),
+       hm_get_raw_tss("bmw", bucket=bucket, force_update=True).assign(data_provider="high_mobility"),
     ))
 
 def get_direct_bmw_raw_tss(bucket:S3_Bucket) -> DF:
@@ -25,10 +25,11 @@ def get_direct_bmw_raw_tss(bucket:S3_Bucket) -> DF:
         bucket.list_responses_keys_of_brand("BMW")
         .groupby("vin")
         .apply(parse_responses_of_vin, include_groups=False)
+        .reset_index(drop=False)
     )
 
 def parse_responses_of_vin(responses:DF) -> DF:
-    logger.debug(f"Parsing direct bmw responses of vin {responses.name}")
+    logger.debug(f"Parsing direct bmw responses of vin {responses.name}.")
     responses_dicts = responses["key"].apply(bucket.read_json_file)
     cat_responses_dicts = reduce(lambda cat_rep, rep_2: cat_rep + rep_2["data"], responses_dicts, [])
     return (
@@ -37,7 +38,6 @@ def parse_responses_of_vin(responses:DF) -> DF:
         .eval("date_of_value = date_of_value.ffill().bfill()")
         .drop_duplicates(subset=["date_of_value", "key"])
         .pivot(index="date_of_value", columns="key", values="value")
-        .assign(vin=responses.name)
     )
 
 
@@ -45,7 +45,6 @@ if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "transform")
     single_dataframe_script_main(
         get_raw_tss,
-        bucket=S3_Bucket(),
         force_update=True,
     )
 
