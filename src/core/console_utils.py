@@ -3,11 +3,11 @@ import ast
 from typing import Callable, Union
 from logging import Logger
 
-from core.pandas_utils import *
 from rich.traceback import install as install_rich_traceback
 from rich import print
 
-from core.pandas_utils import total_MB_memory_usage, sanity_check
+from core.pandas_utils import *
+from core.time_series_processing import tss_frequency_sanity_check
 
 def parse_kwargs(cli_args: dict[str, dict[str, str]] = [], **kwargs):
     parser = ArgumentParser(**kwargs)                                                                 # Set up argparse to accept known arguments
@@ -49,6 +49,19 @@ def main_decorator(main_func):
             exit()
     return wrapper
 
+@main_decorator
+def tss_script_main(dataframe_gen: Callable[[bool], DF], logger:Union[Logger, None]=None, **kwargs) -> DF:
+    df:DF = dataframe_gen(**kwargs)
+    show = logger.info if logger is not None else print
+    show(df)
+    with pd.option_context("display.max_columns", None, "display.expand_frame_repr", False):
+        show("sanity check:")
+        show(sanity_check(df))
+        print("Frequency sanity check:")
+        show(tss_frequency_sanity_check(df))
+        show(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
+
+    return df
 @main_decorator
 def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], logger:Union[Logger, None]=None, **kwargs) -> DF:
     df:DF = dataframe_gen(**kwargs)
