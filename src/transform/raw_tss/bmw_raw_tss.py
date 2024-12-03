@@ -9,52 +9,36 @@ from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
 
+
+logger:Logger = getLogger("transform.raw_tss.bmw_raw_tss")
+
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
 def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
     return pd.concat((
+        get_direct_bmw_raw_tss(bucket).assign(data_provider="bmw"),
         hm_get_raw_tss("bmw", bucket=bucket, force_update=True).assign(data_provider="high_mobility"),
-        get_direct_bmw_raw_tss(bucket, append_units_to_col_names=False).assign(data_provider="bmw")
     ))
 
-def get_direct_bmw_raw_tss(bucket: S3_Bucket, append_units_to_col_names=False) -> DF:
-    logger = getLogger("transform.BMW-RawTSS")
+def get_direct_bmw_raw_tss(bucket:S3_Bucket) -> DF:
+    logger.debug("Getting direct bmw raw tss.")
     return (
         bucket.list_responses_keys_of_brand("BMW")
-        .apply(
-            parse_response_as_raw_ts,
-            axis="columns",
-            bucket=bucket,
-            logger=logger,
-            append_units_to_col_names=append_units_to_col_names
-        )
-        .pipe(concat)
-        .drop(columns=["mileage"])  # Hot fix to prevent bug in ayvens presentation, for some reason some mileage elements don't have a unit km and are null
-                                    # This in turn creates 2 columns witth the name odometer when we rename cols mileage_km and mileage to odometer...
+        .groupby("vin")
+        .apply(parse_responses_of_vin, include_groups=False)
     )
 
-def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, append_units_to_col_names=False) -> DF:
-    api_response = bucket.read_json_file(key["key"])                                # The json response contains a "data" key who's values are a list of dicts.
-    raw_ts = DF.from_dict(api_response["data"])                                     # The dicts have a "key" and "value" items.
-    if append_units_to_col_names:
-        unit_not_none = raw_ts["unit"].notna()                                      # They also have a "unit" item but not all of them are not null.
-        raw_ts.loc[unit_not_none, "key"] += "_" + raw_ts.loc[unit_not_none, "unit"] # So we append "_" + "unit" to the key only if the "unit" is not none.
-    raw_ts = (
-        raw_ts
-        .pipe(
-            pd.pivot_table,                                                     
-            columns="key",
-            values="value",
-            index="date_of_value",
-            aggfunc="first",
-            dropna=False,
-        )
-        .assign(vin=key["vin"])
-        .reset_index(drop=False)
+def parse_responses_of_vin(responses:DF) -> DF:
+    logger.debug(f"Parsing direct bmw responses of vin {responses.name}")
+    responses_dicts = responses["key"].apply(bucket.read_json_file)
+    cat_responses_dicts = reduce(lambda cat_rep, rep_2: cat_rep + rep_2["data"], responses_dicts, [])
+    return (
+        DF.from_dict(cat_responses_dicts)
+        .drop(columns=["unit", "info"])
+        .eval("date_of_value = date_of_value.ffill().bfill()")
+        .drop_duplicates(subset=["date_of_value", "key"])
+        .pivot(index="date_of_value", columns="key", values="value")
+        .assign(vin=responses.name)
     )
-
-    logger.debug(f"Parsed {key['key']} with bmw parsing.")
-
-    return raw_ts
 
 
 if __name__ == "__main__":
