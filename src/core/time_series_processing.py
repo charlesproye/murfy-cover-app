@@ -26,7 +26,7 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
         return (
             tss
             .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
-            .eval("in_discharge = ~in_charge")
+            .eval("in_discharge = in_charge == False")
         )
     elif "soc" in tss.columns:
         logger.debug(f"Computing charging and discharging masks using soc difference.")

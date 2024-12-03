@@ -1,4 +1,5 @@
 import pandas as pd
+
 S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{brand}/time_series/processed_tss.parquet'
 # High mobility 
 HIGH_MOBILITY_BRANDS = [
@@ -33,8 +34,24 @@ RENAME_COLS_DICT:dict[str, str] = {
     "charging.estimated_range": "estimated_range",
     "charging.battery_level": "soc",
     "soc_hv_header": "soc",
+    # Mobilisight
+    "datetime": "date",
+    "engine.oilTemperature": "oil_temp",
+    "electricity.level.percentage": "soc",
+    "engine.coolantTemperature": "coolant_temp",
+    "externalTemperature": "outside_temp",
+    "electricity.residualAutonomy": "estimated_range",
+    "electricity.residualAutonomy": "estimated_range",
+    "electricity.batteryCapacity": "battery_energy",
+    "electricity.charging.plugged": "charging_plug_connected",
+    "electricity.charging.status": "charging_status",
+    "electricity.charging.remainingTime": "minutes_to_full_charge",
+    "electricity.charging.mode": "charging_method",
+    "electricity.charging.planned": "charging_planned",
+    "electricity.charging.rate": "charging_rate",
+    "electricity.engineSpeed": "engine_speed",
+    "electricity.batteryCapacity":"battery_energy",
     # BMW
-    #"date": "date", # renaming is useless but we will use the key to determine what columns to keep
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
     "mileage": "odometer", # Yes, mileage is in km no need to convert it
@@ -53,13 +70,15 @@ COL_DTYPES = {
     "soc": "float32",
     "odometer": "float32",
     "estimated_range": "float32",
-    # High mobility
+    "outside_temp": "float32",
+    "unit": "string",
     "date": "datetime64[ns]",
     "battery_energy": "float32",
+    "charging_plug_connected": "bool", #BMW and Mobilisight
+    "charging_status": "string", #BMW, Tesla and Mobilisight
+    "minutes_to_full_charge": "float32", #Tesla and Mobilisight
+    "charging_method": "string", #BMW and Mobilisight
     # BMW
-    "charging_plug_connected": "bool",
-    "charging_method": "category",
-    "charging_status": "string",
     "charging_ac_current": "float32",
     "charging_ac_voltage": "float32",
     "coolant_temperature": "float32",
@@ -69,7 +88,6 @@ COL_DTYPES = {
     "fast_charger_present": "bool",
     "power": "float32",
     "speed": "float32",
-    "minutes_to_full_charge": "float32",
     "battery_level": "float32",
     "battery_range": "float32",
     "charge_current_request": "float32",
@@ -89,9 +107,14 @@ COL_DTYPES = {
     "charger_voltage": "float32",
     "est_battery_range": "float32",
     "inside_temp": "float32",
-    "outside_temp": "float32",
     "charging_state": "string",
     "fast_charger_type": "string",
+    # Mobilisight
+    "oil_temp": "float32",
+    "coolant_temp": "float32",
+    "charging_planned": "float32",
+    "charging_rate": "float32",
+    "engine_speed": "float32",
 }
 
 CHARGING_STATUS_VAL_TO_MASK = {
@@ -104,4 +127,11 @@ CHARGING_STATUS_VAL_TO_MASK = {
     "CHARGINGERROR": False,
     "INITIALIZATION": False,
     "CHARGINGPAUSED": False,
+    # Mobilisight
+    "cable_unplugged": False,
+    "slow_charging": True,
+    "fast_charging": True,
+    "charging_complete": False,
+    "charging_error": False,
 }
+
