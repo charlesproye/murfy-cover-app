@@ -1,3 +1,4 @@
+from functools import reduce
 from typing import TypeVar, Any
 from logging import Logger
 import logging
@@ -52,12 +53,15 @@ def uniques_as_series(s:Series) -> Series:
     """Warp around Series.unique to return another Series instead of an ndarray."""
     return Series(s.unique())
 
-def concat(objects:list|dict|Series, **kwargs) -> DF:
+def concat(objects:list|dict|Series, logger:Logger=logger, **kwargs) -> DF:
     """
     Warp around pd.concat to work on Series and not emmit empty object.  
     Empty objects will be ignored.  
     If objects is a Series, the index will be ignores.  
     """
+    if len(objects) == 0:
+        logger.debug("concat called with empty objects, returning empty DF.")
+        return DF()
     if isinstance(objects, Series):
         return pd.concat([value for _, value in objects.items() if not value.empty], **kwargs)
     if isinstance(objects, list):
@@ -214,4 +218,46 @@ def dropna_cols(df:DF, logger:Logger=logger) -> DF:
     logger.info(f"dropna_cols called.")
     logger.debug(f"notna cols:\n{df.notna().any(axis=0)}")
     return df.loc[:, df.notna().any(axis=0)]
+
+# WIP: this has only been tested with mobilisight data.
+def parse_unstructured_json(json_obj, no_prefix_path:list[str]=[], no_suffix_path:list[str]=[], path:list[str]=[], logger:Logger=logger) -> DF:
+    path = path.copy()
+    if isinstance(json_obj, dict):
+        df = DF(columns=["datetime"]).astype({"datetime": "datetime64[ns]"})
+        for key, value in json_obj.items():
+            item_df = parse_unstructured_json(value, no_prefix_path, no_suffix_path, path + [key])
+            if "datetime" in item_df.columns:
+                item_df["datetime"] = pd.to_datetime(item_df["datetime"], format="mixed").dt.tz_localize(None)
+            logger.debug("item_df:")
+            logger.debug(item_df)
+            logger.debug(item_df.dtypes)
+            logger.debug("df:")
+            logger.debug(df)
+            logger.debug(df.dtypes)
+            logger.debug("============")
+            if not item_df.empty:
+                df = df.merge(item_df, how="outer", on="datetime")
+        return df
+        #return concat(dfs, ignore_index=True)
+    elif isinstance(json_obj, list):
+        rename_cols_fct = lambda col: set_json_parsed_col_name(col, path, no_prefix_path, no_suffix_path)
+        return pd.json_normalize(json_obj).rename(columns=rename_cols_fct)
+    else:
+        return DF()
+
+def merge_dfs(dfs:list[DF]) -> DF:
+    def join_two_dfs(df1:DF, df2:DF) -> DF:
+        return pd.merge(df1, df2, how="outer", on="datetime")
+    if len(dfs) > 0:
+        return reduce(join_two_dfs, dfs)
+    else:
+        return DF()
+
+def set_json_parsed_col_name(col:str, path:list[str], no_prefix_path:list[str], no_suffix_path:list[str]) -> str:
+    if col in no_suffix_path and len(path) > 0:
+        col = ""
+    if not col in no_prefix_path:
+        col = ".".join(path + [col] if col else path)
+
+    return col
 

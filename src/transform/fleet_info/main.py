@@ -44,6 +44,8 @@ def get_fleet_info() -> DF:
         pd.concat((ayvens_fleet_info, test_tesla_fleet_info))
         .pipe(set_all_str_cols_to_lower, but=["vin"])
         .pipe(left_merge, followed_tesla_vehicles_info, left_on=["vin"], right_on=["vin"], src_dest_cols=["model", "version"])
+        # Hot fix to pervent the name of the versino to break the parsing of models_info.csv
+        .assign(version=lambda df: df["version"].mask(df["version"] == "gt première ev 50kwh 136 7,4kw 5d", "gt première ev 50kwh 136 7;4kw 5d"))
         .pipe(left_merge, models_info, left_on=["model", "version"], right_on=["model", "version"])
     )
 
@@ -51,6 +53,6 @@ def get_fleet_info() -> DF:
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
     set_level_of_loggers_with_prefix("DEBUG", "transform.fleet_info")
-    single_dataframe_script_main(update_db_vehicle_table) #.to_csv("fleet_info_update.csv")
+    single_dataframe_script_main(update_db_vehicle_table)
 
 fleet_info = get_fleet_info()
