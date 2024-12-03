@@ -1,16 +1,12 @@
-import pandas as pd
-from pandas import Series
-from pandas import DataFrame as DF
 from logging import Logger, getLogger
-import logging.config
 
+from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
-from core.pandas_utils import concat
 from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
@@ -35,7 +31,6 @@ def get_direct_bmw_raw_tss(bucket: S3_Bucket, append_units_to_col_names=False) -
         .drop(columns=["mileage"])  # Hot fix to prevent bug in ayvens presentation, for some reason some mileage elements don't have a unit km and are null
                                     # This in turn creates 2 columns witth the name odometer when we rename cols mileage_km and mileage to odometer...
     )
-
 
 def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, append_units_to_col_names=False) -> DF:
     api_response = bucket.read_json_file(key["key"])                                # The json response contains a "data" key who's values are a list of dicts.
