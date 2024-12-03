@@ -10,7 +10,7 @@ logger = getLogger("transform.results.tesla_results")
 
 def get_soh_per_vehicle() -> DF:
     return (
-        get_soh_per_charge()
+        get_results()
         .groupby("vin")
         .agg(
             soh=pd.NamedAgg("soh", "mean"),
@@ -22,7 +22,7 @@ def get_soh_per_vehicle() -> DF:
         .eval("model_version = model + version")
     )
 
-def get_soh_per_charge() -> DF:
+def get_results() -> DF:
     return (
         get_processed_tss("tesla")
         .query("in_charge_perf_mask")
@@ -48,5 +48,5 @@ def get_soh_per_charge() -> DF:
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "transform.results")
-    single_dataframe_script_main(get_soh_per_charge, logger=logger)
+    single_dataframe_script_main(get_results, logger=logger)
 
