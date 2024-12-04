@@ -11,17 +11,14 @@ from core.constants import *
 
 logger = getLogger("core.time_series_processing")
 
-def compute_discharge_summary(tss:DF, logger:Logger=logger) -> DF:
+def compute_discharge_diffs(tss:DF, vars_to_measure:list[str], logger:Logger=logger) -> DF:
     logger.info(f"compute_discharge_summary called.")
+    transform_dict = {f"{var}_discharge_loss": series_start_end_diff for var in vars_to_measure}    
     return (
         tss
         .query("in_discharge_perf_mask")
         .groupby(["vin", "in_discharge_perf_idx"])
-        .transform({
-            "soc": series_start_end_diff,
-            "odometer": series_start_end_diff,
-            "estimated_range": series_start_end_diff,
-        })
+        .transform(transform_dict)
     )
 
 def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
