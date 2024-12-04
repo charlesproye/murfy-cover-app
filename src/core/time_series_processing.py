@@ -11,7 +11,7 @@ from core.constants import *
 
 logger = getLogger("core.time_series_processing")
 
-def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
+def compute_charging_n_discharging_masks(tss:DF, id_col:str="vin", charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
     """
     ### Description:
     Computes the charging and discharging masks for a time series.
@@ -23,11 +23,19 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
     logger.info(f"compute_charging_n_discharging_masks called.")
     if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
         logger.debug(f"Computing charging and discharging masks using charging status dictionary.")
-        return (
-            tss
-            .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
-            .eval("in_discharge = in_charge == False")
-        )
+        charge_mask = tss["charging_status"].map(charging_status_val_to_mask)
+        tss["in_charge"] = charge_mask
+        tss["in_discharge"] = charge_mask == False
+        if id_col is not None and id_col in tss.columns:
+            tss = (
+                tss
+                .groupby(id_col)
+                .apply(compute_charge_n_discharge_perf_mask_and_idx_from_masks)
+                .reset_index(drop=True)
+            )
+        else:
+            tss = compute_charge_n_discharge_perf_mask_and_idx_from_masks(tss)
+        return tss
     elif "soc" in tss.columns:
         logger.debug(f"Computing charging and discharging masks using soc difference.")
         if id_col in tss.columns:
@@ -145,6 +153,12 @@ def high_freq_in_discharge_and_charge_from_soc_diff(ts: DF) -> DF:
 
     return ts
 
+def compute_charge_n_discharge_perf_mask_and_idx_from_masks(ts:DF, id_col:str=None, logger:Logger=logger) -> DF:
+    return (
+        ts
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
+    )
 
 # TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
 def perf_mask_and_idx_from_condition_mask(
