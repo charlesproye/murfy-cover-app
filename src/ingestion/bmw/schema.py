@@ -50,7 +50,6 @@ class BMWMergedInfo(MergedInfoProtocol[BMWInfo]):
                         break
                     elif point.date_of_value == existing_point.date_of_value:
                         if point.value != existing_point.value:
-                            self.logger.warning(f"Conflict for {point.key}: existing value {existing_point.value}, new value {point.value}")
                             if point.value is not None:
                                 self.data_points.remove(existing_point)
                                 self.data_points.append(point)
