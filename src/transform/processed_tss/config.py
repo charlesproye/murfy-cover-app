@@ -117,7 +117,7 @@ COL_DTYPES = {
     "engine_speed": "float32",
 }
 
-DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
+DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range", "charging_status"]
 
 CHARGING_STATUS_VAL_TO_MASK = {
     #BMW
