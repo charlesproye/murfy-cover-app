@@ -13,13 +13,11 @@ logger = getLogger("core.time_series_processing")
 
 def compute_discharge_diffs(tss:DF, vars_to_measure:list[str], logger:Logger=logger) -> DF:
     logger.info(f"compute_discharge_summary called.")
-    transform_dict = {f"{var}_discharge_loss": series_start_end_diff for var in vars_to_measure}    
-    return (
-        tss
-        .query("in_discharge_perf_mask")
-        .groupby(["vin", "in_discharge_perf_idx"])
-        .transform(transform_dict)
-    )
+    for var in tss.columns.intersection(vars_to_measure):
+        logger.debug(f"transforming {var}")
+        tss[f"{var}_discharge_loss"] = tss.groupby(["vin", "in_discharge_perf_idx"])[var].transform(series_start_end_diff)
+    
+    return tss
 
 def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
     """
