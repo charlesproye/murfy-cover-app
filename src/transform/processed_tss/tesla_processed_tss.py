@@ -7,7 +7,7 @@ from core.caching_utils import cache_result
 from transform.processed_tss.config import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
-from core.time_series_processing import compute_cum_energy, perf_mask_and_idx_from_condition_mask
+from core.time_series_processing import compute_cum_energy, perf_mask_and_idx_from_condition_mask, fillna_vars
 from transform.processed_tss.config import *
 from transform.raw_tss.tesla_raw_tss import get_raw_tss
 from transform.fleet_info.main import fleet_info
@@ -41,7 +41,6 @@ def process_ts(raw_ts:DF) -> DF:
         .assign(
             ffiled_outside_temp=raw_ts["outside_temp"].ffill(),
             ffiled_inside_temp=raw_ts["inside_temp"].ffill(),
-            ffilled_odometer=raw_ts["odometer"].ffill(),
             floored_soc=floor_to(raw_ts["soc"].ffill(), 1),
             date_diff=raw_ts["date"].diff(),
             soc_diff=raw_ts["soc"].diff(),
@@ -55,6 +54,7 @@ def process_ts(raw_ts:DF) -> DF:
         .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
         .sort_values(by="date")
         .assign(energy_diff=lambda df: df["cum_energy"].diff())
+        .pipe(fillna_vars, COLS_TO_FILL, MAX_TIME_DIFF_TO_FILL)
     )
 
 if __name__ == "__main__":

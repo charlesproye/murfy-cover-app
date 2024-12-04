@@ -2,7 +2,7 @@ from logging import getLogger
 from logging import Logger
 
 from core.pandas_utils import *
-from core.time_series_processing import compute_charging_n_discharging_masks
+from core.time_series_processing import compute_charging_n_discharging_masks, fillna_vars
 from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
@@ -30,6 +30,7 @@ def process_raw_tss(tss:DF, logger:Logger=logger) -> DF:
     tss = left_merge(tss, fleet_info, "vin", "vin", COLS_TO_CPY_FROM_FLEET_INFO, logger)
     tss = tss.sort_values(by=["vin", "date"])
     tss = compute_charging_n_discharging_masks(tss, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
+    tss = fillna_vars(tss, COLS_TO_FILL, MAX_TIME_DIFF_TO_FILL)
 
     return tss
 
