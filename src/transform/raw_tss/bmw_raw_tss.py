@@ -14,13 +14,7 @@ logger:Logger = getLogger("transform.raw_tss.bmw_raw_tss")
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
 def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
-    return pd.concat((
-       get_direct_bmw_raw_tss(bucket).assign(data_provider="bmw"),
-       hm_get_raw_tss("bmw", bucket=bucket, force_update=True).assign(data_provider="high_mobility"),
-    ))
-
-def get_direct_bmw_raw_tss(bucket:S3_Bucket) -> DF:
-    logger.debug("Getting direct bmw raw tss.")
+    logger.debug("Getting raw tss frin responses provided by bmw.")
     return (
         bucket.list_responses_keys_of_brand("BMW")
         .groupby("vin")
