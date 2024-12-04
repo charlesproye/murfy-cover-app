@@ -22,7 +22,7 @@ def get_processed_tss() -> DF:
         .pipe(safe_astype, COL_DTYPES, logger=logger)
         .sort_values(by=["vin", "date"])
         .merge(fleet_info, left_on="vin", right_on="vin", how="left")
-        .pipe(compute_charging_n_discharging_masks, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
+        .pipe(compute_charging_n_discharging, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
         .pipe(dropna_cols, logger=logger)
         .pipe(compute_discharge_diffs, DISCHARGE_VARS_TO_MEASURE, logger)
     ) 

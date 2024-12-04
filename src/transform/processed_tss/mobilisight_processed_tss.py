@@ -25,8 +25,8 @@ def get_processed_tss(brand:str, **kwargs) -> DF:
         .pipe(safe_astype, COL_DTYPES, logger=logger)
         .pipe(left_merge, fleet_info, "vin", "vin", COLS_TO_CPY_FROM_FLEET_INFO, logger)
         .sort_values(by=["vin", "date"])
-        .pipe(compute_charging_n_discharging_masks, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
         .pipe(compute_discharge_diffs, DISCHARGE_VARS_TO_MEASURE, logger)
+        .pipe(compute_charging_n_discharging, "vin", CHARGING_STATUS_VAL_TO_MASK, logger)
     )
 
 
