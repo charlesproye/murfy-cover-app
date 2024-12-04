@@ -15,7 +15,7 @@ def compute_discharge_diffs(tss:DF, vars_to_measure:list[str], logger:Logger=log
     logger.info(f"compute_discharge_summary called.")
     if "vin" not in tss.columns or "in_discharge_perf_idx" not in tss.columns:
         logger.warning("vin or in_discharge_perf_idx column not found, returning tss unchanged.")
-        logger.warning(f"columns:\n{'\n'.join(tss.columns)}")
+        logger.warning("columns:\n{}".format('\n'.join(tss.columns)))
         return tss
     for var in tss.columns.intersection(vars_to_measure):
         logger.debug(f"transforming {var}")
