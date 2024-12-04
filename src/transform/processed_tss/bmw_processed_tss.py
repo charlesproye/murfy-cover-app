@@ -1,7 +1,7 @@
 from logging import getLogger
 
 from core.pandas_utils import *
-from core.time_series_processing import compute_charging_n_discharging_masks
+from core.time_series_processing import compute_charging_n_discharging
 from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
@@ -44,7 +44,7 @@ def process_raw_tss_provided_by_bmw(tss:DF) -> DF:
     tss = safe_astype(tss, COL_DTYPES, logger=logger)
     tss = tss.sort_values(by=["vin", "date"])
     tss = left_merge(tss, fleet_info, left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO, logger=logger)
-    tss = compute_charging_n_discharging_masks(tss, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
+    tss = compute_charging_n_discharging(tss, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
     tss = dropna_cols(tss, logger=logger)
 
     return tss
