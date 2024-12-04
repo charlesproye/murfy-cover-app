@@ -4,7 +4,7 @@ from core.pandas_utils import *
 from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
-from core.time_series_processing import compute_charging_n_discharging_masks
+from core.time_series_processing import *
 from transform.processed_tss.config import *
 from transform.raw_tss.mobilisight_raw_tss import get_raw_tss
 from transform.fleet_info.main import fleet_info
@@ -26,6 +26,7 @@ def get_processed_tss(brand:str, **kwargs) -> DF:
         .pipe(left_merge, fleet_info, "vin", "vin", COLS_TO_CPY_FROM_FLEET_INFO, logger)
         .sort_values(by=["vin", "date"])
         .pipe(compute_charging_n_discharging_masks, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
+        .pipe(compute_discharge_diffs, DISCHARGE_VARS_TO_MEASURE, logger)
     )
 
 

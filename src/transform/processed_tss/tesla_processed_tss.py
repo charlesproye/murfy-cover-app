@@ -7,7 +7,7 @@ from core.caching_utils import cache_result
 from transform.processed_tss.config import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
-from core.time_series_processing import compute_cum_energy, perf_mask_and_idx_from_condition_mask
+from core.time_series_processing import *
 from transform.processed_tss.config import *
 from transform.raw_tss.tesla_raw_tss import get_raw_tss
 from transform.fleet_info.main import fleet_info
@@ -30,7 +30,8 @@ def get_processed_tss(bucket: S3_Bucket = bucket) -> DF:
         .reset_index(drop=False)
         .sort_values(by=["vin", "date"])
         .pipe(set_all_str_cols_to_lower, but=["vin"])
-        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO, logger=logger)
+        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), "vin", "vin", COLS_TO_CPY_FROM_FLEET_INFO, logger)
+        .pipe(compute_discharge_diffs, DISCHARGE_VARS_TO_MEASURE, logger)
     )
 
 def process_ts(raw_ts:DF) -> DF:
