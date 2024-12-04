@@ -36,11 +36,11 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
     logger.info(f"compute_charging_n_discharging_masks called.")
     if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
         logger.debug(f"Computing charging and discharging masks using charging status dictionary.")
-        return (
-            tss
-            .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
-            .eval("in_discharge = in_charge == False")
-        )
+        charge_mask = tss["charging_status"].map(charging_status_val_to_mask)
+        deischarge_mask = charge_mask == False
+        tss["in_charge"] = charge_mask
+        tss["in_discharge"] = charge_mask == False
+        return tss
     elif "soc" in tss.columns:
         logger.debug(f"Computing charging and discharging masks using soc difference.")
         if id_col in tss.columns:
@@ -200,4 +200,21 @@ def mask_off_leading_soc(soc: Series) -> Series:
     bfilled_soc = soc.bfill()
     bfilled_first = bfilled_soc.iat[0]
     return bfilled_soc.ne(bfilled_first).shift(-1, fill_value=True)
+
+
+def tss_frequency_sanity_check(tss:DF, date_col:str="date", id_col:str="vin") -> DF:
+    """
+    ### Description:
+    Computes the frequency of the time series as the mean of the date difference.
+    """
+    describe_freq = lambda x: pd.to_datetime(x).drop_duplicates().sort_values().diff().dropna().describe()
+    if id_col in tss.columns:
+        return (
+            tss
+            .groupby(id_col)[date_col]
+            .apply(describe_freq)
+            .unstack(level=1)
+        )
+    else:
+        return describe_freq(tss[date_col])
 
