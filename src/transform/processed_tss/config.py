@@ -51,6 +51,8 @@ RENAME_COLS_DICT:dict[str, str] = {
     "electricity.charging.rate": "charging_rate",
     "electricity.engineSpeed": "engine_speed",
     "electricity.batteryCapacity":"battery_energy",
+    # Mercedes
+    "charging.max_range": "max_range",
     # BMW
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
@@ -79,6 +81,8 @@ COL_DTYPES = {
     "charging_status": "string", #BMW, Tesla and Mobilisight
     "minutes_to_full_charge": "float32", #Tesla and Mobilisight
     "charging_method": "string", #BMW and Mobilisight
+    # Mercedes
+    "charging.max_range": "float32",
     # BMW
     "charging_ac_current": "float32",
     "charging_ac_voltage": "float32",
