@@ -19,7 +19,7 @@ def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
         logger.warning(f"No keys found for brand '{brand}'.\n Returning empty dataframe.")
         return DF()
     with Progress() as progress:
-        task = progress.add_task("Parsing responses...", visible=False, total=10)
+        task = progress.add_task("Parsing responses...", visible=False, total=len(keys))
         return (
             keys
             .apply(parse_response_as_raw_ts, axis="columns", bucket=bucket, logger=logger, progress=progress, task=task)
