@@ -1,7 +1,6 @@
 from core.pandas_utils import *
 from core.config import *
 from core.s3_utils import S3_Bucket
-from core.singleton_s3_bucket import bucket
 from core.console_utils import single_dataframe_script_main
 from transform.fleet_info.config import *
 
@@ -38,6 +37,7 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
         .assign(fleet=lambda df: "ayvens_fleet_" + df["fleet"].astype("string"))
         .pipe(safe_astype, AYVENS_COL_DTYPES)
         .eval("activation_status = activation_status.str.lower().eq('activated').fillna(False).astype('bool')")
+        .eval("version = version.mask(model == 'e-transit' & (version == 'x' | version.isna()), '2022')")
     )
 
 if __name__ == "__main__":
