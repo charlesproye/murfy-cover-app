@@ -1,5 +1,7 @@
 from logging import Logger, getLogger
 
+from rich.progress import Progress
+
 from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
@@ -14,16 +16,19 @@ logger:Logger = getLogger("transform.raw_tss.bmw_raw_tss")
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
 def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
-    logger.debug("Getting raw tss frin responses provided by bmw.")
-    return (
-        bucket.list_responses_keys_of_brand("BMW")
-        .groupby("vin")
-        .apply(parse_responses_of_vin, include_groups=False)
-        .reset_index(drop=False)
-    )
+    logger.debug("Getting raw tss from responses provided by bmw.")
+    with Progress() as progress:
+        keys = bucket.list_responses_keys_of_brand("BMW")
+        task = progress.add_task("Parsing responses...", visible=False, total=len(keys))
+        return (
+            keys
+            .groupby("vin")
+            .apply(parse_responses_of_vin, include_groups=False, bucket=bucket, logger=logger, progress=progress, task=task)
+            .reset_index(drop=False)
+        )
 
-def parse_responses_of_vin(responses:DF) -> DF:
-    logger.debug(f"Parsing direct bmw responses of vin {responses.name}.")
+def parse_responses_of_vin(responses:DF, bucket:S3_Bucket, logger:Logger, progress:Progress, task:int) -> DF:
+    progress.update(task, visible=True, advance=1, description=f"vin: {responses.name}")
     responses_dicts = responses["key"].apply(bucket.read_json_file)
     cat_responses_dicts = reduce(lambda cat_rep, rep_2: cat_rep + rep_2["data"], responses_dicts, [])
     return (
