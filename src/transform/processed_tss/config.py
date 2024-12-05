@@ -117,6 +117,15 @@ COL_DTYPES = {
     "engine_speed": "float32",
 }
 
+COLS_TO_FILL = [
+    "charging_status",
+    "soc",
+    "odometer",
+    "estimated_range",
+]
+
+MAX_TIME_DIFF_TO_FILL = pd.Timedelta(minutes=45)
+
 CHARGING_STATUS_VAL_TO_MASK = {
     #BMW
     "CHARGINGACTIVE": True,

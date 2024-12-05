@@ -1,7 +1,7 @@
 from logging import getLogger
 
 from core.pandas_utils import *
-from core.time_series_processing import compute_charging_n_discharging
+from core.time_series_processing import compute_charging_n_discharging_masks, fillna_vars
 from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import tss_script_main
