@@ -1,13 +1,12 @@
-from core.pandas_utils import *
-from datetime import timedelta as TD
 from logging import getLogger
-import pandas as pd
-from pandas import Series
-from pandas import DataFrame as DF
-from scipy import integrate
+from datetime import timedelta as TD
+
 import numpy as np
+from scipy import integrate
+
 from core.config import *
 from core.constants import *
+from core.pandas_utils import *
 
 logger = getLogger("core.time_series_processing")
 
@@ -21,6 +20,22 @@ def compute_discharge_diffs(tss:DF, vars_to_measure:list[str], logger:Logger=log
         logger.debug(f"transforming {var}")
         tss[f"{var}_discharge_loss"] = tss.groupby(["vin", "in_discharge_perf_idx"])[var].transform(series_start_end_diff)
     
+    return tss
+
+def fillna_vars(tss:DF, vars_to_fill:list[str], max_time_diff:TD|None, id_col:str=None, logger:Logger=logger) -> DF:
+    # Recursively call fillna_vars on groups if id_col is provided instead of implementing another function
+    if id_col and id_col in tss.columns:
+        logger.debug(f"Filling na values for {vars_to_fill}.")
+        return (
+            tss
+            .groupby(id_col)
+            .apply(fillna_vars, vars_to_fill, max_time_diff)
+            .reset_index(drop=True)
+        )
+    prev_time_diff = tss["date"].diff()
+    time_diff_low_enough_to_ffill = prev_time_diff.lt(max_time_diff)
+    for var in tss.columns.intersection(vars_to_fill):
+        tss[f"ffilled_{var}"] = tss[var].mask(time_diff_low_enough_to_ffill & tss[var].isna(), tss[var].ffill().bfill())
     return tss
 
 def compute_charging_n_discharging(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
@@ -124,7 +139,6 @@ def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
     if date_not_index:
         ts = ts.reset_index(drop=True)
     return ts
-
 
 def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     """If the time series has more than 6 hours in between soc points, use `low_freq_mask_in_motion_periods`."""

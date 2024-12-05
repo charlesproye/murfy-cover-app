@@ -47,7 +47,6 @@ def process_ts(raw_ts: DF, progress: Progress, task) -> DF:
         .assign(
             ffiled_outside_temp=raw_ts["outside_temp"].ffill(),
             ffiled_inside_temp=raw_ts["inside_temp"].ffill(),
-            ffilled_odometer=raw_ts["odometer"].ffill(),
             floored_soc=floor_to(raw_ts["soc"].ffill(), 1),
             date_diff=raw_ts["date"].diff(),
             soc_diff=raw_ts["soc"].diff(),
@@ -56,6 +55,7 @@ def process_ts(raw_ts: DF, progress: Progress, task) -> DF:
         .pipe(compute_cum_energy, power_col="charger_power", cum_energy_col="cum_charge_energy_added")
         .assign(energy_added=lambda tss: tss["cum_charge_energy_added"].diff())
         .assign(energy_diff=lambda df: df["cum_energy"].diff())
+        .pipe(fillna_vars, COLS_TO_FILL, MAX_TIME_DIFF_TO_FILL)
     )
 
 if __name__ == "__main__":

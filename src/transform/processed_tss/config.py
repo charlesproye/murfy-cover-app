@@ -118,6 +118,14 @@ COL_DTYPES = {
 }
 
 DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
+COLS_TO_FILL = [
+    "charging_status",
+    "soc",
+    "odometer",
+    "estimated_range",
+]
+
+MAX_TIME_DIFF_TO_FILL = pd.Timedelta(minutes=45)
 
 CHARGING_STATUS_VAL_TO_MASK = {
     #BMW
