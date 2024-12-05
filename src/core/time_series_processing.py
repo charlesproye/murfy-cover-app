@@ -202,3 +202,20 @@ def mask_off_leading_soc(soc: Series) -> Series:
     bfilled_first = bfilled_soc.iat[0]
     return bfilled_soc.ne(bfilled_first).shift(-1, fill_value=True)
 
+
+def tss_frequency_sanity_check(tss:DF, date_col:str="date", id_col:str="vin") -> DF:
+    """
+    ### Description:
+    Computes the frequency of the time series as the mean of the date difference.
+    """
+    describe_freq = lambda x: pd.to_datetime(x).drop_duplicates().sort_values().diff().dropna().describe()
+    if id_col in tss.columns:
+        return (
+            tss
+            .groupby(id_col)[date_col]
+            .apply(describe_freq)
+            .unstack(level=1)
+        )
+    else:
+        return describe_freq(tss[date_col])
+
