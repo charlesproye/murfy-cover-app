@@ -1,5 +1,7 @@
 from logging import getLogger
 
+from rich.progress import Progress
+
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
@@ -12,9 +14,8 @@ from transform.processed_tss.config import *
 from transform.raw_tss.tesla_raw_tss import get_raw_tss
 from transform.fleet_info.main import fleet_info
 
-logger = getLogger("transform.processed_tss.tesla")
 
-from rich.progress import Progress
+logger = getLogger("transform.processed_tss.tesla")
 
 @cache_result(S3_PROCESSED_TSS_KEY_FORMAT.format(brand="tesla"), on="s3")
 def get_processed_tss(bucket: S3_Bucket = bucket) -> DF:
