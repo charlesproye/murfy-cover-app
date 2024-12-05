@@ -37,7 +37,7 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
         .assign(fleet=lambda df: "ayvens_fleet_" + df["fleet"].astype("string"))
         .pipe(safe_astype, AYVENS_COL_DTYPES)
         .eval("activation_status = activation_status.str.lower().eq('activated').fillna(False).astype('bool')")
-        .eval("version = version.mask(model == 'e-transit', '2022')")
+        .eval("version = version.mask(model == 'e-transit' & (version == 'x' | version.isna()), '2022')")
     )
 
 if __name__ == "__main__":
