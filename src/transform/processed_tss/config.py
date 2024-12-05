@@ -61,6 +61,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     # Tesla
     "battery_level": "soc",
     "readable_date": "date",
+    "charging_state": "charging_status",
 }
 
 # The keys will be used to determine what columns to keep.
@@ -107,7 +108,6 @@ COL_DTYPES = {
     "charger_voltage": "float32",
     "est_battery_range": "float32",
     "inside_temp": "float32",
-    "charging_state": "string",
     "fast_charger_type": "string",
     # Mobilisight
     "oil_temp": "float32",
@@ -142,5 +142,8 @@ CHARGING_STATUS_VAL_TO_MASK = {
     "fast_charging": True,
     "charging_complete": False,
     "charging_error": False,
+    # Tesla
+    "Charging": True,
+    "Disconnected": False,
 }
 
