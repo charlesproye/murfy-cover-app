@@ -11,6 +11,7 @@ from pandas import MultiIndex as MultiIdx
 import numpy as np
 
 
+PD_OBJ = TypeVar('T', pd.DataFrame, pd.Series)
 logger = logging.getLogger(__name__)
 
 def debug_df(df: DF, subset: list[str]=None, logger:Logger=logger) -> DF:
@@ -20,8 +21,6 @@ def debug_df(df: DF, subset: list[str]=None, logger:Logger=logger) -> DF:
     show(sanity_check(df_to_debug))
     return df
 
-
-PD_OBJ = TypeVar('T', pd.DataFrame, pd.Series)
 def print_data(data: PD_OBJ) -> PD_OBJ:
     print(data)
     print(data.dtypes)
@@ -174,22 +173,27 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
 
 def sanity_check(df:DF) -> DF:
     nunique_dict = {}
-    uniques_dict = {}
+    value_counts_dict = {}
     for col in df.columns:
         try:
-            uniques_dict[col] = df[col].unique()
+            value_counts_dict[col] = df[col].value_counts().to_dict()
             nunique_dict[col] = float(df[col].nunique())
         except:
-            uniques_dict[col] = []
+            value_counts_dict[col] = []
             nunique_dict[col] = np.nan
             
     return DF({
         "dtypes": df.dtypes.astype("string"),
         "nuniques": Series(nunique_dict).astype("float"),
-        "uniques": Series(uniques_dict),
+        "value_counts": Series(value_counts_dict),
         "count": df.count(),
         "density": df.count().div(len(df)),
         "memory_usage_in_MB": df.memory_usage().div(1e6),
+        "mean": df.mean(numeric_only=True),
+        "std": df.std(numeric_only=True),
+        "min": df.min(numeric_only=True),
+        "max": df.max(numeric_only=True),
+        "median": df.median(numeric_only=True),
         },
         index=df.columns
     )
@@ -228,17 +232,9 @@ def parse_unstructured_json(json_obj, no_prefix_path:list[str]=[], no_suffix_pat
             item_df = parse_unstructured_json(value, no_prefix_path, no_suffix_path, path + [key])
             if "datetime" in item_df.columns:
                 item_df["datetime"] = pd.to_datetime(item_df["datetime"], format="mixed").dt.tz_localize(None)
-            logger.debug("item_df:")
-            logger.debug(item_df)
-            logger.debug(item_df.dtypes)
-            logger.debug("df:")
-            logger.debug(df)
-            logger.debug(df.dtypes)
-            logger.debug("============")
             if not item_df.empty:
                 df = df.merge(item_df, how="outer", on="datetime")
         return df
-        #return concat(dfs, ignore_index=True)
     elif isinstance(json_obj, list):
         rename_cols_fct = lambda col: set_json_parsed_col_name(col, path, no_prefix_path, no_suffix_path)
         return pd.json_normalize(json_obj).rename(columns=rename_cols_fct)
