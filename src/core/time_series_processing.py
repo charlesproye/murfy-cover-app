@@ -10,6 +10,18 @@ from core.pandas_utils import *
 
 logger = getLogger("core.time_series_processing")
 
+def compute_discharge_diffs(tss:DF, vars_to_measure:list[str], logger:Logger=logger) -> DF:
+    logger.info(f"compute_discharge_summary called.")
+    if "vin" not in tss.columns or "in_discharge_perf_idx" not in tss.columns:
+        logger.warning("vin or in_discharge_perf_idx column not found, returning tss unchanged.")
+        logger.warning("columns:\n{}".format('\n'.join(tss.columns)))
+        return tss
+    for var in tss.columns.intersection(vars_to_measure):
+        logger.debug(f"transforming {var}")
+        tss[f"{var}_discharge_loss"] = tss.groupby(["vin", "in_discharge_perf_idx"])[var].transform(series_start_end_diff)
+    
+    return tss
+
 def fillna_vars(tss:DF, vars_to_fill:list[str], max_time_diff:TD|None, id_col:str=None, logger:Logger=logger) -> DF:
     # Recursively call fillna_vars on groups if id_col is provided instead of implementing another function
     if id_col and id_col in tss.columns:
@@ -26,7 +38,7 @@ def fillna_vars(tss:DF, vars_to_fill:list[str], max_time_diff:TD|None, id_col:st
         tss[f"ffilled_{var}"] = tss[var].mask(time_diff_low_enough_to_ffill & tss[var].isna(), tss[var].ffill().bfill())
     return tss
 
-def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
+def compute_charging_n_discharging(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
     """
     ### Description:
     Computes the charging and discharging masks for a time series.

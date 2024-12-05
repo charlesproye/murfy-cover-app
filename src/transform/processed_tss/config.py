@@ -117,6 +117,7 @@ COL_DTYPES = {
     "engine_speed": "float32",
 }
 
+DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
 COLS_TO_FILL = [
     "charging_status",
     "soc",
