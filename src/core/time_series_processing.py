@@ -1,17 +1,44 @@
-from core.pandas_utils import *
-from datetime import timedelta as TD
 from logging import getLogger
-import pandas as pd
-from pandas import Series
-from pandas import DataFrame as DF
-from scipy import integrate
+from datetime import timedelta as TD
+
 import numpy as np
+from scipy import integrate
+
 from core.config import *
 from core.constants import *
+from core.pandas_utils import *
 
 logger = getLogger("core.time_series_processing")
 
-def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
+def compute_discharge_diffs(tss:DF, vars_to_measure:list[str], logger:Logger=logger) -> DF:
+    logger.info(f"compute_discharge_summary called.")
+    if "vin" not in tss.columns or "in_discharge_perf_idx" not in tss.columns:
+        logger.warning("vin or in_discharge_perf_idx column not found, returning tss unchanged.")
+        logger.warning("columns:\n{}".format('\n'.join(tss.columns)))
+        return tss
+    for var in tss.columns.intersection(vars_to_measure):
+        logger.debug(f"transforming {var}")
+        tss[f"{var}_discharge_loss"] = tss.groupby(["vin", "in_discharge_perf_idx"])[var].transform(series_start_end_diff)
+    
+    return tss
+
+def fillna_vars(tss:DF, vars_to_fill:list[str], max_time_diff:TD|None, id_col:str=None, logger:Logger=logger) -> DF:
+    # Recursively call fillna_vars on groups if id_col is provided instead of implementing another function
+    if id_col and id_col in tss.columns:
+        logger.debug(f"Filling na values for {vars_to_fill}.")
+        return (
+            tss
+            .groupby(id_col)
+            .apply(fillna_vars, vars_to_fill, max_time_diff)
+            .reset_index(drop=True)
+        )
+    prev_time_diff = tss["date"].diff()
+    time_diff_low_enough_to_ffill = prev_time_diff.lt(max_time_diff)
+    for var in tss.columns.intersection(vars_to_fill):
+        tss[f"ffilled_{var}"] = tss[var].mask(time_diff_low_enough_to_ffill & tss[var].isna(), tss[var].ffill().bfill())
+    return tss
+
+def compute_charging_n_discharging(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
     """
     ### Description:
     Computes the charging and discharging masks for a time series.
@@ -23,11 +50,19 @@ def compute_charging_n_discharging_masks(tss:DF, id_col:str=None, charging_statu
     logger.info(f"compute_charging_n_discharging_masks called.")
     if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
         logger.debug(f"Computing charging and discharging masks using charging status dictionary.")
-        return (
-            tss
-            .assign(in_charge=tss["charging_status"].map(charging_status_val_to_mask))
-            .eval("in_discharge = ~in_charge")
-        )
+        charge_mask = tss["charging_status"].map(charging_status_val_to_mask)
+        tss["in_charge"] = charge_mask
+        tss["in_discharge"] = charge_mask == False
+        if id_col is not None and id_col in tss.columns:
+            tss = (
+                tss
+                .groupby(id_col)
+                .apply(compute_charge_n_discharge_perf_mask_and_idx_from_masks)
+                .reset_index(drop=True)
+            )
+        else:
+            tss = compute_charge_n_discharge_perf_mask_and_idx_from_masks(tss)
+        return tss
     elif "soc" in tss.columns:
         logger.debug(f"Computing charging and discharging masks using soc difference.")
         if id_col in tss.columns:
@@ -105,7 +140,6 @@ def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
         ts = ts.reset_index(drop=True)
     return ts
 
-
 def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
     """If the time series has more than 6 hours in between soc points, use `low_freq_mask_in_motion_periods`."""
     return (
@@ -145,6 +179,12 @@ def high_freq_in_discharge_and_charge_from_soc_diff(ts: DF) -> DF:
 
     return ts
 
+def compute_charge_n_discharge_perf_mask_and_idx_from_masks(ts:DF, id_col:str=None, logger:Logger=logger) -> DF:
+    return (
+        ts
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
+        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
+    )
 
 # TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
 def perf_mask_and_idx_from_condition_mask(
@@ -187,4 +227,21 @@ def mask_off_leading_soc(soc: Series) -> Series:
     bfilled_soc = soc.bfill()
     bfilled_first = bfilled_soc.iat[0]
     return bfilled_soc.ne(bfilled_first).shift(-1, fill_value=True)
+
+
+def tss_frequency_sanity_check(tss:DF, date_col:str="date", id_col:str="vin") -> DF:
+    """
+    ### Description:
+    Computes the frequency of the time series as the mean of the date difference.
+    """
+    describe_freq = lambda x: pd.to_datetime(x).drop_duplicates().sort_values().diff().dropna().describe()
+    if id_col in tss.columns:
+        return (
+            tss
+            .groupby(id_col)[date_col]
+            .apply(describe_freq)
+            .unstack(level=1)
+        )
+    else:
+        return describe_freq(tss[date_col])
 

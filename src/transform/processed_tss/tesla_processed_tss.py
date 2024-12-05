@@ -7,7 +7,7 @@ from core.caching_utils import cache_result
 from transform.processed_tss.config import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
-from core.time_series_processing import compute_cum_energy, perf_mask_and_idx_from_condition_mask
+from core.time_series_processing import *
 from transform.processed_tss.config import *
 from transform.raw_tss.tesla_raw_tss import get_raw_tss
 from transform.fleet_info.main import fleet_info
@@ -23,14 +23,13 @@ def get_processed_tss(bucket: S3_Bucket = bucket) -> DF:
         .pipe(safe_astype, COL_DTYPES, logger=logger)
         .drop_duplicates(subset=["vin",  "date"])
         .sort_values(by=["vin",  "date"])
-        .eval("in_charge = charging_state == 'Charging'")
-        .eval("in_discharge = charging_state == 'Disconnected'")
+        .pipe(compute_charging_n_discharging, "vin", CHARGING_STATUS_VAL_TO_MASK, logger)
         .groupby("vin")
         .apply(process_ts, include_groups=False)
         .reset_index(drop=False)
-        .sort_values(by=["vin", "date"])
         .pipe(set_all_str_cols_to_lower, but=["vin"])
-        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), left_on="vin", right_on="vin", src_dest_cols=COLS_TO_CPY_FROM_FLEET_INFO, logger=logger)
+        .pipe(left_merge, fleet_info.dropna(subset=["vin"]), "vin", "vin", COLS_TO_CPY_FROM_FLEET_INFO, logger)
+        .pipe(compute_discharge_diffs, DISCHARGE_VARS_TO_MEASURE, logger)
     )
 
 def process_ts(raw_ts:DF) -> DF:
@@ -41,20 +40,15 @@ def process_ts(raw_ts:DF) -> DF:
         .assign(
             ffiled_outside_temp=raw_ts["outside_temp"].ffill(),
             ffiled_inside_temp=raw_ts["inside_temp"].ffill(),
-            ffilled_odometer=raw_ts["odometer"].ffill(),
             floored_soc=floor_to(raw_ts["soc"].ffill(), 1),
             date_diff=raw_ts["date"].diff(),
             soc_diff=raw_ts["soc"].diff(),
-            #model=fleet_info.loc[vin, "model"],
-            #default_capacity=fleet_info.loc[vin, "default_kwh_energy_capacity"],
         )
         .pipe(compute_cum_energy, power_col="power", cum_energy_col="cum_energy")
         .pipe(compute_cum_energy, power_col="charger_power", cum_energy_col="cum_charge_energy_added")
         .assign(energy_added=lambda tss: tss["cum_charge_energy_added"].diff())
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
-        .sort_values(by="date")
         .assign(energy_diff=lambda df: df["cum_energy"].diff())
+        .pipe(fillna_vars, COLS_TO_FILL, MAX_TIME_DIFF_TO_FILL)
     )
 
 if __name__ == "__main__":

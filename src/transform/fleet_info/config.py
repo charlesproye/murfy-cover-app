@@ -1,9 +1,19 @@
 # DB
-RDB_TABLES_MERGE_KWARGS = {
-    "vehicle_model": dict(left_on=["model", "version"], right_on=["model_name", "type"], src_dest_cols={"id": "vehicle_model_id"}),
-    "region": dict(left_on="country", right_on="region_name", src_dest_cols={"id": "region_id"}),
-    "fleet": dict(left_on="fleet", right_on="fleet_name", src_dest_cols={"id": "fleet_id"}),
-}
+RIGHT_MERGES_RDB_TABLES_FLEET_INFO_DEST_COLS = [
+    "fleet_id",
+    "region_id",
+    "vehicle_model_id",
+    "licence_plate",
+    "end_of_contract_date",
+    "id",
+    "activation_status",
+    "vin",
+]
+LEFT_MERGES_RDB_TABLES_FLEET_INFO_KWARGS = [
+    dict(rhs="vehicle_model",left_on=["model", "version"], right_on=["model_name", "type"], src_dest_cols={"id": "vehicle_model_id"}),
+    dict(rhs="region", left_on="country", right_on="region_name", src_dest_cols={"id": "region_id"}),
+    dict(rhs="fleet", left_on="fleet", right_on="fleet_name", src_dest_cols={"id": "fleet_id"}),
+]
 COLS_TO_LOAD_IN_RDB_VEHICLE_TABLE = [
     "fleet_id", #
     "region_id", #
@@ -28,8 +38,6 @@ S3_JSON_FLEET_INFO_RESPONSE_KEYS = [
     "fleet_info/tesla/ayvens-slbv.json",
     "fleet_info/tesla/ayvens.json",
 ]
-
-S3_INITIAL_FLEET_INFO_KEY = "fleet_info/tesla/initial_fleet_info.parquet"
 
 # Ayvens
 AYVENS_FLEET_INFO_CSV_KEY = "fleet_info/ayvens/fleet_info_with_regions.csv"

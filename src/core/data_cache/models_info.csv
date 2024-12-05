@@ -1,17 +1,48 @@
 manufacturer,model,version,capacity,range
 
+peugeot,2008,gt ev 50kwh 136 5d,46.3,270
+peugeot,2008,allure ev 50kwh 136 5d,46.3,270
+peugeot,2008,gt première ev 50kwh 136 7;4kw 5d,46.3,270
+peugeot,e-2008,gt ev 50kwh 136 5d actieauto,46.3,270
+peugeot,208,allure ev 50kwh 136 5d,46.3,290
+peugeot,208,gt ev 50kwh 136 5d,46.3,290
+peugeot,208,gt ev 50kwh 136 5d actieauto,46.3,290
+
 volvo-cars,XC40,p8 awd r-design,75,305
 
 mercedes-benz,EQA,EQA,,404
 mercedes-benz,EQB,EQB,,404
-mercedes-benz,EQC,EQC,,404
+mercedes-benz,EQC,EQC,,370
+mercedes-benz,EQC,eqc 400 4matic 5d,80.0,370
+mercedes-benza,EQC,eqc 400 4matic business solution amg,80.0,370
+mercedes-benz,EQC,eqc 400 4matic business solution amg 5d,80.0,370
+mercedes-benz,EQC,eqc 400 4matic business solution 5d,80.0,370
+mercedes-benz,EQC,eqc 400 4matic business solution luxury 5d,80.0,370
+mercedes-benz,EQC,eqc 400 4matic business solution luxury,80.0,370
+mercedes-benz,EQC,eqc 400 4matic amg,80.0,370
+mercedes-benz,EQC,eqc 400 4matic amg 5d,80.0,370
+mercedes-benz,EQC,eqc 400 4matic,80.0,370
+mercedes-benz,EQC,400 4matic 408pk,80.0,370
 mercedes-benz,EQS,EQS,,610
-mercedes-benz,Vito,Vito,,160
-mercedes-benz,Sprinter,Sprinter,,160
+mercedes-benz,Vito,Vito,35,137
+mercedes-benz,Sprinter,Sprinter,47,157
 
 renault,zoe,R90,41.0,
 renault,zoe,R110,52.0,
 renault,zoe,R135,52.0,
+
+bmw,i3,i3 (120Ah),42.2,305
+bmw,i3,Automaat (94Ah) 5d,35,244
+bmw,i3,i3 (120Ah) 5d,42.2,305
+bmw,i3,i3 (120Ah) Executive Edition,42.2,305
+bmw,i3,i3 (120Ah) Executive Edition 5d,42.2,305
+bmw,i3,i3 170pk (120 Ah) Aut i3,42.2,305
+bmw,i3,i3 170pk (120 Ah) Aut i3 Executive Edition,42.2,305
+bmw,i3,i3 94Ah 33kWh Aut,33,244
+bmw,i3,i3 Corporate Executive (120Ah),42.2,305
+bmw,i3,i3s (120Ah) 5d,42.2,285
+bmw,i3,i3s (120Ah) Executive Edition,42.2,285
+bmw,i3,i3S 120Ah 42kWh Aut,42.2,285
 
 Tesla,model s,long range,95,530
 Tesla,model s,long range plus,98,555

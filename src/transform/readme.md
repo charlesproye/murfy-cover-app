@@ -1,63 +1,81 @@
 # Transform ETL pipeline
 >   Note:   
->       This more of an aspirational goal rather than an actual strict guideline.    
+>       This is more of an aspirational goal of how the pipeline should be structured rather than an actual strict guideline.    
 >       As of writting this readme, the pipelines are not exactly implemented in this way.    
 
 ### Content:
 ```
 transform
 .
-├── ayvens
-│   └── test.ipynb
-├── bmw
-│   └── test.ipynb
+├── main.py
 ├── config.py
+├── readme.md
 ├── fleet_info
 │   ├── ayvens_fleet_info.py
-│   ├── fleet_info_config.py
-│   └── test.ipynb
-├── main.py
+│   ├── config.py
+│   ├── main.py
+│   └── tesla_fleet_info.py
+├── processed_tss
+│   ├── bmw_processed_tss.py
+│   ├── config.py
+│   ├── high_mobility_processed_tss.py
+│   ├── main.py
+│   └── tesla_processed_tss.py
 ├── raw_tss
 │   ├── bmw_raw_tss.py
+│   ├── config.py
 │   ├── high_mobility_raw_tss.py
-│   ├── raw_tss.py
-│   ├── stellantis_config.py
-│   ├── stellantis_raw_tss.py
+│   ├── main.py
 │   └── tesla_raw_tss.py
-├── readme.md
-├── tesla
-│   ├── tesla_config.py
-│   ├── tesla_fleet_info.py
-│   └── tesla_processed_tss.py
-├── utils
-│   └── merge_prod_and_dev_s3_buckets.py# since we can not run the pipeline on the dev bucket for limits on API we need some way to merge the prod and dev buckets
 └── watea
-    ├── data_cache
+    ├── data_cache/
     ├── notes.md
     ├── readme.md
     ├── soh_estimation.py
-    ├── test.ipynb
     ├── watea_config.py
     ├── watea_fleet_info.py
     ├── watea_processed_tss.py
     └── watea_raw_tss.py
 ```
 ### Pipeline structure  
+The entire pipeline can be considered as a single ETL.  
+It takes in data of the vehicles from the data providers and outputs valuable informations(called `results`) in our database.  
 The ETL consists in multiple sub ETLs, each implemented in a single module.    
-Here "XX" is the name of the data provider.    
+For each step of the pipeline, there is a main function that orchestrates the execution of the step and performs some steps that are common to all the sub ETLs.
+For this reason, you should always get the output of the step from the main module instead of a sub ETL module of the same step even if you won't use the other functions of the other sub ETLs modules.  
+Here "XX" is the name of the data provider.   
+- **main.py**:   
+    goal:    
+        Orchestrate the execution the pipeline.    
+        Runs a blocking schedueler to execute the sub ETLs in the correct order once every day.  
 -  **XX_raw_time_series.py**:  
+    goal: Provide data in tabular format.  
     Input: Json responses from the data provider.  
     Output: A dataframe that contains unprocessed data. The data should be identical to the responses of the data providers.    
     Output location: `raw_tss/XX/time_series/raw_tss.parquet` (should just be `raw_tss/XX_raw_tss.parquet`...)  
     How: Parses json responses into DataFrames and concatenates them into a single one.  
+- **raw_tss.main**:   
+    goal: Implement a function:
+        - `get_processed_tss(brand)`: provides access to any processed time series.
+        - `update_all_processed_tss()`: updates all the processed time series.
+    This module does not perform any extra step on the sub ETLs it orchestrates.  
+    So you *could* directly use the output of the sub ETLs, but you *should* not in case a change is done in this main.
+    Import `raw_tss` from this module to get the raw time series dataframe: `from transform.raw_tss.main import get_raw_tss`.
+    Run it as a script to update all the raw time series.
 - **XX_fleet_info.py**:
+    goal: Provide a dataframe to get the model, version, capacity and range of the vehicles.  
     Input: (at least one)Table from each client on their fleet.    
     Output: A single dataframe where each line represents a single vehicle.    
-    Output location: `fleet_info/XX/fleet_info.parquet`    
-    Steps:    
-        - Parses tabular data into DataFrames.    
-        - concatenates them into a single one.    
-        - Extracts extra data from data providers such as DAT.    
+    Output location: The output is not stored.
+- **fleet_info.main**:  
+    goal: Provide a single fleet info dataframe that represents all the fleets.  
+    Input: fleet infos provided by the sub ETLs.  
+    Output: A single fleet info dataframe that represents all the fleets.  
+    Takes care of updating the "vehicle" table in the database.  
+    How: Concatenates all the fleet info dataframes into a single one and left merges models_info onto the result.  
+    Because of the extra steps performed on the fleet info, you *should* not use the output of the sub ETLs directly but the output of this main.
+    Import `fleet_info` from this module to get the fleet info dataframe: `from transform.fleet_info.main import fleet_info`.
+    Run it as a script to update the vehicle table in the database.
 -  **XX_processed_tss.py**:  
     Input: Raw time series and fleet info.  
     Output: A dataframe that contains processed data time series.  
@@ -65,21 +83,14 @@ Here "XX" is the name of the data provider.
     Output location: `processed_tss/time_series/XX/processed_tss.parquet`  
     Steps:  
         - Rename columns to be consistent across brands  
-        - Set the dtypes of raw_tss  
-        - Merge fleet info into raw_tss  
+        - Drop unused columns
+        - Set the dtypes of the time series
         - add missing columns (for ex: in_charge/dishcarge, age of vehicle)  
-        - remove the useless ones.    
--  **XX_results.py**(Still not implemented):  
-    Output: One  or  multiple tables.
-  
-You can launch execute any module as a separate script if you want to run a sepcific step of the transform pipeline.    
-  
-### Running the pipelines  
-Each sub ETL can be run as a separate script.  
-To do so, run a main script in a sub directory of `transform`.  
-Main scripts aggregate the results of the sub ETLs and run the results ETL.  
-`transform/main.py` is the entry point to start a scheduler that launches the whole pipeline every day.
-`transform/raw_tss/main.py` is a script that runs all the raw time series ETLs.  
-`transform/fleet_info/main.py` is a script that runs all the fleet info ETLs.  
-`transform/processed_tss/main.py` is a script that runs all the processed time series ETLs.  
-`transform/results/main.py` is a script that runs the results ETL.  
+        - Merge fleet info into the time series
+- **processed_tss.main**:
+    goal: Implement a function:
+        - `get_processed_tss(brand)`: provides access to any processed time series.
+        - `update_all_processed_tss()`: updates all the processed time series.
+    Input: raw time series and fleet info provided by the previous steps.
+    Output: A single processed time series dataframe per brand that can be used to compute the results we want.
+    Run it as a script to update all the processed time series.
