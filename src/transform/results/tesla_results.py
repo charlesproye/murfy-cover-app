@@ -8,20 +8,6 @@ from transform.processed_tss.main import get_processed_tss
 
 logger = getLogger("transform.results.tesla_results")
 
-def get_soh_per_vehicle() -> DF:
-    return (
-        get_results()
-        .groupby("vin")
-        .agg(
-            soh=pd.NamedAgg("soh", "mean"),
-            odometer=pd.NamedAgg("odometer", "last"),
-            model=pd.NamedAgg("model", "first"),
-            version=pd.NamedAgg("version", "first"),
-        )
-        .reset_index(drop=False)
-        .eval("model_version = model + version")
-    )
-
 def get_results() -> DF:
     return (
         get_processed_tss("tesla")
