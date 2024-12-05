@@ -1,6 +1,8 @@
 from os.path import dirname
 from logging import getLogger
 
+from rich.progress import Progress
+
 from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
@@ -18,20 +20,24 @@ def get_raw_tss(brand:str, bucket:S3_Bucket=bucket) -> DF:
     mobilisght_responses_keys = bucket.list_responses_keys_of_brand("stellantis")
     brand_responses_mask = mobilisght_responses_keys["vin"].isin(fleet_info.query(f"make == '{brand}'")["vin"])
     brand_responses_keys = mobilisght_responses_keys[brand_responses_mask]
-    return (
-        brand_responses_keys
-        .apply(
-            parse_mobilisight_response,
-            axis="columns",
-            bucket=bucket,
-            logger=logger,
-            brand=brand,
+    with Progress() as progress:
+        task = progress.add_task("Parsing mobilisight responses", total=len(brand_responses_keys))
+        return (
+            brand_responses_keys
+            .apply(
+                parse_mobilisight_response,
+                axis="columns",
+                bucket=bucket,
+                logger=logger,
+                brand=brand,
+                progress=progress,
+                task=task,
+            )
+            .pipe(concat)
         )
-        .pipe(concat)
-    )
 
-def parse_mobilisight_response(response_key:str, bucket:S3_Bucket, logger:Logger=logger, brand:str="") -> DF:
-    logger.debug(f"Parsing {brand} key {response_key['key']} using mobilisight parsing.")
+def parse_mobilisight_response(response_key:str, bucket:S3_Bucket, logger:Logger=logger, brand:str="", progress:Progress=None, task=None) -> DF:
+    progress.update(task, advance=1, description=f"key: {response_key['key']}, vin: {response_key['vin']}.")
     response = bucket.read_json_file(response_key['key'])
     return parse_unstructured_json(response, no_prefix_path=["datetime"], no_suffix_path=["value"]).assign(vin=response_key["vin"])
 
