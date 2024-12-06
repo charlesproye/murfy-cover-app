@@ -18,7 +18,6 @@ def filter_results(results: DF, valid_soh_points: DF) -> DF:
     """
     logger.debug("Filtering results.")
     max_intercept, max_slope = intercept_and_slope_from_points(valid_soh_points.xs("max", level=0, drop_level=True))
-    print(f"max_intercept: {max_intercept}, max_slope: {max_slope}")
     min_intercept, min_slope = intercept_and_slope_from_points(valid_soh_points.xs("min", level=0, drop_level=True))
     return (
         results

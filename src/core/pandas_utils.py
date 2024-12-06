@@ -105,6 +105,9 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     - ValueError: If `src_dest_cols` is not None, list, or dict, or if `rhs` contains duplicate keys.
     """
     logger.info(f"left_merge called.")
+    if rhs.empty:
+        logger.warning("rhs is empty, returning lhs unchanged.")
+        return lhs
     # Turn right_on and left_on into lists if they are not already.
     left_on = [left_on] if not isinstance(left_on, list) else left_on
     right_on = [right_on] if not isinstance(right_on, list) else right_on
