@@ -1,3 +1,5 @@
+from scipy.stats import linregress as lr
+
 from core.pandas_utils import *
 
 def filter_results(results: DF, valid_soh_points: DF) -> DF:
@@ -34,4 +36,7 @@ def intercept_and_slope_from_points(points: DF) -> tuple[float, float]:
     intercept = points.at["A", "soh"] - slope * points.at["A", "odometer"]
     return intercept, slope
 
+def lr_params_as_series(df: DF, x: str, y: str) -> Series:
+    df = df.dropna(subset=[x, y], how="any")
+    return Series(lr(df[x], df[y]), index=["slope", "intercept", "rvalue", "pvalue", "stderr"])
 
