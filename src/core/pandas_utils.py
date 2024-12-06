@@ -116,8 +116,14 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     logger.debug(f"src_cols: {src_cols}, dest_cols: {dest_cols}")
     lhs_keys = lhs[left_on].itertuples(index=False)
     rhs_keys = rhs[right_on].itertuples(index=False)
-    lhs_idx = pd.MultiIndex.from_tuples(lhs_keys)
-    rhs_idx = pd.MultiIndex.from_tuples(rhs_keys)
+    try:
+        lhs_idx = pd.MultiIndex.from_tuples(lhs_keys)
+        rhs_idx = pd.MultiIndex.from_tuples(rhs_keys)
+    except Exception as e:
+        logger.warning(f"Could not create MultiIndex from lhs_keys and rhs_keys.\nMost likely lhs_keys or rhs_keys are empty.\nExce
+
+                       ption:{e}")
+        return lhs
     lhs_mask = lhs_idx.isin(rhs_idx)
     if not lhs_mask.any():
         logger.debug("lhs_mask is all False(no lhs[left_on] key is present in rhs[right_on]), returning lhs unchanged.")
