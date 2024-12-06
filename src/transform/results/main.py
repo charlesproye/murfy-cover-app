@@ -37,7 +37,7 @@ def get_all_processed_results() -> DF:
                 "soh": "median",
             })
             .reset_index(drop=False)
-            .pipe(filter_results, VALID_SOH_POINTS)
+            .pipe(filter_results, VALID_SOH_POINTS, logger)
         )
     
     return pd.concat([process_results(get_results_func()) for get_results_func in GET_RESULTS_FUNCS])
