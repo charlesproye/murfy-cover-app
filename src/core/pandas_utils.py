@@ -120,9 +120,7 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
         lhs_idx = pd.MultiIndex.from_tuples(lhs_keys)
         rhs_idx = pd.MultiIndex.from_tuples(rhs_keys)
     except Exception as e:
-        logger.warning(f"Could not create MultiIndex from lhs_keys and rhs_keys.\nMost likely lhs_keys or rhs_keys are empty.\nExce
-
-                       ption:{e}")
+        logger.warning(f"Could not create MultiIndex from lhs_keys and rhs_keys.\nMost likely lhs_keys or rhs_keys are empty.\nException:{e}")
         return lhs
     lhs_mask = lhs_idx.isin(rhs_idx)
     if not lhs_mask.any():
