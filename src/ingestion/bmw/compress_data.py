@@ -139,44 +139,67 @@ class BMWCompresser:
         if not temp_data:
             return
 
-        # Group files by date
-        files_by_date = self._group_files_by_date(temp_data)
-        
-        # Process each date separately
-        for date, date_files in files_by_date.items():
-            if self.__shutdown_requested.is_set():
-                return
+        try:
+            # Group files by date
+            files_by_date = self._group_files_by_date(temp_data)
+            
+            # Process each date separately
+            for date, date_files in files_by_date.items():
+                if self.__shutdown_requested.is_set():
+                    return
 
-            # Process in batches for each date
-            batches = [
-                list(islice(date_files, i, i + self.batch_size))
-                for i in range(0, len(date_files), self.batch_size)
-            ]
-            
-            tasks = [
-                self.__process_batch(vin, batch, date)
-                for batch in batches
-            ]
-            await asyncio.gather(*tasks)
-            
-            self.__logger.info(f"Completed processing for VIN {vin} on date {date}")
+                # Reduce batch size if there are too many files
+                adjusted_batch_size = min(self.batch_size, 20)  # Limit max batch size
+                
+                # Process in smaller batches for each date
+                batches = [
+                    list(islice(date_files, i, i + adjusted_batch_size))
+                    for i in range(0, len(date_files), adjusted_batch_size)
+                ]
+                
+                # Process batches sequentially instead of all at once
+                for batch in batches:
+                    if self.__shutdown_requested.is_set():
+                        return
+                        
+                    try:
+                        await self.__process_batch(vin, batch, date)
+                        # Add small delay between batches to prevent overload
+                        await asyncio.sleep(0.1)
+                    except Exception as e:
+                        self.__logger.error(f"Failed processing batch for VIN {vin} on date {date}: {e}")
+                        continue  # Continue with next batch even if one fails
+                
+                self.__logger.info(f"Completed processing for VIN {vin} on date {date}")
+                
+        except Exception as e:
+            self.__logger.error(f"Error in process_vin for {vin}: {e}")
 
     async def run(self):
         self.__logger.info("Starting BMW data compression")
-        await self.list_objects()
-        
-        if self.__shutdown_requested.is_set():
-            return
+        try:
+            await self.list_objects()
             
-        # Créer des tâches asyncio pour chaque VIN
-        tasks = []
-        for vin, temp_data in self.__s3_keys_by_vin["BMW"].items():
-            task = asyncio.create_task(self.process_vin(vin, temp_data))
-            tasks.append(task)
-        
-        await asyncio.gather(*tasks)
-        self.__logger.info("Completed BMW data compression")
-
+            if self.__shutdown_requested.is_set():
+                return
+                
+            # Process VINs sequentially instead of all at once
+            for vin, temp_data in self.__s3_keys_by_vin["BMW"].items():
+                if self.__shutdown_requested.is_set():
+                    break
+                    
+                try:
+                    await self.process_vin(vin, temp_data)
+                except Exception as e:
+                    self.__logger.error(f"Failed processing VIN {vin}: {e}")
+                    continue  # Continue with next VIN even if one fails
+                    
+            self.__logger.info("Completed BMW data compression")
+            
+        except Exception as e:
+            self.__logger.error(f"Error in compression run: {e}")
+        raise
+    
     def start(self):
         asyncio.run(self.run())
 
