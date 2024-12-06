@@ -39,6 +39,8 @@ def right_union_merge_rdb_table(lhs: DF, table: str, left_on: list[str], right_o
     # Set left_on and right_on to list if they are not already
     left_on = [left_on] if isinstance(left_on, str) else left_on
     right_on = [right_on] if isinstance(right_on, str) else right_on
+    # Assert that all the left_on columns are in lhs
+    assert all(col in lhs.columns for col in left_on), f"Not all left_on columns are present in lhs:\nleft_on: {left_on}\nlhs columns: {lhs.columns}"
     # Get rhs table and drop rows with null values in right_on columns to prevent having duplicates down the line
     rhs = pd.read_sql_table(table, con)
     if dropna:
