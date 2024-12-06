@@ -28,7 +28,7 @@ def get_results() -> DF:
             ["max_battery_energy"],
             logger
         )
-        .eval("soh = battery_energy / max_battery_energy * 100")
+        .eval("soh = battery_energy / max_battery_energy")
     )
 
 if __name__ == "__main__":
