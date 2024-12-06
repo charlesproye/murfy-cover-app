@@ -100,6 +100,7 @@ AYVENS_COL_DTYPES = {
     # "capacity": "float",
     # "autonomie": "float",
     "end of contract": "datetime64[ns]",
+    "end_of_contract_date": "datetime64[ns]",
     "country": "string",
     "category": "string",
     "activated": "string",
