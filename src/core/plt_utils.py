@@ -49,7 +49,7 @@ def plt_3d_df(
         )
     )
 
-def plt_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, id_col:str, marker_size:int=8) -> Figure:
+def fig_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, new_x:str=None, id_col:str=None, marker_size:int=8) -> Figure:
     arrow_df = (
         df
         .assign(empty_col=pd.NA)
@@ -62,17 +62,17 @@ def plt_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, id_c
         .reset_index()
     )
 
-    fig = (
+    return (
         px.scatter(
             arrow_df,
-            "odometer",
-            "soh",
-            color="id",
+            x,
+            old_y,
+            color=id_col,
         )
         .add_trace(
             go.Scatter(
-                x=arrow_df["odometer"],
-                y=arrow_df["soh"],
+                x=arrow_df[x],
+                y=arrow_df[old_y],
                 mode="markers+lines",
                 marker=dict(
                     symbol="arrow",
@@ -84,5 +84,4 @@ def plt_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, id_c
             )
         )
     )
-    fig.show()
 
