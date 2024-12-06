@@ -31,7 +31,7 @@ def filter_results(results: DF, valid_soh_points: DF, logger: Logger) -> DF:
         .dropna(subset=["soh", "odometer"], how="any")
     )
     nb_rows_removed = results.shape[0] - filtered_results.shape[0]
-    rows_removed_pct = 100*nb_rows_removed/results.shape[0]
+    rows_removed_pct = 100 * nb_rows_removed / results.shape[0]
     if nb_rows_removed == results.shape[0]:
         logger.warning(f"All results were removed, check the valid SOH points.")
     else:
