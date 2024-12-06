@@ -183,23 +183,30 @@ class BMWCompresser:
             if self.__shutdown_requested.is_set():
                 return
                 
-            # Process VINs sequentially instead of all at once
+            # Process multiple VINs concurrently, but limit concurrency
+            max_concurrent_vins = 5  # Ajuster selon les besoins
+            tasks = []
+            
             for vin, temp_data in self.__s3_keys_by_vin["BMW"].items():
                 if self.__shutdown_requested.is_set():
                     break
                     
-                try:
-                    await self.process_vin(vin, temp_data)
-                except Exception as e:
-                    self.__logger.error(f"Failed processing VIN {vin}: {e}")
-                    continue  # Continue with next VIN even if one fails
+                tasks.append(self.process_vin(vin, temp_data))
+                
+                # When we reach max_concurrent_vins, wait for them to complete
+                if len(tasks) >= max_concurrent_vins:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                    tasks = []
+            
+            # Process any remaining tasks
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
                     
             self.__logger.info("Completed BMW data compression")
-            
         except Exception as e:
             self.__logger.error(f"Error in compression run: {e}")
-        raise
-    
+            raise
+
     def start(self):
         asyncio.run(self.run())
 

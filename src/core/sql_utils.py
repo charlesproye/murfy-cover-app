@@ -6,6 +6,7 @@ from sqlalchemy import Engine, create_engine, text
 from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR
 from core.env_utils import get_env_var
 from core.logging_utils import set_level_of_loggers_with_prefix
+from contextlib import contextmanager
 
 logger = getLogger(__name__)
 set_level_of_loggers_with_prefix("INFO", "sql_utils")
@@ -19,6 +20,15 @@ def get_sqlalchemy_engine() -> Engine:
 
 engine = get_sqlalchemy_engine()
 connection = engine.connect()
+
+@contextmanager
+def get_connection():
+    """Context manager pour obtenir une connexion à la base de données"""
+    conn = engine.raw_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     print(engine)
