@@ -24,7 +24,12 @@ ford,mustang mach-e,98kwh extended range rwd auto 5d,88,
 volvo-cars,XC40,p8 awd r-design,75,305
 
 mercedes-benz,EQA,EQA,,404
-mercedes-benz,EQB,EQB,,404
+mercedes-benz,EQA,250 business solution amg auto,40.0,404
+mercedes-benz,EQA,250 business solution amg auto 5d,40.0,404
+mercedes-benz,EQA,250 business solution luxury auto,40.0,404
+mercedes-benz,EQB,eqb 250 business line auto 5d onze deal,,404
+mercedes-benz,EQB,eqb 250 luxury line auto 5d,40.0,404
+mercedes-benz,EQB,eqb,40.0,404
 mercedes-benz,EQC,EQC,,370
 mercedes-benz,EQC,eqc 400 4matic 5d,80.0,370
 mercedes-benza,EQC,eqc 400 4matic business solution amg,80.0,370
@@ -36,9 +41,13 @@ mercedes-benz,EQC,eqc 400 4matic amg,80.0,370
 mercedes-benz,EQC,eqc 400 4matic amg 5d,80.0,370
 mercedes-benz,EQC,eqc 400 4matic,80.0,370
 mercedes-benz,EQC,400 4matic 408pk,80.0,370
-mercedes-benz,EQS,EQS,,610
+mercedes-benz,EQS,eqs 450+ business line 5d,,610
+mercedes-benz,EQS,eqs 450+ business line,610
+mercedes-benz,EQS,eqs 450+ luxury line 5d,610
 mercedes-benz,Vito,Vito,35,137
-mercedes-benz,Sprinter,Sprinter,47,157
+mercedes-benz,Sprinter,sprinter,47,157
+mercedes-benz,Sprinter,sprinter-47kwh,47,157
+mercedes-benz,Vito,vito-35kwh,35,137
 
 renault,zoe,R90,41.0,
 renault,zoe,R110,52.0,

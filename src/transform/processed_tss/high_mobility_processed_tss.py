@@ -33,6 +33,7 @@ def process_raw_tss(raw_tss:DF, logger:Logger=logger) -> DF:
         .sort_values(by=["vin", "date"])
         .pipe(compute_charging_n_discharging, id_col="vin", charging_status_val_to_mask=CHARGING_STATUS_VAL_TO_MASK, logger=logger)
         .pipe(compute_discharge_diffs, DISCHARGE_VARS_TO_MEASURE, logger)
+        .pipe(fillna_vars, COLS_TO_FILL, MAX_TIME_DIFF_TO_FILL, id_col="vin", logger=logger) 
     )
 
 if __name__ == "__main__":
