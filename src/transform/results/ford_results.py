@@ -10,6 +10,7 @@ from transform.processed_tss.main import get_processed_tss
 logger = getLogger("transform.results.tesla_results")
 
 def get_results() -> DF:
+    logger.info("Getting results for Ford.")
     tss = get_processed_tss("ford", force_update=True)
     max_energy = (
         tss
