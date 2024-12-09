@@ -49,30 +49,16 @@ def plt_3d_df(
         )
     )
 
-def fig_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, new_x:str=None, id_col:str=None, marker_size:int=8) -> Figure:
-    arrow_df = (
-        df
-        .assign(empty_col=pd.NA)
-        .loc[:, [x, id_col, old_y, new_y, "empty_col"]]
-        .set_index([x, id_col], append=True)
-        .T
-        .unstack()
-        .to_frame()
-        .rename(columns={0: old_y})
-        .reset_index()
-    )
-
-    return (
-        px.scatter(
-            arrow_df,
-            x,
-            old_y,
-            color=id_col,
-        )
-        .add_trace(
+def scatter_and_arrow_fig(df: DF, x0:str, x1:str, y0:str, y1:str, id_col:str=None, marker_size:int=8, scatter_kwargs:dict={}, arrow_kwargs:dict={}) -> Figure:
+    x = df_cols_to_series(df, [x0, x1], id_col)
+    y = df_cols_to_series(df, [y0, y1], id_col) 
+    display(x)
+    display(y)
+    fig = px.scatter(x=x.values, y=y.values)
+    fig = fig.add_trace(
             go.Scatter(
-                x=arrow_df[x],
-                y=arrow_df[old_y],
+                x=x,
+                y=y,
                 mode="markers+lines",
                 marker=dict(
                     symbol="arrow",
@@ -81,7 +67,19 @@ def fig_change_with_scatter_and_arrows(df: DF, x:str, old_y:str, new_y:str, new_
                     angleref="previous",
                     standoff=marker_size / 2,
                 ),
+                **arrow_kwargs,
             )
         )
+    return fig
+
+
+def df_cols_to_series(df: DF, cols:list[str], id_col:str) -> Series:
+    return (
+        df
+        .assign(empty_col=pd.NA)
+        .loc[:, cols + [id_col, "empty_col"]]
+        .set_index(id_col, append=True)
+        .T
+        .unstack()
     )
 
