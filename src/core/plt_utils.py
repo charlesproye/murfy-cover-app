@@ -52,10 +52,9 @@ def plt_3d_df(
 def scatter_and_arrow_fig(df: DF, x0:str, x1:str, y0:str, y1:str, id_col:str=None, marker_size:int=8, scatter_kwargs:dict={}, arrow_kwargs:dict={}) -> Figure:
     x = df_cols_to_series(df, [x0, x1], id_col)
     y = df_cols_to_series(df, [y0, y1], id_col) 
-    display(x)
-    display(y)
-    fig = px.scatter(x=x.values, y=y.values)
-    fig = fig.add_trace(
+    return (
+        px.scatter(x=x.values, y=y.values)
+        .add_trace(
             go.Scatter(
                 x=x,
                 y=y,
@@ -67,10 +66,9 @@ def scatter_and_arrow_fig(df: DF, x0:str, x1:str, y0:str, y1:str, id_col:str=Non
                     angleref="previous",
                     standoff=marker_size / 2,
                 ),
-                **arrow_kwargs,
             )
         )
-    return fig
+    )
 
 
 def df_cols_to_series(df: DF, cols:list[str], id_col:str) -> Series:
