@@ -248,7 +248,11 @@ class MergedRenaultInfo(msgspec.Struct):
 
     @classmethod
     def new(cls) -> Self:
-        return cls(MergedRenaultDiagnostics(), MergedRenaultCharging())
+        return cls(
+            MergedRenaultDiagnostics(), 
+            MergedRenaultCharging(),
+            MergedRenaultClimate()
+        )
 
     @classmethod
     def from_initial(cls, initial: RenaultInfo) -> Self:
