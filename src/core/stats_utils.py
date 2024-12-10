@@ -50,13 +50,9 @@ def lr_params_as_series(df: DF, x: str, y: str) -> Series:
     return Series(lr(df[x], df[y]), index=["slope", "intercept", "rvalue", "pvalue", "stderr"])
 
 def mask_out_outliers_by_interquartile_range(soh_values:Series) -> Series:
-    # Méthode de l'écart interquartile (IQR)
-    q1, q3 = soh_values.quantile(0.25), soh_values.quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-    return soh_values.between(lower_bound, upper_bound)
-    
+    q1, q3 = soh_values.quantile(0.05), soh_values.quantile(0.95)
+    return soh_values.between(q1, q3, inclusive="both")
+
 def force_monotonic_decrease(values:Series) -> Series:
     """
     Ajuste les valeurs de SoH pour garantir une décroissance tout en minimisant 
@@ -67,13 +63,13 @@ def force_monotonic_decrease(values:Series) -> Series:
     def objectif(adjusted_values:np.ndarray) -> float:
         return np.sum((adjusted_values - values) ** 2)
    # Contraintes : SoH doit être non-croissant et l'écart hebdomadaire doit être inférieur à 0,1%
-    constraints = [{'type': 'ineq', 'fun': lambda x, i=i: x[i - 1] - x[i]} for i in range(1, n)] 
+    constraints = [{'type': 'ineq', 'fun': lambda x, i=i: (x[i - 1] - x[i]) * 0.00001} for i in range(1, n)] 
     constraints += [{'type': 'ineq', 'fun': lambda x, i=i: 0.001 * x[i - 1] - (x[i - 1] - x[i])} for i in range(1, n)]
     # Borne supérieure et inférieure (par exemple, entre 0 et 100)
     bounds = [(0, 100)] * n
     # Initialisation des valeurs ajustées (on commence par les valeurs brutes)
     # Résolution de l'optimisation
-    result = minimize(objectif, values, constraints=constraints, bounds=bounds)
+    result = minimize(objectif, values, constraints=constraints, bounds=bounds, method="SLSQP")
 
     if result.success:
         return result.x 
