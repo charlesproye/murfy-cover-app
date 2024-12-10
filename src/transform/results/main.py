@@ -32,13 +32,16 @@ def update_vehicle_data_table():
 def get_all_processed_results() -> DF:
     return pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
 
-def get_processed_results(brand: str) -> DF:
-    logger.info(f"Processing {brand} results.")
+def get_processed_results(brand:str) -> DF:
     results = GET_RESULTS_FUNCS[brand]()
     if brand == "ford":
         results = agg_results_by_discharge_and_charge(results)
+    else:
+        print("no aggregation...")
     return (
         results
+        .dropna(subset=["soh", "odometer"], how="any")
+        .reset_index()
         .groupby('vin')
         .apply(make_soh_presentable, include_groups=False)
         .reset_index(drop=False)  # Supprime l'index 'vin' créé par le groupby
@@ -55,10 +58,12 @@ def get_processed_results(brand: str) -> DF:
     )
 
 def make_soh_presentable(df:DF) -> DF:
-    outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
-    assert outliser_mask.sum() > 0, f"There seems to be only outliers??? {outliser_mask.sum()}"
-    df = df[outliser_mask].copy()
-    df["soh"] = force_monotonic_decrease(df["soh"])
+    if len(df) > 3:
+        outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
+        assert outliser_mask.sum() > 0, f"There seems to be only outliers???: {df['soh'].quantile(0.05)}, {df['soh'].quantile(0.95)}\n{df['soh']}"
+        df = df[outliser_mask].copy()
+    if len(df) > 2:
+        df["soh"] = force_monotonic_decrease(df["soh"])
     return df
 
 def agg_results_by_discharge_and_charge(results:DF) -> DF:
