@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize
-from results.config import *
+from .config import *
 
 def detecter_outliers(soh_values, method="iqr"):
     """
