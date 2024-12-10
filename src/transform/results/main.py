@@ -4,7 +4,7 @@ from core.pandas_utils import *
 from core.sql_utils import *
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
-from core.stats_utils import filter_results
+from core.stats_utils import filter_results_by_lines_bounds
 from transform.results.tesla_results import get_results as get_tesla_results
 from transform.results.ford_results import get_results as get_ford_results
 from transform.results.config import *
@@ -37,7 +37,7 @@ def get_all_processed_results() -> DF:
                 "soh": "median",
             })
             .reset_index(drop=False)
-            .pipe(filter_results, VALID_SOH_POINTS, logger)
+            .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger)
         )
     
     return pd.concat([process_results(get_results_func()) for get_results_func in GET_RESULTS_FUNCS])
