@@ -5,24 +5,18 @@ from core.sql_utils import *
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
 from core.stats_utils import filter_results
-from transform.results.tesla_results import get_results
+from transform.results.tesla_results import get_results as get_tesla_results
+from transform.results.ford_results import get_results as get_ford_results
 from transform.results.config import *
 
 logger = getLogger("transform.results.main")
+GET_RESULTS_FUNCS = [get_ford_results, get_tesla_results]
 
 def update_vehicle_data_table():
     logger.info("Updating 'vehicle_data' table.")
-    results = (
-        get_results()
-        .assign(date=lambda df: df["date"].dt.floor(UPDATE_FREQUENCY))
-        .groupby(["vin", "date"])
-        .agg({
-            "odometer": "last",    
-            "soh": "median",
-        })
-        .reset_index(drop=False)
-        .pipe(filter_results, VALID_SOH_POINTS)
-        .pipe(left_merge_rdb_table, "vehicle", left_on="vin", right_on="vin", src_dest_cols={"id": "vehicle_id"})
+    return (
+        get_all_processed_results()
+        .pipe(left_merge_rdb_table, "vehicle", "vin", "vin", {"id": "vehicle_id"})
         .pipe(
             right_union_merge_rdb_table,
             "vehicle_data",
@@ -32,8 +26,21 @@ def update_vehicle_data_table():
         )
     )
 
-    return results
-
+def get_all_processed_results() -> DF:
+    def process_results(df: DF) -> DF:
+        return (
+            df
+            .assign(date=lambda df: df["date"].dt.floor(UPDATE_FREQUENCY))
+            .groupby(["vin", "date"])
+            .agg({
+                "odometer": "last",
+                "soh": "median",
+            })
+            .reset_index(drop=False)
+            .pipe(filter_results, VALID_SOH_POINTS, logger)
+        )
+    
+    return pd.concat([process_results(get_results_func()) for get_results_func in GET_RESULTS_FUNCS])
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")

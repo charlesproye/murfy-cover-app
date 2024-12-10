@@ -1,26 +1,12 @@
 from logging import getLogger
 
-from core.console_utils import single_dataframe_script_main
 from core.pandas_utils import *
+from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.results.config import *
 from transform.processed_tss.main import get_processed_tss
 
 logger = getLogger("transform.results.tesla_results")
-
-def get_soh_per_vehicle() -> DF:
-    return (
-        get_results()
-        .groupby("vin")
-        .agg(
-            soh=pd.NamedAgg("soh", "mean"),
-            odometer=pd.NamedAgg("odometer", "last"),
-            model=pd.NamedAgg("model", "first"),
-            version=pd.NamedAgg("version", "first"),
-        )
-        .reset_index(drop=False)
-        .eval("model_version = model + version")
-    )
 
 def get_results() -> DF:
     return (
