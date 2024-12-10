@@ -6,18 +6,12 @@ from core.caching_utils import cache_result
 from core.pandas_utils import *
 from core.stats_utils import *
 from transform.results.config import *
-from transform.results.tesla_results import get_results as get_results_raw
+from transform.results.ford_results import get_results as get_results_raw
 
-@cache_result("data_cache/tesla_res.parquet", on="local_storage")
+@cache_result("data_cache/ford_res.parquet", on="local_storage")
 def get_results() -> DF:
     return (
         get_results_raw()
-        .astype({
-            "fast_charger_type": "string",
-            "model": "string",
-            "version": "string",
-            "model_version": "string",
-        })
     )
 
 logger = getLogger("eda.results.monotonically_decreasing_soh")
@@ -25,9 +19,9 @@ results = get_results()
 
 def make_soh_presentable(df:DF) -> DF:
     outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
+    assert outliser_mask.sum() > 0, "There seems to be only outliers???"
     df = df[outliser_mask].copy()
-    if len(df) > 0:
-        df["soh"] = force_monotonic_decrease(df["soh"])
+    df["soh"] = force_monotonic_decrease(df["soh"])
     return df
 
 # Application du traitement sur le DataFrame original
@@ -35,13 +29,18 @@ def make_soh_presentable(df:DF) -> DF:
 def get_processed_results() -> DF:
     return (
         results
-        # 3. Appliquer le traitement de SoH par véhicule
+        .assign(date=lambda df: df["date"].dt.floor(UPDATE_FREQUENCY))
+        .groupby(["vin", "date"])
+        .agg({
+            "odometer": "last",
+            "soh": "median",
+            "model": "first",
+        })
+        .reset_index()
         .groupby('vin')
         .apply(make_soh_presentable, include_groups=False)
         .reset_index(drop=False)  # Supprime l'index 'vin' créé par le groupby
-        # 1. D'abord, arrondir les dates à la semaine 
         .assign(date=lambda df: df["date"].dt.floor(UPDATE_FREQUENCY))
-        # 2. Grouper par vin et date pour avoir une valeur hebdomadaire
         .groupby(["vin", "date"])
         .agg({
             "odometer": "last",    
@@ -50,8 +49,6 @@ def get_processed_results() -> DF:
         })
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger=logger)
         .reset_index()
-        # 4. Reset final de l'index
-        .reset_index(drop=True)
         .sort_values(["vin", "odometer"])
     )
 
