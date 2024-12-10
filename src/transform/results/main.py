@@ -1,16 +1,19 @@
 from logging import getLogger
 
-from core.pandas_utils import *
 from core.sql_utils import *
-from core.logging_utils import set_level_of_loggers_with_prefix
+from core.stats_utils import *
+from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
-from core.stats_utils import filter_results_by_lines_bounds
-from transform.results.tesla_results import get_results as get_tesla_results
-from transform.results.ford_results import get_results as get_ford_results
+from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.results.config import *
+from transform.results.ford_results import get_results as get_ford_results
+from transform.results.tesla_results import get_results as get_tesla_results
 
 logger = getLogger("transform.results.main")
-GET_RESULTS_FUNCS = [get_ford_results, get_tesla_results]
+GET_RESULTS_FUNCS = {
+    "tesla": get_tesla_results,
+    "ford": get_ford_results,
+}
 
 def update_vehicle_data_table():
     logger.info("Updating 'vehicle_data' table.")
@@ -27,20 +30,51 @@ def update_vehicle_data_table():
     )
 
 def get_all_processed_results() -> DF:
-    def process_results(df: DF) -> DF:
-        return (
-            df
-            .assign(date=lambda df: df["date"].dt.floor(UPDATE_FREQUENCY))
-            .groupby(["vin", "date"])
-            .agg({
-                "odometer": "last",
-                "soh": "median",
-            })
-            .reset_index(drop=False)
-            .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger)
-        )
-    
-    return pd.concat([process_results(get_results_func()) for get_results_func in GET_RESULTS_FUNCS])
+    return pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
+
+def get_processed_results(brand: str) -> DF:
+    logger.info(f"Processing {brand} results.")
+    results = GET_RESULTS_FUNCS[brand]()
+    if brand == "ford":
+        results = agg_results_by_discharge_and_charge(results)
+    return (
+        results
+        .groupby('vin')
+        .apply(make_soh_presentable, include_groups=False)
+        .reset_index(drop=False)  # Supprime l'index 'vin' créé par le groupby
+        .assign(date=lambda df: df["date"].dt.floor(UPDATE_FREQUENCY))
+        .groupby(["vin", "date"])
+        .agg({
+            "odometer": "last",    
+            "soh": "median",
+            "model": "first",
+        })
+        .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger=logger)
+        .reset_index()
+        .sort_values(["vin", "odometer"])
+    )
+
+def make_soh_presentable(df:DF) -> DF:
+    outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
+    assert outliser_mask.sum() > 0, f"There seems to be only outliers??? {outliser_mask.sum()}"
+    df = df[outliser_mask].copy()
+    df["soh"] = force_monotonic_decrease(df["soh"])
+    return df
+
+def agg_results_by_discharge_and_charge(results:DF) -> DF:
+    return (
+        results
+        .groupby(["vin", "in_discharge_perf_idx"])
+        .agg({
+            "soh": "median",
+            "odometer": "last",
+            "date": "last",
+            "date": "first",
+            "model": "first",
+            "version": "first",
+        })
+        .reset_index()
+    )
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
