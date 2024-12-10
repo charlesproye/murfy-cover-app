@@ -72,9 +72,8 @@ def force_monotonic_decrease(values:Series) -> Series:
     # Borne supérieure et inférieure (par exemple, entre 0 et 100)
     bounds = [(0, 100)] * n
     # Initialisation des valeurs ajustées (on commence par les valeurs brutes)
-    initial_guess = values.copy()
     # Résolution de l'optimisation
-    result = minimize(objectif, initial_guess, method='SLSQP', constraints=constraints, bounds=bounds)
+    result = minimize(objectif, values, constraints=constraints, bounds=bounds)
 
     if result.success:
         return result.x 
