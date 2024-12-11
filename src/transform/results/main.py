@@ -6,11 +6,13 @@ from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.results.config import *
+from transform.results.renault_results import get_results as get_renault_results
 from transform.results.ford_results import get_results as get_ford_results
 from transform.results.tesla_results import get_results as get_tesla_results
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
+    "renault": get_renault_results,
     "tesla": get_tesla_results,
     "ford": get_ford_results,
 }
@@ -34,7 +36,7 @@ def get_all_processed_results() -> DF:
 
 def get_processed_results(brand:str) -> DF:
     results = GET_RESULTS_FUNCS[brand]()
-    if brand == "ford":
+    if brand == "ford" or brand == "renault":
         results = agg_results_by_discharge_and_charge(results)
     else:
         print("no aggregation...")
