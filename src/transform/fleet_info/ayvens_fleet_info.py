@@ -5,7 +5,7 @@ from core.singleton_s3_bucket import bucket
 from core.console_utils import single_dataframe_script_main
 from transform.fleet_info.config import *
 
-def get_fleet_info(bucket=S3_Bucket()) -> DF:
+def get_fleet_info(bucket:S3_Bucket=bucket) -> DF:
     fleet_info_with_contract_start_date = (
         bucket
         .read_csv_df(
@@ -35,12 +35,12 @@ def get_fleet_info(bucket=S3_Bucket()) -> DF:
         .pipe(set_all_str_cols_to_lower, but=["vin"])
         .pipe(left_merge, fleet_info_with_only_start_date, left_on="vin", right_on="VIN", src_dest_cols=COLS_TO_MERGE_ON_AYVENS)
         .pipe(left_merge, fleet_info_with_contract_start_date, left_on="vin", right_on="VIN", src_dest_cols=COLS_TO_MERGE_ON_AYVENS)
-        .assign(fleet=lambda df: "ayvens_fleet_" + df["fleet"].astype("string"))
         .pipe(safe_astype, AYVENS_COL_DTYPES)
         .eval("activation_status = activation_status.str.lower().eq('activated').fillna(False).astype('bool')")
+        .eval("version = version.mask(model == 'e-transit' & (version == 'x' | version.isna()), '2022')")
     )
 
 if __name__ == "__main__":
     single_dataframe_script_main(get_fleet_info)
-    
+
 fleet_info = get_fleet_info()

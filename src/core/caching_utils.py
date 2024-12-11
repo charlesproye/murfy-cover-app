@@ -29,7 +29,7 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
     Function args:
     force_update (bool): Set to True to generate and cache the result even if it was already cached.  
     """
-    assert on in ["s3", "local_storage"], "cache_type must be 's3' or 'local'"
+    assert on in ["s3", "local_storage"], "cache_type must be 's3' or 'local_storage'"
     def decorator(data_gen_func: Callable[..., pd.DataFrame]):
         @wraps(data_gen_func)
         def wrapper(*args, force_update=False, **kwargs) -> pd.DataFrame:
