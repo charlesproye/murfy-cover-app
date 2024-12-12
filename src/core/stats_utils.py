@@ -33,11 +33,14 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         .dropna(subset=["soh", "odometer"], how="any")
     )
     nb_rows_removed = results.shape[0] - filtered_results.shape[0]
-    rows_removed_pct = 100 * nb_rows_removed / results.shape[0]
-    if nb_rows_removed == results.shape[0]:
-        logger.warning(f"All results were removed, check the valid SOH points.")
-    else:
-        logger.debug(f"Filtered results, removed {nb_rows_removed}({rows_removed_pct:.2f}%) rows:\n{filtered_results}")
+    if results.shape[0]:
+        rows_removed_pct = 100 * nb_rows_removed / results.shape[0]
+        if nb_rows_removed == results.shape[0]:
+            logger.warning(f"All results were removed, check the valid SOH points.")
+        else:
+            logger.debug(f"Filtered results, removed {nb_rows_removed}({rows_removed_pct:.2f}%) rows:\n{filtered_results}")
+    else: 
+        logger.warning("No results to filter.")
     return filtered_results
 
 def intercept_and_slope_from_points(points: DF) -> tuple[float, float]:
