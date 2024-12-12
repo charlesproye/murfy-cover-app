@@ -19,7 +19,7 @@ async def read_fleet_info(ownership_filter: str = None) -> pd.DataFrame:
     """
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(current_dir, '..', 'data', 'fleet_info.csv')
+        file_path = os.path.join(current_dir, '..', 'data', 'fleet_info_12.csv')
         
         df = pd.read_csv(file_path)
         
@@ -75,7 +75,7 @@ async def process_vehicles(df: pd.DataFrame):
     models_file = os.path.join(current_dir, '..', 'data', 'models_info.csv')
     
     BRAND_MAPPING = {
-        'volvo': 'volvo cars'
+        'VOLVO': 'Volvo Cars'
     }
 
     COUNTRY_MAPPING = {
