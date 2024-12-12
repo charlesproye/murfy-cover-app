@@ -63,6 +63,7 @@ def get_processed_results(brand:str) -> DF:
 def set_floored_day_date(df:DF, date_col:str="date") -> DF:
     df[date_col] = (
         pd.to_datetime(df[date_col], format='mixed')
+        .dt.floor(UPDATE_FREQUENCY)
         .dt.tz_localize(None)
         .dt.date
         .astype('datetime64[ns]')
