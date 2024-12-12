@@ -11,6 +11,7 @@ logger = getLogger("transform.results.volvo_results")
 
 @main_decorator
 def main():
+    print(get_results())
     df = (
         get_results()
         .eval("date = date.dt.date")
@@ -26,7 +27,9 @@ def main():
         fig = px.scatter(df, x="date", y="soh", color="vin")
         fig.show()
 
-def vget_results() -> DF:
+def get_results() -> DF:
+    print(get_processed_tss("volvo-cars"))
+    print("olé")
     return (
         get_processed_tss("volvo-cars")
         .eval("soh = estimated_range / soc / range")

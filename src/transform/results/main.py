@@ -11,6 +11,7 @@ from transform.results.tesla_results import get_results as get_tesla_results
 from transform.results.renault_results import get_results as get_renault_results
 from transform.results.mercedes_results import get_results as get_mercedes_results
 from transform.results.volvo_results import get_results as get_volvo_results
+
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
     "mercedes-benz": get_mercedes_results,
