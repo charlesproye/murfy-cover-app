@@ -11,7 +11,6 @@ logger = getLogger("transform.results.volvo_results")
 
 @main_decorator
 def main():
-    print(get_results())
     df = (
         get_results()
         .eval("date = date.dt.date")
@@ -24,15 +23,16 @@ def main():
     )
     print(df)
     if not df.empty:
-        fig = px.scatter(df, x="date", y="soh", color="vin")
+        fig = px.line(df, x="date", y="soh", color="vin")
         fig.show()
 
 def get_results() -> DF:
-    print(get_processed_tss("volvo-cars"))
-    print("olé")
+    logger.info("Getting Volvo results")
     return (
         get_processed_tss("volvo-cars")
+        .eval("odometer = odometer.ffill().bfill()")
         .eval("soh = estimated_range / soc / range")
+        .query("soc > 0.7")
     )
 
 if __name__ == "__main__":
