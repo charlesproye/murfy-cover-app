@@ -54,6 +54,7 @@ def get_processed_results(brand:str) -> DF:
             "odometer": "last",    
             "soh": "median",
             "model": "first",
+            "version": "first",
         })
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger=logger)
         .reset_index()
