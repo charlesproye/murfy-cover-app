@@ -47,7 +47,7 @@ def get_processed_results(brand:str) -> DF:
         .groupby('vin')
         .apply(make_soh_presentable, include_groups=False)
         .reset_index(drop=False)  # Supprime l'index 'vin' créé par le groupby
-        .assign(date=lambda df: df["date"].dt.floor(UPDATE_FREQUENCY))
+        .pipe(set_floored_day_date)
         .groupby(["vin", "date"])
         .agg({
             "odometer": "last",    
@@ -59,6 +59,15 @@ def get_processed_results(brand:str) -> DF:
         .reset_index()
         .sort_values(["vin", "odometer"])
     )
+
+def set_floored_day_date(df:DF, date_col:str="date") -> DF:
+    df[date_col] = (
+        pd.to_datetime(df[date_col], format='mixed')
+        .dt.tz_localize(None)
+        .dt.date
+        .astype('datetime64[ns]')
+    )
+    return df
 
 def make_soh_presentable(df:DF) -> DF:
     if len(df) > 3:
