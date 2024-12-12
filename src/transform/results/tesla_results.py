@@ -30,6 +30,7 @@ def get_results() -> DF:
         .reset_index(drop=False)
         .eval("soh = energy_added / (soc_diff / 100 * capacity)")
         .eval("model_version = model + version")
+        .query("soc_diff > 40")
     )
 
 if __name__ == "__main__":
