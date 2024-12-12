@@ -26,7 +26,7 @@ def main():
         fig = px.scatter(df, x="date", y="soh", color="vin")
         fig.show()
 
-def get_results() -> DF:
+def vget_results() -> DF:
     return (
         get_processed_tss("volvo-cars")
         .eval("soh = estimated_range / soc / range")
