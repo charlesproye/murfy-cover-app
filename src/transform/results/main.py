@@ -57,6 +57,7 @@ def get_processed_results(brand:str) -> DF:
             "model": "first",
             "version": "first",
         })
+        .reset_index()
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger=logger)
         .reset_index()
         .sort_values(["vin", "odometer"])
