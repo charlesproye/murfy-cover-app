@@ -36,7 +36,23 @@ def update_vehicle_data_table():
     )
 
 def get_all_processed_results() -> DF:
-    return pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
+    return (
+        pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
+        .groupby("vin")
+        .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
+        .reset_index()
+    )
+
+def add_lines_up_to_today_for_vehicle(results:DF) -> DF:
+    last_date = pd.Timestamp.now().floor(UPDATE_FREQUENCY).date()
+    dates_up_to_last_date = pd.date_range(results["date"].min(), last_date, freq=UPDATE_FREQUENCY, name="date")
+    test = (
+        results
+        .set_index("date")
+        .sort_index()
+        .reindex(dates_up_to_last_date, method="ffill")
+    )
+    return test
 
 def get_processed_results(brand:str) -> DF:
     results = GET_RESULTS_FUNCS[brand]()
