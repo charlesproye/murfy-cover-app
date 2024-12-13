@@ -31,7 +31,7 @@ def get_results() -> DF:
     return (
         get_processed_tss("volvo-cars")
         .eval("odometer = odometer.ffill().bfill()")
-        .eval("soh = estimated_range / soc / range")
+        .eval("soh = estimated_range / soc / range / 0.87")
         .query("soc > 0.7")
     )
 
