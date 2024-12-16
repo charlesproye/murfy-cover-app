@@ -230,7 +230,6 @@ async def wake_up_vehicle(access_token, vehicle_id):
             delay = exponential_backoff(attempts)
             logging.info(f"Waiting {delay:.2f} seconds before next wake-up attempt.")
             await asyncio.sleep(delay)
-
     logging.error(f"Failed to wake up vehicle {vehicle_id} after {MAX_WAKE_UP_ATTEMPTS} attempts.")
     return False
 

@@ -33,6 +33,12 @@ async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_poo
         except Exception:
             return False
     
+    # Ajouter le Content-Type aux headers
+    headers = {
+        **headers,
+        'Content-Type': 'application/json'
+    }
+    
     wake_up_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/wake_up"
     
     while retry_count < max_retries:
@@ -40,10 +46,8 @@ async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_poo
             async with session.post(wake_up_url, headers=headers) as response:
                 if response.status == 200:
                     logging.info(f"Wake up command sent successfully to vehicle {vehicle_id}, waiting for vehicle to wake up")
-                    # Attendre que le véhicule se réveille
                     await asyncio.sleep(WAKE_UP_WAIT_TIME * (retry_count + 1))
                     
-                    # Vérifier si le véhicule est réveillé
                     check_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
                     async with session.get(check_url, headers=headers) as check_response:
                         if check_response.status == 200:
@@ -54,6 +58,9 @@ async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_poo
                     
                 elif response.status == 429:
                     return 'rate_limit'
+                elif response.status == 406:
+                    logging.error(f"Content-Type error (406) for vehicle {vehicle_id}")
+                    return False
             
             retry_count += 1
             if retry_count < max_retries:
