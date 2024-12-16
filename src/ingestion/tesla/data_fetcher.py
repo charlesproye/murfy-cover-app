@@ -75,15 +75,17 @@ async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_poo
     return False
 
 async def fetch_vehicle_data_with_retry(session, url, headers, max_retries=3, base_delay=1):
-    """Fonction utilitaire pour les appels API avec retry"""
+    """Fonction utilitaire pour les appels API Tesla avec retry"""
     for attempt in range(max_retries):
         try:
             async with session.get(url, headers=headers, timeout=30) as response:
-                logging.debug(f"API Response status: {response.status}, URL: {url}")
+                logging.debug(f"Tesla API Response status: {response.status}, URL: {url}")
                 
                 if response.status == 408:
                     return response.status, 'sleeping'
                 elif response.status == 429:
+                    # Pour Tesla, on respecte strictement leur rate limiting
+                    logging.warning(f"Tesla API rate limit hit, backing off...")
                     return response.status, 'rate_limit'
                 elif response.status == 405:
                     logging.error(f"Method not allowed (405) - Vehicle might be offline or unavailable")
@@ -94,15 +96,18 @@ async def fetch_vehicle_data_with_retry(session, url, headers, max_retries=3, ba
                     return response.status, await response.json()
                 else:
                     response_text = await response.text()
-                    logging.error(f"Failed request with status {response.status}. Response: {response_text}")
+                    logging.error(f"Tesla API request failed with status {response.status}. Response: {response_text}")
                     return response.status, None
                     
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             if attempt == max_retries - 1:
                 raise
+            
+            # Délai progressif avec un peu de random pour éviter les collisions
             delay = base_delay * (2 ** attempt) + random.uniform(0, 0.1)
-            logging.warning(f"Connection error, retrying in {delay:.1f}s: {str(e)}")
+            logging.warning(f"Tesla API connection error, retrying in {delay:.1f}s: {str(e)}")
             await asyncio.sleep(delay)
+            
     return None, None
 
 async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_token_key, refresh_token_key, vehicle_pool, auth_code=None):
