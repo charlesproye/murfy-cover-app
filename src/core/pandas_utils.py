@@ -216,9 +216,9 @@ def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Lo
     if not isinstance(col_loc, pd.Index) and col_loc is not None:
         col_loc = pd.Index(col_loc)
     if index_loc is not None:
-        index_loc = df.index.intersection(index_loc)
+        index_loc = pd.Index(index_loc).intersection(df.index)
     if col_loc is not None:
-        col_loc = df.columns.intersection(col_loc)
+        col_loc = pd.Index(col_loc).intersection(df.columns)
 
     if col_loc is None and not index_loc is None:
         return df.loc[index_loc]
