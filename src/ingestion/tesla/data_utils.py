@@ -217,7 +217,7 @@ async def wake_up_vehicle(access_token, vehicle_id):
                     elif response.status == 408:
                         logging.warning(f"Timeout while waking up vehicle {vehicle_id}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")
                     elif response.status == 429:
-                        logging.warning(f"Rate^ limit exceeded while trying to wake up vehicle {vehicle_id}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")
+                        logging.warning(f"Rate limit exceeded while trying to wake up vehicle {vehicle_id}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")
                         return 'rate_limit'
                     else:
                         logging.error(f"Failed to wake up vehicle {vehicle_id}: HTTP {response.status}. Attempt {attempts + 1}/{MAX_WAKE_UP_ATTEMPTS}")

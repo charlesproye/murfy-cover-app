@@ -43,7 +43,7 @@ ACCOUNTS_JSON='[
     "access_token_key": "ACCESS_TOKEN_OLINO",
     "professional_account": true,
     "code": "d77c548f8b98ca5acbc49e741498a0f1b4784a13152496e22f579f6a67088ad6f296b94f"
-  },
+  }
 ]'
 
 # Run the main.py script with the accounts JSON
