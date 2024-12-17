@@ -204,12 +204,28 @@ class S3_Bucket():
 
         return subfolders
 
-    def generate_presigned_post(self, key:str, expires_in:int=3600) -> dict[str, Any]:
-        conditions = [
-            {"bucket": self.bucket_name},  # Only allow uploads to this bucket
-            ["starts-with", "$key", key],  # Restrict to the specific folder
-            {"acl": "private"},  # Ensure files are private after upload
-        ]
+    def generate_presigned_post(self, key:str, conditions:list[Any], expires_in:int=3600) -> dict[str, Any]:
+        # conditions = [
+        #     {"bucket": self.bucket_name},  # Only allow uploads to this bucket
+        #     ["starts-with", "$key", key],  # Restrict to the specific folder
+        #     {"acl": "private"},  # Ensure files are private after upload
+        # ]
         return self._s3_client.generate_presigned_post(Bucket=self.bucket_name, Key=key, ExpiresIn=expires_in, Conditions=conditions)
     
-
+    def generate_folder_presigned_url(self, folder_name):
+        # s3 = S3_Bucket()
+        # bucket_name = os.getenv("S3_BUCKET")
+        # folder_name = 'response/ituran/'
+        
+        response = self.generate_presigned_post(
+            key=f'{folder_name}${{filename}}',
+            expires_in=600000,
+            conditions=[
+                ["starts-with", "$key", folder_name],
+                ["starts-with", "$Content-Type", ""],  # Accepte tous les types de contenu
+                {"acl": "private"},  # Fichiers privés
+                ["content-length-range", 0, 10485760],  # Limite la taille des fichiers (ici 10MB)
+            ],
+        )
+        
+        return response
