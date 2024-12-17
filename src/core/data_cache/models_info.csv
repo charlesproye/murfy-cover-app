@@ -1,25 +1,25 @@
 manufacturer,model,version,capacity,range
 
-peugeot,2008,gt ev 50kwh 136 5d,46.3,270
-peugeot,2008,allure ev 50kwh 136 5d,46.3,270
-peugeot,2008,gt première ev 50kwh 136 7;4kw 5d,46.3,270
-peugeot,e-2008,gt ev 50kwh 136 5d actieauto,46.3,270
+peugeot,2008,gt ev 50kwh 136 5d,46.3,260
+peugeot,2008,allure ev 50kwh 136 5d,46.3,260
+peugeot,2008,gt première ev 50kwh 136 7;4kw 5d,46.3,260
+peugeot,e-2008,gt ev 50kwh 136 5d actieauto,46.3,260
 peugeot,208,allure ev 50kwh 136 5d,46.3,290
 peugeot,208,gt ev 50kwh 136 5d,46.3,290
 peugeot,208,gt ev 50kwh 136 5d actieauto,46.3,290
 
 ford,e-transit,2022,68,255
 ford,e-transit,2024,89,255
-ford,mustang mach-e,75kwh awd auto,68,
-ford,mustang mach-e,75kwh awd auto 5d tech pack plus onze deal,68,
-ford,mustang mach-e,75kwh rwd 5d onze deal,68,
-ford,mustang mach-e,75kwh rwd 5d tech.pack onze deal,68,
-ford,mustang mach-e,75kwh rwd auto 5d,68,
-ford,mustang mach-e,98kwh extended range awd auto,88,
-ford,mustang mach-e,98kwh extended range awd auto 5d,88,
-ford,mustang mach-e,98kwh extended range rwd 5d tech.pack onze deal,88,
-ford,mustang mach-e,98kwh extended range rwd auto,88,
-ford,mustang mach-e,98kwh extended range rwd auto 5d,88,
+ford,mustang mach-e,75kwh awd auto,72.6,
+ford,mustang mach-e,75kwh awd auto 5d tech pack plus onze deal,72.6,
+ford,mustang mach-e,75kwh rwd 5d onze deal,72.6,
+ford,mustang mach-e,75kwh rwd 5d tech.pack onze deal,72.6,
+ford,mustang mach-e,75kwh rwd auto 5d,72.6,
+ford,mustang mach-e,98kwh extended range awd auto,91,
+ford,mustang mach-e,98kwh extended range awd auto 5d,91,
+ford,mustang mach-e,98kwh extended range rwd 5d tech.pack onze deal,91,
+ford,mustang mach-e,98kwh extended range rwd auto,91,
+ford,mustang mach-e,98kwh extended range rwd auto 5d,91,
 
 volvo-cars,XC40,p8 awd r-design,75,305
 
