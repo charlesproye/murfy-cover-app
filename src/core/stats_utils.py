@@ -66,6 +66,7 @@ def force_monotonic_decrease(values:Series) -> Series:
     def objectif(adjusted_values:np.ndarray) -> float:
         return np.sum((adjusted_values - values) ** 2)
    # Contraintes : SoH doit être non-croissant et l'écart hebdomadaire doit être inférieur à 0,1%
+    # constraints = []
     constraints = [{'type': 'ineq', 'fun': lambda x, i=i: (x[i - 1] - x[i]) * 0.00001} for i in range(1, n)] 
     constraints += [{'type': 'ineq', 'fun': lambda x, i=i: 0.00005 * x[i - 1] - (x[i - 1] - x[i])} for i in range(1, n)]
     # Borne supérieure et inférieure (par exemple, entre 0 et 100)

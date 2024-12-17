@@ -10,6 +10,7 @@ from transform.results.ford_results import get_results as get_ford_results
 from transform.results.tesla_results import get_results as get_tesla_results
 from transform.results.renault_results import get_results as get_renault_results
 from transform.results.mercedes_results import get_results as get_mercedes_results
+from transform.results.volvo_results import get_results as get_volvo_results
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
@@ -17,6 +18,7 @@ GET_RESULTS_FUNCS = {
     "renault": get_renault_results,
     "tesla": get_tesla_results,
     "ford": get_ford_results,
+    "volvo": get_volvo_results,
 }
 
 def update_vehicle_data_table():
@@ -34,7 +36,23 @@ def update_vehicle_data_table():
     )
 
 def get_all_processed_results() -> DF:
-    return pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
+    return (
+        pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
+        .groupby("vin")
+        .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
+        .reset_index()
+    )
+
+def add_lines_up_to_today_for_vehicle(results:DF) -> DF:
+    last_date = pd.Timestamp.now().floor(UPDATE_FREQUENCY).date()
+    dates_up_to_last_date = pd.date_range(results["date"].min(), last_date, freq=UPDATE_FREQUENCY, name="date")
+    test = (
+        results
+        .set_index("date")
+        .sort_index()
+        .reindex(dates_up_to_last_date, method="ffill")
+    )
+    return test
 
 def get_processed_results(brand:str) -> DF:
     results = GET_RESULTS_FUNCS[brand]()
@@ -55,6 +73,7 @@ def get_processed_results(brand:str) -> DF:
             "model": "first",
             "version": "first",
         })
+        .reset_index()
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger=logger)
         .reset_index()
         .sort_values(["vin", "odometer"])

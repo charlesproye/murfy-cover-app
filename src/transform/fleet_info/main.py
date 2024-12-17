@@ -21,7 +21,6 @@ def get_fleet_info() -> DF:
         .pipe(left_merge, models_info, left_on=["model", "version"], right_on=["model", "version"])
     )
 
-
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "transform.fleet_info")
     single_dataframe_script_main(get_fleet_info)
