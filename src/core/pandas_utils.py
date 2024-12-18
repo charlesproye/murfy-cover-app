@@ -187,7 +187,7 @@ def sanity_check(df:DF) -> DF:
     value_counts_dict = {}
     for col in df.columns:
         try:
-            value_counts_dict[col] = df[col].value_counts().to_dict()
+            value_counts_dict[col] = df[col].value_counts(sort=True, ascending=False).to_dict()
             nunique_dict[col] = float(df[col].nunique())
         except:
             value_counts_dict[col] = []
