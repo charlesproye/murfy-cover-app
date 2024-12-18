@@ -78,7 +78,6 @@ def standardize_model_type(model: str, type_value: str, brand: str) -> tuple[str
     model = model.lower()
     type_value = type_value.lower()
 
-    # Suppression des suffixes communs
     suffixes_to_remove = ['5d', '4d', '3d', 'auto', 'aut', 'actieauto', 'onze deal', 
                          'business', 'executive', 'edition', 'line', 'r-design']
     

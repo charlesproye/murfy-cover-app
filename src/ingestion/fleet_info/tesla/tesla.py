@@ -120,7 +120,6 @@ async def get_token_from_slack(session: aiohttp.ClientSession, access_token_key:
 
 async def get_account_vins_mapping(session: aiohttp.ClientSession) -> Dict[str, List[str]]:
     """Récupère la liste des VINs pour chaque compte et sauvegarde dans un fichier"""
-    # Définir le chemin du fichier de cache
     current_dir = os.path.dirname(os.path.abspath(__file__))
     cache_file = os.path.join(current_dir, 'data', 'account_vins_mapping.json')
     
@@ -224,13 +223,12 @@ async def get_vehicle_options(session: aiohttp.ClientSession, access_token: str,
                 if model_info:
                     # Garde la version originale (ex: MT301)
                     version = model_info['code'][1:]
-                    model_code = version[2]  # Le 3ème caractère indique le modèle
+                    model_code = version[2]
                     
                     if model_code in ["1", "7"]:
                         model_code = "S"
                     model_name = f"model {model_code}".lower()
                     
-                    # Standardise le type selon les patterns
                     display_name = model_info['displayName'].lower()
                     vehicle_type = "unknown"
                     
@@ -299,7 +297,6 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 vehicle_data = df[df['VIN'] == vin].iloc[0]
                 options = await get_vehicle_options(session, access_token, vin)
                 
-                # D'abord, cherche une correspondance sur model_name + type avec version vide
                 cursor.execute("""
                     SELECT id FROM vehicle_model 
                     WHERE LOWER(model_name) = LOWER(%s) 
@@ -310,7 +307,6 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 empty_version_result = cursor.fetchone()
                 
                 if empty_version_result:
-                    # Si trouvé avec version vide, met à jour avec la nouvelle version
                     vehicle_model_id = empty_version_result[0]
                     cursor.execute("""
                         UPDATE vehicle_model 
@@ -319,7 +315,6 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     """, (options['version'], vehicle_model_id))
                     logging.info(f"Updated vehicle_model {vehicle_model_id} with version {options['version']}")
                 else:
-                    # Sinon, cherche une correspondance exacte avec version
                     cursor.execute("""
                         SELECT id FROM vehicle_model 
                         WHERE LOWER(model_name) = LOWER(%s) 
@@ -331,7 +326,6 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     if result:
                         vehicle_model_id = result[0]
                     else:
-                        # Si pas de correspondance exacte, crée un nouveau vehicle_model
                         vehicle_model_id = str(uuid.uuid4())
                         cursor.execute("""
                             INSERT INTO vehicle_model (id, model_name, type, version, oem_id)
