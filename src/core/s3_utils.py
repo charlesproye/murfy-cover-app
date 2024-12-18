@@ -224,7 +224,7 @@ class S3_Bucket():
                 ["starts-with", "$key", folder_name],
                 ["starts-with", "$Content-Type", ""],  # Accepte tous les types de contenu
                 {"acl": "private"},  # Fichiers privés
-                ["content-length-range", 0, 10485760],  # Limite la taille des fichiers (ici 10MB)
+                ["content-length-range", 0, 1000485760],  # Limite la taille des fichiers (ici 10MB)
             ],
         )
         
