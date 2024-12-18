@@ -8,6 +8,7 @@ from core.sql_utils import get_connection
 import uuid
 import pandas as pd
 import time
+import re
 
 from dotenv import load_dotenv
 
@@ -29,6 +30,41 @@ ACCOUNT_TOKEN_KEYS = {
 
 RATE_LIMIT_DELAY = 0.5  
 MAX_RETRIES = 3 
+
+TESLA_PATTERNS = {
+    'model 3': {
+        'patterns': [
+            (r'.*standard range.*plus.*rear.?wheel.*|.*standard range.*plus.*rwd.*|.*rear.?wheel drive.*', 'RWD'),
+            (r'.*performance.*dual motor.*|.*performance.*', 'Performance'),
+            (r'.*long range.*all.?wheel drive.*', 'Long Range AWD'),
+        ]
+    },
+    'model s': {
+        'patterns': [
+            (r'.*100d.*', '100D'),
+            (r'.*75d.*', '75D'),
+            (r'.*long range.*plus.*', 'Long Range Plus'),
+            (r'.*long range.*', 'Long Range'),
+            (r'.*plaid.*', 'Plaid'),
+            (r'.*performance.*', 'Performance'),
+            (r'.*standard range.*', 'Standard Range'),
+        ]
+    },
+    'model x': {
+        'patterns': [
+            (r'.*long range.*plus.*', 'Long Range Plus'),
+            (r'.*long range.*', 'Long Range'),
+        ]
+    },
+    'model y': {
+        'patterns': [
+            (r'.*rear.?wheel drive.*', 'RWD'),
+            (r'.*long range.*rwd.*', 'Long Range RWD'),
+            (r'.*long range.*all.?wheel drive.*', 'Long Range AWD'),
+            (r'.*performance.*awd.*', 'Performance'),
+        ]
+    }
+}
 
 async def fetch_slack_messages(session: aiohttp.ClientSession, channel_id: str, slack_token: str) -> List[Dict]:
     """Récupère les messages de Slack"""
@@ -186,28 +222,40 @@ async def get_vehicle_options(session: aiohttp.ClientSession, access_token: str,
                 )
                 
                 if model_info:
-                    model_code = model_info['code'][3]
+                    # Garde la version originale (ex: MT301)
+                    version = model_info['code'][1:]
+                    model_code = version[2]  # Le 3ème caractère indique le modèle
+                    
                     if model_code in ["1", "7"]:
                         model_code = "S"
                     model_name = f"model {model_code}".lower()
                     
-                    display_name = model_info['displayName']
-                    vehicle_type = display_name.split(f"Model {model_code} ")[-1].lower()
+                    # Standardise le type selon les patterns
+                    display_name = model_info['displayName'].lower()
+                    vehicle_type = "unknown"
+                    
+                    if model_name in TESLA_PATTERNS:
+                        for pattern, type_name in TESLA_PATTERNS[model_name]['patterns']:
+                            if re.match(pattern, display_name, re.IGNORECASE):
+                                vehicle_type = type_name
+                                break
                 else:
                     model_name = "unknown"
                     vehicle_type = "unknown"
+                    version = "unknown"
                 
                 return {
                     'vin': vin,
                     'model_name': model_name,
                     'type': vehicle_type,
+                    'version': version
                 }
             else:
                 logging.error(f"Error fetching options for VIN {vin}: HTTP {response.status}")
-                return {'vin': vin, 'model_name': 'unknown', 'type': 'unknown', 'codes': []}
+                return {'vin': vin, 'model_name': 'unknown', 'type': 'unknown', 'version': 'unknown'}
     except Exception as e:
         logging.error(f"Error fetching options for VIN {vin}: {str(e)}")
-        return {'vin': vin, 'model_name': 'unknown', 'type': 'unknown', 'codes': []}
+        return {'vin': vin, 'model_name': 'unknown', 'type': 'unknown', 'version': 'unknown'}
 
 async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, account_vins: List[str]) -> List[Dict]:
 
@@ -249,30 +297,55 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
         for vin in vins:
             try:
                 vehicle_data = df[df['VIN'] == vin].iloc[0]
-                
                 options = await get_vehicle_options(session, access_token, vin)
                 
+                # D'abord, cherche une correspondance sur model_name + type avec version vide
                 cursor.execute("""
                     SELECT id FROM vehicle_model 
-                    WHERE LOWER(model_name) = LOWER(%s) AND LOWER(type) = LOWER(%s)
+                    WHERE LOWER(model_name) = LOWER(%s) 
+                    AND LOWER(type) = LOWER(%s)
+                    AND (version IS NULL OR version = '')
                 """, (options['model_name'], options['type']))
                 
-                result = cursor.fetchone()
-                if result:
-                    vehicle_model_id = result[0]
-                else:
-                    vehicle_model_id = str(uuid.uuid4())
+                empty_version_result = cursor.fetchone()
+                
+                if empty_version_result:
+                    # Si trouvé avec version vide, met à jour avec la nouvelle version
+                    vehicle_model_id = empty_version_result[0]
                     cursor.execute("""
-                        INSERT INTO vehicle_model (id, model_name, type, oem_id)
-                        VALUES (%s, %s, %s, %s)
-                        RETURNING id
-                    """, (
-                        vehicle_model_id,
-                        options['model_name'],
-                        options['type'],
-                        '98809ac9-acb5-4cca-b67a-c1f6c489035a'
-                    ))
-                    vehicle_model_id = cursor.fetchone()[0]
+                        UPDATE vehicle_model 
+                        SET version = %s
+                        WHERE id = %s
+                    """, (options['version'], vehicle_model_id))
+                    logging.info(f"Updated vehicle_model {vehicle_model_id} with version {options['version']}")
+                else:
+                    # Sinon, cherche une correspondance exacte avec version
+                    cursor.execute("""
+                        SELECT id FROM vehicle_model 
+                        WHERE LOWER(model_name) = LOWER(%s) 
+                        AND LOWER(type) = LOWER(%s)
+                        AND version = %s
+                    """, (options['model_name'], options['type'], options['version']))
+                    
+                    result = cursor.fetchone()
+                    if result:
+                        vehicle_model_id = result[0]
+                    else:
+                        # Si pas de correspondance exacte, crée un nouveau vehicle_model
+                        vehicle_model_id = str(uuid.uuid4())
+                        cursor.execute("""
+                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id)
+                            VALUES (%s, %s, %s, %s, %s)
+                            RETURNING id
+                        """, (
+                            vehicle_model_id,
+                            options['model_name'],
+                            options['type'],
+                            options['version'],
+                            '98809ac9-acb5-4cca-b67a-c1f6c489035a'
+                        ))
+                        vehicle_model_id = cursor.fetchone()[0]
+                        logging.info(f"Created new vehicle_model for {options['model_name']} {options['type']} version {options['version']}")
                 
                 cursor.execute("""
                     SELECT id FROM fleet 
@@ -430,5 +503,4 @@ async def main():
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(test_vin_matching())
-
+    asyncio.run(main())
