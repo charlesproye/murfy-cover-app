@@ -18,7 +18,7 @@ def get_fleet_info() -> DF:
         .pipe(left_merge, followed_tesla_vehicles_info, left_on=["vin"], right_on=["vin"], src_dest_cols=["model", "version"])
         # Hot fix to pervent the name of the versino to break the parsing of models_info.csv
         .assign(version=lambda df: df["version"].mask(df["version"] == "gt première ev 50kwh 136 7,4kw 5d", "gt première ev 50kwh 136 7;4kw 5d"))
-        .pipe(left_merge, models_info, left_on=["model", "version"], right_on=["model", "version"])
+        .pipe(left_merge, models_info, left_on=["model", "version", "tesla_code"], right_on=["model", "version", "tesla_code"])
     )
 
 if __name__ == "__main__":
