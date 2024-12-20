@@ -134,9 +134,33 @@ COLS_TO_FILL = [
 
 MAX_TIME_DIFF_TO_FILL = pd.Timedelta(minutes=45)
 
+IN_CHARGE_CHARGING_STATUS_VALS = [
+    'charging',
+    'chargingactive',
+    'slow_charging',
+    'fast_charging',
+    'chargingerror',
+    'initialization'
+]
+
+IN_DISCHARGE_CHARGING_STATUS_VALS = [
+    'charging_error',
+    'nocharging',
+    'chargingerror',
+    'cable_unplugged',
+    'disconnected'
+]
+
 CHARGING_STATUS_VAL_TO_MASK = {
     #BMW
     "CHARGINGACTIVE": True,
+    "slow_charging": True,
+    "fast_charging": True,
+    "charging_complete": False,
+    "Charging": True,
+
+    "charging_error": False,
+    # Tesla
     "<NA>": False,
     pd.NA: False,
     "NOCHARGING": False,
@@ -146,12 +170,6 @@ CHARGING_STATUS_VAL_TO_MASK = {
     "CHARGINGPAUSED": False,
     # Mobilisight
     "cable_unplugged": False,
-    "slow_charging": True,
-    "fast_charging": True,
-    "charging_complete": False,
-    "charging_error": False,
-    # Tesla
-    "Charging": True,
     "Disconnected": False,
 }
 
