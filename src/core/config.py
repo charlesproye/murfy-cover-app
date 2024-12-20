@@ -26,7 +26,7 @@ DB_URI_FORMAT_STR = "postgresql+psycopg2://{DB_DATA_USER}:{DB_DATA_PASSWORD}@{DB
 
 valid_soh_points = pd.DataFrame({
   "odometer": [20_000, 200_000, 0, 200_000],
-  "soh": [1.0, 0.95, 0.9, 0.5],
+  "soh": [1.0, 0.95, 0.9, 0.6],
   "point": ["A", "B", "A", "B"],
   "bound": ["max", "max", "min", "min"]
 }).set_index(["bound", "point"])
