@@ -49,9 +49,15 @@ mercedes-benz,Sprinter,sprinter,47,157
 mercedes-benz,Sprinter,sprinter-47kwh,47,157
 mercedes-benz,Vito,vito-35kwh,35,137
 
-renault,zoe,R90,41.0,
-renault,zoe,R110,52.0,
-renault,zoe,R135,52.0,
+renault,zoe,R90,41.0,300
+renault,zoe,R110,52.0,300
+renault,zoe,R135,52.0,300
+
+volvo,xc40 recharge,p8 awd r-design,75,418
+volvo,xc40 recharge,twin pure electric pro,79,535
+volvo,xc40 recharge,pure electric plus,75, 414
+volvo,xc40 recharge,p8 awd,75,418
+volvo,c40 recharge,pure electric 170 KW plus,75,481
 
 bmw,i3,i3 (120Ah),42.2,305
 bmw,i3,Automaat (94Ah) 5d,35,244
@@ -80,3 +86,4 @@ Tesla,model 3,standard range plus rwd,51,350
 Tesla,model x,long range,95,440
 Tesla,model x,long range plus,98,480
 Tesla,model y,long range rear-wheel drive,75,450
+
