@@ -85,7 +85,7 @@ COL_DTYPES = {
     "minutes_to_full_charge": "float32", #Tesla and Mobilisight
     "charging_method": "string", #BMW and Mobilisight
     # Mercedes
-    "charging.max_range": "float32",
+    "max_range": "float32",
     # BMW
     "charging_ac_current": "float32",
     "charging_ac_voltage": "float32",

@@ -37,6 +37,10 @@ def floor_to(s:Series, quantization:float) -> Series:
     )
 
 def series_start_end_diff(s: Series) -> Any:
+    notna_mask = s.notna()
+    s = s.loc[notna_mask]
+    if s.empty:
+        return np.nan
     return s.iat[-1] - s.iat[0]
 
 def str_split_and_retain_src(src: Series, pattern:str, n:int=None, col_names:list[str]=None,) -> DF:
