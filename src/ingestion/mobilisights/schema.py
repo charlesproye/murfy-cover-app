@@ -264,12 +264,12 @@ class ChargingMode(StrEnum):
 
 
 class Charging(WithTimestamp):
-    plugged: bool
-    status: ChargingStatus
-    remaining_time: int
-    mode: ChargingMode
-    planned: dt
-    rate: int | ValueWithUnit[float, ChargingRateUnit] 
+    plugged: Optional[bool] = None
+    status: Optional[ChargingStatus] = None
+    remainingTime: Optional[int] = None
+    mode: Optional[ChargingMode] = None
+    planned: Optional[dt] = None
+    rate: Optional[int | ValueWithUnit[float, ChargingRateUnit]] = None
 
     @classmethod
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
@@ -861,12 +861,14 @@ class Crash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rena
     auto_ecall: Optional[TimestampedValue[bool]] = None
     pedestrian: Optional[TimestampedValue[bool]] = None
     tipped_over: Optional[TimestampedValue[bool]] = None
+    rear: Optional[TimestampedValue[bool | dict]] = None 
 
 
 class MergedCrash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
     auto_ecall: list[TimestampedValue[bool]] = []
     pedestrian: list[TimestampedValue[bool]] = []
     tipped_over: list[TimestampedValue[bool]] = []
+    rear: list[TimestampedValue[bool | dict]] = []
 
     @classmethod
     def from_list(cls, lst: list[Crash]) -> Self:
@@ -879,6 +881,9 @@ class MergedCrash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True
         )
         res.tipped_over = TimestampedValue.merge_list(
             [x for x in map(lambda e: e.tipped_over, lst) if x is not None]
+        )
+        res.rear = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.rear, lst) if x is not None]
         )
         return res
 
