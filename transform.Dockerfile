@@ -14,11 +14,12 @@ WORKDIR /app
 
 # Installer les dépendances
 RUN conda update -n base -c defaults conda
-RUN conda env update --prune -n base -f ingestion.conda-env.yaml
-RUN chmod +x ./start_hm.sh
+RUN conda env update --prune -n base -f conda-env.yaml
+RUN chmod +x ./start_transform.sh
 
 # Définir le shell par défaut pour utiliser conda
 SHELL ["/bin/bash", "-c"]
 
 # Démarrer l'application
-CMD ["./start_hm.sh"]
+CMD ["./start_transform.sh"]
+
