@@ -140,7 +140,8 @@ IN_CHARGE_CHARGING_STATUS_VALS = [
     'slow_charging',
     'fast_charging',
     'chargingerror',
-    'initialization'
+    'initialization',
+    "in-progress",
 ]
 
 IN_DISCHARGE_CHARGING_STATUS_VALS = [
