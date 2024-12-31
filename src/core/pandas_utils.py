@@ -211,6 +211,7 @@ def sanity_check(df:DF) -> DF:
 
 def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Logger=logger) -> DF:
     logger.info(f"safe_locate called.")
+    logger.debug(f"Initial shape: {df.shape}")
     if not isinstance(index_loc, pd.Index) and index_loc is not None:
         index_loc = pd.Index(index_loc)
     if not isinstance(col_loc, pd.Index) and col_loc is not None:
@@ -223,6 +224,7 @@ def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Lo
     if col_loc is None and not index_loc is None:
         return df.loc[index_loc]
     if not col_loc is None and index_loc is None:
+        logger.debug("Final shape: {df.loc[:, col_loc].shape}")
         return df.loc[:, col_loc]
     if not col_loc is None and not index_loc is None:
         return df.loc[index_loc, col_loc]
