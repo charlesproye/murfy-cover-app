@@ -224,7 +224,7 @@ def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Lo
     if col_loc is None and not index_loc is None:
         return df.loc[index_loc]
     if not col_loc is None and index_loc is None:
-        logger.debug("Final shape: {df.loc[:, col_loc].shape}")
+        logger.debug(f"Final shape: {df.loc[:, col_loc].shape}")
         return df.loc[:, col_loc]
     if not col_loc is None and not index_loc is None:
         return df.loc[index_loc, col_loc]
