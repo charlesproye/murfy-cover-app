@@ -2,168 +2,71 @@ from logging import getLogger
 from datetime import timedelta as TD
 
 import numpy as np
-from scipy import integrate
+from scipy.integrate import cumulative_trapezoid
 
 from core.config import *
 from core.constants import *
 from core.pandas_utils import *
 
+
 logger = getLogger("core.time_series_processing")
 
-def compute_discharge_diffs(tss:DF, vars_to_measure:list[str], logger:Logger=logger) -> DF:
+def compute_discharge_diffs(tss:DF, vars_to_measure:list[str], id_col:str="vin", logger:Logger=logger) -> DF:
     logger.info(f"compute_discharge_summary called.")
-    if "vin" not in tss.columns or "in_discharge_perf_idx" not in tss.columns:
-        logger.warning("vin or in_discharge_perf_idx column not found, returning tss unchanged.")
+    if id_col not in tss.columns or "in_discharge_perf_idx" not in tss.columns:
+        logger.warning(f"{id_col} or in_discharge_perf_idx column not found, returning tss unchanged.")
         logger.warning("columns:\n{}".format('\n'.join(tss.columns)))
         return tss
     for var in tss.columns.intersection(vars_to_measure):
         logger.debug(f"transforming {var}")
-        tss[f"{var}_discharge_loss"] = tss.groupby(["vin", "in_discharge_perf_idx"])[var].transform(series_start_end_diff)
-    
+        tss[f"{var}_discharge_loss"] = tss.groupby([id_col, "in_discharge_perf_idx"])[var].transform(series_start_end_diff)
+
     return tss
 
 def fillna_vars(tss:DF, vars_to_fill:list[str], max_time_diff:TD|None, id_col:str=None, logger:Logger=logger) -> DF:
-    # Recursively call fillna_vars on groups if id_col is provided instead of implementing another function
-    if id_col and id_col in tss.columns:
-        logger.debug(f"Filling na values for {vars_to_fill}.")
-        return (
-            tss
-            .groupby(id_col)
-            .apply(fillna_vars, vars_to_fill, max_time_diff)
-            .reset_index(drop=True)
-        )
-    prev_time_diff = tss["date"].diff()
-    time_diff_low_enough_to_ffill = prev_time_diff.lt(max_time_diff)
+    logger.info(f"fillna_vars called.")
+    time_diff_low_enough_to_ffill = tss.groupby(id_col)["date"].diff() < max_time_diff
     for var in tss.columns.intersection(vars_to_fill):
-        tss[f"ffilled_{var}"] = tss[var].mask(time_diff_low_enough_to_ffill & tss[var].isna(), tss[var].ffill().bfill())
+        logger.debug(f"- filling {var}")
+        var_filled = tss.groupby(id_col)[var].ffill().groupby(tss[id_col]).bfill()
+        tss[f"ffilled_{var}"] = tss[var].mask(time_diff_low_enough_to_ffill & tss[var].isna(), var_filled)
+
     return tss
 
-def compute_charging_n_discharging(tss:DF, id_col:str=None, charging_status_val_to_mask:dict=None, logger:Logger=logger) -> DF:
-    """
-    ### Description:
-    Computes the charging and discharging masks for a time series.
-    Uses the string charging_status column if it exists, otherwise uses the soc difference.
-    ### Parameters:
-    id_col: optional parameter to provide if the dataframe represents multiple time series.
-    charging_status_val_to_mask: dict mapping charging status values to boolean values to create masks.
-    """
-    logger.info(f"compute_charging_n_discharging_masks called.")
-    if "charging_status" in tss.columns and charging_status_val_to_mask is not None:
-        logger.debug(f"Computing charging and discharging masks using charging status dictionary.")
-        charge_mask = tss["charging_status"].map(charging_status_val_to_mask)
-        tss["in_charge"] = charge_mask
-        tss["in_discharge"] = charge_mask == False
-        if id_col is not None and id_col in tss.columns:
-            tss = (
-                tss
-                .groupby(id_col)
-                .apply(compute_charge_n_discharge_perf_mask_and_idx_from_masks)
-                .reset_index(drop=True)
-            )
-        else:
-            tss = compute_charge_n_discharge_perf_mask_and_idx_from_masks(tss)
-        return tss
-    elif "soc" in tss.columns:
-        logger.debug(f"Computing charging and discharging masks using soc difference.")
-        if id_col in tss.columns:
-            return (
-                tss
-                .groupby(id_col)
-                .apply(low_freq_compute_charge_n_discharge_vars)
-                .reset_index(drop=True)
-            )
-        else:
-            return low_freq_compute_charge_n_discharge_vars(tss)
-    else:
-        logger.warning("No charging status or soc column found to compute charging and discharging masks, returning original tss.")
-        return tss
-
-def compute_cum_energy(vehicle_df: DF, power_col:str="power", cum_energy_col:str="cum_energy") -> DF:
-    """
-    ### Description:
-    Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).
-    """
-    if power_col in vehicle_df.columns:
-        vehicle_df[cum_energy_col] = (
-            vehicle_df[power_col]
-            .pipe(cum_integral, date_series=vehicle_df["date"])
+def compute_cum_var(tss: DF, var_col:str, cum_var_col:str, id_col:str="vin", logger:Logger=logger) -> DF:
+    if var_col in tss.columns:
+        logger.debug(f"Computing {cum_var_col} from {var_col}.")
+        tss[cum_var_col] = (
+            cumulative_trapezoid(
+                # Leave the keywords as default order is y x not x y (-_-)
+                # Make sure that date time units are in seconds before converting to int
+                x=tss["date"].dt.as_unit("s").astype(int),
+                y=tss[var_col].fillna(0).values,
+                initial=0,
+            )            
             .astype("float32")
         )
-    return vehicle_df
-
-def cum_integral(series: Series, date_series=None) -> Series:
-    """
-    ### Description:
-    Computes the cumulative of the time series by using cumulative trapezoid and a date series.
-    ### Parameters:
-    power_col: name of the power column, must be in kw.
-    date_series: optional parameter to provide if the series is not indexed by date.
-    """
-    date_series = series.index.to_series() if date_series is None else date_series
-    cum_energy_data = integrate.cumulative_trapezoid(
-        # Make sure that date time units are in seconds before converting to int
-        x=date_series.dt.as_unit("s").astype(int),
-        y=series.fillna(0).values,
-        initial=0,
-    )
-    return Series(cum_energy_data * KJ_TO_KWH, index=series.index)
-
-def low_freq_mask_in_motion_periods(ts:DF) -> DF:
-    """Use for time series where there can be more than 6 hours in between odometer points"""
-    if not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex):
-        ts = ts.set_index("date", drop=False)
-    ts["odometer_increase_mask"] = ts["odometer"].interpolate(method="time").diff().gt(0.0, fill_value=True)
-    ts["last_notna_odo_date"] = ts["date"].mask(ts["odometer"].isna(), pd.NaT).ffill()
-    ts["time_diff_low_enough"] = ts["last_notna_odo_date"].diff().lt(pd.Timedelta("6h"))
-    ts["in_motion"] = ts["odometer_increase_mask"] & ts["time_diff_low_enough"]
-    ts = perf_mask_and_idx_from_condition_mask(ts, "in_motion")
-
-    return ts
-
-
-def low_freq_compute_charge_n_discharge_vars(ts:DF) -> DF:
-    """Use for time series where there can be more than 6 hours in between soc points"""
-    MAX_CHARGE_TIME_DIFF = TD(hours=6)
-    date_not_index = not isinstance(ts.index, pd.core.indexes.datetimes.DatetimeIndex)
-    if date_not_index:
-        ts = ts.set_index("date", drop=False)
-        ts = ts.sort_index()
-    ts = ts.pipe(high_freq_in_discharge_and_charge_from_soc_diff)
-    ts["last_notna_soc_date"] = ts["date"].mask(ts["soc"].isna(), pd.NaT).shift().ffill()
-    ts["last_notna_soc_diff_low_enough"] = ts.eval("date - last_notna_soc_date").lt(MAX_CHARGE_TIME_DIFF)
-    ts["date_diff_low_enough"] = ts["date"].diff().lt(MAX_CHARGE_TIME_DIFF)
-    ts["in_charge"] = ts.eval("in_charge & last_notna_soc_diff_low_enough & date_diff_low_enough")
-    ts["in_discharge"] = ts.eval("in_discharge & last_notna_soc_diff_low_enough & date_diff_low_enough")
-    ts = perf_mask_and_idx_from_condition_mask(ts, "in_charge")
-    ts = perf_mask_and_idx_from_condition_mask(ts, "in_discharge")
-    if date_not_index:
-        ts = ts.reset_index(drop=True)
-    return ts
-
-def high_freq_in_motion_mask_from_odo_diff(vehicle_df: DF) -> DF:
-    """If the time series has more than 6 hours in between soc points, use `low_freq_mask_in_motion_periods`."""
-    return (
-        vehicle_df
-        # use interpolate before checking if the odometer increased to compensate for missing values
-        .assign(in_motion=vehicle_df["odometer"].interpolate(method="time").diff().gt(0))
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_motion")
-    )
+        tss[cum_var_col] *= KJ_TO_KWH # Convert from kj to kwh
+        # Reset value to zero at the start of each vin time series
+        tss[cum_var_col] -= tss.groupby(id_col)[cum_var_col].transform("first")
+    else:
+        logger.debug(f"{var_col} not found, returning tss unchanged.")
+    return tss
 
 def high_freq_in_discharge_and_charge_from_soc_diff(ts: DF) -> DF:
-    """If the time series has more than 6 hours in between odometer points, use `high_freq_in_discharge_and_charge_from_soc_diff`."""
-    soc_diff = ts["soc"].ffill().diff()
-    ts["soc_dir"] = np.nan
-    ts["soc_dir"] = (
-        ts["soc_dir"] 
-        .mask(soc_diff.gt(0), 1)
-        .mask(soc_diff.lt(0), -1)
-    )
+    """If the time series has more than 6 hours in between soc points, use `low_freq_in_discharge_and_charge_from_soc_diff`."""
+    ts["soc_dir"] = norm_soc_dir(ts["soc"].ffill().diff())
     # mitigate soc spikes effect on mask
     prev_dir = ts["soc_dir"].ffill().shift()
     next_dir = ts["soc_dir"].bfill().shift(-1)
     ts["value_is_spike"] = (next_dir == prev_dir) & (ts["soc_dir"] != next_dir) & ts["soc_dir"].notna()
     ts["soc_dir"] = ts["soc_dir"].mask(ts["value_is_spike"], np.nan)
-    ts["smoothed_soc_dir"] = ts["soc_dir"].rolling(window=TD(minutes=20), center=True).mean()
+    ts["smoothed_soc_dir"] = (
+        ts["soc_dir"]
+        .rolling(window=TD(minutes=20), center=True)
+        .mean()
+        .pipe(np.sign)
+    )
     ts["soc_dir"] = (
         ts["soc_dir"]
         .mask(ts["smoothed_soc_dir"].gt(0) & ts["soc_dir"].lt(0), np.nan)
@@ -179,55 +82,9 @@ def high_freq_in_discharge_and_charge_from_soc_diff(ts: DF) -> DF:
 
     return ts
 
-def compute_charge_n_discharge_perf_mask_and_idx_from_masks(ts:DF, id_col:str=None, logger:Logger=logger) -> DF:
-    return (
-        ts
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_charge")
-        .pipe(perf_mask_and_idx_from_condition_mask, "in_discharge")
-    )
-
-# TODO: Find why some perfs grps have a size of 1 even though they are supposed to be filtered out with  trimed_series if trimed_series.sum() > 1 else False
-def perf_mask_and_idx_from_condition_mask(
-        vehicle_df: DF,
-        src_mask:str,
-        src_mask_idx_col_name="{src_mask}_idx",
-        perf_mask_col_name="{src_mask}_perf_mask",
-        max_time_diff:TD|None=None
-    ) -> DF:
-    src_mask_idx_col_name = src_mask_idx_col_name.format(src_mask=src_mask)
-    perf_mask_col_name = perf_mask_col_name.format(src_mask=src_mask)
-    vehicle_df[src_mask_idx_col_name] = period_idx_of_mask(vehicle_df, src_mask, max_time_diff=max_time_diff)
-    perf_grps = vehicle_df.groupby(src_mask_idx_col_name)["soc"]
-    vehicle_df[perf_mask_col_name] = perf_grps.transform(sanitize_perf_period) & vehicle_df[src_mask]
-    vehicle_df[f"{src_mask}_perf_idx"] = period_idx_of_mask(vehicle_df, perf_mask_col_name)
-
-    return vehicle_df
-
-def period_idx_of_mask(vehicle_df:DF, mask_col: str, period_shift:int=1, max_time_diff:TD|None=None) -> Series:
-    if max_time_diff:
-        mask = vehicle_df.eval(f"{mask_col} & sec_time_diff < {max_time_diff.total_seconds()}") 
-    else:
-        mask = vehicle_df[mask_col]
-    mask_for_idx = mask.ne(mask.shift(period_shift), fill_value=False)
-    idx = mask_for_idx.cumsum().astype("uint16")
-    return idx
-
-def sanitize_perf_period(soc: Series, min_size=2) -> bool|Series:
-    trimed_mask = trim_off_mask_perf_period(soc)
-    return trimed_mask if trimed_mask.sum() >= min_size else False
-
-def trim_off_mask_perf_period(soc: Series) -> Series:
-    return mask_off_trailing_soc(soc) & mask_off_leading_soc(soc)
-
-def mask_off_trailing_soc(soc: Series) -> Series:
-    ffilled_soc = soc.ffill()
-    return ffilled_soc.ne(ffilled_soc.iat[-1]).shift(fill_value=True)
-
-def mask_off_leading_soc(soc: Series) -> Series:
-    bfilled_soc = soc.bfill()
-    bfilled_first = bfilled_soc.iat[0]
-    return bfilled_soc.ne(bfilled_first).shift(-1, fill_value=True)
-
+def norm_soc_dir(soc_dir:Series) -> Series:
+    """Normalize the soc direction to -1 for negative, NaN for zero, 1 for positive."""
+    return soc_dir / soc_dir.abs()
 
 def tss_frequency_sanity_check(tss:DF, date_col:str="date", id_col:str="vin") -> DF:
     """
