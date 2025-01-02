@@ -175,7 +175,7 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     logger.debug(f"datetime_cols:{datetime_cols}")
     df = df.astype(col_dtypes, errors="ignore")
     for col in datetime_cols:
-        df[col] = pd.to_datetime(df[col], format='mixed')
+        df[col] = pd.to_datetime(df[col], format='mixed').dt.as_unit("s")
     dtypes_dict = df[df.columns.intersection(col_dtypes.keys())].dtypes.to_dict()
     if dtypes_dict != col_dtypes:
         logger.warning("safe_astype did not succeed in changing all dtypes.")
