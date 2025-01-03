@@ -499,14 +499,11 @@ async def cleanup_unused_models():
         logging.error(f"Erreur lors du nettoyage des modèles non utilisés: {str(e)}")
         raise
 
-async def main():
+async def main(dataframe: pd.DataFrame):
     try:
-
-        df = await fleet_info()
-        print(df)
-        logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}") #don't work at the moment
+        logging.info(f"Nombre total de véhicules dans fleet_info: {len(dataframe)}") #don't work at the moment
         
-        await process_vehicles(df)
+        await process_vehicles(dataframe)
         # await list_used_models()
         # await cleanup_unused_models()
         # metadata = await get_existing_model_metadata()
@@ -515,5 +512,6 @@ async def main():
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    df = asyncio.run(fleet_info())
+    asyncio.run(main(df))
 

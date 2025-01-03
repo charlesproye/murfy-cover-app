@@ -10,6 +10,7 @@ import pandas as pd
 import time
 import re
 
+from fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -472,11 +473,11 @@ async def test_vin_matching():
     except Exception as e:
         logging.error(f"Erreur dans test_vin_matching: {str(e)}")
 
-async def main():
+async def main(dataframe: pd.DataFrame):
     try:
-        ownership_filter = "AYVENS"
-        df = await read_fleet_info(ownership_filter=ownership_filter)
-        logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}")
+        # ownership_filter = "AYVENS"
+        # df = await read_fleet_info(ownership_filter=ownership_filter)
+        # logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}")
         
         async with aiohttp.ClientSession() as session:
             account_vins_mapping = await get_account_vins_mapping(session)
@@ -488,7 +489,7 @@ async def main():
                         logging.warning(f"No VINs found for account {account_name}")
                         continue
                         
-                    await process_account(session, account_name, token_key, df, account_vins)
+                    await process_account(session, account_name, token_key, dataframe, account_vins)
                 except Exception as e:
                     logging.error(f"Error processing account {account_name}: {str(e)}")
                     
@@ -496,4 +497,7 @@ async def main():
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+
+    df = asyncio.run(fleet_info())
+
+    asyncio.run(main(df))

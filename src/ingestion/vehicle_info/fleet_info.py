@@ -21,9 +21,9 @@ async def read_fleet_info(ownership_filter: str = None) -> pd.DataFrame:
         .pipe(map_col_to_dict, "country", COUNTRY_NAME_MAPPING)
         .drop_duplicates(subset="vin")
         .pipe(safe_astype, COL_DTYPES)
-
     )
 
 if __name__ == "__main__":
     fleet_info = asyncio.run(read_fleet_info())
     print(fleet_info)
+    

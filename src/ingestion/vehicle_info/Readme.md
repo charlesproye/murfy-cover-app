@@ -12,6 +12,10 @@ For all the others brands we are basing our data on the one given by the leasing
 The process is the following : 
 1. We list all the VIN and their ownership : fleet_info.py
 2. Depending on the brand we run the right script to get the model information 
+    a. We get the list of the VIN for the particluar brand 
+    b. We do all the API call to get the information of the model 
+    c. We add the model that still don't exist into the database vehicle_model
+    d. We load the vehicle with the right ownership and vehicle_model
 3. We load the date in the database with the right ownership
 
 
