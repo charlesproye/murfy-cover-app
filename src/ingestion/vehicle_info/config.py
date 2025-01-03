@@ -29,21 +29,24 @@ COLS_TO_LOAD_IN_RDB_VEHICLE_TABLE = [
 ]
 
 #S3
-TEST_TESLA_FLEET_INFO_KEY = "fleet_info/tesla/raw_fleet_info.json"
-S3_JSON_FLEET_INFO_RESPONSE_KEYS = [
-    "fleet_info/tesla/raw_fleet_info.json",
-    "fleet_info/tesla/ayvens-blbv.json",
-    "fleet_info/tesla/ayvens-nv.json",
-    "fleet_info/tesla/ayvens-nva.json",
-    "fleet_info/tesla/ayvens-slbv.json",
-    "fleet_info/tesla/ayvens.json",
-]
+# TEST_TESLA_FLEET_INFO_KEY = "fleet_info/tesla/raw_fleet_info.json"
+# S3_JSON_FLEET_INFO_RESPONSE_KEYS = [
+#     "fleet_info/tesla/raw_fleet_info.json",
+#     "fleet_info/tesla/ayvens-blbv.json",
+#     "fleet_info/tesla/ayvens-nv.json",
+#     "fleet_info/tesla/ayvens-nva.json",
+#     "fleet_info/tesla/ayvens-slbv.json",
+#     "fleet_info/tesla/ayvens.json",
+# ]
+# All
+FLEET_INFO_KEY = "fleet_info/fleet_info.csv"
 
 # Ayvens
-AYVENS_FLEET_INFO_CSV_KEY = "fleet_info/ayvens/fleet_info_with_regions.csv"
-AYVENS_FLEET_WITH_ONLY_CONTRACT_START_DATE_KEY = "fleet_info/ayvens/fleet_info - Global NL.csv"
-AYVENS_FLEET_WITH_CAR_REGISTRATION_KEY = "fleet_info/ayvens/fleet_info - Global NL 2.csv"
-AYVENS_FLEET_INFO_PARQUET_KEY = "fleet_info/ayvens/fleet_info.parquet"
+# AYVENS_FLEET_INFO_CSV_KEY = "fleet_info/ayvens/fleet_info_with_regions.csv"
+# AYVENS_FLEET_WITH_ONLY_CONTRACT_START_DATE_KEY = "fleet_info/ayvens/fleet_info - Global NL.csv"
+# AYVENS_FLEET_WITH_CAR_REGISTRATION_KEY = "fleet_info/ayvens/fleet_info - Global NL 2.csv"
+# AYVENS_FLEET_INFO_PARQUET_KEY = "fleet_info/ayvens/fleet_info.parquet"
+
 RENAME_AYVENS_COLS = {
     "end of contract": "end_of_contract_date",
     "activated": "activation_status"
@@ -67,7 +70,7 @@ MODEL_VERSION_NAME_MAPPING = {
 }
 MAKE_NAME_MAPPING = {
     # bmw
-    "bmw": "BMW",
+    "BMW": "bmw",
     # high mobility
     "FORD": "ford",
     "Mercedes-Benz": "mercedes-benz",
@@ -92,7 +95,7 @@ MAKE_NAME_MAPPING = {
 COUNTRY_NAME_MAPPING = {
     "NL": "netherlands"   
 }
-AYVENS_COL_DTYPES = {
+COL_DTYPES = {
     "licence plate": "string",
     "make": "string",
     "model": "string",
@@ -111,8 +114,3 @@ AYVENS_COL_DTYPES = {
     "activation_status": "string",
 }
 
-# Tesla
-TESLA_VERSION_MAPPING = {
-    "roof": "roof",
-    "long range plus": "long range plus",
-}

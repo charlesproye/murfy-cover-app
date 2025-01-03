@@ -5,47 +5,12 @@ import uuid
 from core.sql_utils import con
 import os
 import re
+from fleet_info import read_fleet_info as fleet_info
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
-async def read_fleet_info(ownership_filter: str = None) -> pd.DataFrame:
-    """
-    Lit le fichier fleet_info.csv et retourne un DataFrame
-    
-    Args:
-        ownership_filter (str, optional): Filtre pour ne garder qu'un certain type d'ownership
-    """
-    try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(current_dir, '..', 'data', 'fleet_info_13.csv')
-        
-        df = pd.read_csv(file_path)
-        
-        df.columns = [col if col != " " else "brand" for col in df.columns]
-        
-        # Exclure Tesla car géré en solo
-        df = df[df['brand'].str.lower() != 'tesla']
-        
-        if ownership_filter:
-            df['Ownership_lower'] = df['Ownership '].str.lower()
-            df = df[df['Ownership_lower'] == ownership_filter.lower()]
-            df = df.drop('Ownership_lower', axis=1)
-            
-            logging.info(f"Filtré pour Ownership = {ownership_filter}")
-            logging.info(f"Nombre de véhicules après filtrage: {len(df)}")
-        
-        
-        return df
-        
-    except FileNotFoundError:
-        logging.error(f"Le fichier fleet_info.csv n'a pas été trouvé dans {file_path}")
-        raise
-    except Exception as e:
-        logging.error(f"Erreur lors de la lecture du fichier CSV: {str(e)}")
-        raise
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format='%(asctime)s - %(levelname)s - %(message)s'
+# )
 
 def convert_date_format(date_str):
     """Convertit les différents formats de date en format YYYY-MM-DD"""
@@ -238,30 +203,30 @@ def standardize_model_type(model: str, type_value: str, brand: str) -> tuple[str
 
 async def process_vehicles(df: pd.DataFrame):
     """Traite les véhicules du DataFrame et les insère dans la base de données"""
-    BRAND_MAPPING = {
-        'VOLVO': 'Volvo Cars'
-    }
+    # BRAND_MAPPING = {
+    #     'VOLVO': 'Volvo Cars'
+    # }
 
     COUNTRY_MAPPING = {
         'NL': 'Netherlands',
     }
-
+    con = get_sqlalchemy_engine()
     cursor = con.cursor()
     
     for index, vehicle in df.iterrows():
         try:
             # Gestion de la marque
-            brand_lower = vehicle['brand'].lower()
-            brand_lower = BRAND_MAPPING.get(brand_lower, brand_lower) 
-            
+            make_lower = vehicle['make'].lower()
+            # brand_lower = BRAND_MAPPING.get(brand_lower, brand_lower) 
+            print("ici")
             cursor.execute("""
                 SELECT id FROM oem 
                 WHERE LOWER(oem_name) = %s
-            """, (brand_lower,))
+            """, (make_lower,))
             
-            oem_result = cursor.fetchone()
+            oem_result = con.fetchone()
             if not oem_result:
-                logging.error(f"OEM non trouvé pour la marque: {vehicle['brand']} (mappé à {brand_lower})")
+                logging.error(f"OEM non trouvé pour la marque: {vehicle['brand']} (mappé à {make_lower})")
                 continue
             oem_id = oem_result[0]
             
@@ -276,7 +241,7 @@ async def process_vehicles(df: pd.DataFrame):
             model_name, type_value = standardize_model_type(model_name, type_value, vehicle['brand'])
 
             # Recherche du modèle dans la base
-            cursor.execute("""
+            con.execute("""
                 SELECT id FROM vehicle_model 
                 WHERE LOWER(model_name) = %s 
                 AND (
@@ -287,13 +252,13 @@ async def process_vehicles(df: pd.DataFrame):
             """, (model_name.lower(), type_value.lower() if type_value else None, 
                     type_value, type_value, oem_id))
             
-            result = cursor.fetchone()
+            result = con.fetchone()
             if result:
                 vehicle_model_id = result[0]
             else:
                 vehicle_model_id = str(uuid.uuid4())
                 if type_value:
-                    cursor.execute("""
+                    con.execute("""
                         INSERT INTO vehicle_model (id, model_name, type, oem_id)
                         VALUES (%s, %s, %s, %s)
                         RETURNING id
@@ -304,7 +269,7 @@ async def process_vehicles(df: pd.DataFrame):
                         oem_id
                     ))
                 else:
-                    cursor.execute("""
+                    con.execute("""
                         INSERT INTO vehicle_model (id, model_name, oem_id)
                         VALUES (%s, %s, %s)
                         RETURNING id
@@ -313,16 +278,16 @@ async def process_vehicles(df: pd.DataFrame):
                         model_name.lower(),
                         oem_id
                     ))
-                vehicle_model_id = cursor.fetchone()[0]
+                vehicle_model_id = con.fetchone()[0]
                 logging.info(f"Créé nouveau modèle: {model_name} {type_value or ''} pour {vehicle['brand']}")
 
             # Récupération fleet_id
-            cursor.execute("""
+            con.execute("""
                 SELECT id FROM fleet 
                 WHERE LOWER(fleet_name) = LOWER(%s)
             """, (vehicle['Ownership '],))
             
-            fleet_result = cursor.fetchone()
+            fleet_result = con.fetchone()
             if not fleet_result:
                 logging.error(f"Fleet non trouvée pour ownership: {vehicle['Ownership ']}")
                 continue
@@ -334,33 +299,33 @@ async def process_vehicles(df: pd.DataFrame):
                 continue
             
             country = COUNTRY_MAPPING.get(vehicle['Country'], vehicle['Country'])
-            cursor.execute("""
+            con.execute("""
                 SELECT id FROM region 
                 WHERE LOWER(region_name) = LOWER(%s)
             """, (country,))
             
-            region_result = cursor.fetchone()
+            region_result = con.fetchone()
             if not region_result:
                 region_id = str(uuid.uuid4())
-                cursor.execute("""
+                con.execute("""
                     INSERT INTO region (id, region_name)
                     VALUES (%s, %s)
                     RETURNING id
                 """, (region_id, country))
-                region_id = cursor.fetchone()[0]
+                region_id = con.fetchone()[0]
                 logging.info(f"Nouvelle région créée: {country}")
             else:
                 region_id = region_result[0]
             
             # Gestion du véhicule
-            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['VIN'],))
-            vehicle_exists = cursor.fetchone()
+            con.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['VIN'],))
+            vehicle_exists = con.fetchone()
             
             end_of_contract = convert_date_format(vehicle['End of Contract'])
             start_date = convert_date_format(vehicle['Start Date'])
             
             if vehicle_exists:
-                cursor.execute("""
+                con.execute("""
                     UPDATE vehicle 
                     SET fleet_id = %s,
                         region_id = %s,
@@ -381,7 +346,7 @@ async def process_vehicles(df: pd.DataFrame):
                 logging.info(f"Véhicule mis à jour avec VIN: {vehicle['VIN']}")
             else:
                 vehicle_id = str(uuid.uuid4())
-                cursor.execute("""
+                con.execute("""
                     INSERT INTO vehicle (
                         id, vin, fleet_id, region_id, vehicle_model_id,
                         licence_plate, end_of_contract_date, start_date
@@ -407,9 +372,8 @@ async def process_vehicles(df: pd.DataFrame):
 async def get_existing_model_metadata():
     """Récupère les métadonnées existantes des modèles de véhicules"""
    
-    cursor = con.cursor()
     
-    cursor.execute("""
+    con.execute("""
         SELECT 
             o.oem_name,
             vm.model_name,
@@ -427,7 +391,7 @@ async def get_existing_model_metadata():
         ORDER BY o.oem_name, vm.model_name, vm.type
     """)
     
-    results = cursor.fetchall()
+    results = con.fetchall()
     
     if results:
         print("\nMétadonnées existantes des modèles :")
@@ -446,9 +410,8 @@ async def get_existing_model_metadata():
 
 async def list_used_models():
     """Liste tous les modèles de véhicules présents dans la base de données qui sont utilisés"""
-    cursor = con.cursor()
     
-    cursor.execute("""
+    con.execute("""
         SELECT 
             vm.id,
             o.oem_name,
@@ -462,7 +425,7 @@ async def list_used_models():
         ORDER BY o.oem_name, vm.model_name, vm.type
     """)
     
-    results = cursor.fetchall()
+    results = con.fetchall()
     
     if results:
         print("\nModèles de véhicules utilisés dans la base :")
@@ -486,11 +449,10 @@ async def cleanup_unused_models():
     Supprime les modèles de véhicules qui ne sont liés à aucun véhicule dans la base de données.
     Retourne le nombre de modèles supprimés.
     """
-    cursor = con.cursor()
         
     try:
         # Récupère les modèles non utilisés
-        cursor.execute("""
+        con.execute("""
             SELECT 
                 vm.id,
                 o.oem_name,
@@ -502,11 +464,11 @@ async def cleanup_unused_models():
             WHERE v.id IS NULL
         """)
         
-        unused_models = cursor.fetchall()
+        unused_models = con.fetchall()
         
         if unused_models:
             # Supprime les modèles non utilisés
-            cursor.execute("""
+            con.execute("""
                 DELETE FROM vehicle_model vm
                 WHERE NOT EXISTS (
                     SELECT 1 
@@ -516,7 +478,7 @@ async def cleanup_unused_models():
                 RETURNING id
             """)
             
-            deleted_count = len(cursor.fetchall())
+            deleted_count = len(con.fetchall())
             con.commit()
             
             # Log les modèles supprimés
@@ -538,14 +500,14 @@ async def cleanup_unused_models():
 
 async def main():
     try:
-        #on peut mettre ce qu'on veut ici
-        ownership_filter = "Ayvens" 
-        df = await read_fleet_info(ownership_filter)
-        logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}")
+
+        df = await fleet_info()
+        print(df)
+        logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}") #don't work at the moment
         
         await process_vehicles(df)
-        await list_used_models()
-        await cleanup_unused_models()
+        # await list_used_models()
+        # await cleanup_unused_models()
         # metadata = await get_existing_model_metadata()
         
     except Exception as e:
