@@ -42,7 +42,7 @@ def upsert_table_with_df(df: DF, table: str, key_col: str, logger: Logger=logger
         insert_task = progress.add_task("Inserting rows", total=len(df_to_insert))
         df_to_insert.apply(insert_row, axis=1, table=table, key_col=key_col, progress=progress, task_id=insert_task)
 
-    connection.commit()
+    con.commit()
 
 def update_row(row: Series, table: str, key_col: str, progress: Progress, task_id: int):
     row = row.dropna()
@@ -53,7 +53,7 @@ def update_row(row: Series, table: str, key_col: str, progress: Progress, task_i
         WHERE {key_col} = :key_value
     """)
     parameters = row.to_dict() | {"key_value": row[key_col]}
-    connection.execute(update_statement, parameters)
+    con.execute(update_statement, parameters)
     progress.update(task_id, advance=1)
 
 def insert_row(row: Series, table: str, key_col: str, progress: Progress, task_id: int):
@@ -67,7 +67,7 @@ def insert_row(row: Series, table: str, key_col: str, progress: Progress, task_i
     """)
     logger.debug(f"Inserting row for {key_col}={row.get(key_col, f'no {key_col}')}")
     parameters = {col: row[col] for col in row.index}
-    connection.execute(insert_statement, parameters)
+    con.execute(insert_statement, parameters)
     progress.update(task_id, advance=1)
 
 engine = get_sqlalchemy_engine()
