@@ -50,11 +50,11 @@ def compute_cum_var(tss: DF, var_col:str, cum_var_col:str, id_col:str="vin", log
         # Reset value to zero at the start of each vin time series
         tss[cum_var_col] -= tss.groupby(id_col)[cum_var_col].transform("first")
     else:
-        logger.debug(f"{var_col} not found, returning tss unchanged.")
+        logger.debug(f"{var_col} not found, not computing {cum_var_col}.")
     return tss
 
 def high_freq_in_discharge_and_charge_from_soc_diff(ts: DF) -> DF:
-    """If the time series has more than 6 hours in between soc points, use `low_freq_in_discharge_and_charge_from_soc_diff`."""
+    """If the time series has more than 6 hours in between soc points, use `low_freq_in_discharge_and_charge_from_soc_diff."""
     ts["soc_dir"] = norm_soc_dir(ts["soc"].ffill().diff())
     # mitigate soc spikes effect on mask
     prev_dir = ts["soc_dir"].ffill().shift()
