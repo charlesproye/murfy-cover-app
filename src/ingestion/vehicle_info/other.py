@@ -7,10 +7,11 @@ import os
 import re
 from fleet_info import read_fleet_info as fleet_info
 
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format='%(asctime)s - %(levelname)s - %(message)s'
-# )
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 def convert_date_format(date_str):
     """Convertit les différents formats de date en format YYYY-MM-DD"""
@@ -36,7 +37,7 @@ def convert_date_format(date_str):
 
         return None
 
-def standardize_model_type(model: str, type_value: str, brand: str) -> tuple[str, str]:
+def standardize_model_type(model: str, type_value: str, make: str) -> tuple[str, str]:
     if not type_value:
         return model.lower(), None
 
@@ -186,9 +187,9 @@ def standardize_model_type(model: str, type_value: str, brand: str) -> tuple[str
         }
     }
 
-    brand_lower = brand.lower()
-    if brand_lower in mappings and model in mappings[brand_lower]:
-        model_info = mappings[brand_lower][model]
+    make_lower = make.lower()
+    if make_lower in mappings and model in mappings[make_lower]:
+        model_info = mappings[make_lower][model]
         
         # Applique le nettoyage du modèle si spécifié
         if 'model_clean' in model_info:
@@ -203,179 +204,170 @@ def standardize_model_type(model: str, type_value: str, brand: str) -> tuple[str
 
 async def process_vehicles(df: pd.DataFrame):
     """Traite les véhicules du DataFrame et les insère dans la base de données"""
-    # BRAND_MAPPING = {
-    #     'VOLVO': 'Volvo Cars'
-    # }
+
 
     COUNTRY_MAPPING = {
         'NL': 'Netherlands',
     }
-    
+
     with get_connection() as con:
         cursor = con.cursor()
         for index, vehicle in df.iterrows():
-            
+            try:
             # Gestion de la marque
-            make_lower = vehicle['make'].lower()
-            print(make_lower)
-            # brand_lower = BRAND_MAPPING.get(brand_lower, brand_lower) 
-            
-            con.execute("""
-                SELECT id FROM oem 
-                WHERE LOWER(oem_name) = %s
-            """, (make_lower,))
-            print("ici")
-            oem_result = con.fetchone()
-            if not oem_result:
-                logging.error(f"OEM non trouvé pour la marque: {vehicle['brand']} (mappé à {make_lower})")
-                continue
-            oem_id = oem_result[0]
-            
-            # Standardisation du modèle et type
-            model_name = vehicle['Model'].strip() if pd.notna(vehicle['Model']) else None
-            type_value = vehicle['Type'].strip() if pd.notna(vehicle['Type']) else None
-
-            if not model_name:
-                logging.error(f"Modèle manquant pour le véhicule VIN: {vehicle['VIN']}")
-                continue
-
-            model_name, type_value = standardize_model_type(model_name, type_value, vehicle['brand'])
-
-            # Recherche du modèle dans la base
-            con.execute("""
-                SELECT id FROM vehicle_model 
-                WHERE LOWER(model_name) = %s 
-                AND (
-                    (LOWER(type) = %s AND %s IS NOT NULL)
-                    OR (type IS NULL AND %s IS NULL)
-                )
-                AND oem_id = %s
-            """, (model_name.lower(), type_value.lower() if type_value else None, 
-                    type_value, type_value, oem_id))
-            
-            result = con.fetchone()
-            if result:
-                vehicle_model_id = result[0]
-            else:
-                vehicle_model_id = str(uuid.uuid4())
-                if type_value:
-                    con.execute("""
-                        INSERT INTO vehicle_model (id, model_name, type, oem_id)
-                        VALUES (%s, %s, %s, %s)
-                        RETURNING id
-                    """, (
-                        vehicle_model_id,
-                        model_name.lower(),
-                        type_value.lower(),
-                        oem_id
-                    ))
-                else:
-                    con.execute("""
-                        INSERT INTO vehicle_model (id, model_name, oem_id)
-                        VALUES (%s, %s, %s)
-                        RETURNING id
-                    """, (
-                        vehicle_model_id,
-                        model_name.lower(),
-                        oem_id
-                    ))
-                vehicle_model_id = con.fetchone()[0]
-                logging.info(f"Créé nouveau modèle: {model_name} {type_value or ''} pour {vehicle['brand']}")
-
-            # Récupération fleet_id
-            con.execute("""
-                SELECT id FROM fleet 
-                WHERE LOWER(fleet_name) = LOWER(%s)
-            """, (vehicle['Ownership '],))
-            
-            fleet_result = con.fetchone()
-            if not fleet_result:
-                logging.error(f"Fleet non trouvée pour ownership: {vehicle['Ownership ']}")
-                continue
-            fleet_id = fleet_result[0]
-
-            # Gestion de la région
-            if pd.isna(vehicle['Country']):
-                logging.warning(f"Pays manquant pour le véhicule VIN: {vehicle['VIN']}")
-                continue
-            
-            country = COUNTRY_MAPPING.get(vehicle['Country'], vehicle['Country'])
-            con.execute("""
-                SELECT id FROM region 
-                WHERE LOWER(region_name) = LOWER(%s)
-            """, (country,))
-            
-            region_result = con.fetchone()
-            if not region_result:
-                region_id = str(uuid.uuid4())
-                con.execute("""
-                    INSERT INTO region (id, region_name)
-                    VALUES (%s, %s)
-                    RETURNING id
-                """, (region_id, country))
-                region_id = con.fetchone()[0]
-                logging.info(f"Nouvelle région créée: {country}")
-            else:
-                region_id = region_result[0]
-            
-            # Gestion du véhicule
-            con.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['VIN'],))
-            vehicle_exists = con.fetchone()
-            
-            end_of_contract = convert_date_format(vehicle['End of Contract'])
-            start_date = convert_date_format(vehicle['Start Date'])
-            
-            if vehicle_exists:
-                con.execute("""
-                    UPDATE vehicle 
-                    SET fleet_id = %s,
-                        region_id = %s,
-                        vehicle_model_id = %s,
-                        licence_plate = %s,
-                        end_of_contract_date = %s,
-                        start_date = %s
-                    WHERE vin = %s
-                """, (
-                    fleet_id,
-                    region_id,
-                    vehicle_model_id,
-                    vehicle['Licence plate'],
-                    end_of_contract,
-                    start_date,
-                    vehicle['VIN']
-                ))
-                logging.info(f"Véhicule mis à jour avec VIN: {vehicle['VIN']}")
-            else:
-                vehicle_id = str(uuid.uuid4())
-                con.execute("""
-                    INSERT INTO vehicle (
-                        id, vin, fleet_id, region_id, vehicle_model_id,
-                        licence_plate, end_of_contract_date, start_date
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    vehicle_id,
-                    vehicle['VIN'],
-                    fleet_id,
-                    region_id,
-                    vehicle_model_id,
-                    vehicle['Licence plate'],
-                    end_of_contract,
-                    start_date
-                ))
-                logging.info(f"Nouveau véhicule inséré avec VIN: {vehicle['VIN']}")
+                make_lower = vehicle['make'].lower()
                 
-            # except Exception as e:
-            #     logging.error(f"Erreur lors du traitement du véhicule {vehicle['VIN']}: {str(e)}")
-            #     continue
-        
+                cursor.execute("""
+                    SELECT id FROM oem 
+                    WHERE LOWER(oem_name) = %s
+                """, (make_lower,))
+                
+                oem_result = cursor.fetchone()
+                
+                if not oem_result:
+                    logging.error(f"OEM non trouvé pour la marque: {vehicle['make']} (mappé à {make_lower})")
+                    continue
+                oem_id = oem_result[0]
+                # Standardisation du modèle et type
+                model_name = vehicle['model'].strip() if pd.notna(vehicle['model']) else None
+                type_value = vehicle['version'].strip() if pd.notna(vehicle['version']) else None
+                if not model_name:
+                    logging.error(f"Modèle manquant pour le véhicule VIN: {vehicle['vin']}")
+                    continue
+
+                model_name, type_value = standardize_model_type(model_name, type_value, vehicle['make'])
+
+                # Recherche du modèle dans la base
+                cursor.execute("""
+                    SELECT id FROM vehicle_model 
+                    WHERE LOWER(model_name) = %s 
+                    AND (
+                        (LOWER(type) = %s AND %s IS NOT NULL)
+                        OR (type IS NULL AND %s IS NULL)
+                    )
+                    AND oem_id = %s
+                """, (model_name.lower(), type_value.lower() if type_value else None, 
+                        type_value, type_value, oem_id))
+                
+                result = cursor.fetchone()
+                if result:
+                    vehicle_model_id = result[0]
+                else:
+                    
+                    vehicle_model_id = str(uuid.uuid4())
+                    if type_value:
+                        cursor.execute("""
+                            INSERT INTO vehicle_model (id, model_name, type, oem_id)
+                            VALUES (%s, %s, %s, %s)
+                            RETURNING id
+                        """, (
+                            vehicle_model_id,
+                            model_name.lower(),
+                            type_value.lower(),
+                            oem_id
+                        ))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO vehicle_model (id, model_name, oem_id)
+                            VALUES (%s, %s, %s)
+                            RETURNING id
+                        """, (
+                            vehicle_model_id,
+                            model_name.lower(),
+                            oem_id
+                        ))
+                    vehicle_model_id = cursor.fetchone()[0]
+                
+                    logging.info(f"Créé nouveau modèle: {model_name} {type_value or ''} pour {vehicle['make']}") 
+                # Récupération fleet_id
+                cursor.execute("""
+                    SELECT id FROM fleet 
+                    WHERE LOWER(fleet_name) = LOWER(%s)
+                """, (vehicle['owner'],))
+                fleet_result = cursor.fetchone()
+                if not fleet_result:
+                    logging.error(f"Fleet non trouvée pour owner: {vehicle['owner']}")
+                    continue
+                fleet_id = fleet_result[0]
+    
+                # Gestion de la région
+                if pd.isna(vehicle['country']):
+                    logging.warning(f"Pays manquant pour le véhicule VIN: {vehicle['vin']}")
+                    continue
+                
+                country = COUNTRY_MAPPING.get(vehicle['country'], vehicle['country'])
+                cursor.execute("""
+                    SELECT id FROM region 
+                    WHERE LOWER(region_name) = LOWER(%s)
+                """, (country,))
+                region_result = cursor.fetchone()
+                if not region_result:
+                    region_id = str(uuid.uuid4())
+                    cursor.execute("""
+                        INSERT INTO region (id, region_name)
+                        VALUES (%s, %s)
+                        RETURNING id
+                    """, (region_id, country))
+                    region_id = cursor.fetchone()[0]
+                    logging.info(f"Nouvelle région créée: {country}")
+                else:
+                    region_id = region_result[0]
+                # Gestion du véhicule
+                cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
+                vehicle_exists = cursor.fetchone()
+                
+                end_of_contract = convert_date_format(vehicle['end_of_contract'])
+                start_date = convert_date_format(vehicle['start_date']) 
+                if vehicle_exists:
+                    cursor.execute("""
+                        UPDATE vehicle 
+                        SET fleet_id = %s,
+                            region_id = %s,
+                            vehicle_model_id = %s,
+                            licence_plate = %s,
+                            end_of_contract_date = %s,
+                            start_date = %s
+                        WHERE vin = %s
+                    """, (
+                        fleet_id,
+                        region_id,
+                        vehicle_model_id,
+                        vehicle['licence_plate'],
+                        end_of_contract,
+                        start_date,
+                        vehicle['vin']
+                    ))
+                    logging.info(f"Véhicule mis à jour avec VIN: {vehicle['vin']}")
+                else:
+                    vehicle_id = str(uuid.uuid4())
+                    cursor.execute("""
+                        INSERT INTO vehicle (
+                            id, vin, fleet_id, region_id, vehicle_model_id,
+                            licence_plate, end_of_contract_date, start_date
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        vehicle_id,
+                        vehicle['vin'],
+                        fleet_id,
+                        region_id,
+                        vehicle_model_id,
+                        vehicle['licence_plate'],
+                        end_of_contract,
+                        start_date
+                    ))
+                    logging.info(f"Nouveau véhicule inséré avec VIN: {vehicle['vin']}")
+                
+            except Exception as e:
+                logging.error(f"Erreur lors du traitement du véhicule {vehicle['VIN']}: {str(e)}")
+                continue
         con.commit()
 
 async def get_existing_model_metadata():
     """Récupère les métadonnées existantes des modèles de véhicules"""
-   
-    with get_connection() as con:
-        cursor = con.cursor()
-        con.execute("""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("""
             SELECT 
                 o.oem_name,
                 vm.model_name,
@@ -387,13 +379,13 @@ async def get_existing_model_metadata():
             FROM vehicle_model vm
             JOIN oem o ON vm.oem_id = o.id
             WHERE vm.url_image IS NOT NULL 
-                OR vm.warranty_km IS NOT NULL 
-                OR vm.warranty_date IS NOT NULL 
-                OR vm.capacity IS NOT NULL
+               OR vm.warranty_km IS NOT NULL 
+               OR vm.warranty_date IS NOT NULL 
+               OR vm.capacity IS NOT NULL
             ORDER BY o.oem_name, vm.model_name, vm.type
         """)
         
-        results = con.fetchall()
+        results = cursor.fetchall()
         
         if results:
             print("\nMétadonnées existantes des modèles :")
@@ -412,102 +404,107 @@ async def get_existing_model_metadata():
 
 async def list_used_models():
     """Liste tous les modèles de véhicules présents dans la base de données qui sont utilisés"""
-    
-    con.execute("""
-        SELECT 
-            vm.id,
-            o.oem_name,
-            vm.model_name,
-            vm.type,
-            COUNT(v.id) as vehicle_count
-        FROM vehicle_model vm
-        JOIN oem o ON vm.oem_id = o.id
-        JOIN vehicle v ON v.vehicle_model_id = vm.id
-        GROUP BY vm.id, o.oem_name, vm.model_name, vm.type
-        ORDER BY o.oem_name, vm.model_name, vm.type
-    """)
-    
-    results = con.fetchall()
-    
-    if results:
-        print("\nModèles de véhicules utilisés dans la base :")
-        print("--------------------------------------------------------------------------------")
-        print("ID | Marque | Modèle | Type | Nombre de véhicules")
-        print("--------------------------------------------------------------------------------")
-        total_vehicles = 0
-        for row in results:
-            model_id, oem, model, type_value, count = row
-            type_str = type_value if type_value else "N/A"
-            print(f"{model_id} | {oem} | {model} | {type_str} | {count}")
-            total_vehicles += count
-        print("--------------------------------------------------------------------------------")
-        print(f"Total : {len(results)} modèles différents")
-        print(f"Total véhicules : {total_vehicles}")
-    else:
-        print("Aucun modèle trouvé dans la base")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT 
+                vm.id,
+                o.oem_name,
+                vm.model_name,
+                vm.type,
+                COUNT(v.id) as vehicle_count
+            FROM vehicle_model vm
+            JOIN oem o ON vm.oem_id = o.id
+            JOIN vehicle v ON v.vehicle_model_id = vm.id
+            GROUP BY vm.id, o.oem_name, vm.model_name, vm.type
+            ORDER BY o.oem_name, vm.model_name, vm.type
+        """)
+        
+        results = cursor.fetchall()
+        
+        if results:
+            print("\nModèles de véhicules utilisés dans la base :")
+            print("--------------------------------------------------------------------------------")
+            print("ID | Marque | Modèle | Type | Nombre de véhicules")
+            print("--------------------------------------------------------------------------------")
+            total_vehicles = 0
+            for row in results:
+                model_id, oem, model, type_value, count = row
+                type_str = type_value if type_value else "N/A"
+                print(f"{model_id} | {oem} | {model} | {type_str} | {count}")
+                total_vehicles += count
+            print("--------------------------------------------------------------------------------")
+            print(f"Total : {len(results)} modèles différents")
+            print(f"Total véhicules : {total_vehicles}")
+        else:
+            print("Aucun modèle trouvé dans la base")
 
 async def cleanup_unused_models():
     """
     Supprime les modèles de véhicules qui ne sont liés à aucun véhicule dans la base de données.
     Retourne le nombre de modèles supprimés.
     """
+    with get_connection() as conn:
+        cursor = conn.cursor()
         
-    try:
-        # Récupère les modèles non utilisés
-        con.execute("""
-            SELECT 
-                vm.id,
-                o.oem_name,
-                vm.model_name,
-                vm.type
-            FROM vehicle_model vm
-            JOIN oem o ON vm.oem_id = o.id
-            LEFT JOIN vehicle v ON v.vehicle_model_id = vm.id
-            WHERE v.id IS NULL
-        """)
-        
-        unused_models = con.fetchall()
-        
-        if unused_models:
-            # Supprime les modèles non utilisés
-            con.execute("""
-                DELETE FROM vehicle_model vm
-                WHERE NOT EXISTS (
-                    SELECT 1 
-                    FROM vehicle v 
-                    WHERE v.vehicle_model_id = vm.id
-                )
-                RETURNING id
+        try:
+            # Récupère les modèles non utilisés
+            cursor.execute("""
+                SELECT 
+                    vm.id,
+                    o.oem_name,
+                    vm.model_name,
+                    vm.type
+                FROM vehicle_model vm
+                JOIN oem o ON vm.oem_id = o.id
+                LEFT JOIN vehicle v ON v.vehicle_model_id = vm.id
+                WHERE v.id IS NULL
             """)
             
-            deleted_count = len(con.fetchall())
-            con.commit()
+            unused_models = cursor.fetchall()
             
-            # Log les modèles supprimés
-            logging.info(f"Suppression de {deleted_count} modèles non utilisés:")
-            for model in unused_models:
-                model_id, oem, model_name, type_value = model
-                type_str = type_value if type_value else "N/A"
-                logging.info(f"- {oem} | {model_name} | {type_str} (ID: {model_id})")
-            
-            return deleted_count
-        else:
-            logging.info("Aucun modèle non utilisé trouvé dans la base")
-            return 0
-            
-    except Exception as e:
-        con.rollback()
-        logging.error(f"Erreur lors du nettoyage des modèles non utilisés: {str(e)}")
-        raise
+            if unused_models:
+                # Supprime les modèles non utilisés
+                cursor.execute("""
+                    DELETE FROM vehicle_model vm
+                    WHERE NOT EXISTS (
+                        SELECT 1 
+                        FROM vehicle v 
+                        WHERE v.vehicle_model_id = vm.id
+                    )
+                    RETURNING id
+                """)
+                
+                deleted_count = len(cursor.fetchall())
+                conn.commit()
+                
+                # Log les modèles supprimés
+                logging.info(f"Suppression de {deleted_count} modèles non utilisés:")
+                for model in unused_models:
+                    model_id, oem, model_name, type_value = model
+                    type_str = type_value if type_value else "N/A"
+                    logging.info(f"- {oem} | {model_name} | {type_str} (ID: {model_id})")
+                
+                return deleted_count
+            else:
+                logging.info("Aucun modèle non utilisé trouvé dans la base")
+                return 0
+                
+        except Exception as e:
+            conn.rollback()
+            logging.error(f"Erreur lors du nettoyage des modèles non utilisés: {str(e)}")
+            raise
 
-async def main(dataframe: pd.DataFrame):
+async def main(df: pd.DataFrame):
     try:
-        logging.info(f"Nombre total de véhicules dans fleet_info: {len(dataframe)}") #don't work at the moment
-        
-        await process_vehicles(dataframe)
-        # await list_used_models()
-        # await cleanup_unused_models()
-        # metadata = await get_existing_model_metadata()
+        logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}") #don't work at the moment
+        df = df.query("make != 'tesla'")
+
+        await process_vehicles(df)
+        await list_used_models()
+        await cleanup_unused_models()
+        metadata = await get_existing_model_metadata()
         
     except Exception as e:
         logging.error(f"Erreur dans le programme principal: {str(e)}")
@@ -515,4 +512,6 @@ async def main(dataframe: pd.DataFrame):
 if __name__ == "__main__":
     df = asyncio.run(fleet_info())
     asyncio.run(main(df))
+
+
 

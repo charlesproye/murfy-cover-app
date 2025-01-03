@@ -4,7 +4,7 @@ RIGHT_MERGES_RDB_TABLES_FLEET_INFO_DEST_COLS = [
     "region_id",
     "vehicle_model_id",
     "licence_plate",
-    "end_of_contract_date",
+    "end_of_contract",
     "id",
     "activation_status",
     "vin",
@@ -20,7 +20,7 @@ COLS_TO_LOAD_IN_RDB_VEHICLE_TABLE = [
     "vehicle_model_id", #
     "purchase_date",
     "licence_plate", #
-    "end_of_contract_date", #
+    "end_of_contract", #
     "id",
     #"updated_at",
     #"created_at",
@@ -47,17 +47,8 @@ FLEET_INFO_KEY = "fleet_info/fleet_info.csv"
 # AYVENS_FLEET_WITH_CAR_REGISTRATION_KEY = "fleet_info/ayvens/fleet_info - Global NL 2.csv"
 # AYVENS_FLEET_INFO_PARQUET_KEY = "fleet_info/ayvens/fleet_info.parquet"
 
-RENAME_AYVENS_COLS = {
-    "end of contract": "end_of_contract_date",
-    "activated": "activation_status"
-}
-COLS_TO_MERGE_ON_AYVENS = {
-    "Contract start datum": "contract_start_date",
-    "Car registration date": "registration_date",
-    "Contract start date": "contract_start_date"
-}
 FLEET_INFO_COLS_NAME_MAPPING = {
-    "end_of_contract": "end_of_contract_date",
+    "end_of_contract": "end_of_contract",
     "activated": "activation_status",
     "type": "version",
     "ownership_": "owner",

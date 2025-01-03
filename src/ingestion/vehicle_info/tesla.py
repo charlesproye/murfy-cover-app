@@ -473,7 +473,7 @@ async def test_vin_matching():
     except Exception as e:
         logging.error(f"Erreur dans test_vin_matching: {str(e)}")
 
-async def main(dataframe: pd.DataFrame):
+async def main(df: pd.DataFrame):
     try:
         # ownership_filter = "AYVENS"
         # df = await read_fleet_info(ownership_filter=ownership_filter)
@@ -489,7 +489,7 @@ async def main(dataframe: pd.DataFrame):
                         logging.warning(f"No VINs found for account {account_name}")
                         continue
                         
-                    await process_account(session, account_name, token_key, dataframe, account_vins)
+                    await process_account(session, account_name, token_key, df, account_vins)
                 except Exception as e:
                     logging.error(f"Error processing account {account_name}: {str(e)}")
                     
