@@ -24,7 +24,7 @@ def upsert_table_with_df(df: DF, table: str, key_col: str, logger: Logger=logger
     for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
         df[col] = pd.to_datetime(df[col]).dt.strftime('%Y-%m-%d %H:%M:%S')
     # Get existing records from the table
-    rdb_table = pd.read_sql_table(table, connection).dropna(subset=[key_col])
+    rdb_table = pd.read_sql_table(table, con).dropna(subset=[key_col])
     existing_keys_mask = df[key_col].isin(rdb_table[key_col])
     insert_columns = df.columns.intersection(rdb_table.columns)
     # Get metadata of the table to find not-null columns and remove rows with null columns

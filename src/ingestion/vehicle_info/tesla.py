@@ -4,7 +4,7 @@ import json
 import os
 import logging
 from typing import List, Dict
-from core.sql_utils import get_connection
+from core.sql_utils import con
 import uuid
 import pandas as pd
 import time
@@ -289,128 +289,127 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
     vins = account_df['VIN'].unique().tolist()
     logging.info(f"Processing {len(vins)} vehicles from fleet info for {account_name}")
     
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        for vin in vins:
-            try:
-                vehicle_data = df[df['VIN'] == vin].iloc[0]
-                options = await get_vehicle_options(session, access_token, vin)
-                
+    cursor = con.cursor()
+    
+    for vin in vins:
+        try:
+            vehicle_data = df[df['VIN'] == vin].iloc[0]
+            options = await get_vehicle_options(session, access_token, vin)
+            
+            cursor.execute("""
+                SELECT id FROM vehicle_model 
+                WHERE LOWER(model_name) = LOWER(%s) 
+                AND LOWER(type) = LOWER(%s)
+                AND (version IS NULL OR version = '')
+            """, (options['model_name'], options['type']))
+            
+            empty_version_result = cursor.fetchone()
+            
+            if empty_version_result:
+                vehicle_model_id = empty_version_result[0]
+                cursor.execute("""
+                    UPDATE vehicle_model 
+                    SET version = %s
+                    WHERE id = %s
+                """, (options['version'], vehicle_model_id))
+                logging.info(f"Updated vehicle_model {vehicle_model_id} with version {options['version']}")
+            else:
                 cursor.execute("""
                     SELECT id FROM vehicle_model 
                     WHERE LOWER(model_name) = LOWER(%s) 
                     AND LOWER(type) = LOWER(%s)
-                    AND (version IS NULL OR version = '')
-                """, (options['model_name'], options['type']))
+                    AND version = %s
+                """, (options['model_name'], options['type'], options['version']))
                 
-                empty_version_result = cursor.fetchone()
-                
-                if empty_version_result:
-                    vehicle_model_id = empty_version_result[0]
-                    cursor.execute("""
-                        UPDATE vehicle_model 
-                        SET version = %s
-                        WHERE id = %s
-                    """, (options['version'], vehicle_model_id))
-                    logging.info(f"Updated vehicle_model {vehicle_model_id} with version {options['version']}")
+                result = cursor.fetchone()
+                if result:
+                    vehicle_model_id = result[0]
                 else:
+                    vehicle_model_id = str(uuid.uuid4())
                     cursor.execute("""
-                        SELECT id FROM vehicle_model 
-                        WHERE LOWER(model_name) = LOWER(%s) 
-                        AND LOWER(type) = LOWER(%s)
-                        AND version = %s
-                    """, (options['model_name'], options['type'], options['version']))
-                    
-                    result = cursor.fetchone()
-                    if result:
-                        vehicle_model_id = result[0]
-                    else:
-                        vehicle_model_id = str(uuid.uuid4())
-                        cursor.execute("""
-                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id)
-                            VALUES (%s, %s, %s, %s, %s)
-                            RETURNING id
-                        """, (
-                            vehicle_model_id,
-                            options['model_name'],
-                            options['type'],
-                            options['version'],
-                            '98809ac9-acb5-4cca-b67a-c1f6c489035a'
-                        ))
-                        vehicle_model_id = cursor.fetchone()[0]
-                        logging.info(f"Created new vehicle_model for {options['model_name']} {options['type']} version {options['version']}")
-                
-                cursor.execute("""
-                    SELECT id FROM fleet 
-                    WHERE LOWER(fleet_name) = LOWER(%s)
-                """, (vehicle_data['Ownership '],))
-                
-                fleet_result = cursor.fetchone()
-                if not fleet_result:
-                    logging.error(f"Fleet not found for ownership: {vehicle_data['Ownership ']}")
-                    continue
-                fleet_id = fleet_result[0]
-                
-                cursor.execute("""
-                    SELECT id FROM region 
-                    WHERE LOWER(region_name) = LOWER(%s)
-                """, (vehicle_data['Country'],))
-                
-                region_result = cursor.fetchone()
-                if not region_result:
-                    logging.error(f"Region not found for country: {vehicle_data['Country']}")
-                    continue
-                region_id = region_result[0]
-                
-                cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
-                vehicle_exists = cursor.fetchone()
-
-                end_of_contract = convert_date_format(vehicle_data['End of Contract'])
-                start_date = convert_date_format(vehicle_data['Start Date'])
-                
-                if vehicle_exists:
-                    cursor.execute("""
-                        UPDATE vehicle 
-                        SET fleet_id = %s,
-                            region_id = %s,
-                            vehicle_model_id = %s,
-                            licence_plate = %s,
-                            end_of_contract_date = %s,
-                            start_date = %s
-                        WHERE vin = %s
+                        INSERT INTO vehicle_model (id, model_name, type, version, oem_id)
+                        VALUES (%s, %s, %s, %s, %s)
+                        RETURNING id
                     """, (
-                        fleet_id,
-                        region_id,
                         vehicle_model_id,
-                        vehicle_data['Licence plate'],
-                        end_of_contract,
-                        start_date,
-                        vin
+                        options['model_name'],
+                        options['type'],
+                        options['version'],
+                        '98809ac9-acb5-4cca-b67a-c1f6c489035a'
                     ))
-                    logging.info(f"Updated vehicle with VIN: {vin}")
-                else:
-                    vehicle_id = str(uuid.uuid4())
-                    cursor.execute("""
-                        INSERT INTO vehicle (
-                            id, vin, fleet_id, region_id, vehicle_model_id,
-                            licence_plate, end_of_contract_date, start_date
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
-                        vehicle_data['Licence plate'],
-                        end_of_contract,
-                        start_date
-                    ))
-                    logging.info(f"Inserted new vehicle with VIN: {vin}")
-                
-                await asyncio.sleep(RATE_LIMIT_DELAY)
-                
-            except Exception as e:
-                logging.error(f"Error processing VIN {vin}: {str(e)}")
+                    vehicle_model_id = cursor.fetchone()[0]
+                    logging.info(f"Created new vehicle_model for {options['model_name']} {options['type']} version {options['version']}")
+            
+            cursor.execute("""
+                SELECT id FROM fleet 
+                WHERE LOWER(fleet_name) = LOWER(%s)
+            """, (vehicle_data['Ownership '],))
+            
+            fleet_result = cursor.fetchone()
+            if not fleet_result:
+                logging.error(f"Fleet not found for ownership: {vehicle_data['Ownership ']}")
                 continue
-        
-        conn.commit()
+            fleet_id = fleet_result[0]
+            
+            cursor.execute("""
+                SELECT id FROM region 
+                WHERE LOWER(region_name) = LOWER(%s)
+            """, (vehicle_data['Country'],))
+            
+            region_result = cursor.fetchone()
+            if not region_result:
+                logging.error(f"Region not found for country: {vehicle_data['Country']}")
+                continue
+            region_id = region_result[0]
+            
+            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
+            vehicle_exists = cursor.fetchone()
+
+            end_of_contract = convert_date_format(vehicle_data['End of Contract'])
+            start_date = convert_date_format(vehicle_data['Start Date'])
+            
+            if vehicle_exists:
+                cursor.execute("""
+                    UPDATE vehicle 
+                    SET fleet_id = %s,
+                        region_id = %s,
+                        vehicle_model_id = %s,
+                        licence_plate = %s,
+                        end_of_contract_date = %s,
+                        start_date = %s
+                    WHERE vin = %s
+                """, (
+                    fleet_id,
+                    region_id,
+                    vehicle_model_id,
+                    vehicle_data['Licence plate'],
+                    end_of_contract,
+                    start_date,
+                    vin
+                ))
+                logging.info(f"Updated vehicle with VIN: {vin}")
+            else:
+                vehicle_id = str(uuid.uuid4())
+                cursor.execute("""
+                    INSERT INTO vehicle (
+                        id, vin, fleet_id, region_id, vehicle_model_id,
+                        licence_plate, end_of_contract_date, start_date
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
+                    vehicle_data['Licence plate'],
+                    end_of_contract,
+                    start_date
+                ))
+                logging.info(f"Inserted new vehicle with VIN: {vin}")
+            
+            await asyncio.sleep(RATE_LIMIT_DELAY)
+            
+        except Exception as e:
+            logging.error(f"Error processing VIN {vin}: {str(e)}")
+            continue
+    
+    con.commit()
     
     return []
 
