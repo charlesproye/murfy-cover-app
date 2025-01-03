@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import Engine, create_engine, text, inspect
 from sqlalchemy import Connection as Con
 from rich.progress import Progress
+from contextlib import contextmanager
 
 from core.pandas_utils import *
 from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR
@@ -17,6 +18,15 @@ def get_sqlalchemy_engine() -> Engine:
     engine = create_engine(db_uri)
 
     return engine
+
+@contextmanager
+def get_connection():
+    """Context manager pour obtenir une connexion à la base de données"""
+    conn = engine.raw_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 def upsert_table_with_df(df: DF, table: str, key_col: str, logger: Logger=logger):
     logger.info(f"Upserting table {table} with {len(df)} rows")
