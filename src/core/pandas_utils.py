@@ -8,6 +8,7 @@ from pandas import DataFrame as DF
 from pandas import Series
 from pandas import Index as Idx
 from pandas import MultiIndex as MultiIdx
+from pandas import Timedelta as TD
 import numpy as np
 
 
