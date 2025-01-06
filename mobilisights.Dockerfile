@@ -15,7 +15,7 @@ WORKDIR /app
 # Installer les dépendances
 RUN conda update -n base -c defaults conda
 RUN conda env update --prune -n base -f ingestion.conda-env.yaml
-RUN chmod +x ./start_tesla.sh
+RUN chmod +x ./start_mobilisights.sh
 
 # Définir le shell par défaut pour utiliser conda
 SHELL ["/bin/bash", "-c"]

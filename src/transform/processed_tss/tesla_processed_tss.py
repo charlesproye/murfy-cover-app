@@ -6,7 +6,7 @@ from core.logging_utils import set_level_of_loggers_with_prefix
 from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
-from transform.processed_tss.config import *
+from core.config import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from core.time_series_processing import *
@@ -60,5 +60,4 @@ def process_ts(raw_ts: DF, progress: Progress, task) -> DF:
     )
 
 if __name__ == "__main__":
-    set_level_of_loggers_with_prefix("DEBUG", "transform.processed_tss.tesla")
     single_dataframe_script_main(get_processed_tss, force_update=True)

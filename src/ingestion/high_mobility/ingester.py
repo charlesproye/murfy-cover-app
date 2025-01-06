@@ -112,12 +112,8 @@ class HMIngester:
         )
         self.__bucket = S3_BUCKET
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
-        self.__compresser = HMCompresser(
-            self.__s3,
-            self.__bucket,
-            threaded=self.compress_threaded,
-            max_workers=self.max_workers,
-        )
+        self.__compresser = HMCompresser(threaded=compress_threaded)
+
         self.__job_queue = Queue()
         self.refresh_interval = refresh_interval or self.refresh_interval
         self.compress_interval = compress_interval or self.compress_interval
@@ -257,7 +253,6 @@ class HMIngester:
             f"Starting processing for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
         )
         error, info = self.__api.get_vehicle_info(vehicle.vin)
-
         def log_error(info):
             self.__ingester_logger.error(
                 f"Error getting info for VIN {vehicle.vin} (brand {vehicle.brand}) (request {info['request_id']}): {info['errors'][0]['title']} - {info['errors'][0]['detail']}"

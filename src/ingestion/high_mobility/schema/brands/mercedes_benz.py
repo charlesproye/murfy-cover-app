@@ -36,8 +36,8 @@ class MercedesBenzCharging(msgspec.Struct):
     time_to_complete_charge: Optional[HMApiValue[float]] = None
     
 class MercedesBenzUsage(msgspec.Struct):
-    electric_consumption_rate_since_reset: Optional[HMApiValue[float]] = None
-    electric_consumption_rate_since_start: Optional[HMApiValue[float]] = None
+    electric_consumption_rate_since_reset: Optional[HMApiValue[DataWithUnit[float]]] = None
+    electric_consumption_rate_since_start: Optional[HMApiValue[DataWithUnit[float]]] = None
     electric_distance_last_trip: Optional[HMApiValue[DataWithUnit[float]]] = None
     electric_distance_since_reset: Optional[HMApiValue[DataWithUnit[int]]] = None
     electric_duration_last_trip: Optional[HMApiValue[DataWithUnit[int]]] = None
@@ -47,6 +47,7 @@ class MercedesBenzUsage(msgspec.Struct):
 class MercedesBenzInfo(HMApiResponse):
     diagnostics: Optional[MercedesBenzDiagnostics] = None
     charging: Optional[MercedesBenzCharging] = None
+    usage: Optional[MercedesBenzUsage] = None
 
 
 class MergedMercedesBenzDiagnostics(msgspec.Struct):
@@ -219,8 +220,8 @@ class MergedMercedesBenzCharging(msgspec.Struct):
                 )
 
 class MergedMercedesBenzUsage(msgspec.Struct):
-    electric_consumption_rate_since_reset: list[HMApiValue[float]] = []
-    electric_consumption_rate_since_start: list[HMApiValue[float]] = []
+    electric_consumption_rate_since_reset: list[HMApiValue[DataWithUnit[float]]] = []
+    electric_consumption_rate_since_start: list[HMApiValue[DataWithUnit[float]]] = []
     electric_distance_last_trip: list[HMApiValue[DataWithUnit[float]]] = []
     electric_distance_since_reset: list[HMApiValue[DataWithUnit[int]]] = []
     electric_duration_last_trip: list[HMApiValue[DataWithUnit[int]]] = []
@@ -255,12 +256,12 @@ class MergedMercedesBenzUsage(msgspec.Struct):
     def merge(self, other: Optional[MercedesBenzUsage]):
         if other is not None:
             if is_new_value(self.electric_consumption_rate_since_reset, other.electric_consumption_rate_since_reset):
-                self.electric_consumption_rate_since_reset.append(cast(HMApiValue[float], other.electric_consumption_rate_since_reset))
-            if is_new_value(
-                self.electric_consumption_rate_since_start, other.electric_consumption_rate_since_start
-            ):
+                self.electric_consumption_rate_since_reset.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.electric_consumption_rate_since_reset)
+                )
+            if is_new_value(self.electric_consumption_rate_since_start, other.electric_consumption_rate_since_start):
                 self.electric_consumption_rate_since_start.append(
-                    cast(HMApiValue[float], other.electric_consumption_rate_since_start)
+                    cast(HMApiValue[DataWithUnit[float]], other.electric_consumption_rate_since_start)
                 )
             if is_new_value(self.electric_distance_last_trip, other.electric_distance_last_trip):
                 self.electric_distance_last_trip.append(
@@ -282,19 +283,21 @@ class MergedMercedesBenzUsage(msgspec.Struct):
 class MergedMercedesBenzInfo(msgspec.Struct):
     diagnostics: MergedMercedesBenzDiagnostics
     charging: MergedMercedesBenzCharging
+    usage: MergedMercedesBenzUsage
 
     @classmethod
     def new(cls) -> Self:
-        return cls(MergedMercedesBenzDiagnostics(), MergedMercedesBenzCharging())
+        return cls(MergedMercedesBenzDiagnostics(), MergedMercedesBenzCharging(), MergedMercedesBenzUsage())
 
     @classmethod
     def from_initial(cls, initial: MercedesBenzInfo) -> Self:
         return cls(
             MergedMercedesBenzDiagnostics.from_initial(initial.diagnostics),
             MergedMercedesBenzCharging.from_initial(initial.charging),
+            MergedMercedesBenzUsage.from_initial(initial.usage),
         )
 
     def merge(self, other: MercedesBenzInfo):
         self.diagnostics.merge(other.diagnostics)
         self.charging.merge(other.charging)
-
+        self.usage.merge(other.usage)

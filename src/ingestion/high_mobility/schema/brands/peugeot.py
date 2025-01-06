@@ -71,7 +71,7 @@ class MergedPeugeotCharging(msgspec.Struct):
     battery_level: list[HMApiValue[float]] = []
     plugged_in: list[HMApiValue[str]] = []
     battery_capacity: list[HMApiValue[DataWithUnit[int]]] = []
-    timers: list[list[Timer]] = []
+    timers: list[Timer] = []  # Modifié ici
 
     @classmethod
     def from_initial(cls, initial: Optional[PeugeotCharging]) -> Self:
@@ -83,7 +83,8 @@ class MergedPeugeotCharging(msgspec.Struct):
             ret.battery_level = [initial.battery_level] if initial.battery_level is not None else []
             ret.plugged_in = [initial.plugged_in] if initial.plugged_in is not None else []
             ret.battery_capacity = [initial.battery_capacity] if initial.battery_capacity is not None else []
-            ret.timers = [initial.timers] if initial.timers is not None else []
+            if initial.timers:
+                ret.timers.extend(initial.timers)  # Modifié ici
         return ret
 
     def merge(self, other: Optional[PeugeotCharging]):
@@ -100,8 +101,13 @@ class MergedPeugeotCharging(msgspec.Struct):
                 self.plugged_in.append(cast(HMApiValue[str], other.plugged_in))
             if is_new_value(self.battery_capacity, other.battery_capacity):
                 self.battery_capacity.append(cast(HMApiValue[DataWithUnit[int]], other.battery_capacity))
-            if is_new_value(self.timers, other.timers):
-                self.timers.append(cast(list[Timer], other.timers))
+            if other.timers:  # Modifié ici
+                for timer in other.timers:
+                    if not any(
+                        existing_timer.timestamp == timer.timestamp 
+                        for existing_timer in self.timers
+                    ):
+                        self.timers.append(timer)
 
 
 @register_merged

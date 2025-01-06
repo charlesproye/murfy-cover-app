@@ -11,6 +11,7 @@ from typing import Callable, Optional
 
 import boto3
 import dotenv
+import asyncio
 import msgspec
 import schedule
 from botocore.client import ClientError
@@ -366,9 +367,9 @@ class BMWIngester:
                 log_error(info)
                 return
 
-    def __compress(self):
+    async def __compress(self):
         self.__ingester_logger.info("Starting compression job")
-        self.__compresser.run()
+        await self.__compresser.run()
 
     def __process_job_queue(self):
         self.__ingester_logger.info("Starting processing job queue")
@@ -383,15 +384,15 @@ class BMWIngester:
 
     def run(self):
         # Vérification de COMPRESS_ONLY déplacée ici
-        if os.getenv("COMPRESS_ONLY") and os.getenv("COMPRESS_ONLY") == "1":
-            self.__compress()
+        if os.getenv("COMPRESS_ONLY_BMW") and os.getenv("COMPRESS_ONLY_BMW") == "1":
+            asyncio.run(self.__compress())
         else:
             self.__update_vehicles_initial()
             self.__worker_thread = threading.Thread(target=self.__process_job_queue)
             self.__scheduler_logger.info("Starting initial scheduler run")
             self.__fetch_scheduler.run_all()
             self.__compress_scheduler.every(self.compress_interval).hours.do(
-                self.__job_queue.put, self.__compress
+                lambda: asyncio.run(self.__compress()) 
             ).tag("compress")
             self.__scheduler_logger.info(
                 f"Schedule S3 compressing at {self.compress_interval}"

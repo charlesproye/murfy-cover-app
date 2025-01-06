@@ -8,7 +8,8 @@ from data_fetcher import fetch_all_vehicle_ids, job
 from data_utils import setup_logging
 from datetime import datetime, timedelta
 import json
-from s3_handler import compress_data, save_data_to_s3, consolidate_all_tesla_files
+from s3_handler import compress_data
+from fleet_manager import VehiclePool
 
 # Global variables to store account information
 accounts_info = []
@@ -52,7 +53,9 @@ async def main():
 async def schedule_compression(compression_queue):
     while True:
         now = datetime.now()
-        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        midnight = now.replace(hour=23, minute=0, second=0, microsecond=0) 
+        if now > midnight:
+            midnight += timedelta(days=1)
         seconds_until_midnight = (midnight - now).total_seconds()
 
         try:
@@ -78,7 +81,7 @@ async def schedule_compression(compression_queue):
                 # Don't set compression_event here, we'll do it at 6 AM
                 logging.info("Scheduled compression process completed")
             
-            # Wait until 6 AM
+            # Wait until 5 AM
             now = datetime.now()
             five_am = now.replace(hour=5, minute=0, second=0, microsecond=0)
             if now > five_am:
@@ -99,53 +102,64 @@ async def perform_compression():
     finally:
         logging.info("Compression task finished")
 
+async def process_vehicle_batch(vehicle_pool, access_token_key, refresh_token_key, auth_code=None):
+    """Process a batch of vehicles"""
+    while True:
+        await compression_event.wait()
+        
+        current_time = datetime.now()
+        if current_time.hour < 5:
+            await asyncio.sleep(60)
+            continue
+
+        batch = vehicle_pool.get_next_batch(current_time)
+        if not batch:
+            await asyncio.sleep(1)
+            continue
+
+        tasks = []
+        for vehicle_id in batch:  # batch contient maintenant directement les IDs
+            if not compression_event.is_set():
+                break
+            task = asyncio.create_task(
+                job(vehicle_id, access_token_key, refresh_token_key, vehicle_pool, auth_code)
+            )
+            tasks.append(task)
+
+        if tasks:
+            await asyncio.gather(*tasks)
+        
+        await asyncio.sleep(1)
+
 async def process_vehicle(account):
+    """Process vehicles for an account"""
     access_token_key = account['access_token_key']
-    refresh_token_key = account['refresh_token_key']
+    refresh_token_key = account.get('refresh_token_key', None)
     professional_account = account.get('professional_account', False)
     excel_url = account.get('excel_url', None)
     vehicle_id = account.get('vehicle_id')
-
+    auth_code = account.get('code', None)
+    
     if professional_account:
-        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key, excel_url)
+        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key, excel_url, auth_code)
     else:
         vehicle_ids = [vehicle_id]
 
-    logging.info(f"Processing vehicles: {vehicle_ids}")
+    # Créer le pool de véhicules avec des véhicules uniques
+    vehicle_pool = VehiclePool(size=100)
+    unique_vehicles = list(dict.fromkeys(vehicle_ids))  # Dédupliquer les IDs
+    for vid in unique_vehicles:
+        vehicle_pool.add_vehicle({'id': vid})
 
-    while True:
-        await compression_event.wait()  # Wait if compression is in progress
+    num_workers = min(10, len(unique_vehicles))  # Ajuster le nombre de workers
+    workers = [
+        process_vehicle_batch(vehicle_pool, access_token_key, refresh_token_key, auth_code)
+        for _ in range(num_workers)
+    ]
 
-        now = datetime.now()
-        if now.hour < 5:
-            logging.info("It's between midnight and 5 AM, pausing vehicle processing")
-            await asyncio.sleep((now.replace(hour=5, minute=0, second=0, microsecond=0) - now).total_seconds())
-            continue
-        
-        logging.info("Starting vehicle processing cycle")
-        for vid in vehicle_ids:
-            if not compression_event.is_set():
-                logging.info("Compression started, pausing vehicle processing")
-                break
-            
-            logging.info(f"Processing vehicle {vid}")
-            try:
-                await job(vid, access_token_key, refresh_token_key)
-            except Exception as e:
-                logging.error(f"Error processing vehicle {vid}: {str(e)}")
-            
-            if not compression_event.is_set():
-                logging.info("Compression started during vehicle processing, breaking loop")
-                break
-        
-        if compression_event.is_set():
-            logging.info("Vehicle processing cycle completed, waiting for next cycle")
-            await asyncio.sleep(240)  # Wait for 4 minutes before next cycle
-        else:
-            logging.info("Compression in progress, waiting for it to finish")
-            await compression_event.wait()
-            logging.info("Compression finished, resuming vehicle processing")
+    await asyncio.gather(*workers)
 
 if __name__ == "__main__":
     asyncio.run(main())
 
+    

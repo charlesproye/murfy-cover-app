@@ -33,7 +33,7 @@ class VolvoUsage(msgspec.Struct):
     electric_consumption_average: Optional[HMApiValue[DataWithUnit[float]]] = None
 
 
-@register_brand(rate_limit=36)  # Ajustez le rate_limit si nécessaire pour Volvo
+@register_brand(rate_limit=36)  
 class VolvoInfo(HMApiResponse):
     diagnostics: Optional[VolvoDiagnostics] = None
     charging: Optional[VolvoCharging] = None
