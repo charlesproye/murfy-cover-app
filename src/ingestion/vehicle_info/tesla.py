@@ -10,6 +10,7 @@ import pandas as pd
 import time
 import re
 
+from core.sql_utils import get_connection
 from fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
 
@@ -126,7 +127,7 @@ async def get_account_vins_mapping(session: aiohttp.ClientSession) -> Dict[str, 
     
     if os.path.exists(cache_file):
         file_age = time.time() - os.path.getmtime(cache_file)
-        if file_age < 864000:  # J'ai mis 30 jours
+        if file_age < 1:  # J'ai mis 30 jours
             try:
                 with open(cache_file, 'r') as f:
                     account_vins = json.load(f)
@@ -286,192 +287,193 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
         logging.error(f"Could not get access token for {account_name}")
         return []
     
-    account_df = df[df['VIN'].isin(account_vins)]
-    vins = account_df['VIN'].unique().tolist()
+    account_df = df[df['vin'].isin(account_vins)]
+    vins = account_df['vin'].unique().tolist()
     logging.info(f"Processing {len(vins)} vehicles from fleet info for {account_name}")
     
-    cursor = con.cursor()
+    with get_connection() as con:
+        cursor = con.cursor()
     
-    for vin in vins:
-        try:
-            vehicle_data = df[df['VIN'] == vin].iloc[0]
-            options = await get_vehicle_options(session, access_token, vin)
-            
-            cursor.execute("""
-                SELECT id FROM vehicle_model 
-                WHERE LOWER(model_name) = LOWER(%s) 
-                AND LOWER(type) = LOWER(%s)
-                AND (version IS NULL OR version = '')
-            """, (options['model_name'], options['type']))
-            
-            empty_version_result = cursor.fetchone()
-            
-            if empty_version_result:
-                vehicle_model_id = empty_version_result[0]
-                cursor.execute("""
-                    UPDATE vehicle_model 
-                    SET version = %s
-                    WHERE id = %s
-                """, (options['version'], vehicle_model_id))
-                logging.info(f"Updated vehicle_model {vehicle_model_id} with version {options['version']}")
-            else:
+        for vin in vins:
+            try:
+                vehicle_data = df[df['vin'] == vin].iloc[0]
+                options = await get_vehicle_options(session, access_token, vin)
+                
                 cursor.execute("""
                     SELECT id FROM vehicle_model 
                     WHERE LOWER(model_name) = LOWER(%s) 
                     AND LOWER(type) = LOWER(%s)
-                    AND version = %s
-                """, (options['model_name'], options['type'], options['version']))
+                    AND (version IS NULL OR version = '')
+                """, (options['model_name'], options['type']))
                 
-                result = cursor.fetchone()
-                if result:
-                    vehicle_model_id = result[0]
-                else:
-                    vehicle_model_id = str(uuid.uuid4())
+                empty_version_result = cursor.fetchone()
+                
+                if empty_version_result:
+                    vehicle_model_id = empty_version_result[0]
                     cursor.execute("""
-                        INSERT INTO vehicle_model (id, model_name, type, version, oem_id)
-                        VALUES (%s, %s, %s, %s, %s)
-                        RETURNING id
-                    """, (
-                        vehicle_model_id,
-                        options['model_name'],
-                        options['type'],
-                        options['version'],
-                        '98809ac9-acb5-4cca-b67a-c1f6c489035a'
-                    ))
-                    vehicle_model_id = cursor.fetchone()[0]
-                    logging.info(f"Created new vehicle_model for {options['model_name']} {options['type']} version {options['version']}")
-            
-            cursor.execute("""
-                SELECT id FROM fleet 
-                WHERE LOWER(fleet_name) = LOWER(%s)
-            """, (vehicle_data['Ownership '],))
-            
-            fleet_result = cursor.fetchone()
-            if not fleet_result:
-                logging.error(f"Fleet not found for ownership: {vehicle_data['Ownership ']}")
-                continue
-            fleet_id = fleet_result[0]
-            
-            cursor.execute("""
-                SELECT id FROM region 
-                WHERE LOWER(region_name) = LOWER(%s)
-            """, (vehicle_data['Country'],))
-            
-            region_result = cursor.fetchone()
-            if not region_result:
-                logging.error(f"Region not found for country: {vehicle_data['Country']}")
-                continue
-            region_id = region_result[0]
-            
-            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
-            vehicle_exists = cursor.fetchone()
+                        UPDATE vehicle_model 
+                        SET version = %s
+                        WHERE id = %s
+                    """, (options['version'], vehicle_model_id))
+                    logging.info(f"Updated vehicle_model {vehicle_model_id} with version {options['version']}")
+                else:
+                    cursor.execute("""
+                        SELECT id FROM vehicle_model 
+                        WHERE LOWER(model_name) = LOWER(%s) 
+                        AND LOWER(type) = LOWER(%s)
+                        AND version = %s
+                    """, (options['model_name'], options['type'], options['version']))
+                    
+                    result = cursor.fetchone()
+                    if result:
+                        vehicle_model_id = result[0]
+                    else:
+                        vehicle_model_id = str(uuid.uuid4())
+                        cursor.execute("""
+                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id)
+                            VALUES (%s, %s, %s, %s, %s)
+                            RETURNING id
+                        """, (
+                            vehicle_model_id,
+                            options['model_name'],
+                            options['type'],
+                            options['version'],
+                            '98809ac9-acb5-4cca-b67a-c1f6c489035a'
+                        ))
+                        vehicle_model_id = cursor.fetchone()[0]
+                        logging.info(f"Created new vehicle_model for {options['model_name']} {options['type']} version {options['version']}")
+                
+                cursor.execute("""
+                    SELECT id FROM fleet 
+                    WHERE LOWER(fleet_name) = LOWER(%s)
+                """, (vehicle_data['owner'],))
+                
+                fleet_result = cursor.fetchone()
+                if not fleet_result:
+                    logging.error(f"Fleet not found for ownership: {vehicle_data['owner']}")
+                    continue
+                fleet_id = fleet_result[0]
+                
+                cursor.execute("""
+                    SELECT id FROM region 
+                    WHERE LOWER(region_name) = LOWER(%s)
+                """, (vehicle_data['country'],))
+                
+                region_result = cursor.fetchone()
+                if not region_result:
+                    logging.error(f"Region not found for country: {vehicle_data['country']}")
+                    continue
+                region_id = region_result[0]
+                
+                cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
+                vehicle_exists = cursor.fetchone()
 
-            end_of_contract = convert_date_format(vehicle_data['End of Contract'])
-            start_date = convert_date_format(vehicle_data['Start Date'])
-            
-            if vehicle_exists:
-                cursor.execute("""
-                    UPDATE vehicle 
-                    SET fleet_id = %s,
-                        region_id = %s,
-                        vehicle_model_id = %s,
-                        licence_plate = %s,
-                        end_of_contract_date = %s,
-                        start_date = %s
-                    WHERE vin = %s
-                """, (
-                    fleet_id,
-                    region_id,
-                    vehicle_model_id,
-                    vehicle_data['Licence plate'],
-                    end_of_contract,
-                    start_date,
-                    vin
-                ))
-                logging.info(f"Updated vehicle with VIN: {vin}")
-            else:
-                vehicle_id = str(uuid.uuid4())
-                cursor.execute("""
-                    INSERT INTO vehicle (
-                        id, vin, fleet_id, region_id, vehicle_model_id,
-                        licence_plate, end_of_contract_date, start_date
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
-                    vehicle_data['Licence plate'],
-                    end_of_contract,
-                    start_date
-                ))
-                logging.info(f"Inserted new vehicle with VIN: {vin}")
-            
-            await asyncio.sleep(RATE_LIMIT_DELAY)
-            
-        except Exception as e:
-            logging.error(f"Error processing VIN {vin}: {str(e)}")
-            continue
+                end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
+                start_date = convert_date_format(vehicle_data['start_date'])
+                
+                if vehicle_exists:
+                    cursor.execute("""
+                        UPDATE vehicle 
+                        SET fleet_id = %s,
+                            region_id = %s,
+                            vehicle_model_id = %s,
+                            licence_plate = %s,
+                            end_of_contract_date = %s,
+                            start_date = %s
+                        WHERE vin = %s
+                    """, (
+                        fleet_id,
+                        region_id,
+                        vehicle_model_id,
+                        vehicle_data['licence_plate'],
+                        end_of_contract,
+                        start_date,
+                        vin
+                    ))
+                    logging.info(f"Updated vehicle with VIN: {vin}")
+                else:
+                    vehicle_id = str(uuid.uuid4())
+                    cursor.execute("""
+                        INSERT INTO vehicle (
+                            id, vin, fleet_id, region_id, vehicle_model_id,
+                            licence_plate, end_of_contract_date, start_date
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
+                        vehicle_data['licence_plate'],
+                        end_of_contract,
+                        start_date
+                    ))
+                    logging.info(f"Inserted new vehicle with VIN: {vin}")
+                
+                await asyncio.sleep(RATE_LIMIT_DELAY)
+                
+            except Exception as e:
+                logging.error(f"Error processing VIN {vin}: {str(e)}")
+                continue
     
     con.commit()
     
     return []
 
-async def read_fleet_info(ownership_filter: str = None) -> pd.DataFrame:
-    """
-    Lit le fichier fleet_info.csv et retourne un DataFrame
+# async def read_fleet_info(ownership_filter: str = None) -> pd.DataFrame:
+#     """
+#     Lit le fichier fleet_info.csv et retourne un DataFrame
     
-    Args:
-        ownership_filter (str, optional): Filtre pour ne garder qu'un certain type d'ownership
-    """
-    try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(current_dir, '..', 'data', 'fleet_info.csv')
+#     Args:
+#         ownership_filter (str, optional): Filtre pour ne garder qu'un certain type d'ownership
+#     """
+#     try:
+#         current_dir = os.path.dirname(os.path.abspath(__file__))
+#         file_path = os.path.join(current_dir, '..', 'data', 'fleet_info.csv')
         
-        df = pd.read_csv(file_path)
+#         df = pd.read_csv(file_path)
         
-        df.columns = [col if col != " " else "brand" for col in df.columns]
-        df = df[df['brand'].str.lower() == 'tesla']
-        df['Country'] = df['Country'].replace('NL', 'netherlands')
+#         df.columns = [col if col != " " else "brand" for col in df.columns]
+#         df = df[df['brand'].str.lower() == 'tesla']
+#         df['Country'] = df['Country'].replace('NL', 'netherlands')
         
-        if ownership_filter:
-            df['Ownership_lower'] = df['Ownership '].str.lower()
-            df = df[df['Ownership_lower'] == ownership_filter.lower()]
-            df = df.drop('Ownership_lower', axis=1) 
+#         if ownership_filter:
+#             df['Ownership_lower'] = df['Ownership '].str.lower()
+#             df = df[df['Ownership_lower'] == ownership_filter.lower()]
+#             df = df.drop('Ownership_lower', axis=1) 
             
-            logging.info(f"Filtré pour Ownership = {ownership_filter}")        
-        return df
+#             logging.info(f"Filtré pour Ownership = {ownership_filter}")        
+#         return df
         
-    except FileNotFoundError:
-        logging.error(f"Le fichier fleet_info.csv n'a pas été trouvé dans {file_path}")
-        raise
-    except Exception as e:
-        logging.error(f"Erreur lors de la lecture du fichier CSV: {str(e)}")
-        raise
+#     except FileNotFoundError:
+#         logging.error(f"Le fichier fleet_info.csv n'a pas été trouvé dans {file_path}")
+#         raise
+#     except Exception as e:
+#         logging.error(f"Erreur lors de la lecture du fichier CSV: {str(e)}")
+#         raise
 
-async def test_vin_matching():
-    """Test function to compare VINs between fleet_info and account_vins_mapping"""
-    try:
-        df = await read_fleet_info()
-        excel_vins = set(df['VIN'].unique())
-        logging.info(f"Nombre de VINs uniques dans fleet_info: {len(excel_vins)}")
+# async def test_vin_matching():
+#     """Test function to compare VINs between fleet_info and account_vins_mapping"""
+#     try:
+#         df = await read_fleet_info()
+#         excel_vins = set(df['VIN'].unique())
+#         logging.info(f"Nombre de VINs uniques dans fleet_info: {len(excel_vins)}")
         
-        async with aiohttp.ClientSession() as session:
-            account_vins_mapping = await get_account_vins_mapping(session)
-            all_mapped_vins = set()
-            for account_vins in account_vins_mapping.values():
-                all_mapped_vins.update(account_vins)
+#         async with aiohttp.ClientSession() as session:
+#             account_vins_mapping = await get_account_vins_mapping(session)
+#             all_mapped_vins = set()
+#             for account_vins in account_vins_mapping.values():
+#                 all_mapped_vins.update(account_vins)
             
-            logging.info(f"Nombre de VINs dans account_vins_mapping: {len(all_mapped_vins)}")
+#             logging.info(f"Nombre de VINs dans account_vins_mapping: {len(all_mapped_vins)}")
             
-            matching_vins = excel_vins.intersection(all_mapped_vins)
-            logging.info(f"Nombre de VINs qui matchent: {len(matching_vins)}")
+#             matching_vins = excel_vins.intersection(all_mapped_vins)
+#             logging.info(f"Nombre de VINs qui matchent: {len(matching_vins)}")
             
-            missing_vins = excel_vins - all_mapped_vins
-            logging.info(f"VINs dans fleet_info mais pas dans mapping: {len(missing_vins)}")
+#             missing_vins = excel_vins - all_mapped_vins
+#             logging.info(f"VINs dans fleet_info mais pas dans mapping: {len(missing_vins)}")
             
-            extra_vins = all_mapped_vins - excel_vins
-            logging.info(f"VINs dans mapping mais pas dans fleet_info: {len(extra_vins)}")
+#             extra_vins = all_mapped_vins - excel_vins
+#             logging.info(f"VINs dans mapping mais pas dans fleet_info: {len(extra_vins)}")
             
-    except Exception as e:
-        logging.error(f"Erreur dans test_vin_matching: {str(e)}")
+#     except Exception as e:
+#         logging.error(f"Erreur dans test_vin_matching: {str(e)}")
 
 async def main(df: pd.DataFrame):
     try:

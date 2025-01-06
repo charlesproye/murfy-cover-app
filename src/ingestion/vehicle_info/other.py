@@ -2,9 +2,11 @@ import asyncio
 import logging
 import pandas as pd
 import uuid
-from core.sql_utils import get_connection
+
 import os
 import re
+
+from core.sql_utils import get_connection
 from fleet_info import read_fleet_info as fleet_info
 
 
