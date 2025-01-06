@@ -90,6 +90,7 @@ def left_merge_rdb_table(
         right_on: str|list[str],
         src_dest_cols: list|dict|None=None,
         con: Con=con,
+        logger: Logger=logger,
     ) -> DF:
     logger.info(f"Left merging {lhs.shape[0]} rows with {rhs} on {left_on} and {right_on}")
     rhs = pd.read_sql_table(rhs, con)
