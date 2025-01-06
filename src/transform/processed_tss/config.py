@@ -139,7 +139,6 @@ IN_CHARGE_CHARGING_STATUS_VALS = [
     'chargingactive',
     'slow_charging',
     'fast_charging',
-    'chargingerror',
     'initialization',
     "in-progress",
 ]
@@ -174,3 +173,16 @@ CHARGING_STATUS_VAL_TO_MASK = {
     "Disconnected": False,
 }
 
+CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
+    "bmw",
+    "tesla",
+    "mercedes-benz",
+    "ford",
+    "volvo-cars",
+]
+
+CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
+    "kia",
+    "renault",
+    "bmw",
+]
