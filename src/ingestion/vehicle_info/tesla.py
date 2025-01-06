@@ -4,12 +4,14 @@ import json
 import os
 import logging
 from typing import List, Dict
-from core.sql_utils import get_connection
+from core.sql_utils import con
 import uuid
 import pandas as pd
 import time
 import re
 
+from core.sql_utils import get_connection
+from fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -125,7 +127,7 @@ async def get_account_vins_mapping(session: aiohttp.ClientSession) -> Dict[str, 
     
     if os.path.exists(cache_file):
         file_age = time.time() - os.path.getmtime(cache_file)
-        if file_age < 864000:  # J'ai mis 30 jours
+        if file_age < 1:  # J'ai mis 30 jours
             try:
                 with open(cache_file, 'r') as f:
                     account_vins = json.load(f)
@@ -285,16 +287,16 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
         logging.error(f"Could not get access token for {account_name}")
         return []
     
-    account_df = df[df['VIN'].isin(account_vins)]
-    vins = account_df['VIN'].unique().tolist()
+    account_df = df[df['vin'].isin(account_vins)]
+    vins = account_df['vin'].unique().tolist()
     logging.info(f"Processing {len(vins)} vehicles from fleet info for {account_name}")
     
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
+    with get_connection() as con:
+        cursor = con.cursor()
+    
         for vin in vins:
             try:
-                vehicle_data = df[df['VIN'] == vin].iloc[0]
+                vehicle_data = df[df['vin'] == vin].iloc[0]
                 options = await get_vehicle_options(session, access_token, vin)
                 
                 cursor.execute("""
@@ -344,30 +346,30 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 cursor.execute("""
                     SELECT id FROM fleet 
                     WHERE LOWER(fleet_name) = LOWER(%s)
-                """, (vehicle_data['Ownership '],))
+                """, (vehicle_data['owner'],))
                 
                 fleet_result = cursor.fetchone()
                 if not fleet_result:
-                    logging.error(f"Fleet not found for ownership: {vehicle_data['Ownership ']}")
+                    logging.error(f"Fleet not found for ownership: {vehicle_data['owner']}")
                     continue
                 fleet_id = fleet_result[0]
                 
                 cursor.execute("""
                     SELECT id FROM region 
                     WHERE LOWER(region_name) = LOWER(%s)
-                """, (vehicle_data['Country'],))
+                """, (vehicle_data['country'],))
                 
                 region_result = cursor.fetchone()
                 if not region_result:
-                    logging.error(f"Region not found for country: {vehicle_data['Country']}")
+                    logging.error(f"Region not found for country: {vehicle_data['country']}")
                     continue
                 region_id = region_result[0]
                 
                 cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
                 vehicle_exists = cursor.fetchone()
 
-                end_of_contract = convert_date_format(vehicle_data['End of Contract'])
-                start_date = convert_date_format(vehicle_data['Start Date'])
+                end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
+                start_date = convert_date_format(vehicle_data['start_date'])
                 
                 if vehicle_exists:
                     cursor.execute("""
@@ -383,7 +385,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         fleet_id,
                         region_id,
                         vehicle_model_id,
-                        vehicle_data['Licence plate'],
+                        vehicle_data['licence_plate'],
                         end_of_contract,
                         start_date,
                         vin
@@ -398,7 +400,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
-                        vehicle_data['Licence plate'],
+                        vehicle_data['licence_plate'],
                         end_of_contract,
                         start_date
                     ))
@@ -409,75 +411,75 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
             except Exception as e:
                 logging.error(f"Error processing VIN {vin}: {str(e)}")
                 continue
-        
-        conn.commit()
+    
+    con.commit()
     
     return []
 
-async def read_fleet_info(ownership_filter: str = None) -> pd.DataFrame:
-    """
-    Lit le fichier fleet_info.csv et retourne un DataFrame
+# async def read_fleet_info(ownership_filter: str = None) -> pd.DataFrame:
+#     """
+#     Lit le fichier fleet_info.csv et retourne un DataFrame
     
-    Args:
-        ownership_filter (str, optional): Filtre pour ne garder qu'un certain type d'ownership
-    """
-    try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(current_dir, '..', 'data', 'fleet_info.csv')
+#     Args:
+#         ownership_filter (str, optional): Filtre pour ne garder qu'un certain type d'ownership
+#     """
+#     try:
+#         current_dir = os.path.dirname(os.path.abspath(__file__))
+#         file_path = os.path.join(current_dir, '..', 'data', 'fleet_info.csv')
         
-        df = pd.read_csv(file_path)
+#         df = pd.read_csv(file_path)
         
-        df.columns = [col if col != " " else "brand" for col in df.columns]
-        df = df[df['brand'].str.lower() == 'tesla']
-        df['Country'] = df['Country'].replace('NL', 'netherlands')
+#         df.columns = [col if col != " " else "brand" for col in df.columns]
+#         df = df[df['brand'].str.lower() == 'tesla']
+#         df['Country'] = df['Country'].replace('NL', 'netherlands')
         
-        if ownership_filter:
-            df['Ownership_lower'] = df['Ownership '].str.lower()
-            df = df[df['Ownership_lower'] == ownership_filter.lower()]
-            df = df.drop('Ownership_lower', axis=1) 
+#         if ownership_filter:
+#             df['Ownership_lower'] = df['Ownership '].str.lower()
+#             df = df[df['Ownership_lower'] == ownership_filter.lower()]
+#             df = df.drop('Ownership_lower', axis=1) 
             
-            logging.info(f"Filtré pour Ownership = {ownership_filter}")        
-        return df
+#             logging.info(f"Filtré pour Ownership = {ownership_filter}")        
+#         return df
         
-    except FileNotFoundError:
-        logging.error(f"Le fichier fleet_info.csv n'a pas été trouvé dans {file_path}")
-        raise
-    except Exception as e:
-        logging.error(f"Erreur lors de la lecture du fichier CSV: {str(e)}")
-        raise
+#     except FileNotFoundError:
+#         logging.error(f"Le fichier fleet_info.csv n'a pas été trouvé dans {file_path}")
+#         raise
+#     except Exception as e:
+#         logging.error(f"Erreur lors de la lecture du fichier CSV: {str(e)}")
+#         raise
 
-async def test_vin_matching():
-    """Test function to compare VINs between fleet_info and account_vins_mapping"""
-    try:
-        df = await read_fleet_info()
-        excel_vins = set(df['VIN'].unique())
-        logging.info(f"Nombre de VINs uniques dans fleet_info: {len(excel_vins)}")
+# async def test_vin_matching():
+#     """Test function to compare VINs between fleet_info and account_vins_mapping"""
+#     try:
+#         df = await read_fleet_info()
+#         excel_vins = set(df['VIN'].unique())
+#         logging.info(f"Nombre de VINs uniques dans fleet_info: {len(excel_vins)}")
         
-        async with aiohttp.ClientSession() as session:
-            account_vins_mapping = await get_account_vins_mapping(session)
-            all_mapped_vins = set()
-            for account_vins in account_vins_mapping.values():
-                all_mapped_vins.update(account_vins)
+#         async with aiohttp.ClientSession() as session:
+#             account_vins_mapping = await get_account_vins_mapping(session)
+#             all_mapped_vins = set()
+#             for account_vins in account_vins_mapping.values():
+#                 all_mapped_vins.update(account_vins)
             
-            logging.info(f"Nombre de VINs dans account_vins_mapping: {len(all_mapped_vins)}")
+#             logging.info(f"Nombre de VINs dans account_vins_mapping: {len(all_mapped_vins)}")
             
-            matching_vins = excel_vins.intersection(all_mapped_vins)
-            logging.info(f"Nombre de VINs qui matchent: {len(matching_vins)}")
+#             matching_vins = excel_vins.intersection(all_mapped_vins)
+#             logging.info(f"Nombre de VINs qui matchent: {len(matching_vins)}")
             
-            missing_vins = excel_vins - all_mapped_vins
-            logging.info(f"VINs dans fleet_info mais pas dans mapping: {len(missing_vins)}")
+#             missing_vins = excel_vins - all_mapped_vins
+#             logging.info(f"VINs dans fleet_info mais pas dans mapping: {len(missing_vins)}")
             
-            extra_vins = all_mapped_vins - excel_vins
-            logging.info(f"VINs dans mapping mais pas dans fleet_info: {len(extra_vins)}")
+#             extra_vins = all_mapped_vins - excel_vins
+#             logging.info(f"VINs dans mapping mais pas dans fleet_info: {len(extra_vins)}")
             
-    except Exception as e:
-        logging.error(f"Erreur dans test_vin_matching: {str(e)}")
+#     except Exception as e:
+#         logging.error(f"Erreur dans test_vin_matching: {str(e)}")
 
-async def main():
+async def main(df: pd.DataFrame):
     try:
-        ownership_filter = "AYVENS"
-        df = await read_fleet_info(ownership_filter=ownership_filter)
-        logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}")
+        # ownership_filter = "AYVENS"
+        # df = await read_fleet_info(ownership_filter=ownership_filter)
+        # logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}")
         
         async with aiohttp.ClientSession() as session:
             account_vins_mapping = await get_account_vins_mapping(session)
@@ -497,4 +499,7 @@ async def main():
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+
+    df = asyncio.run(fleet_info())
+
+    asyncio.run(main(df))

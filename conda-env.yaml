@@ -23,6 +23,7 @@ dependencies:
   - psycopg2=2.9.9
   - nbstripout=0.8.1
   - statsmodels=0.14.4
+  - aiohttp=3.11.11
   
   - pip:
     - git+https://bib-batteries-admin@bitbucket.org/bib-batteries/bib-models.git@main#subdirectory=src

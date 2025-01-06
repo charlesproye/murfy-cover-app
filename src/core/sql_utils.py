@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import Engine, create_engine, text, inspect
 from sqlalchemy import Connection as Con
 from rich.progress import Progress
+from contextlib import contextmanager
 
 from core.pandas_utils import *
 from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR
@@ -18,13 +19,22 @@ def get_sqlalchemy_engine() -> Engine:
 
     return engine
 
+@contextmanager
+def get_connection():
+    """Context manager pour obtenir une connexion à la base de données"""
+    conn = engine.raw_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
 def upsert_table_with_df(df: DF, table: str, key_col: str, logger: Logger=logger):
     logger.info(f"Upserting table {table} with {len(df)} rows")
     # Convert datetime columns in the DataFrame
     for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
         df[col] = pd.to_datetime(df[col]).dt.strftime('%Y-%m-%d %H:%M:%S')
     # Get existing records from the table
-    rdb_table = pd.read_sql_table(table, connection).dropna(subset=[key_col])
+    rdb_table = pd.read_sql_table(table, con).dropna(subset=[key_col])
     existing_keys_mask = df[key_col].isin(rdb_table[key_col])
     insert_columns = df.columns.intersection(rdb_table.columns)
     # Get metadata of the table to find not-null columns and remove rows with null columns
@@ -42,7 +52,7 @@ def upsert_table_with_df(df: DF, table: str, key_col: str, logger: Logger=logger
         insert_task = progress.add_task("Inserting rows", total=len(df_to_insert))
         df_to_insert.apply(insert_row, axis=1, table=table, key_col=key_col, progress=progress, task_id=insert_task)
 
-    connection.commit()
+    con.commit()
 
 def update_row(row: Series, table: str, key_col: str, progress: Progress, task_id: int):
     row = row.dropna()
@@ -53,7 +63,7 @@ def update_row(row: Series, table: str, key_col: str, progress: Progress, task_i
         WHERE {key_col} = :key_value
     """)
     parameters = row.to_dict() | {"key_value": row[key_col]}
-    connection.execute(update_statement, parameters)
+    con.execute(update_statement, parameters)
     progress.update(task_id, advance=1)
 
 def insert_row(row: Series, table: str, key_col: str, progress: Progress, task_id: int):
@@ -67,7 +77,7 @@ def insert_row(row: Series, table: str, key_col: str, progress: Progress, task_i
     """)
     logger.debug(f"Inserting row for {key_col}={row.get(key_col, f'no {key_col}')}")
     parameters = {col: row[col] for col in row.index}
-    connection.execute(insert_statement, parameters)
+    con.execute(insert_statement, parameters)
     progress.update(task_id, advance=1)
 
 engine = get_sqlalchemy_engine()
