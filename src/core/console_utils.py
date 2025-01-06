@@ -7,7 +7,7 @@ from rich.traceback import install as install_rich_traceback
 from rich import print
 
 from core.pandas_utils import *
-from core.time_series_processing import tss_frequency_sanity_check
+from core.time_series_processing import describe_tss_date_diff
 
 def parse_kwargs(cli_args: dict[str, dict[str, str]] = [], **kwargs):
     parser = ArgumentParser(**kwargs)                                                                 # Set up argparse to accept known arguments
@@ -58,7 +58,7 @@ def tss_script_main(dataframe_gen: Callable[[bool], DF], logger:Union[Logger, No
     show("sanity check:")
     show(sanity_check(df)) #.to_string(max_rows=None))
     print("Frequency sanity check:")
-    freq_sanity_check = tss_frequency_sanity_check(df)
+    freq_sanity_check = describe_tss_date_diff(df)
     show(freq_sanity_check.to_string(max_rows=None))
     show(freq_sanity_check.describe().to_string(max_rows=None))
     show(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
