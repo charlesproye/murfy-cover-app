@@ -162,6 +162,8 @@ cython_debug/
 .csv 
 .png
 *.parquet
+
+.json
 *.csv
 **/*.csv
 

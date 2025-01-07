@@ -37,7 +37,7 @@ class MobilisightsIngester:
 
     rate_limit: int = 36
     upload_interval: int = 60
-    compress_time: str = "00"
+    compress_time: Optional[str] = "00:00",
     max_workers: int = 8
     compress_threaded: bool = True
 
@@ -118,6 +118,7 @@ class MobilisightsIngester:
 
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
+        self.__is_compressing = False 
 
         signal.signal(signal.SIGTERM, self.__handle_shutdown_signal)
         signal.signal(signal.SIGINT, self.__handle_shutdown_signal)
@@ -210,31 +211,47 @@ class MobilisightsIngester:
         )
         compresser.run()
 
-    def run(self):
-        self.__worker_thread = threading.Thread(target=self.__process_job_queue)
-        self.__scheduler_logger.info(
-            f"Scheduling data fetching every {self.rate_limit} seconds"
-        )
+    def __schedule_tasks(self):
         self.__fetch_scheduler.every(self.rate_limit).seconds.do(
             self.__job_queue.put, self.__fetch_vehicles
-        )
-        self.__scheduler_logger.info("Running initial scheduled tasks")
-        self.__fetch_scheduler.run_all()
-        self.__compress_scheduler.every().day.at(self.compress_time).do(
-            self.__job_queue.put, self.__compress
-        )
-        self.__scheduler_logger.info(
-            f"Scheduled data compression at {self.compress_time}"
-        )
+        ).tag("fetch")
+        self.__scheduler_logger.info(f"Scheduled vehicle fetch every {self.rate_limit} seconds")
+
+        # Schedule compression at specified time
+        self.__compress_scheduler.every().day.at(self.compress_time).do(self.__compress)
+        self.__scheduler_logger.info(f"Scheduled daily compression at {self.compress_time}")
+
+        # Run initial fetch
+        self.__scheduler_logger.info("Starting initial fetch")
+        self.__fetch_vehicles()
+
+    def run(self):
+        # Check for a forced compression parameter
+        compress_only = os.getenv("COMPRESS_ONLY_MS") == "1"
+        
+        if compress_only:
+            self.__ingester_logger.info("COMPRESS_ONLY_MS flag set. Running compression first.")
+            self.__is_compressing = True
+            try:
+                self.__compress()
+            except Exception as e:
+                self.__ingester_logger.error(f"Error during compression: {e}")
+            finally:
+                self.__is_compressing = False
+            self.__ingester_logger.info("Compression completed. Exiting.")
+            return
+
+        self.__schedule_tasks()
+        self.__worker_thread = threading.Thread(target=self.__process_job_queue)
         self.__ingester_logger.info("Starting worker thread")
         self.__worker_thread.start()
         self.__scheduler_logger.info("Starting scheduler")
+
         while not self.__shutdown_requested.is_set():
-            now = datetime.now().hour
-            if now >= 6 and now <= 23:
+            if not self.__is_compressing:
                 self.__fetch_scheduler.run_pending()
-            else:
-                self.__compress_scheduler.run_pending()
+            self.__compress_scheduler.run_pending()
             time.sleep(1)
+
         self.__shutdown()
 
