@@ -1,6 +1,11 @@
+from pandas import Timedelta as TD
 import pandas as pd
 
-S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{brand}/time_series/processed_tss.parquet'
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss.parquet'
+
+ODOMETER_MILES_TO_KM = {
+    "tesla": 1.60934,
+}
 # High mobility 
 HIGH_MOBILITY_BRANDS = [
     "kia",
@@ -134,9 +139,33 @@ COLS_TO_FILL = [
 
 MAX_TIME_DIFF_TO_FILL = pd.Timedelta(minutes=45)
 
+IN_CHARGE_CHARGING_STATUS_VALS = [
+    'charging',
+    'chargingactive',
+    'slow_charging',
+    'fast_charging',
+    'initialization',
+    "in-progress",
+]
+
+IN_DISCHARGE_CHARGING_STATUS_VALS = [
+    'charging_error',
+    'nocharging',
+    'chargingerror',
+    'cable_unplugged',
+    'disconnected'
+]
+
 CHARGING_STATUS_VAL_TO_MASK = {
     #BMW
     "CHARGINGACTIVE": True,
+    "slow_charging": True,
+    "fast_charging": True,
+    "charging_complete": False,
+    "Charging": True,
+
+    "charging_error": False,
+    # Tesla
     "<NA>": False,
     pd.NA: False,
     "NOCHARGING": False,
@@ -146,12 +175,30 @@ CHARGING_STATUS_VAL_TO_MASK = {
     "CHARGINGPAUSED": False,
     # Mobilisight
     "cable_unplugged": False,
-    "slow_charging": True,
-    "fast_charging": True,
-    "charging_complete": False,
-    "charging_error": False,
-    # Tesla
-    "Charging": True,
     "Disconnected": False,
 }
+
+CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
+    "bmw",
+    "mercedes-benz",
+    "ford",
+    "volvo-cars",
+    "tesla",
+]
+
+CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
+    "kia",
+    "renault",
+    "bmw",
+]
+MAX_TD = TD(hours=1, minutes=30)
+
+NO_CHARGING_STATUS_COL_ERROR = "charging_status column not found in tss while trying to compute charging and discharging masks."
+
+MAKE_NOT_SUPPORTED_ERROR = """
+It is unclear how to compute charging and discharging masks for {make}.
+Please add it to the CHARGE_MASK_WITH_CHARGING_STATUS_MAKES or CHARGE_MASK_WITH_SOC_DIFFS_MAKES lists.
+"""
+
+ALL_MAKES = CHARGE_MASK_WITH_CHARGING_STATUS_MAKES + CHARGE_MASK_WITH_SOC_DIFFS_MAKES
 

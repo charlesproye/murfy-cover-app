@@ -1,13 +1,13 @@
 from typing import Callable, TypeVar, ParamSpec, List
 from os.path import exists, dirname
-from os import makedirs
+from abc import ABC, abstractmethod
 from functools import wraps
+from os import makedirs
 import inspect
 import logging
 
 import pandas as pd
 from pandas import DataFrame as DF
-from pandas import Series
 
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
@@ -17,6 +17,41 @@ R = TypeVar('R')
 P = ParamSpec('P')
 
 logger = logging.getLogger("caching_utils")
+
+class CachedETL(DF, ABC):
+    def __init__(self, path: str, on: str, force_update: bool = False, bucket: S3_Bucket = bucket):
+        """
+        Initialize a CachedETL with caching capabilities.
+
+        Args:
+        - path (str): Path for the cache file.
+        - on (str): Either 's3' or 'local_storage', specifying the type of caching.
+        - force_update (bool): If True, regenerate and cache the result even if it exists.
+        - bucket_instance (S3_Bucket): S3 bucket instance, defaults to the global bucket.
+        """
+        assert on in ["s3", "local_storage"], "on must be 's3' or 'local_storage'"
+        assert path.endswith(".parquet"), "Path must end with '.parquet'"
+
+        # Determine if we need to update the cache
+        if force_update or (on == "s3" and not bucket.check_file_exists(path)) or (on == "local_storage" and not exists(path)):
+            data = self.run()  # Call the abstract run method to generate data
+            if on == "s3":
+                bucket.save_df_as_parquet(data, path)
+            elif on == "local_storage":
+                data.to_parquet(path)
+        else:
+            if on == "s3":
+                data = bucket.read_parquet_df(path)
+            elif on == "local_storage":
+                data = pd.read_parquet(path)
+
+        # Initialize the DataFrame with the cached or newly generated data
+        super().__init__(data)
+
+    @abstractmethod
+    def run(self) -> DF:
+        """Abstract method to be implemented by subclasses to generate the DataFrame."""
+        pass
 
 def cache_result(path_template: str, on: str, path_params: List[str] = []):
     """
@@ -49,7 +84,7 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
             elif on == "local_storage":
                 if force_update or not exists(path):                                         # Check if we need to update the cache or if the cache does not exist
                     data: pd.DataFrame = data_gen_func(*args, **kwargs)                      # Generate the data using the wrapped function
-                    save_cache_to(data, path)                                                # Save the data locally
+                    save_cache_locally_to(data, path)                                                # Save the data locally
                     return data
                 return pd.read_parquet(path)                                                 # Read cached data from local file
         return wrapper
@@ -59,28 +94,28 @@ def get_bucket_from_func_args(func:Callable, *args, **kwargs) -> tuple[S3_Bucket
     signature = inspect.signature(func)                                         # Get the function's signature
     bound_args = signature.bind_partial(*args, **kwargs)                        # Map the positional args to the parameter names
     bound_args.apply_defaults()                                                 # Apply default values to the bound arguments
-    bucket_present = 'bucket' in bound_args.arguments                           # Check if 'bucket' is in the arguments
-    if not bucket_present:
+    bucket_is_in_func_args = 'bucket' in bound_args.arguments                           # Check if 'bucket' is in the arguments
+    if not bucket_is_in_func_args:
         logger.debug(NO_BUCKET_ARG_FOUND.format(func_name=func.__name__))
     bucket_value = bound_args.arguments.get('bucket', bucket)
     # Return the bucket value and a bool indicating presence
-    return bucket_value, bucket_present
+    return bucket_value, bucket_is_in_func_args
 
-def save_cache_to(data: DF, path:str, **kwargs):
+def save_cache_locally_to(data: DF, path:str, **kwargs):
     """
     ### Description:
-    Creates the parent dirs if they don't exist.
+    Creates the parent dirs if they don't exist before saving the cache locally.
     """
     extension = path.split(".")[-1]
     if extension != "csv" and extension != "parquet":
         raise ValueError(f"Extension of path '{path}' is must be 'csv' or 'parquet'")
-    ensure_that_dirs_exist(path)
+    ensure_that_local_dirs_exist(path)
     if extension == 'parquet':
         data.to_parquet(path, **kwargs)
     if extension == "csv":
         data.to_csv(path, **kwargs)
 
-def ensure_that_dirs_exist(path:str):
+def ensure_that_local_dirs_exist(path:str):
     dir_path = dirname(path)
     if not exists(dir_path):
         makedirs(dir_path)
