@@ -2,6 +2,10 @@ from pandas import Timedelta as TD
 import pandas as pd
 
 S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss.parquet'
+
+ODOMETER_MILES_TO_KM = {
+    "tesla": 1.60934,
+}
 # High mobility 
 HIGH_MOBILITY_BRANDS = [
     "kia",

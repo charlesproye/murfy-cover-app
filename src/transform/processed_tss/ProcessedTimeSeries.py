@@ -31,6 +31,7 @@ class ProcessedTimeSeries(CachedETL):
             .rename(columns=RENAME_COLS_DICT, errors="ignore")
             .pipe(safe_locate, col_loc=list(COL_DTYPES.keys()), logger=self.logger)
             .pipe(safe_astype, COL_DTYPES, logger=self.logger)
+            .pipe(self.metric_normalize)
             .sort_values(by=["vin", "date"])
             .pipe(set_all_str_cols_to_lower, but=["vin"])
             .pipe(self.compute_date_vars)
@@ -42,6 +43,10 @@ class ProcessedTimeSeries(CachedETL):
             .pipe(self.compute_cum_var, "charger_power", "cum_charge_energy_added")
             .merge(fleet_info, on="vin", how="left")
         )
+    
+    def metric_normalize(self, tss:DF) -> DF:
+        tss["odometer"] = tss["odometer"] * ODOMETER_MILES_TO_KM.get(self.make, 1)
+        return tss
 
     def compute_cum_var(self, tss: DF, var_col:str, cum_var_col:str) -> DF:
         if not var_col in tss.columns:
