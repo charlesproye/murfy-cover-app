@@ -76,7 +76,7 @@ Here "XX" is the name of the data provider.
     Because of the extra steps performed on the fleet info, you *should* not use the output of the sub ETLs directly but the output of this main.
     Import `fleet_info` from this module to get the fleet info dataframe: `from transform.fleet_info.main import fleet_info`.
     Run it as a script to update the vehicle table in the database.
--  **XX_processed_tss.py**:  
+-  **ProcessedTimeSeries.py**:  
     Input: Raw time series and fleet info.  
     Output: A dataframe that contains processed data time series.  
             The dataframe should have a `date`, `soc` and `odometer` columns.  
@@ -85,12 +85,6 @@ Here "XX" is the name of the data provider.
         - Rename columns to be consistent across brands  
         - Drop unused columns
         - Set the dtypes of the time series
-        - add missing columns (for ex: in_charge/dishcarge, age of vehicle)  
+        - add missing columns (for ex: in_charge/dishcarge, cum energy added, cum energy spent, ...)  
         - Merge fleet info into the time series
-- **processed_tss.ProcessedTimeSeries**:
-    goal: Implement a function:
-        - `get_processed_tss(brand)`: provides access to any processed time series.
-        - `update_all_processed_tss()`: updates all the processed time series.
-    Input: raw time series and fleet info provided by the previous steps.
-    Output: A single processed time series dataframe per brand that can be used to compute the results we want.
-    Run it as a script to update all the processed time series.
+
