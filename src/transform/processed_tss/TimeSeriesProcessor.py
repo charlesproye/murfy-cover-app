@@ -12,7 +12,7 @@ from transform.raw_tss.main import get_raw_tss
 from transform.fleet_info.main import fleet_info
 
 
-class TimeSeriesProcessor(CachedETL):
+class ProcessedTimeSeries(CachedETL):
     _metadata = ['make', "logger", "id_col", "max_td"]
 
     def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False):
@@ -126,7 +126,7 @@ class TimeSeriesProcessor(CachedETL):
 
 @main_decorator
 def main():
-    TimeSeriesProcessor.update_all_tss()
+    ProcessedTimeSeries.update_all_tss()
 
 if __name__ == "__main__":
     main()
