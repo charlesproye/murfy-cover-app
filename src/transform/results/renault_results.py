@@ -3,14 +3,14 @@ from logging import Logger, getLogger
 import plotly.express as px
 
 from core.pandas_utils import *
-from transform.processed_tss.main import get_processed_tss
+from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from transform.results.config import *
 
 logger = getLogger("transform.results.renault_results")
 
 def get_results() -> DF:
     return (
-        get_processed_tss("renault")
+        ProcessedTimeSeries("renault")
         .eval("expected_battery_energy = capacity * soc")
         .eval("soh = battery_energy / expected_battery_energy") 
         .query("~in_discharge & soc > 0.5")

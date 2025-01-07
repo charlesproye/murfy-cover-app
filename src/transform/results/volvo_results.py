@@ -4,7 +4,7 @@ import plotly.express as px
 
 from core.pandas_utils import *
 from core.console_utils import main_decorator
-from transform.processed_tss.main import get_processed_tss
+from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from transform.results.config import *
 
 logger = getLogger("transform.results.volvo_results")
@@ -29,7 +29,7 @@ def main():
 def get_results() -> DF:
     logger.info("Getting Volvo results")
     return (
-        get_processed_tss("volvo-cars")
+        ProcessedTimeSeries("volvo-cars")
         .eval("odometer = odometer.ffill().bfill()")
         .eval("soh = estimated_range / soc / range / 0.87")
         .query("soc > 0.7")

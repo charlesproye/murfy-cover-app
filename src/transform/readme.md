@@ -87,7 +87,7 @@ Here "XX" is the name of the data provider.
         - Set the dtypes of the time series
         - add missing columns (for ex: in_charge/dishcarge, age of vehicle)  
         - Merge fleet info into the time series
-- **processed_tss.main**:
+- **processed_tss.ProcessedTimeSeries**:
     goal: Implement a function:
         - `get_processed_tss(brand)`: provides access to any processed time series.
         - `update_all_processed_tss()`: updates all the processed time series.

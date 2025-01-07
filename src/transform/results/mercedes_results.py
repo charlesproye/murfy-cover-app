@@ -5,7 +5,7 @@ import plotly.express as px
 from core.pandas_utils import *
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
-from transform.processed_tss.main import get_processed_tss
+from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from transform.results.config import *
 
 logger = getLogger("transform.results.mercedes_results")
@@ -43,7 +43,7 @@ def apply_model_calculation(group):
 
 def get_results() -> DF:
     return (
-        get_processed_tss("mercedes-benz")
+        ProcessedTimeSeries("mercedes-benz")
         .groupby("vin")
         .apply(fill_vars, include_groups=False)
         .reset_index()

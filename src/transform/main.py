@@ -9,7 +9,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from transform.config import *
 from transform.raw_tss.main import update_all_raw_tss
-from transform.processed_tss.main import update_all_processed_tss
+from transform.processed_tss.ProcessedTimeSeries import update_all_processed_tss
 from core.console_utils import main_decorator, parse_kwargs
 from core.logging_utils import set_level_of_loggers_with_prefix
 
