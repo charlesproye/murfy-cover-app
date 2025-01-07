@@ -4,7 +4,7 @@ from scipy.integrate import cumulative_trapezoid
 from core.constants import *
 
 from core.pandas_utils import *
-from core.caching_utils import cache_result
+from core.caching_utils import CachedETL
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import main_decorator
 from transform.processed_tss.config import *
@@ -12,15 +12,19 @@ from transform.raw_tss.main import get_raw_tss
 from transform.fleet_info.main import fleet_info
 
 
-class TimeSeriesProcessor:
-    # __call__ acts as a constructor as we meed to pass the make to the decorator
-    @cache_result(S3_PROCESSED_TSS_KEY_FORMAT, "s3", ["make"])
-    def __call__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD) -> DF:
+class TimeSeriesProcessor(CachedETL):
+    _metadata = ['make', "logger", "id_col", "max_td"]
+
+    def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False):
         self.make = make
         logger_name = f"transform.processed_tss.{make}"
         self.logger = getLogger(logger_name)
         set_level_of_loggers_with_prefix(log_level, logger_name)
         self.id_col = id_col
+        self.max_td = max_td
+        super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update)
+
+    def run(self) -> DF:
         self.logger.info(f"Processing {self.make} raw tss.")
         return (
             get_raw_tss(self.make)
@@ -31,9 +35,9 @@ class TimeSeriesProcessor:
             .pipe(set_all_str_cols_to_lower, but=["vin"])
             .pipe(self.compute_date_vars)
             .pipe(self.compute_charge_n_discharge_masks, IN_CHARGE_CHARGING_STATUS_VALS, IN_DISCHARGE_CHARGING_STATUS_VALS)
-            .pipe(self.compute_idx_from_masks, ["in_charge", "in_discharge"], max_td)
-            .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"], max_td)
-            .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"], max_td)
+            .pipe(self.compute_idx_from_masks, ["in_charge", "in_discharge"])
+            .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
+            .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
             .pipe(self.compute_cum_var, "power", "cum_energy")
             .pipe(self.compute_cum_var, "charger_power", "cum_charge_energy_added")
             .merge(fleet_info, on="vin", how="left")
@@ -93,7 +97,7 @@ class TimeSeriesProcessor:
             .eval(f"in_discharge = charging_status in {in_discharge_vals}")
         )
 
-    def trim_leading_n_trailing_soc_off_masks(self, tss:DF, masks:list[str], max_time_diff:TD=None) -> DF:
+    def trim_leading_n_trailing_soc_off_masks(self, tss:DF, masks:list[str]) -> DF:
         self.logger.info(f"Trimming off trailing soc of {masks} masks.")
         tss_grp = tss.groupby(self.id_col)
         for mask in masks:
@@ -102,22 +106,23 @@ class TimeSeriesProcessor:
             tss[f"trimmed_{mask}"] = tss[mask] & (tss["soc"] != trailing_soc) & (tss["soc"] != leading_soc)
         return tss
 
-    def compute_idx_from_masks(self, tss: DF, masks:list[str], max_time_diff:TD=None) -> DF:
+    def compute_idx_from_masks(self, tss: DF, masks:list[str]) -> DF:
         self.logger.info(f"Computing {masks} idx from masks.")
         for mask in masks:
             idx_col_name = f"{mask}_idx"
             shifted_mask = tss.groupby(self.id_col)[mask].shift(fill_value=False)
             tss["new_period_start_mask"] = shifted_mask.ne(tss[mask]) 
-            if max_time_diff is not None:
-                tss["new_period_start_mask"] |= (tss["time_diff"] > max_time_diff)
+            if self.max_td is not None:
+                tss["new_period_start_mask"] |= (tss["time_diff"] > self.max_td)
             tss[idx_col_name] = tss.groupby(self.id_col)["new_period_start_mask"].cumsum().astype("uint16")
             tss.drop(columns=["new_period_start_mask"], inplace=True)
         return tss
-    
+
     @classmethod
     def update_all_tss(cls, **kwargs):
         for make in ALL_MAKES:
-            cls()(make, force_update=True, **kwargs)
+            print(f"Updating {make} tss.")
+            cls(make, force_update=True, **kwargs)
 
 @main_decorator
 def main():
