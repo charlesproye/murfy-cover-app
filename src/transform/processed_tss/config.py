@@ -1,3 +1,4 @@
+from pandas import Timedelta as TD
 import pandas as pd
 
 S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{brand}/time_series/processed_tss.parquet'
@@ -186,3 +187,5 @@ CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
     "renault",
     "bmw",
 ]
+
+MAX_TD = TD(hours=1, minutes=30)
