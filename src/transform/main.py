@@ -9,7 +9,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from transform.config import *
 from transform.raw_tss.main import update_all_raw_tss
-from transform.processed_tss.ProcessedTimeSeries import update_all_processed_tss
+from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from core.console_utils import main_decorator, parse_kwargs
 from core.logging_utils import set_level_of_loggers_with_prefix
 
@@ -51,7 +51,7 @@ def run_entire_pipeline():
         
         #  update_db_vehicle_table()
 
-        update_all_processed_tss()
+        ProcessedTimeSeries.update_all_tss()
         logging.info("Processed TSS update completed")
         
         end_time = DT.now()
@@ -60,9 +60,6 @@ def run_entire_pipeline():
         
     except Exception as e:
         raise
-
-    update_all_raw_tss()
-    update_all_processed_tss()
 
 def run_scheduler():
     # Programmer l'exécution tous les jours à minuit
