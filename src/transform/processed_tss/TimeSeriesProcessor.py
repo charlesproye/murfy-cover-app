@@ -6,6 +6,7 @@ from core.constants import *
 from core.pandas_utils import *
 from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
+from core.console_utils import main_decorator
 from transform.processed_tss.config import *
 from transform.raw_tss.main import get_raw_tss
 from transform.fleet_info.main import fleet_info
@@ -113,5 +114,15 @@ class TimeSeriesProcessor:
             tss.drop(columns=["new_period_start_mask"], inplace=True)
         return tss
     
-    #@classmethod
-    #def update_all_tss(cls, log_level:str="INFO", max_td:TD=MAX_TD):
+    @classmethod
+    def update_all_tss(cls, **kwargs):
+        for make in ALL_MAKES:
+            cls()(make, force_update=True, **kwargs)
+
+@main_decorator
+def main():
+    TimeSeriesProcessor.update_all_tss()
+
+if __name__ == "__main__":
+    main()
+

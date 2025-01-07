@@ -1,7 +1,7 @@
 from pandas import Timedelta as TD
 import pandas as pd
 
-S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{brand}/time_series/processed_tss.parquet'
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss.parquet'
 # High mobility 
 HIGH_MOBILITY_BRANDS = [
     "kia",
@@ -176,10 +176,10 @@ CHARGING_STATUS_VAL_TO_MASK = {
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
     "bmw",
-    "tesla",
     "mercedes-benz",
     "ford",
     "volvo-cars",
+    "tesla",
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
@@ -187,7 +187,6 @@ CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
     "renault",
     "bmw",
 ]
-
 MAX_TD = TD(hours=1, minutes=30)
 
 NO_CHARGING_STATUS_COL_ERROR = "charging_status column not found in tss while trying to compute charging and discharging masks."
@@ -196,3 +195,6 @@ MAKE_NOT_SUPPORTED_ERROR = """
 It is unclear how to compute charging and discharging masks for {make}.
 Please add it to the CHARGE_MASK_WITH_CHARGING_STATUS_MAKES or CHARGE_MASK_WITH_SOC_DIFFS_MAKES lists.
 """
+
+ALL_MAKES = CHARGE_MASK_WITH_CHARGING_STATUS_MAKES + CHARGE_MASK_WITH_SOC_DIFFS_MAKES
+
