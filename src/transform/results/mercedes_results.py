@@ -15,6 +15,7 @@ def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform.results")
     df = get_results()
     print(df)
+    # print(df["soh"].count())
     df = (
         df
         .dropna(subset=["odometer", "soh"])
@@ -41,15 +42,16 @@ def apply_model_calculation(group:DF) -> DF:
     model = group.name
     calculation = model_calculations.get(model, model_calculations['default'])
     group['soh'] = calculation(group)
+    print(group.shape)
     return group
 
 def get_results() -> DF:
     return (
         ProcessedTimeSeries("mercedes-benz")
-        .pipe(fill_vars, cols=["soc", "estimated_range"])
+        .pipe(fill_vars, cols=["soc", "estimated_range", "range"])
         .reset_index()
         .assign(discharge_size = lambda df: df.groupby(["vin", "trimmed_in_discharge_idx"]).transform("size"))
-        .query("soc > 0.7 & soc> 0.98 & discharge_size > 10 & trimmed_in_discharge")
+        .query("soc > 0.7 & soc < 0.98 & discharge_size > 10 & trimmed_in_discharge")
         .groupby('model', group_keys=False)
         .apply(apply_model_calculation)
         .sort_values(["vin", "date"])

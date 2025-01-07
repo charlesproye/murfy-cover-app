@@ -56,6 +56,7 @@ def add_lines_up_to_today_for_vehicle(results:DF) -> DF:
 
 def get_processed_results(brand:str) -> DF:
     results = GET_RESULTS_FUNCS[brand]()
+    print(brand)
     if brand != "tesla":
         results = agg_results_by_discharge_and_charge(results)
     return (
