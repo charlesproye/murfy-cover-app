@@ -14,8 +14,7 @@ core
 ├── pandas_utils.py
 ├── plt_utils.py
 ├── readme.md
-├── s3_utils.py
-└── time_series_processing.py
+└── s3_utils.py
 ```
 
 Let's go through the modules one by one to summarize what they do:
@@ -220,52 +219,3 @@ Provides a few helper functions to simplify the use of the plotly API.
 ### s3_utils:
 Implements an `S3_Bucket` class that acts as a wrapper around the `boto3.client` class to (greatly) simplify CRUD operations on the S3.    
 You can pass the credentials of the S3 in the constructor call to cnnect to a specific S3 or leave it empty and it will default to the credentials in the dotenv.  
-
-### time_series_processing:
-Provides a bunch of, you guessed it, time series processing functions.  
-Mainly:
-1. ```python
-    def compute_cum_integrals_of_current_vars(vehicle_df: DF) -> DF:
-    ```
-    Computes and adds to the dataframe cumulative energy (in kwh) and charge (in C).  
-    If `power` is not present, `cum_energy` will not be computed.  
-    If `current` is not present, `cum_charge` will not be computed.  
-
-1. ```python
-    def cum_integral(power_series: Series, date_series=None) -> Series:
-    ```
-    Description:
-    Computes the cumulative of the time series by using cumulative trapezoid and a date series.
-    Parameters:
-    power_col: name of the power column, must be in kw.
-    date_series: optional parameter to provide if the series is not indexed by date.
-1.  ```python
-    def high_freq_in_discharge_and_charge_from_soc_diff(vehicle_df: DF) -> DF:
-    ```
-    Computes and adds to the dataframe two boolean columns `in_charge` and `in_discharge`.  
-    The reason why there is not just one column is because sometimes we are not sure that the vehicle is in charge nor in discharge.  
-    In which case both of them are at `False`.  
-    The columns are computed from soc and date.  
-1.  ```python
-    def low_freq_compute_charge_n_discharge_vars(vehicle_df: DF) -> DF:
-    ```
-    Same as the previous version with extra steps to handle time series with data points that have more than 6 hours in between.
-1.  ```python
-    def perf_mask_and_idx_from_condition_mask(
-            vehicle_df: DF,
-            src_mask:str,
-            src_mask_idx_col_name="{src_mask}_idx",
-            perf_mask_col_name="{src_mask}_perf_mask",
-            max_time_diff:TD|None=None
-        ) -> DF:
-    ```
-    This function implements a processing steps that aims at improving the results of aggregations of periods(charges, trips, ...).  
-    The period must be represented by a mask/bool column.  
-    It will add two columns with the names `src_mask_idx_col_name` and `perf_mask_col_name`.  
-    `src_mask_idx_col_name` Will by used to `groupby` the dataframe.  
-    `perf_mask_col_name` is a mask that equal to the `src_mask`(in_discharge for ex.) with the leading and trailing socs trimmed off.  
-    The need for this processing step is caused by the quantization level of the soc which is usually 1%:  
-    Let a A and B be the leading and trailing soc values respectively.  
-    If we use the soc diff in our aggregation we have a +/- 2% soc margin of error.  
-    By taking the next soc after A and the soc before B we are sure that the battery actually went trhoug those A + 1 and B - 1 values.  
-

@@ -8,6 +8,7 @@ from pandas import DataFrame as DF
 from pandas import Series
 from pandas import Index as Idx
 from pandas import MultiIndex as MultiIdx
+from pandas import Timedelta as TD
 import numpy as np
 
 
@@ -175,7 +176,7 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     logger.debug(f"datetime_cols:{datetime_cols}")
     df = df.astype(col_dtypes, errors="ignore")
     for col in datetime_cols:
-        df[col] = pd.to_datetime(df[col], format='mixed')
+        df[col] = pd.to_datetime(df[col], format='mixed').dt.as_unit("s")
     dtypes_dict = df[df.columns.intersection(col_dtypes.keys())].dtypes.to_dict()
     if dtypes_dict != col_dtypes:
         logger.warning("safe_astype did not succeed in changing all dtypes.")
@@ -211,6 +212,7 @@ def sanity_check(df:DF) -> DF:
 
 def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Logger=logger) -> DF:
     logger.info(f"safe_locate called.")
+    logger.debug(f"Initial shape: {df.shape}")
     if not isinstance(index_loc, pd.Index) and index_loc is not None:
         index_loc = pd.Index(index_loc)
     if not isinstance(col_loc, pd.Index) and col_loc is not None:
@@ -223,6 +225,7 @@ def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Lo
     if col_loc is None and not index_loc is None:
         return df.loc[index_loc]
     if not col_loc is None and index_loc is None:
+        logger.debug(f"Final shape: {df.loc[:, col_loc].shape}")
         return df.loc[:, col_loc]
     if not col_loc is None and not index_loc is None:
         return df.loc[index_loc, col_loc]

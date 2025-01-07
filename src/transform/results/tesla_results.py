@@ -6,7 +6,7 @@ from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main, main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.results.config import *
-from transform.processed_tss.main import get_processed_tss
+from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 
 logger = getLogger("transform.results.tesla_results")
 
@@ -30,9 +30,9 @@ def main():
 
 def get_results() -> DF:
     return (
-        get_processed_tss("tesla")
-        .query("in_charge_perf_mask")
-        .groupby(["vin", "in_charge_perf_idx"])
+        ProcessedTimeSeries("tesla")
+        .query("trimmed_in_charge")
+        .groupby(["vin", "trimmed_in_charge_idx"])
         .agg(
             energy_added=pd.NamedAgg("charge_energy_added", series_start_end_diff),
             soc_diff=pd.NamedAgg("soc", series_start_end_diff),
