@@ -74,7 +74,7 @@ class ProcessedTimeSeries(CachedETL):
         if self.make in CHARGE_MASK_WITH_CHARGING_STATUS_MAKES:
             return self.charge_n_discharging_masks_from_charging_status(tss, in_charge_vals, in_discharge_vals)
         if self.make in CHARGE_MASK_WITH_SOC_DIFFS_MAKES:
-            return self.new_charge_n_discharging_from_soc_diff(tss)
+            return self.charge_n_discharging_masks_from_soc_diff(tss)
         raise ValueError(MAKE_NOT_SUPPORTED_ERROR.format(make=self.make))
 
     def charge_n_discharging_masks_from_soc_diff(self, tss:DF) -> DF:
