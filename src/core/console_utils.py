@@ -50,22 +50,6 @@ def main_decorator(main_func):
     return wrapper
 
 @main_decorator
-def tss_script_main(dataframe_gen: Callable[[bool], DF], logger:Union[Logger, None]=None, **kwargs) -> DF:
-    df:DF = dataframe_gen(**kwargs)
-    show = logger.info if logger is not None else print
-    show(df)
-#    with pd.option_context("display.max_rows", None, "display.expand_frame_repr", False):
-    show("sanity check:")
-    show(sanity_check(df)) #.to_string(max_rows=None))
-    print("Frequency sanity check:")
-    freq_sanity_check = describe_tss_date_diff(df)
-    show(freq_sanity_check.to_string(max_rows=None))
-    show(freq_sanity_check.describe().to_string(max_rows=None))
-    show(f"total memory usage: {total_MB_memory_usage(df):.2f}MB.")
-
-    return df
-
-@main_decorator
 def single_dataframe_script_main(dataframe_gen: Callable[[bool], DF], logger:Union[Logger, None]=None, **kwargs) -> DF:
     df:DF = dataframe_gen(**kwargs)
     show = logger.info if logger is not None else print
