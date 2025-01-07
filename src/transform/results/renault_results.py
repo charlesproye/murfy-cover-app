@@ -18,7 +18,7 @@ def get_results() -> DF:
         # Ensure that there are at least 3 discharge period
         # Since discharge_perf_idx is declared as discharge_perf_mask.diff().cumsum(), it increases per discharge AND charge, i.e 2 per discharge
         # So we check that the max is superiror or equal to 3 * 2
-        .filter(lambda ts: ts["in_discharge_perf_idx"].max() >= 6)
+        .filter(lambda ts: ts["trimmed_in_discharge_idx"].max() >= 6)
     )
 
 if __name__ == "__main__":

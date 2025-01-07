@@ -101,7 +101,7 @@ def make_soh_presentable(df:DF) -> DF:
 def agg_results_by_discharge_and_charge(results:DF) -> DF:
     return (
         results
-        .groupby(["vin", "in_discharge_perf_idx"])
+        .groupby(["vin", "trimmed_in_discharge_idx"])
         .agg({
             "soh": "median",
             "odometer": "last",

@@ -13,8 +13,10 @@ logger = getLogger("transform.results.mercedes_results")
 @main_decorator
 def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform.results")
+    df = get_results()
+    print(df)
     df = (
-        get_results()
+        df
         .dropna(subset=["odometer", "soh"])
         .eval("date = date.dt.date")
         .groupby(["vin", "date"])
@@ -35,8 +37,8 @@ model_calculations = {
     'default': lambda df: df['estimated_range'] / df['soc'] / df['range']
 }
 
-def apply_model_calculation(group):
-    model = group['model'].iloc[0]
+def apply_model_calculation(group:DF) -> DF:
+    model = group.name
     calculation = model_calculations.get(model, model_calculations['default'])
     group['soh'] = calculation(group)
     return group
@@ -44,22 +46,21 @@ def apply_model_calculation(group):
 def get_results() -> DF:
     return (
         ProcessedTimeSeries("mercedes-benz")
-        .groupby("vin")
-        .apply(fill_vars, include_groups=False)
+        .pipe(fill_vars, cols=["soc", "estimated_range"])
         .reset_index()
-        .assign(discharge_size = lambda df: df.groupby(["vin", "in_discharge_idx"]).transform("size"))
-        .query("soc > 0.7 & soc> 0.98&discharge_size > 10 & in_discharge_perf_mask")
+        .assign(discharge_size = lambda df: df.groupby(["vin", "trimmed_in_discharge_idx"]).transform("size"))
+        .query("soc > 0.7 & soc> 0.98 & discharge_size > 10 & trimmed_in_discharge")
         .groupby('model', group_keys=False)
         .apply(apply_model_calculation)
         .sort_values(["vin", "date"])
     )
 
-def fill_vars(ts:DF) -> DF:
-    return (
-        ts
-        .eval("soc = soc.ffill().bfill()")
-        .eval("estimated_range = estimated_range.ffill().bfill()")
-    )
+def fill_vars(tss:DF, cols:list[str]) -> DF:
+    tss_grouped = tss.groupby("vin")
+    for col in cols:
+        tss[col] = tss_grouped[col].ffill()
+        tss[col] = tss_grouped[col].bfill()
+    return tss
 
 if __name__ == "__main__":
     main()

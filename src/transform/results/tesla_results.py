@@ -31,8 +31,8 @@ def main():
 def get_results() -> DF:
     return (
         ProcessedTimeSeries("tesla")
-        .query("in_charge_perf_mask")
-        .groupby(["vin", "in_charge_perf_idx"])
+        .query("trimmed_in_charge")
+        .groupby(["vin", "trimmed_in_charge_idx"])
         .agg(
             energy_added=pd.NamedAgg("charge_energy_added", series_start_end_diff),
             soc_diff=pd.NamedAgg("soc", series_start_end_diff),
