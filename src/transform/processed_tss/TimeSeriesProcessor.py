@@ -4,7 +4,6 @@ from scipy.integrate import cumulative_trapezoid
 from core.constants import *
 
 from core.pandas_utils import *
-from core.time_series_processing import *
 from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.processed_tss.config import *
@@ -13,7 +12,7 @@ from transform.fleet_info.main import fleet_info
 
 
 class TimeSeriesProcessor:
-
+    # __call__ acts as a constructor as we meed to pass the make to the decorator
     @cache_result(S3_PROCESSED_TSS_KEY_FORMAT, "s3", ["make"])
     def __call__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD) -> DF:
         self.make = make
@@ -68,16 +67,12 @@ class TimeSeriesProcessor:
     def compute_charge_n_discharge_masks(self, tss:DF, in_charge_vals:list, in_discharge_vals:list) -> DF:
         self.logger.debug(f"Computing charging and discharging masks.")
         if self.make in CHARGE_MASK_WITH_CHARGING_STATUS_MAKES:
-            return self.new_charge_n_discharging_from_charging_status(tss, in_charge_vals, in_discharge_vals)
-        elif self.make in CHARGE_MASK_WITH_SOC_DIFFS_MAKES:
+            return self.charge_n_discharging_masks_from_charging_status(tss, in_charge_vals, in_discharge_vals)
+        if self.make in CHARGE_MASK_WITH_SOC_DIFFS_MAKES:
             return self.new_charge_n_discharging_from_soc_diff(tss)
-        else:
-            raise ValueError(f"""
-                It is unclear how to compute charging and discharging masks for {self.make}.
-                Please add it to the CHARGE_MASK_WITH_CHARGING_STATUS_MAKES or CHARGE_MASK_WITH_SOC_DIFFS_MAKES lists.
-            """)
+        raise ValueError(MAKE_NOT_SUPPORTED_ERROR.format(make=self.make))
 
-    def new_charge_n_discharging_from_soc_diff(self, tss:DF) -> DF:
+    def charge_n_discharging_masks_from_soc_diff(self, tss:DF) -> DF:
         tss_grp = tss.groupby(self.id_col)
         tss["soc_ffilled"] = tss_grp["soc"].ffill()
         tss["soc_diff"] = tss_grp["soc_ffilled"].diff()
@@ -88,8 +83,9 @@ class TimeSeriesProcessor:
         tss["in_discharge"] = soc_diff_ffilled.lt(0, fill_value=False) & soc_diff_bfilled.lt(0, fill_value=False)
         return tss
 
-    def new_charge_n_discharging_from_charging_status(self, tss:DF, in_charge_vals:list, in_discharge_vals:list) -> DF:
+    def charge_n_discharging_masks_from_charging_status(self, tss:DF, in_charge_vals:list, in_discharge_vals:list) -> DF:
         self.logger.debug(f"Computing charging and discharging vars using charging status dictionary.")
+        assert "charging_status" in tss.columns, NO_CHARGING_STATUS_COL_ERROR
         return (
             tss
             .eval(f"in_charge = charging_status in {in_charge_vals}")
@@ -117,4 +113,5 @@ class TimeSeriesProcessor:
             tss.drop(columns=["new_period_start_mask"], inplace=True)
         return tss
     
-
+    #@classmethod
+    #def update_all_tss(cls, log_level:str="INFO", max_td:TD=MAX_TD):

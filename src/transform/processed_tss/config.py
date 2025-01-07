@@ -189,3 +189,10 @@ CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
 ]
 
 MAX_TD = TD(hours=1, minutes=30)
+
+NO_CHARGING_STATUS_COL_ERROR = "charging_status column not found in tss while trying to compute charging and discharging masks."
+
+MAKE_NOT_SUPPORTED_ERROR = """
+It is unclear how to compute charging and discharging masks for {make}.
+Please add it to the CHARGE_MASK_WITH_CHARGING_STATUS_MAKES or CHARGE_MASK_WITH_SOC_DIFFS_MAKES lists.
+"""
