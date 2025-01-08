@@ -22,6 +22,7 @@ def plt_3d_df(
         width=1500,
         height=1000,
         hover_name=None,
+        **kwargs
     ) -> Figure:
     """Abstracts away some of the boiler plate code when calling px.scatter_3d."""
     return (
@@ -37,6 +38,7 @@ def plt_3d_df(
             hover_name=hover_name,
             size=[size] * len(df),
             color_continuous_scale=colorscale,
+            **kwargs
         )
         .update_traces(marker=dict(line=dict(width=0)))
         .update_layout(
