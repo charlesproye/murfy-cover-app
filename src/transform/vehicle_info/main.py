@@ -18,13 +18,11 @@ logger = logging.getLogger(__name__)
 
 class VehicleInfoProcessor:
     def __init__(self, bucket:S3_Bucket=bucket, con:Con=con):
-        self.db_engine = create_engine(os.getenv('DATABASE_URL'))
-        Session = sessionmaker(bind=self.db_engine)
-        self.session = Session()
 
     def get_vehicle_vins(self) -> List[str]:
         """Retrieve all VINs from the vehicle table"""
         try:
+            
             vehicles = self.session.query(Vehicle.vin).all()
             return [v[0] for v in vehicles]
         except Exception as e:
