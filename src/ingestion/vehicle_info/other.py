@@ -503,10 +503,10 @@ async def main(df: pd.DataFrame):
         logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}") #don't work at the moment
         df = df.query("make != 'tesla'")
 
-        await process_vehicles(df)
+        # await process_vehicles(df)
         await list_used_models()
-        await cleanup_unused_models()
-        metadata = await get_existing_model_metadata()
+        # await cleanup_unused_models()
+        # metadata = await get_existing_model_metadata()
         
     except Exception as e:
         logging.error(f"Erreur dans le programme principal: {str(e)}")
