@@ -228,7 +228,7 @@ async def get_vehicle_options(session: aiohttp.ClientSession, access_token: str,
                     model_code = version[2]
                     
                     if model_code in ["1", "7"]:
-                        model_code = "S"
+                        model_code = "s"
                     model_name = f"model {model_code}".lower()
                     
                     display_name = model_info['displayName'].lower()
