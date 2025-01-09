@@ -11,7 +11,7 @@ from sqlalchemy import Connection as Con
 
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
-from core.sql_utils import con, right_union_merge_rdb_table
+from core.sql_utils import con, right_inner_merge
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,8 +68,7 @@ class VehicleInfoProcessor:
 
             final_last_date = pd.concat([final_last_date, last_date])
             # logger.info(f"VIN: {vin}, Last file date: {last_date}")
-        
-        right_union_merge_rdb_table(final_last_date, "vehicle", "vin", "vin", ["last_date_data"])
+        right_inner_merge(final_last_date, "vehicle", "vin", "vin", ["last_date_data"])
         print(final_last_date)
 
         return results
