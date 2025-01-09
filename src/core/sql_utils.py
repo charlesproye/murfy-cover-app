@@ -37,7 +37,6 @@ def right_inner_merge(
     left_on: str|list[str],
     right_on: str|list[str],
     update_cols: list[str],
-    con: Connection=con,
     logger: logging.Logger = logger,
 ):
     try:
