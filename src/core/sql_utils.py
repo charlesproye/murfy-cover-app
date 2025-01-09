@@ -56,25 +56,25 @@ def right_inner_merge(
 
         # Construct the SQL update query
         set_clause = ", ".join(
-            [f"{rhs_name}.{col} = temp.{col}" for col in update_cols]
+            [f"{col} = temp.{col}" for col in update_cols]
         )
         join_condition = " AND ".join(
             [f"{rhs_name}.{r} = temp.{l}" for l, r in zip(left_on, right_on)]
         )
 
-        update_query = f"""
+        update_query = text(f"""
         UPDATE {rhs_name}
         SET {set_clause}
         FROM {temp_table_name} AS temp
         WHERE {join_condition};
-        """
+        """)
         logger.info(f"Executing update query:\n{update_query}")
         with con.begin() as _:
             con.execute(update_query)
 
         # Drop the temporary table
         logger.info("Dropping temporary table...")
-        con.execute(f"DROP TABLE IF EXISTS {temp_table_name};")
+        con.execute(text(f"DROP TABLE IF EXISTS {temp_table_name};"))
 
         logger.info("Update operation completed successfully.")
 
