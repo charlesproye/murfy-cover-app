@@ -50,31 +50,27 @@ def right_inner_merge(
                 raise ValueError(f"Column '{col}' not found in DataFrame.")
 
         # Upload DataFrame to a temporary table
-        temp_table_name = "temp_table"
+        TMP_TABLE_NAME = "temp_table"
         logger.info("Uploading DataFrame to temporary table...")
-        lhs.to_sql(temp_table_name, con, if_exists="replace", index=False)
+        lhs.to_sql(TMP_TABLE_NAME, con, if_exists="replace", index=False)
 
         # Construct the SQL update query
-        set_clause = ", ".join(
-            [f"{col} = temp.{col}" for col in update_cols]
-        )
-        join_condition = " AND ".join(
-            [f"{rhs_name}.{r} = temp.{l}" for l, r in zip(left_on, right_on)]
-        )
+        set_clause = ", ".join([f"{col} = temp.{col}" for col in update_cols])
+        join_condition = " AND ".join([f"{rhs_name}.{r} = temp.{l}" for l, r in zip(left_on, right_on)])
 
         update_query = text(f"""
         UPDATE {rhs_name}
         SET {set_clause}
-        FROM {temp_table_name} AS temp
+        FROM {TMP_TABLE_NAME} AS temp
         WHERE {join_condition};
         """)
         logger.info(f"Executing update query:\n{update_query}")
         with con.begin() as _:
             con.execute(update_query)
 
-        # Drop the temporary table
-        logger.info("Dropping temporary table...")
-        con.execute(text(f"DROP TABLE IF EXISTS {temp_table_name};"))
+            # Drop the temporary table
+            logger.info("Dropping temporary table...")
+            con.execute(text(f"DROP TABLE IF EXISTS {TMP_TABLE_NAME};"))
 
         logger.info("Update operation completed successfully.")
 
