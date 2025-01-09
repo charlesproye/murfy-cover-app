@@ -32,20 +32,18 @@ class VehicleInfoProcessor:
         """Get the date of the most recent file for a specific VIN"""
         try:
             # List objects in the VIN's folder
-            # prefix = f"response/{brand}/{vin}/"
             keys = bucket.list_responses_keys_of_brand(brand)
-
-            keys["date"] = pd.to_datetime(keys["file"].str[:-5])
-            keys = keys.groupby("vin").agg({"date": "max"})
-            print(type(keys))
-            # last_date = keys.groupby("date").last()
-            # print(type(last_date))
-
-            if not keys:
+            
+            # Check if keys is empty before processing
+            if keys.empty:
                 logger.warning(f"No files found for the brand {brand}")
                 return None
+                
+            # Process the data only if we have keys
+            keys["last_date_data"] = pd.to_datetime(keys["file"].str[:-5])
+            last_date_data = keys.groupby("vin").agg({"last_date_data": "max"})
             
-            return last_date
+            return last_date_data.reset_index()
 
         except Exception as e:
             logger.error(f"Error checking S3 for brand {brand}: {e}")
@@ -58,7 +56,9 @@ class VehicleInfoProcessor:
         # Once we have all the vins, we want to check all the brands and get the last file date
         brands = pd.read_sql_table("oem", con)
         final_last_date = pd.DataFrame()
-        for brand in brands['oem_name'].values:
+        # for brand in brands['oem_name'].values except tesla:
+        for brand in [b for b in brands['oem_name'].values if b.lower() != 'tesla']:
+
             # Determine brand from VIN or database
             # brand = self.determine_brand(vin)
             print(brand)
@@ -69,7 +69,7 @@ class VehicleInfoProcessor:
             final_last_date = pd.concat([final_last_date, last_date])
             # logger.info(f"VIN: {vin}, Last file date: {last_date}")
         
-        # right_union_merge_rdb_table(final_last_date, "vehicle", "vin", "vin", ["last_date"])
+        right_union_merge_rdb_table(final_last_date, "vehicle", "vin", "vin", ["last_date_data"])
         print(final_last_date)
 
         return results
