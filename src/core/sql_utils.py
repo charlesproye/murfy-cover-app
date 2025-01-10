@@ -19,6 +19,9 @@ def get_sqlalchemy_engine() -> Engine:
 
     return engine
 
+engine = get_sqlalchemy_engine()
+con = engine.connect()
+
 @contextmanager
 def get_connection():
     """Context manager pour obtenir une connexion à la base de données"""
@@ -28,31 +31,54 @@ def get_connection():
     finally:
         conn.close()
 
-def upsert_table_with_df(df: DF, table: str, key_col: str, logger: Logger=logger):
-    logger.info(f"Upserting table {table} with {len(df)} rows")
-    # Convert datetime columns in the DataFrame
-    for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
-        df[col] = pd.to_datetime(df[col]).dt.strftime('%Y-%m-%d %H:%M:%S')
-    # Get existing records from the table
-    rdb_table = pd.read_sql_table(table, con).dropna(subset=[key_col])
-    existing_keys_mask = df[key_col].isin(rdb_table[key_col])
-    insert_columns = df.columns.intersection(rdb_table.columns)
-    # Get metadata of the table to find not-null columns and remove rows with null columns
-    inspector = inspect(engine)
-    columns_info = inspector.get_columns(table)
-    notna_cols = [col['name'] for col in columns_info if not col['nullable']]
-    df = df.dropna(subset=notna_cols, how="any")
-    # Split DataFrame into records to update and records to insert
-    df_to_update = df.loc[existing_keys_mask, insert_columns]
-    df_to_insert = df.loc[~existing_keys_mask, insert_columns]
+def right_inner_merge(
+    lhs: pd.DataFrame,
+    rhs_name: str,
+    left_on: str|list[str],
+    right_on: str|list[str],
+    update_cols: list[str],
+    logger: logging.Logger = logger,
+):
+    try:
+        # Ensure keys are lists
+        left_on = [left_on] if isinstance(left_on, str) else left_on
+        right_on = [right_on] if isinstance(right_on, str) else right_on
 
-    with Progress() as progress:
-        update_task = progress.add_task("Updating rows", total=len(df_to_update))
-        df_to_update.apply(update_row, axis=1, table=table, key_col=key_col, progress=progress, task_id=update_task)
-        insert_task = progress.add_task("Inserting rows", total=len(df_to_insert))
-        df_to_insert.apply(insert_row, axis=1, table=table, key_col=key_col, progress=progress, task_id=insert_task)
+        # Validate column presence
+        for col in left_on + update_cols:
+            if col not in lhs.columns:
+                raise ValueError(f"Column '{col}' not found in DataFrame.")
 
-    con.commit()
+        # Upload DataFrame to a temporary table
+        TMP_TABLE_NAME = "temp_table"
+        logger.info("Uploading DataFrame to temporary table...")
+        lhs.to_sql(TMP_TABLE_NAME, con, if_exists="replace", index=False)
+
+        # Construct the SQL update query
+        set_clause = ", ".join([f"{col} = temp.{col}" for col in update_cols])
+        join_condition = " AND ".join([f"{rhs_name}.{r} = temp.{l}" for l, r in zip(left_on, right_on)])
+
+        update_query = text(f"""
+        UPDATE {rhs_name}
+        SET {set_clause}
+        FROM {TMP_TABLE_NAME} AS temp
+        WHERE {join_condition};
+        """)
+        logger.info(f"Executing update query:\n{update_query}")
+        with con.begin() as _:
+            con.execute(update_query)
+
+            # Drop the temporary table
+            logger.info("Dropping temporary table...")
+            con.execute(text(f"DROP TABLE IF EXISTS {TMP_TABLE_NAME};"))
+
+        logger.info("Update operation completed successfully.")
+
+    except Exception as e:
+        logger.error(f"An error occurred during the update operation: {e}")
+        raise
+
+
 
 def update_row(row: Series, table: str, key_col: str, progress: Progress, task_id: int):
     row = row.dropna()
@@ -79,9 +105,6 @@ def insert_row(row: Series, table: str, key_col: str, progress: Progress, task_i
     parameters = {col: row[col] for col in row.index}
     con.execute(insert_statement, parameters)
     progress.update(task_id, advance=1)
-
-engine = get_sqlalchemy_engine()
-con = engine.connect()
 
 def left_merge_rdb_table(
         lhs: DF,
