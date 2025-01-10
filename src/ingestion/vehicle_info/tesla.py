@@ -13,13 +13,44 @@ import re
 from core.sql_utils import get_connection
 from fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
+import datetime
 
 load_dotenv()
 
+current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+current_dir = os.path.dirname(os.path.abspath(__file__))
+log_dir = os.path.join(current_dir, 'logs')
+os.makedirs(log_dir, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(log_dir, f'tesla_errors_{current_date}.log')),
+        logging.StreamHandler()  # Garde aussi l'affichage console
+    ]
 )
+
+current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+current_dir = os.path.dirname(os.path.abspath(__file__))
+log_dir = os.path.join(current_dir, 'logs')
+os.makedirs(log_dir, exist_ok=True)
+
+# Handler pour les erreurs (fichier)
+error_handler = logging.FileHandler(os.path.join(log_dir, f'tesla_errors_{current_date}.log'))
+error_handler.setLevel(logging.ERROR)
+error_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+# Handler pour la console (info)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+# Configuration du logger
+logger = logging.getLogger('tesla_logger')
+logger.setLevel(logging.INFO)
+logger.addHandler(error_handler)
+logger.addHandler(console_handler)
 
 ACCOUNT_TOKEN_KEYS = {
     'OLINO': 'ACCESS_TOKEN_OLINO',
@@ -127,7 +158,7 @@ async def get_account_vins_mapping(session: aiohttp.ClientSession) -> Dict[str, 
     
     if os.path.exists(cache_file):
         file_age = time.time() - os.path.getmtime(cache_file)
-        if file_age < 1:  # J'ai mis 30 jours
+        if file_age < 24 * 3600:   #24h
             try:
                 with open(cache_file, 'r') as f:
                     account_vins = json.load(f)
@@ -169,42 +200,47 @@ async def get_all_vehicles(session: aiohttp.ClientSession, access_token: str) ->
     retries = 0
     
     while True:
-        url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles?page={page}"
+        url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles?page={page}&per_page=100"
         headers = {'Authorization': f'Bearer {access_token}'}
         
         try:
             async with session.get(url, headers=headers) as response:
-                if response.status == 429: #rip
+                if response.status == 429:
                     if retries < MAX_RETRIES:
                         retries += 1
-                        await asyncio.sleep(RATE_LIMIT_DELAY * 2**retries)
+                        retry_delay = RATE_LIMIT_DELAY * 2**retries
+                        logger.warning(f"Rate limit hit, waiting {retry_delay}s before retry {retries}/{MAX_RETRIES}")
+                        await asyncio.sleep(retry_delay)
                         continue
                     else:
-                        logging.error("Max retries reached for rate limiting")
+                        logger.error("Max retries reached for rate limiting")
                         break
                         
                 if response.status != 200:
-                    logging.error(f"Error fetching vehicles: HTTP {response.status}")
+                    response_text = await response.text()
+                    logger.error(f"Error fetching vehicles: HTTP {response.status}\nURL: {url}\nResponse: {response_text}")
                     break
                 
                 retries = 0
                 data = await response.json()
                 vehicles = data.get('response', [])
                 
-                if not vehicles:
+                if not vehicles:  # Page vide = on a fini
                     break
                 
                 vins = [vehicle['vin'] for vehicle in vehicles]
                 all_vins.extend(vins)
-                logging.info(f"Found {len(vins)} vehicles on page {page}")
+                logger.info(f"Found {len(vins)} vehicles on page {page}. Total so far: {len(all_vins)}")
                 
+                # Continue à la page suivante
                 page += 1
                 await asyncio.sleep(RATE_LIMIT_DELAY)
                 
         except Exception as e:
-            logging.error(f"Error fetching vehicles: {str(e)}")
+            logger.error(f"Error fetching vehicles: {str(e)}")
             break
     
+    logger.info(f"Total vehicles retrieved: {len(all_vins)}")
     return all_vins
 
 async def get_vehicle_options(session: aiohttp.ClientSession, access_token: str, vin: str) -> Dict:
