@@ -87,4 +87,20 @@ Here "XX" is the name of the data provider.
         - Set the dtypes of the time series
         - add missing columns (for ex: in_charge/dishcarge, cum energy added, cum energy spent, ...)  
         - Merge fleet info into the time series
+- **results.py**:
+    goal: Store the results in the database.
+    Input: The processed time series dataframes.
+    Output: None.
+    Output location: The results table in the database.
+    Steps:
+        - For each vehicle, find the latest date of data in the processed time series.
+        - Update the vehicle table in the database with the latest date of data for each vehicle.
+- **VehicleInfoProcessor.py**:
+    goal: Update the vehicle table in the database with the last date of data for each vehicle.
+    Input: The processed time series dataframes.
+    Output: None.
+    Output location: The vehicle table in the database.
+    Steps:
+        - For each vehicle, find the latest date of data in the processed time series.
+        - Update the vehicle table in the database with the latest date of data for each vehicle.
 
