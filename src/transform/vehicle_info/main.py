@@ -57,7 +57,7 @@ class VehicleInfoProcessor:
         brands = pd.read_sql_table("oem", con)
         final_last_date = pd.DataFrame()
         # for brand in brands['oem_name'].values except tesla:
-        for brand in [b for b in brands['oem_name'].values if b.lower() != 'tesla']:
+        for brand in brands['oem_name'].values:
 
             # Determine brand from VIN or database
             # brand = self.determine_brand(vin)
