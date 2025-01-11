@@ -260,12 +260,12 @@ class BMWIngester:
         self.__vehicles.update(vehicles)
         for vehicle in vehicles:
             # TODO: fix rate limiting
-            logging.info(f"Adding vehicle with VIN {vehicle.vin} (brand {vehicle.brand}) to the scheduler (interval: {vehicle.rate_limit} seconds)")
+            logging.info(f"Adding vehicle with VIN {vehicle.vin} (brand {vehicle.brand.lower()}) to the scheduler (interval: {vehicle.rate_limit} seconds)")
             self.__fetch_scheduler.every(vehicle.rate_limit).seconds.do(
                 self.__job_queue.put, lambda v=vehicle: self.__process_vehicle(v)
             ).tag(vehicle.vin)
             self.__scheduler_logger.info(
-                f"Adding vehicle with VIN {vehicle.vin} (brand {vehicle.brand}) to the scheduler (interval: {vehicle.rate_limit} seconds)"
+                f"Adding vehicle with VIN {vehicle.vin} (brand {vehicle.brand.lower()}) to the scheduler (interval: {vehicle.rate_limit} seconds)"
             )
         self.__fetch_scheduler.every(self.refresh_interval).minutes.do(
             self.__job_queue.put,
@@ -301,20 +301,20 @@ class BMWIngester:
         )
         for v in vehicles_to_add:
             self.__scheduler_logger.info(
-                f"Adding vehicle with VIN {v.vin} (brand {v.brand}) to scheduler (interval {v.rate_limit} seconds)"
+                f"Adding vehicle with VIN {v.vin} (brand {v.brand.lower()}) to scheduler (interval {v.rate_limit} seconds)"
             )
             self.__fetch_scheduler.every(v.rate_limit).seconds.do(
                 self.__job_queue.put, lambda vv=v: self.__process_vehicle(vv)
             ).tag(v.vin)
         for v in vehicles_to_remove:
             self.__scheduler_logger.info(
-                f"Removing task for vehicle with VIN {v.vin} (brand {v.brand})"
+                f"Removing task for vehicle with VIN {v.vin} (brand {v.brand.lower()})"
             )
             self.__fetch_scheduler.clear(v.vin)
 
     def __process_vehicle(self, vehicle: Vehicle) -> None:
         self.__ingester_logger.info(
-            f"Starting processing for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
+            f"Starting processing for vehicle with VIN {vehicle.vin} (brand {vehicle.brand.lower()})"
         )
         error, info = self.__api.get_vehicle_info(vehicle.vin)
         def log_error(info):
@@ -325,19 +325,19 @@ class BMWIngester:
         match error:
             case 200:
                 self.__ingester_logger.info(
-                    f"Fetched vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
+                    f"Fetched vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand.lower()})"
                 )
                 try:
                     decoded = info
                 except (msgspec.ValidationError, msgspec.DecodeError) as e:
                     self.__ingester_logger.error(
-                        f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): response {info} does not fit schema ({e})"
+                        f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand.lower()}): response {info} does not fit schema ({e})"
                     )
                     return
                 self.__ingester_logger.info(
                     f"Parsed response for vehicle with VIN {vehicle.vin} correctly"
                 )
-                filename = f"response/{vehicle.brand}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
+                filename = f"response/{vehicle.brand.lower()}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
                 try:
                     encoded = msgspec.json.encode(decoded)
                 except msgspec.EncodeError as e:
@@ -382,8 +382,7 @@ class BMWIngester:
                 pass
         self.__ingester_logger.info("Stopping worker thread")
 
-    def run(self):
-        # Vérification de COMPRESS_ONLY déplacée ici
+    def run(self):        
         if os.getenv("COMPRESS_ONLY_BMW") and os.getenv("COMPRESS_ONLY_BMW") == "1":
             asyncio.run(self.__compress())
         else:
