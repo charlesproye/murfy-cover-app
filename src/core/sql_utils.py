@@ -143,10 +143,16 @@ def right_union_merge_rdb_table(lhs: DF, table: str, left_on: list[str], right_o
     columns_info = inspector.get_columns(table)
     notna_cols = [col['name'] for col in columns_info if not col['nullable']]
     lhs = lhs.dropna(subset=lhs.columns.intersection(notna_cols), how="any")
-    if "id" in notna_cols and "id" not in lhs.columns and "id" in right_on:        
-        logger.debug(f'"id" column is a mandatory not null col in rdb table {table} but is not in lhs. Adding id column to lhs.')
+    if "id" in notna_cols:
+        if "id" not in lhs.columns:
+            logger.debug(f'"id" column is a mandatory not null col in rdb table {table} but is not in lhs. Adding id column to lhs.')
+            dest_cols.append("id")
+            lhs["id"] = [uuid4() for _ in range(len(lhs))]
+        else:
+            logger.debug(f'filling any null values in id column with uuid4')
+            na_id_mask = lhs["id"].isna()
+            lhs.loc[na_id_mask, "id"] = [uuid4() for _ in range(na_id_mask.sum())]
         dest_cols.append("id")
-        lhs["id"] = [uuid4() for _ in range(len(lhs))]
     # Split DataFrame into records to update and records to insert
     # Get existing key records from the table to know which ones will be updated
     rdb_table_keys = MultiIdx.from_frame(rhs[right_on])
