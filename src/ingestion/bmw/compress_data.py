@@ -176,7 +176,7 @@ class BMWCompresser:
             self.__logger.error(f"Error in process_vin for {vin}: {e}")
 
     async def run(self):
-        self.__logger.info("Starting BMW data compression")
+        self.__logger.info("Starting bmw data compression")
         try:
             await self.list_objects()
             
@@ -187,7 +187,7 @@ class BMWCompresser:
             max_concurrent_vins = 5  # Ajuster selon les besoins
             tasks = []
             
-            for vin, temp_data in self.__s3_keys_by_vin["BMW"].items():
+            for vin, temp_data in self.__s3_keys_by_vin["bmw"].items():
                 if self.__shutdown_requested.is_set():
                     break
                     
@@ -202,7 +202,7 @@ class BMWCompresser:
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
                     
-            self.__logger.info("Completed BMW data compression")
+            self.__logger.info("Completed bmw data compression")
         except Exception as e:
             self.__logger.error(f"Error in compression run: {e}")
             raise
