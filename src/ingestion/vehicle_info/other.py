@@ -498,6 +498,52 @@ async def cleanup_unused_models():
             logging.error(f"Erreur lors du nettoyage des modèles non utilisés: {str(e)}")
             raise
 
+async def find_models_needing_completion():
+    """
+    Identifier les modèles avec des valeurs NULL.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT 
+                       id,
+                       model_name,
+                       type,
+                       url_image,
+                       warranty_km,
+                       warranty_date,
+                       capacity,
+                       net_capacity,
+                       autonomy
+            FROM vehicle_model
+            WHERE 
+                       id IS NULL 
+                       OR model_name IS NULL
+                       OR type IS NULL
+                       OR url_image IS NULL 
+                       OR warranty_km IS NULL 
+                       OR warranty_date IS NULL 
+                       OR capacity IS NULL
+                       OR net_capacity IS NULL
+                       OR autonomy IS NULL
+        """)
+        
+        results = cursor.fetchall()
+        
+        if results:
+            print("\nVéhicules besoin d'être complétés:")
+            print("--------------------------------------------------------------------------------")
+            print("ID | Brand | Model ")
+            print("--------------------------------------------------------------------------------")
+            for row in results:
+                id, model_name, type = row
+                print(f"{id} | {type} | {model_name}")
+            print("--------------------------------------------------------------------------------")
+        else:
+            print("Tout les modèles sont complets")
+            
+        return results
 async def main(df: pd.DataFrame):
     try:
         logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}") #don't work at the moment
@@ -507,6 +553,7 @@ async def main(df: pd.DataFrame):
         await list_used_models()
         # await cleanup_unused_models()
         # metadata = await get_existing_model_metadata()
+        await find_models_needing_completion()
         
     except Exception as e:
         logging.error(f"Erreur dans le programme principal: {str(e)}")
