@@ -143,7 +143,7 @@ def right_union_merge_rdb_table(lhs: DF, table: str, left_on: list[str], right_o
     columns_info = inspector.get_columns(table)
     notna_cols = [col['name'] for col in columns_info if not col['nullable']]
     lhs = lhs.dropna(subset=lhs.columns.intersection(notna_cols), how="any")
-    if "id" in notna_cols and "id" not in lhs.columns:
+    if "id" in notna_cols and "id" not in lhs.columns and "id" in right_on:        
         logger.debug(f'"id" column is a mandatory not null col in rdb table {table} but is not in lhs. Adding id column to lhs.')
         dest_cols.append("id")
         lhs["id"] = [uuid4() for _ in range(len(lhs))]

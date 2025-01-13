@@ -7,11 +7,15 @@ import time
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from transform.config import *
-from transform.raw_tss.main import update_all_raw_tss
-from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from core.console_utils import main_decorator, parse_kwargs
 from core.logging_utils import set_level_of_loggers_with_prefix
+from transform.config import *
+
+from transform.raw_tss.main import update_all_raw_tss
+from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
+from transform.results.main import update_vehicle_data_table
+from transform.vehicle_info.main import VehicleInfoProcessor
+
 
 logger = getLogger("transform.main")
 
@@ -46,13 +50,19 @@ def run_entire_pipeline():
         logging.info("Starting pipeline execution")
         start_time = DT.now()
         
-        update_all_raw_tss()
-        logging.info("Raw TSS update completed")
+        # update_all_raw_tss()
+        # logging.info("Raw TSS update completed")
         
-        #  update_db_vehicle_table()
+        # #  update_db_vehicle_table()
 
-        ProcessedTimeSeries.update_all_tss()
-        logging.info("Processed TSS update completed")
+        # ProcessedTimeSeries.update_all_tss()
+        # logging.info("Processed TSS update completed")
+
+        # update_vehicle_data_table()
+        # logging.info("Results update completed")
+
+        VehicleInfoProcessor().process_all_vehicles()
+        logging.info("Vehicle info update completed")
         
         end_time = DT.now()
         duration = end_time - start_time
@@ -64,7 +74,7 @@ def run_entire_pipeline():
 def run_scheduler():
     # Programmer l'exécution tous les jours à minuit
     logger.info("Scheduling pipeline execution")
-    schedule.every().day.at("00:00").do(run_entire_pipeline)
+    schedule.every().day.at("9:00").do(run_entire_pipeline)
     # run_entire_pipeline()
     logger.info("Scheduler started - Pipeline will run daily at midnight")
     
