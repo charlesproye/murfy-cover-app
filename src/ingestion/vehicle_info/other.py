@@ -520,7 +520,6 @@ async def find_models_needing_completion():
             WHERE 
                        id IS NULL 
                        OR model_name IS NULL
-                       OR type IS NULL
                        OR url_image IS NULL 
                        OR warranty_km IS NULL 
                        OR warranty_date IS NULL 
