@@ -61,12 +61,12 @@ class BMWCompresser:
             endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
         ) as s3:
             paginator = s3.get_paginator("list_objects_v2")
-            brand_name = "BMW"
+            brand_name = "bmw"
             s3_keys = set()
             
             async for page in paginator.paginate(
                 Bucket=self.__bucket, 
-                Prefix=f"response/{brand_name}"
+                Prefix=f"response/{brand_name.lower()}"
             ):
                 if 'Contents' in page:
                     s3_keys.update(obj["Key"] for obj in page["Contents"])
@@ -76,9 +76,9 @@ class BMWCompresser:
                 filter(lambda v: len(v) == 17, map(lambda v: v.split("/")[2], s3_keys))
             )
             
-            self.__s3_keys_by_vin[brand_name] = {
+            self.__s3_keys_by_vin[brand_name.lower()] = {
                 vin: set(filter(
-                    lambda e: e.startswith(f"response/{brand_name}/{vin}/temp/"),
+                    lambda e: e.startswith(f"response/{brand_name.lower()}/{vin}/temp/"),
                     s3_keys
                 ))
                 for vin in vins
@@ -109,7 +109,7 @@ class BMWCompresser:
                 # Upload to date-specific file
                 await s3.put_object(
                     Bucket=self.__bucket,
-                    Key=f"response/BMW/{vin}/{date}.json",
+                    Key=f"response/bmw/{vin}/{date}.json",
                     Body=encoded,
                 )
                 
