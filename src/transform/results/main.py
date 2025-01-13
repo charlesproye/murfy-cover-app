@@ -14,11 +14,11 @@ from transform.results.volvo_results import get_results as get_volvo_results
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
-    # "mercedes-benz": get_mercedes_results,
-    "renault": get_renault_results,
-    "tesla": get_tesla_results,
-    "ford": get_ford_results,
-    "volvo": get_volvo_results,
+    "mercedes-benz": get_mercedes_results,
+    # "renault": get_renault_results,
+    # "tesla": get_tesla_results,
+    # "ford": get_ford_results,
+    # "volvo": get_volvo_results,
 }
 
 def update_vehicle_data_table():
