@@ -74,8 +74,9 @@ def run_entire_pipeline():
 def run_scheduler():
     # Programmer l'exécution tous les jours à minuit
     logger.info("Scheduling pipeline execution")
-    schedule.every().day.at("9:00").do(run_entire_pipeline)
-    # run_entire_pipeline()
+    # schedule.every().day.at("11:26").do(run_entire_pipeline)
+    ## For testing
+    run_entire_pipeline()
     logger.info("Scheduler started - Pipeline will run daily at midnight")
     
     # Boucle infinie pour maintenir le scheduler actif

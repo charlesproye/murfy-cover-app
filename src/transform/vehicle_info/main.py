@@ -8,6 +8,7 @@ from typing import Dict, List
 import logging
 
 from sqlalchemy import Connection as Con
+from core.sql_utils import get_connection
 
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
@@ -49,30 +50,38 @@ class VehicleInfoProcessor:
             logger.error(f"Error checking S3 for brand {brand}: {e}")
             return None
 
-    def process_all_vehicles(self) -> Dict[str, datetime]:
-        """Process all vehicles and return their last file dates"""
-        results = {}
-        vins = self.get_vehicle_vins()
-        # Once we have all the vins, we want to check all the brands and get the last file date
-        brands = pd.read_sql_table("oem", con)
-        final_last_date = pd.DataFrame()
-        # for brand in brands['oem_name'].values except tesla:
-        for brand in brands['oem_name'].values:
-
-            # Determine brand from VIN or database
-            # brand = self.determine_brand(vin)
-            print(brand)
-
-            last_date = self.get_last_file_date(brand)
-            # results[vin] = last_date
-
-            final_last_date = pd.concat([final_last_date, last_date])
-            # logger.info(f"VIN: {vin}, Last file date: {last_date}")
-        right_inner_merge(final_last_date, "vehicle", "vin", "vin", ["last_date_data"])
-        print(final_last_date)
-
-        return results
-
+    def process_all_vehicles(self):
+        try:
+            # Get all brands except Tesla
+            with get_connection() as conn:
+                brands = pd.read_sql("SELECT DISTINCT oem_name FROM oem", conn)
+                
+                final_last_date = pd.DataFrame()
+                
+                for brand in brands['oem_name'].values:
+                    try:
+                        last_date_data = self.get_last_file_date(brand)
+                        if last_date_data is not None and not last_date_data.empty:
+                            print(brand)
+                            final_last_date = pd.concat([final_last_date, last_date_data])
+                    except Exception as e:
+                        logging.error(f"Error processing brand {brand}: {str(e)}")
+                        continue
+                        
+                if not final_last_date.empty:
+                    # Create cursor and execute updates within the same connection context
+                    with conn.cursor() as cursor:
+                        for index, row in final_last_date.iterrows():
+                            cursor.execute("""
+                                UPDATE vehicle 
+                                SET last_date_data = %s 
+                                WHERE vin = %s
+                            """, (row['last_date_data'], row['vin']))
+                        conn.commit()
+                        
+        except Exception as e:
+            logging.error(f"Error in process_all_vehicles: {str(e)}")
+            raise
     
 
 def main():
