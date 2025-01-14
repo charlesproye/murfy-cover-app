@@ -8,7 +8,7 @@ import re
 
 from core.sql_utils import get_connection
 from fleet_info import read_fleet_info as fleet_info
-
+from config import *
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,156 +40,16 @@ def convert_date_format(date_str):
         return None
 
 def standardize_model_type(model: str, type_value: str, make: str) -> tuple[str, str]:
-    if not type_value:
+    if not type_value or type_value =='x':
         return model.lower(), None
 
     model = model.lower()
     type_value = type_value.lower()
-
-    suffixes_to_remove = ['5d', '4d', '3d', 'auto', 'aut', 'actieauto', 'onze deal', 
-                         'business', 'executive', 'edition', 'line', 'r-design']
+    make_lower = make.lower()
     
     for suffix in suffixes_to_remove:
         type_value = type_value.replace(f" {suffix}", "")
     
-    mappings = {
-        'bmw': {
-            'i3': {  # Un seul modèle i3
-                'patterns': [
-                    (r'.*i3s.*120\s*ah.*', 'i3s 120ah'),  # i3s doit être avant i3 pour être vérifié en premier
-                    (r'.*120\s*ah.*', '120ah'),           # i3 120ah standards
-                    (r'.*94\s*ah.*|.*92\s*ah.*', '94ah'), # Capture les deux variantes 94/92ah
-                ],
-                'model_clean': lambda m: 'i3'
-            },
-            'i4': {
-                'patterns': [(r'.*', 'x')],
-                'model_clean': lambda m: 'i4'
-            }
-        },
-        'ds': {
-            'ds 3 crossback': {
-                'patterns': [(r'.*e-tense 50\s*kwh.*', 'e-tense 50 kwh')],
-            },
-            'ds 7 crossback': {
-                'patterns': [(r'.*e-tense 4x4.*', 'e-tense 4x4')],
-            },
-        },
-        'mercedes': {
-            'eqa': {
-                'patterns': [(r'.*250.*|.*eqa.*', '250')],
-                'model_clean': lambda m: 'eqa'
-            },
-            'eqb': {
-                'patterns': [(r'.*250.*|.*eqb.*', '250')],
-                'model_clean': lambda m: 'eqb'
-            },
-            'eqc': {
-                # Tous les EQC sont des 400 4matic, peu importe les suffixes (amg, solution, luxury, etc.)
-                'patterns': [(r'.*400.*4matic.*', '400 4matic')],
-                'model_clean': lambda m: 'eqc'
-            },
-            'eqs': {
-                # Tous les EQS sont des 450+, peu importe les suffixes (luxury, etc.)
-                'patterns': [(r'.*450\+.*', '450+')],
-                'model_clean': lambda m: 'eqs'
-            },
-            'sprinter': {
-                'patterns': [(r'.*47kwh.*|.*sprinter.*', '47kwh')],
-                'model_clean': lambda m: 'sprinter'
-            },
-            'vito': {
-                'patterns': [(r'.*35kwh.*|.*vito.*', '35kwh')],
-                'model_clean': lambda m: 'vito'
-            },
-        },
-        'kia': {
-            'e-niro': {
-                'patterns': [(r'.*64kwh.*|.*x.*', '64kwh')],
-            },
-            'ev6': {
-                'patterns': [(r'.*77\.4kwh.*rwd.*|.*x.*', '77.4kwh rwd')],
-            },
-        },
-        'peugeot': {
-            '208': {
-                'patterns': [(r'.*50kwh 136.*', 'ev 50kwh 136')],
-            },
-            '2008': {
-                'patterns': [(r'.*50kwh 136.*', 'ev 50kwh 136')],
-                'model_clean': lambda m: '2008'  # Unifie e-2008 et 2008
-            },
-            'e-2008': {
-                'patterns': [(r'.*50kwh 136.*', 'ev 50kwh 136')],
-                'model_clean': lambda m: '2008'  # Unifie e-2008 et 2008
-            },
-        },
-        'renault': {
-            'zoe': {
-                'patterns': [
-                    (r'.*r110.*', 'R110'),
-                    (r'.*r135.*', 'R135'),
-                ],
-                'model_clean': lambda m: 'zoe',
-                'metadata': {
-                    'url_image': {
-                        'R110': 'https://olinn.eu/sites/default/files/styles/max_650/public/images/zoe-1-2.png?itok=WtFDoX9b',
-                        'R135': 'https://carvo.ch/assets/images/models/md-5/medium/renault-zoe.png'
-                    },
-                    'warranty_km': 160000,
-                    'warranty_date': {
-                        'R110': 8,
-                        'R135': 6
-                    },
-                    'capacity': {
-                        'R110': 52,
-                        'R135': 52
-                    }
-                }
-            }
-        },
-        'ford': {
-            'mustang mach-e': {
-                'patterns': [
-                    # 75 kWh versions
-                    (r'.*75kwh.*awd.*(?:tech.*pack.*)?', '75kwh awd'),     # Ignore tech pack/plus
-                    (r'.*75kwh.*rwd.*(?:tech.*pack.*)?', '75kwh rwd'),     # Ignore tech pack/plus
-                    # 98 kWh versions
-                    (r'.*98kwh.*extended.*range.*awd.*(?:tech.*pack.*)?', '98kwh extended range awd'),
-                    (r'.*98kwh.*extended.*range.*rwd.*(?:tech.*pack.*)?', '98kwh extended range rwd'),
-                ],
-                'model_clean': lambda m: 'mustang mach-e'
-            },
-            'e-transit': {
-                'patterns': [(r'.*', 'x')],
-                'model_clean': lambda m: 'e-transit'
-            }
-        },
-        'volvo': {
-            'xc40': {
-                'patterns': [
-                    (r'.*p8.*awd.*', 'p8 awd'),
-                    (r'.*recharge.*twin.*', 'recharge twin'),
-                    (r'.*recharge.*plus.*', 'recharge plus'),
-                    (r'.*recharge.*core.*', 'recharge core')
-                ],
-                'model_clean': lambda m: 'xc40',
-                'metadata': {
-                    'url_image': 'https://cas.volvocars.com/image/dynamic/MY25_2417/536/exterior-v1/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/default.png?market=fr&client=ccs-self-service&fallback&angle=4&w=750&bg=00000000',
-                    'warranty_km': 160000,
-                    'warranty_date': 8,
-                    'capacity': {
-                        'p8 awd': 75,
-                        'recharge twin': 78,
-                        'recharge plus': 69,
-                        'recharge core': 69
-                    }
-                }
-            }
-        }
-    }
-
-    make_lower = make.lower()
     if make_lower in mappings and model in mappings[make_lower]:
         model_info = mappings[make_lower][model]
         
@@ -200,9 +60,9 @@ def standardize_model_type(model: str, type_value: str, make: str) -> tuple[str,
         # Applique les patterns pour le type
         for pattern, replacement in model_info['patterns']:
             if re.search(pattern, type_value):
-                return model, replacement
+                return model.lower(), str(replacement).lower()
 
-    return model, type_value.strip()
+    return model.lower(), type_value.strip().lower()
 
 async def process_vehicles(df: pd.DataFrame):
     """Traite les véhicules du DataFrame et les insère dans la base de données"""
@@ -402,157 +262,14 @@ async def get_existing_model_metadata():
             print("Aucune métadonnée trouvée dans la base")
             
         return results
-
-
-async def list_used_models():
-    """Liste tous les modèles de véhicules présents dans la base de données qui sont utilisés"""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT 
-                vm.id,
-                o.oem_name,
-                vm.model_name,
-                vm.type,
-                COUNT(v.id) as vehicle_count
-            FROM vehicle_model vm
-            JOIN oem o ON vm.oem_id = o.id
-            JOIN vehicle v ON v.vehicle_model_id = vm.id
-            GROUP BY vm.id, o.oem_name, vm.model_name, vm.type
-            ORDER BY o.oem_name, vm.model_name, vm.type
-        """)
-        
-        results = cursor.fetchall()
-        
-        if results:
-            print("\nModèles de véhicules utilisés dans la base :")
-            print("--------------------------------------------------------------------------------")
-            print("ID | Marque | Modèle | Type | Nombre de véhicules")
-            print("--------------------------------------------------------------------------------")
-            total_vehicles = 0
-            for row in results:
-                model_id, oem, model, type_value, count = row
-                type_str = type_value if type_value else "N/A"
-                print(f"{model_id} | {oem} | {model} | {type_str} | {count}")
-                total_vehicles += count
-            print("--------------------------------------------------------------------------------")
-            print(f"Total : {len(results)} modèles différents")
-            print(f"Total véhicules : {total_vehicles}")
-        else:
-            print("Aucun modèle trouvé dans la base")
-
-async def cleanup_unused_models():
-    """
-    Supprime les modèles de véhicules qui ne sont liés à aucun véhicule dans la base de données.
-    Retourne le nombre de modèles supprimés.
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        try:
-            # Récupère les modèles non utilisés
-            cursor.execute("""
-                SELECT 
-                    vm.id,
-                    o.oem_name,
-                    vm.model_name,
-                    vm.type
-                FROM vehicle_model vm
-                JOIN oem o ON vm.oem_id = o.id
-                LEFT JOIN vehicle v ON v.vehicle_model_id = vm.id
-                WHERE v.id IS NULL
-            """)
             
-            unused_models = cursor.fetchall()
-            
-            if unused_models:
-                # Supprime les modèles non utilisés
-                cursor.execute("""
-                    DELETE FROM vehicle_model vm
-                    WHERE NOT EXISTS (
-                        SELECT 1 
-                        FROM vehicle v 
-                        WHERE v.vehicle_model_id = vm.id
-                    )
-                    RETURNING id
-                """)
-                
-                deleted_count = len(cursor.fetchall())
-                conn.commit()
-                
-                # Log les modèles supprimés
-                logging.info(f"Suppression de {deleted_count} modèles non utilisés:")
-                for model in unused_models:
-                    model_id, oem, model_name, type_value = model
-                    type_str = type_value if type_value else "N/A"
-                    logging.info(f"- {oem} | {model_name} | {type_str} (ID: {model_id})")
-                
-                return deleted_count
-            else:
-                logging.info("Aucun modèle non utilisé trouvé dans la base")
-                return 0
-                
-        except Exception as e:
-            conn.rollback()
-            logging.error(f"Erreur lors du nettoyage des modèles non utilisés: {str(e)}")
-            raise
-
-async def find_models_needing_completion():
-    """
-    Identifier les modèles avec des valeurs NULL.
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT 
-                       id,
-                       model_name,
-                       type,
-                       url_image,
-                       warranty_km,
-                       warranty_date,
-                       capacity,
-                       net_capacity,
-                       autonomy
-            FROM vehicle_model
-            WHERE 
-                       id IS NULL 
-                       OR model_name IS NULL
-                       OR url_image IS NULL 
-                       OR warranty_km IS NULL 
-                       OR warranty_date IS NULL 
-                       OR capacity IS NULL
-                       OR net_capacity IS NULL
-                       OR autonomy IS NULL
-        """)
-        
-        results = cursor.fetchall()
-        
-        if results:
-            print("\nVéhicules besoin d'être complétés:")
-            print("--------------------------------------------------------------------------------")
-            print("ID | Brand | Model ")
-            print("--------------------------------------------------------------------------------")
-            for row in results:
-                id, model_name, type = row
-                print(f"{id} | {type} | {model_name}")
-            print("--------------------------------------------------------------------------------")
-        else:
-            print("Tout les modèles sont complets")
-            
-        return results
 async def main(df: pd.DataFrame):
     try:
         logging.info(f"Nombre total de véhicules dans fleet_info: {len(df)}") #don't work at the moment
         df = df.query("make != 'tesla'")
 
-        # await process_vehicles(df)
-        await list_used_models()
-        # await cleanup_unused_models()
-        # metadata = await get_existing_model_metadata()
-        await find_models_needing_completion()
+        await process_vehicles(df)
+        #metadata = await get_existing_model_metadata()
         
     except Exception as e:
         logging.error(f"Erreur dans le programme principal: {str(e)}")
