@@ -287,6 +287,7 @@ class Electricity(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True
     residual_autonomy: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
     level: Optional[EnergyConsumptionLevel] = None
     instant_consumption: Optional[TimestampedValueWithUnit[float, EnergyConsumptionUnit]] = None
+    stateOfHealth: Optional[TimestampedValue[float]] = None
 
     @classmethod
     def __struct_from_dict__(cls, d):
@@ -302,6 +303,7 @@ class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_default
     battery_capacity: list[TimestampedValueWithUnit[float, CapacityUnit]] = []
     charging: list[Charging] = []
     engine_speed: list[TimestampedValueWithUnit[float, EngineSpeedUnit]] = []
+    stateOfHealth: list[TimestampedValue[float]] = []
 
     @classmethod
     def from_list(cls, lst: list[Electricity]) -> Self:
@@ -328,6 +330,9 @@ class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_default
                 for x in map(lambda e: e.engine.speed if e.engine else None, lst)
                 if x is not None
             ]
+        )
+        res.stateOfHealth = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.stateOfHealth, lst) if x is not None]
         )
         return res
 
