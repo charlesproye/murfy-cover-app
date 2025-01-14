@@ -166,9 +166,9 @@ if __name__ == "__main__":
     fleet_info = asyncio.run(fleet_info())
     print(fleet_info)
     # Get the correct info model for each brand 
-    #asyncio.run(tesla_main(fleet_info))
+    asyncio.run(tesla_main(fleet_info))
     #Get the information of the model based on the excel file 
-    #asyncio.run(other_main(fleet_info))
+    asyncio.run(other_main(fleet_info))
 
     cleanup_unused_models()
     list_used_models()
