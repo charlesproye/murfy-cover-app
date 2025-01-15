@@ -145,21 +145,6 @@ def find_models_needing_completion():
         else:
             print("Tout les modèles sont complets")
 
-def force_lowercase():
-    """
-    Forcer model_name et type en minuscule
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            UPDATE vehicle_model
-            SET
-                model_name = lower(model_name),
-                type = lower(type)""")
-            
-        conn.commit()
-
 
 if __name__ == "__main__":
 
@@ -173,4 +158,3 @@ if __name__ == "__main__":
     cleanup_unused_models()
     list_used_models()
     find_models_needing_completion()
-    force_lowercase()
