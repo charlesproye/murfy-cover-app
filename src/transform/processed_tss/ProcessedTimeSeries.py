@@ -11,6 +11,7 @@ from transform.processed_tss.config import *
 from transform.raw_tss.main import get_raw_tss
 from transform.fleet_info.main import fleet_info
 
+logger = getLogger("transform.processed_tss")
 
 class ProcessedTimeSeries(CachedETL):
     _metadata = ['make', "logger", "id_col", "max_td"]
@@ -126,7 +127,7 @@ class ProcessedTimeSeries(CachedETL):
     @classmethod
     def update_all_tss(cls, **kwargs):
         for make in ALL_MAKES:
-            print(f"Updating {make} tss.")
+            logger.info(f"==============Updating {make} tss.==============")
             cls(make, force_update=True, **kwargs)
 
 @main_decorator

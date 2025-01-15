@@ -97,6 +97,7 @@ COL_DTYPES = {
     "coolant_temperature": "float32",
     "kombi_remaining_electric_range": "float32",
     # Tesla
+    "battery_heater": "bool",
     "battery_heater_no_power": "bool",
     "fast_charger_present": "bool",
     "power": "float32",
