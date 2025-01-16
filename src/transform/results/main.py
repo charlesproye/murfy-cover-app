@@ -15,10 +15,10 @@ from transform.results.volvo_results import get_results as get_volvo_results
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
     "mercedes-benz": get_mercedes_results,
-    # "renault": get_renault_results,
-    # "tesla": get_tesla_results,
-    # "ford": get_ford_results,
-    # "volvo": get_volvo_results,
+    "renault": get_renault_results,
+    "tesla": get_tesla_results,
+    "ford": get_ford_results,
+    "volvo": get_volvo_results,
 }
 
 def update_vehicle_data_table():
@@ -42,18 +42,36 @@ def get_all_processed_results() -> DF:
 
 def get_processed_results(brand:str) -> DF:
     results = GET_RESULTS_FUNCS[brand]()
-    print(brand)
-    if brand != "tesla":
-        results = agg_results_by_discharge_and_charge(results)
+    logger.info(f"Processing {brand} results.")
     results =  (
         results
         .sort_values(["vin", "date"])
-        .dropna(subset=["soh", "odometer"], how="all")
-        .reset_index()
+        .pipe(agg_results_by_update_frequency)
         .groupby('vin')
         .apply(make_soh_presentable, include_groups=False)
         .reset_index(drop=False)  # Supprime l'index 'vin' créé par le groupby
-        .pipe(set_floored_day_date)
+        .pipe(filter_results_by_lines_bounds, VALID_SOH_LINE_BOUNDS, logger=logger)
+        .groupby("vin")
+        .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
+        .reset_index()
+        .sort_values(["vin", "date"])
+    )
+    results["soh"] = results.groupby("vin")["soh"].ffill()
+    results["odometer"] = results.groupby("vin")["odometer"].ffill()
+    results["soh"] = results.groupby("vin")["soh"].bfill()
+    results["odometer"] = results.groupby("vin")["odometer"].bfill()
+    return results
+
+def agg_results_by_update_frequency(results:DF) -> DF:
+    results["date"] = (
+        pd.to_datetime(results["date"], format='mixed')
+        .dt.floor(UPDATE_FREQUENCY)
+        .dt.tz_localize(None)
+        .dt.date
+        .astype('datetime64[ns]')
+    )
+    return (
+        results
         .groupby(["vin", "date"])
         .agg({
             "odometer": "last",    
@@ -62,43 +80,12 @@ def get_processed_results(brand:str) -> DF:
             "version": "first",
         })
         .reset_index()
-        .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger=logger)
-        .reset_index()
-        .groupby("vin")
-        .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
-        .reset_index()
     )
-    results_grp = results.groupby("vin")
-    results[["soh", "odometer"]] = results_grp[["soh", "odometer"]].ffill()
-    results[["soh", "odometer"]] = results_grp[["soh", "odometer"]].bfill()
-    return results
-
-def agg_results_by_discharge_and_charge(results:DF) -> DF:
-    return (
-        results
-        .groupby(["vin", "trimmed_in_discharge_idx"])
-        .agg({
-            "soh": "median",
-            "odometer": "last",
-            "date": "last",
-            "date": "first",
-            "model": "first",
-            "version": "first",
-        })
-        .reset_index()
-    )
-
-def set_floored_day_date(df:DF) -> DF:
-    df["date"] = (
-        pd.to_datetime(df["date"], format='mixed')
-        .dt.floor(UPDATE_FREQUENCY)
-        .dt.tz_localize(None)
-        .dt.date
-        .astype('datetime64[ns]')
-    )
-    return df
 
 def make_soh_presentable(df:DF) -> DF:
+    if df["soh"].isna().all():
+        logger.warning(f"No SOH data for {df.name}")
+        return df
     if len(df) > 3:
         outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
         assert outliser_mask.sum() > 0, f"There seems to be only outliers???: {df['soh'].quantile(0.05)}, {df['soh'].quantile(0.95)}\n{df['soh']}"
