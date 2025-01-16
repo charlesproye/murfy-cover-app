@@ -11,7 +11,7 @@ logger = getLogger("transform.results.tesla_results")
 
 def get_results() -> DF:
     logger.info("Getting results for Ford.")
-    tss = ProcessedTimeSeries("ford", force_update=True)
+    tss = ProcessedTimeSeries("ford")
     max_energy = (
         tss
         .groupby(["capacity", "soc"])
@@ -34,3 +34,4 @@ def get_results() -> DF:
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "transform.results")
     single_dataframe_script_main(get_results, logger=logger)
+
