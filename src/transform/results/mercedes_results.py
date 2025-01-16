@@ -51,7 +51,7 @@ def get_results() -> DF:
         .pipe(fill_vars, cols=["soc", "estimated_range", "range"])
         .reset_index()
         .assign(discharge_size = lambda df: df.groupby(["vin", "in_discharge_idx"]).transform("size"))
-        .query("soc > 0.7 & soc < 0.98 & discharge_size > 10") # & in_discharge")
+        .query("soc.between(0.7, 0.98) & discharge_size > 10")
         .groupby('model', group_keys=False)
         .apply(apply_model_calculation)
         .sort_values(["vin", "date"])
