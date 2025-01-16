@@ -43,6 +43,9 @@ def get_all_processed_results() -> DF:
 def get_processed_results(brand:str) -> DF:
     results = GET_RESULTS_FUNCS[brand]()
     logger.info(f"Processing {brand} results.")
+    return process_results(results)
+
+def process_results(results:DF) -> DF:
     results =  (
         results
         .sort_values(["vin", "date"])
