@@ -38,30 +38,17 @@ def update_vehicle_data_table():
 def get_all_processed_results() -> DF:
     return (
         pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
-        .groupby("vin")
-        .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
-        .reset_index()
     )
-
-def add_lines_up_to_today_for_vehicle(results:DF) -> DF:
-    last_date = pd.Timestamp.now().floor(UPDATE_FREQUENCY).date()
-    dates_up_to_last_date = pd.date_range(results["date"].min(), last_date, freq=UPDATE_FREQUENCY, name="date")
-    test = (
-        results
-        .set_index("date")
-        .sort_index()
-        .reindex(dates_up_to_last_date, method="ffill")
-    )
-    return test
 
 def get_processed_results(brand:str) -> DF:
     results = GET_RESULTS_FUNCS[brand]()
     print(brand)
     if brand != "tesla":
         results = agg_results_by_discharge_and_charge(results)
-    return (
+    results =  (
         results
-        .dropna(subset=["soh", "odometer"], how="any")
+        .sort_values(["vin", "date"])
+        .dropna(subset=["soh", "odometer"], how="all")
         .reset_index()
         .groupby('vin')
         .apply(make_soh_presentable, include_groups=False)
@@ -77,12 +64,33 @@ def get_processed_results(brand:str) -> DF:
         .reset_index()
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS, logger=logger)
         .reset_index()
-        .sort_values(["vin", "odometer"])
+        .groupby("vin")
+        .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
+        .reset_index()
+    )
+    results_grp = results.groupby("vin")
+    results[["soh", "odometer"]] = results_grp[["soh", "odometer"]].ffill()
+    results[["soh", "odometer"]] = results_grp[["soh", "odometer"]].bfill()
+    return results
+
+def agg_results_by_discharge_and_charge(results:DF) -> DF:
+    return (
+        results
+        .groupby(["vin", "trimmed_in_discharge_idx"])
+        .agg({
+            "soh": "median",
+            "odometer": "last",
+            "date": "last",
+            "date": "first",
+            "model": "first",
+            "version": "first",
+        })
+        .reset_index()
     )
 
-def set_floored_day_date(df:DF, date_col:str="date") -> DF:
-    df[date_col] = (
-        pd.to_datetime(df[date_col], format='mixed')
+def set_floored_day_date(df:DF) -> DF:
+    df["date"] = (
+        pd.to_datetime(df["date"], format='mixed')
         .dt.floor(UPDATE_FREQUENCY)
         .dt.tz_localize(None)
         .dt.date
@@ -99,20 +107,16 @@ def make_soh_presentable(df:DF) -> DF:
         df["soh"] = force_monotonic_decrease(df["soh"])
     return df
 
-def agg_results_by_discharge_and_charge(results:DF) -> DF:
-    return (
+def add_lines_up_to_today_for_vehicle(results:DF) -> DF:
+    last_date = pd.Timestamp.now().floor(UPDATE_FREQUENCY).date()
+    dates_up_to_last_date = pd.date_range(results["date"].min(), last_date, freq=UPDATE_FREQUENCY, name="date")
+    test = (
         results
-        .groupby(["vin", "trimmed_in_discharge_idx"])
-        .agg({
-            "soh": "median",
-            "odometer": "last",
-            "date": "last",
-            "date": "first",
-            "model": "first",
-            "version": "first",
-        })
-        .reset_index()
+        .set_index("date")
+        .sort_index()
+        .reindex(dates_up_to_last_date, method="ffill")
     )
+    return test
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
