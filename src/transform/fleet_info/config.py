@@ -2,9 +2,9 @@ TABLE_QUERY = """
 SELECT * FROM vehicle
 JOIN vehicle_model ON vehicle.vehicle_model_id = vehicle_model.id
 JOIN oem ON vehicle_model.oem_id = oem.id
+JOIN fleet ON vehicle.fleet_id = fleet.id
 """
 COLS_NAME_MAPPING = {
-    "fleet_name": "fleet",
     "model_name": "model",
     "oem_name": "make",
     "region_name": "region",
@@ -14,6 +14,7 @@ COLS_NAME_MAPPING = {
 }
 COLS_TO_KEEP = [
     "end_of_contract_date",
+    "fleet_name",
     "vin",
     "start_date",
     "model",
@@ -26,6 +27,7 @@ COLS_TO_KEEP = [
 ]
 COL_DTYPES = {
     "end_of_contract_date": "datetime64[ns]",
+    "fleet_name": "string",
     "vin": "string",
     "start_date": "datetime64[ns]",
     "model": "string",
