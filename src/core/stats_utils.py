@@ -50,7 +50,9 @@ def intercept_and_slope_from_points(points: DF) -> tuple[float, float]:
 
 def lr_params_as_series(df: DF, x: str, y: str) -> Series:
     df = df.dropna(subset=[x, y], how="any")
-    return Series(lr(df[x], df[y]), index=["slope", "intercept", "rvalue", "pvalue", "stderr"])
+    s = Series(lr(df[x], df[y]), index=["slope", "intercept", "rvalue", "pvalue", "stderr"])
+    s["r2"] = s["rvalue"] ** 2
+    return s
 
 def mask_out_outliers_by_interquartile_range(soh_values:Series) -> Series:
     q1, q3 = soh_values.quantile(0.05), soh_values.quantile(0.95)
