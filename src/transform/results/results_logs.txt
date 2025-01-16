@@ -1,18 +1,42 @@
-(data_ev) ➜  results git:(DATAEV-232) ✗ python3 test.py
-mercedes-benz
-soh
-1.0    58
-0.0    38
-Name: count, dtype: int64
-renault
-[01/16/25 15:42:59] WARNING  No SOH data for VF1RCB00568404768                                                                                                                                           main.py:87
+[01/16/25 15:54:47] INFO     Updating 'vehicle_data' table.                                                                                                                                              main.py:25
+[01/16/25 15:54:56] INFO     Processing mercedes-benz results.                                                                                                                                           main.py:45
+[01/16/25 15:54:58] DEBUG    Filtering out of bounds SoH results.                                                                                                                                 stats_utils.py:24
+                    DEBUG    Filtered results, removed 756(54.19%) rows:                                                                                                                          stats_utils.py:41
+                                                 vin  level_1       date  odometer       soh model           version   raw_soh  max_valid_soh  min_valid_soh  soh_is_valid                                         
+                             0     W1K2938901F003139        1 2024-09-05   70068.0       NaN   eqc  400 4matic 408pk  0.720296       1.005556       0.759864         False                                         
+                             1     W1K2938901F003139        2 2024-09-12   70110.0       NaN   eqc  400 4matic 408pk  0.720260       1.005556       0.759780         False                                         
+                             2     W1K2938901F003139        3 2024-09-19   70824.0       NaN   eqc  400 4matic 408pk  0.720224       1.005556       0.758352         False                                         
+                             3     W1K2938901F003139        4 2024-09-26   71429.0       NaN   eqc  400 4matic 408pk  0.720188       1.005556       0.757142         False                                         
+                             4     W1K2938901F003139        5 2024-10-03       NaN       NaN   eqc  400 4matic 408pk  0.720152            NaN            NaN         False                                         
+                             ...                 ...      ...        ...       ...       ...   ...               ...       ...            ...            ...           ...                                         
+                             1390  WDD2938901F002791     1634 2024-10-24       NaN       NaN   eqc    eqc 400 4matic  0.706285            NaN            NaN         False                                         
+                             1391  WDD2938901F002791     1635 2024-11-14  135737.0  0.706250   eqc    eqc 400 4matic  0.706250       1.005556       0.628526          True                                         
+                             1392  WDD2938901F002791     1636 2024-11-28  135738.0  0.706215   eqc    eqc 400 4matic  0.706215       1.005556       0.628524          True                                         
+                             1393  WDD2938901F002791     1637 2024-12-05       NaN       NaN   eqc    eqc 400 4matic  0.706179            NaN            NaN         False                                         
+                             1394  WDD2938901F002791     1638 2024-12-19  135739.0  0.706144   eqc    eqc 400 4matic  0.706144       1.005556       0.628522          True                                         
+                                                                                                                                                                                                                   
+                             [1395 rows x 11 columns]                                                                                                                                                              
+[01/16/25 15:54:59] INFO     Processing renault results.                                                                                                                                                 main.py:45
+[01/16/25 15:55:00] WARNING  No SOH data for VF1RCB00568404768                                                                                                                                           main.py:87
                     WARNING  No SOH data for VF1RCB00769791396                                                                                                                                           main.py:87
-soh
-1.0    66
-0.0     4
-Name: count, dtype: int64
-tesla
-[01/16/25 15:50:01] WARNING  No SOH data for 5YJ3E7EA0KF318942                                                                                                                                           main.py:87
+                    DEBUG    Filtering out of bounds SoH results.                                                                                                                                 stats_utils.py:24
+                    DEBUG    Filtered results, removed 22(4.15%) rows:                                                                                                                            stats_utils.py:41
+                                                vin  level_1       date       odometer       soh model version   raw_soh  max_valid_soh  min_valid_soh  soh_is_valid                                               
+                             0    VF1AG000064475468        2 2024-09-26   99856.312500  0.900988   zoe    r135  0.900988       1.005556       0.700287          True                                               
+                             1    VF1AG000064475468        4 2024-10-10  100742.250000  0.900988   zoe    r135  0.900988       1.005556       0.698515          True                                               
+                             2    VF1AG000064475468        5 2024-10-17  101178.640625  0.900988   zoe    r135  0.900988       1.005556       0.697643          True                                               
+                             3    VF1AG000064475468        6 2024-10-24  101550.132812  0.900988   zoe    r135  0.900988       1.005556       0.696900          True                                               
+                             4    VF1AG000064475468        7 2024-10-31  102250.140625  0.900988   zoe    r135  0.900988       1.005556       0.695500          True                                               
+                             ..                 ...      ...        ...            ...       ...   ...     ...       ...            ...            ...           ...                                               
+                             525  VF1RCB00769791396      864 2024-10-24            NaN       NaN  <NA>    <NA>       NaN            NaN            NaN         False                                               
+                             526  VF1RCB00769791396      865 2024-11-07            NaN       NaN  <NA>    <NA>       NaN            NaN            NaN         False                                               
+                             527  VF1RCB00769791396      866 2024-12-05   29597.830078       NaN  <NA>    <NA>       NaN       1.005556       0.840804         False                                               
+                             528  VF1RCB00769791396      867 2024-12-19   29929.490234       NaN  <NA>    <NA>       NaN       1.005556       0.840141         False                                               
+                             529  VF1RCB00769791396      868 2025-01-09            NaN       NaN  <NA>    <NA>       NaN            NaN            NaN         False                                               
+                                                                                                                                                                                                                   
+                             [530 rows x 11 columns]                                                                                                                                                               
+[01/16/25 16:01:00] INFO     Processing tesla results.                                                                                                                                                   main.py:45
+[01/16/25 16:01:01] WARNING  No SOH data for 5YJ3E7EA0KF318942                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA0KF380714                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA0KF516145                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA0LF541175                                                                                                                                           main.py:87
@@ -22,11 +46,11 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EA0LF589288                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA0MF905354                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA0MF911767                                                                                                                                           main.py:87
-[01/16/25 15:50:02] WARNING  No SOH data for 5YJ3E7EA1KF380785                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EA1KF380785                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA1KF500777                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA1KF516283                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA1KF525565                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EA1LF588411                                                                                                                                           main.py:87
+[01/16/25 16:01:02] WARNING  No SOH data for 5YJ3E7EA1LF588411                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA1LF591938                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA1LF605627                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA1MF888967                                                                                                                                           main.py:87
@@ -47,7 +71,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EA2LF605670                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA2LF727946                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA2LF728157                                                                                                                                           main.py:87
-[01/16/25 15:50:03] WARNING  No SOH data for 5YJ3E7EA2MF905470                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EA2MF905470                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA3KF343902                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA3KF370047                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA3KF374941                                                                                                                                           main.py:87
@@ -56,7 +80,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EA3KF526295                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA3KF526359                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA3KF536311                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EA3KF541461                                                                                                                                           main.py:87
+[01/16/25 16:01:03] WARNING  No SOH data for 5YJ3E7EA3KF541461                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA3LF552784                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA3LF558102                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA3LF589267                                                                                                                                           main.py:87
@@ -73,8 +97,8 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EA4LF516540                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA4LF531216                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA4LF552826                                                                                                                                           main.py:87
-[01/16/25 15:50:04] WARNING  No SOH data for 5YJ3E7EA4LF557525                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EA4LF588497                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EA4LF557525                                                                                                                                           main.py:87
+[01/16/25 16:01:04] WARNING  No SOH data for 5YJ3E7EA4LF588497                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA4LF606237                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA4LF671363                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA4MF905230                                                                                                                                           main.py:87
@@ -92,7 +116,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EA5LF588427                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA5LF588671                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA5LF589299                                                                                                                                           main.py:87
-[01/16/25 15:50:05] WARNING  No SOH data for 5YJ3E7EA5MF900358                                                                                                                                           main.py:87
+[01/16/25 16:01:05] WARNING  No SOH data for 5YJ3E7EA5MF900358                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA5MF900683                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA5MF904491                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA5MF905267                                                                                                                                           main.py:87
@@ -123,11 +147,11 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EA7LF547460                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA7LF547698                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA7LF547863                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EA7LF551962                                                                                                                                           main.py:87
+[01/16/25 16:01:06] WARNING  No SOH data for 5YJ3E7EA7LF551962                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA7LF552643                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA7LF557745                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA7LF588669                                                                                                                                           main.py:87
-[01/16/25 15:50:06] WARNING  No SOH data for 5YJ3E7EA7LF589322                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EA7LF589322                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA7LF592074                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA7LF605633                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA7MF900961                                                                                                                                           main.py:87
@@ -147,7 +171,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EA8MF901228                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA8MF909703                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9KF343533                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EA9KF376564                                                                                                                                           main.py:87
+[01/16/25 16:01:07] WARNING  No SOH data for 5YJ3E7EA9KF376564                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9KF522901                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9KF523028                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9KF526849                                                                                                                                           main.py:87
@@ -156,7 +180,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EA9LF516193                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9LF523080                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9LF531485                                                                                                                                           main.py:87
-[01/16/25 15:50:07] WARNING  No SOH data for 5YJ3E7EA9LF551798                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EA9LF551798                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9LF552045                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9LF552823                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EA9LF553468                                                                                                                                           main.py:87
@@ -188,12 +212,12 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EAXLF557903                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EAXLF605691                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EAXLF672338                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EAXLF752626                                                                                                                                           main.py:87
+[01/16/25 16:01:08] WARNING  No SOH data for 5YJ3E7EAXLF752626                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EAXLF759091                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EAXMF894265                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EAXMF898879                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EAXMF905409                                                                                                                                           main.py:87
-[01/16/25 15:50:08] WARNING  No SOH data for 5YJ3E7EB0KF320473                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EB0KF320473                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB0KF444730                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB0KF446719                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB0KF531897                                                                                                                                           main.py:87
@@ -223,12 +247,12 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EB1LF561234                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF561329                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF561637                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EB1LF564764                                                                                                                                           main.py:87
+[01/16/25 16:01:09] WARNING  No SOH data for 5YJ3E7EB1LF564764                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF565736                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF568359                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF568409                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF569785                                                                                                                                           main.py:87
-[01/16/25 15:50:09] WARNING  No SOH data for 5YJ3E7EB1LF609699                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EB1LF609699                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF609721                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF609945                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB1LF629547                                                                                                                                           main.py:87
@@ -244,7 +268,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EB2KF542058                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB2LF543616                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB2LF560609                                                                                                                                           main.py:87
-[01/16/25 15:50:10] WARNING  No SOH data for 5YJ3E7EB2LF567849                                                                                                                                           main.py:87
+[01/16/25 16:01:10] WARNING  No SOH data for 5YJ3E7EB2LF567849                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB2LF569861                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB2LF569875                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB2LF593562                                                                                                                                           main.py:87
@@ -268,7 +292,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EB3LF607727                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB3LF607890                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB3LF610661                                                                                                                                           main.py:87
-[01/16/25 15:50:11] WARNING  No SOH data for 5YJ3E7EB3MF969185                                                                                                                                           main.py:87
+[01/16/25 16:01:11] WARNING  No SOH data for 5YJ3E7EB3MF969185                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB4KF333940                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB4KF334005                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB4KF334070                                                                                                                                           main.py:87
@@ -292,10 +316,10 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EB4LF605792                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB4LF607753                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB4MF970927                                                                                                                                           main.py:87
-[01/16/25 15:50:12] WARNING  No SOH data for 5YJ3E7EB5KF320307                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EB5KF320307                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB5KF333946                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB5KF333977                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EB5KF381916                                                                                                                                           main.py:87
+[01/16/25 16:01:12] WARNING  No SOH data for 5YJ3E7EB5KF381916                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB5KF460034                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB5KF532818                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB5LF543867                                                                                                                                           main.py:87
@@ -330,7 +354,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EB6LF565702                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB6LF566042                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB6LF567028                                                                                                                                           main.py:87
-[01/16/25 15:50:13] WARNING  No SOH data for 5YJ3E7EB6LF570138                                                                                                                                           main.py:87
+[01/16/25 16:01:13] WARNING  No SOH data for 5YJ3E7EB6LF570138                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB6LF570219                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB6LF572116                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB6LF606135                                                                                                                                           main.py:87
@@ -361,7 +385,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EB7LF590110                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB7LF606144                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB7LF607990                                                                                                                                           main.py:87
-[01/16/25 15:50:14] WARNING  No SOH data for 5YJ3E7EB7MF817698                                                                                                                                           main.py:87
+[01/16/25 16:01:14] WARNING  No SOH data for 5YJ3E7EB7MF817698                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB7MF837806                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB7MF917588                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB8KF338963                                                                                                                                           main.py:87
@@ -382,7 +406,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EB8MF847275                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB8MF971501                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9KF333884                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EB9KF446184                                                                                                                                           main.py:87
+[01/16/25 16:01:15] WARNING  No SOH data for 5YJ3E7EB9KF446184                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9KF446220                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9KF457721                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9KF526875                                                                                                                                           main.py:87
@@ -390,7 +414,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EB9KF532398                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9KF541893                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9KF544079                                                                                                                                           main.py:87
-[01/16/25 15:50:15] WARNING  No SOH data for 5YJ3E7EB9LF589508                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EB9LF589508                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9LF592392                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9LF593378                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EB9LF593588                                                                                                                                           main.py:87
@@ -403,7 +427,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EBXKF333893                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXKF446145                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXKF528019                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EBXLF532332                                                                                                                                           main.py:87
+[01/16/25 16:01:16] WARNING  No SOH data for 5YJ3E7EBXLF532332                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXLF543606                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXLF560924                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXLF561409                                                                                                                                           main.py:87
@@ -411,7 +435,7 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EBXLF563077                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXLF564410                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXLF564469                                                                                                                                           main.py:87
-[01/16/25 15:50:16] WARNING  No SOH data for 5YJ3E7EBXLF566657                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EBXLF566657                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXLF569607                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXLF570059                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EBXLF572099                                                                                                                                           main.py:87
@@ -428,8 +452,8 @@ tesla
                     WARNING  No SOH data for 5YJ3E7EC1LF594243                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EC1LF608190                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EC1LF682046                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJ3E7EC2MF954296                                                                                                                                           main.py:87
-[01/16/25 15:50:17] WARNING  No SOH data for 5YJ3E7EC3LF594339                                                                                                                                           main.py:87
+[01/16/25 16:01:17] WARNING  No SOH data for 5YJ3E7EC2MF954296                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJ3E7EC3LF594339                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EC3MF964514                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EC4LF594463                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJ3E7EC5LF605180                                                                                                                                           main.py:87
@@ -442,8 +466,8 @@ tesla
                     WARNING  No SOH data for 5YJSA7E21GF163390                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJSA7E21JF276411                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJSA7E22JF287269                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJSA7E23KF341132                                                                                                                                           main.py:87
-[01/16/25 15:50:18] WARNING  No SOH data for 5YJSA7E26JF271933                                                                                                                                           main.py:87
+[01/16/25 16:01:18] WARNING  No SOH data for 5YJSA7E23KF341132                                                                                                                                           main.py:87
+                    WARNING  No SOH data for 5YJSA7E26JF271933                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJSA7E27JF268958                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJSA7E27JF285064                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJSA7E27JF288353                                                                                                                                           main.py:87
@@ -485,7 +509,7 @@ tesla
                     WARNING  No SOH data for 5YJXCCE25HF057051                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJXCCE28HF038476                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJXCCE29HF056064                                                                                                                                           main.py:87
-                    WARNING  No SOH data for 5YJXCCE43LF223111                                                                                                                                           main.py:87
+[01/16/25 16:01:19] WARNING  No SOH data for 5YJXCCE43LF223111                                                                                                                                           main.py:87
                     WARNING  No SOH data for 5YJXCCE44LF288484                                                                                                                                           main.py:87
                     WARNING  No SOH data for 7SAXCCE50RF444329                                                                                                                                           main.py:87
                     WARNING  No SOH data for 7SAXCCE51RF434912                                                                                                                                           main.py:87
@@ -506,7 +530,7 @@ tesla
                     WARNING  No SOH data for 7SAXCCE60RF432917                                                                                                                                           main.py:87
                     WARNING  No SOH data for 7SAXCCE64PF410884                                                                                                                                           main.py:87
                     WARNING  No SOH data for 7SAXCCE67PF386533                                                                                                                                           main.py:87
-[01/16/25 15:50:19] WARNING  No SOH data for LRW3E7EB4NC568238                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRW3E7EB4NC568238                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EB8NC604352                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EBXNC567739                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EJ0SC351398                                                                                                                                           main.py:87
@@ -795,7 +819,7 @@ tesla
                     WARNING  No SOH data for LRW3E7EK5SC352099                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK5SC353382                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK5SC353401                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRW3E7EK6MC385177                                                                                                                                           main.py:87
+[01/16/25 16:01:20] WARNING  No SOH data for LRW3E7EK6MC385177                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK6NC509742                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK6PC752454                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK6PC770808                                                                                                                                           main.py:87
@@ -890,7 +914,7 @@ tesla
                     WARNING  No SOH data for LRW3E7EK8RC130456                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK8RC155888                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK8RC155955                                                                                                                                           main.py:87
-[01/16/25 15:50:20] WARNING  No SOH data for LRW3E7EK8RC203261                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRW3E7EK8RC203261                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK8RC203759                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK8RC204426                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7EK8RC205026                                                                                                                                           main.py:87
@@ -1109,14 +1133,14 @@ tesla
                     WARNING  No SOH data for LRW3E7ETXRC299564                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7ETXSC335629                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7ETXSC339566                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRW3E7FA1LC098401                                                                                                                                           main.py:87
-[01/16/25 15:50:21] WARNING  No SOH data for LRW3E7FA3LC099002                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRW3E7FA4LC098764                                                                                                                                           main.py:87
+[01/16/25 16:01:21] WARNING  No SOH data for LRW3E7FA1LC098401                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRW3E7FA3LC099002                                                                                                                                           main.py:87
+[01/16/25 16:01:22] WARNING  No SOH data for LRW3E7FA4LC098764                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FA4LC099770                                                                                                                                           main.py:87
-[01/16/25 15:50:22] WARNING  No SOH data for LRW3E7FA5LC099020                                                                                                                                           main.py:87
-[01/16/25 15:50:23] WARNING  No SOH data for LRW3E7FA8LC099495                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRW3E7FA5LC099020                                                                                                                                           main.py:87
+[01/16/25 16:01:23] WARNING  No SOH data for LRW3E7FA8LC099495                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FA8LC099643                                                                                                                                           main.py:87
-[01/16/25 15:50:24] WARNING  No SOH data for LRW3E7FAXLC098378                                                                                                                                           main.py:87
+[01/16/25 16:01:24] WARNING  No SOH data for LRW3E7FAXLC098378                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FAXMC409485                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FR0NC480914                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FR0NC481559                                                                                                                                           main.py:87
@@ -1133,19 +1157,19 @@ tesla
                     WARNING  No SOH data for LRW3E7FR7NC499038                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FR9NC498425                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FR9NC498649                                                                                                                                           main.py:87
-[01/16/25 15:50:25] WARNING  No SOH data for LRW3E7FR9NC499297                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRW3E7FR9NC499297                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FRXNC481553                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRW3E7FS0RC068551                                                                                                                                           main.py:87
+[01/16/25 16:01:25] WARNING  No SOH data for LRW3E7FS0RC068551                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS0SC343874                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS0SC346998                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS1PC793234                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS1PC834848                                                                                                                                           main.py:87
-[01/16/25 15:50:26] WARNING  No SOH data for LRW3E7FS1SC346914                                                                                                                                           main.py:87
+[01/16/25 16:01:26] WARNING  No SOH data for LRW3E7FS1SC346914                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS2PC759769                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS2PC765779                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS2PC858592                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS2RC065506                                                                                                                                           main.py:87
-[01/16/25 15:50:27] WARNING  No SOH data for LRW3E7FS2RC254818                                                                                                                                           main.py:87
+[01/16/25 16:01:27] WARNING  No SOH data for LRW3E7FS2RC254818                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS2RC301118                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS2SC344153                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS3PC788665                                                                                                                                           main.py:87
@@ -1153,7 +1177,7 @@ tesla
                     WARNING  No SOH data for LRW3E7FS3RC034961                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS3RC169793                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS3RC171382                                                                                                                                           main.py:87
-[01/16/25 15:50:28] WARNING  No SOH data for LRW3E7FS3SC348275                                                                                                                                           main.py:87
+[01/16/25 16:01:28] WARNING  No SOH data for LRW3E7FS3SC348275                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS3SC355484                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS4PC900518                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS4RC033155                                                                                                                                           main.py:87
@@ -1161,102 +1185,102 @@ tesla
                     WARNING  No SOH data for LRW3E7FS4RC254996                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS4RC301427                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS4RC302691                                                                                                                                           main.py:87
-[01/16/25 15:50:29] WARNING  No SOH data for LRW3E7FS4SC354263                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRW3E7FS5RC309911                                                                                                                                           main.py:87
-[01/16/25 15:50:30] WARNING  No SOH data for LRW3E7FS6RC278345                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRW3E7FS4SC354263                                                                                                                                           main.py:87
+[01/16/25 16:01:29] WARNING  No SOH data for LRW3E7FS5RC309911                                                                                                                                           main.py:87
+[01/16/25 16:01:30] WARNING  No SOH data for LRW3E7FS6RC278345                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS6SC346973                                                                                                                                           main.py:87
-[01/16/25 15:50:31] WARNING  No SOH data for LRW3E7FS8PC827699                                                                                                                                           main.py:87
+[01/16/25 16:01:31] WARNING  No SOH data for LRW3E7FS8PC827699                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS8PC895601                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS8RC059385                                                                                                                                           main.py:87
-[01/16/25 15:50:32] WARNING  No SOH data for LRW3E7FS8RC169854                                                                                                                                           main.py:87
+[01/16/25 16:01:32] WARNING  No SOH data for LRW3E7FS8RC169854                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS8RC254175                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS8RC343745                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS8SC354184                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FS8SC354248                                                                                                                                           main.py:87
-[01/16/25 15:50:33] WARNING  No SOH data for LRW3E7FS9SC354243                                                                                                                                           main.py:87
+[01/16/25 16:01:33] WARNING  No SOH data for LRW3E7FS9SC354243                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FSXPC827705                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRW3E7FSXRC055046                                                                                                                                           main.py:87
-[01/16/25 15:50:34] WARNING  No SOH data for LRW3E7FSXSC338116                                                                                                                                           main.py:87
+[01/16/25 16:01:34] WARNING  No SOH data for LRW3E7FSXSC338116                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCEK4MC062187                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCEK4MC150284                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCEK4NC241394                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCEK4NC343164                                                                                                                                           main.py:87
-[01/16/25 15:50:35] WARNING  No SOH data for LRWYGCEK5NC351158                                                                                                                                           main.py:87
+[01/16/25 16:01:35] WARNING  No SOH data for LRWYGCEK5NC351158                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCEK7MC140171                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCEK8MC141636                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCEKXMC150144                                                                                                                                           main.py:87
-[01/16/25 15:50:36] WARNING  No SOH data for LRWYGCFS0PC579621                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRWYGCFS0PC579621                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS0PC579733                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS0PC635217                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS0PC635282                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRWYGCFS0PC875948                                                                                                                                           main.py:87
+[01/16/25 16:01:36] WARNING  No SOH data for LRWYGCFS0PC875948                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS1PC782713                                                                                                                                           main.py:87
-[01/16/25 15:50:37] WARNING  No SOH data for LRWYGCFS2PC030177                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRWYGCFS2PC030177                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS2PC050042                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS2PC578969                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRWYGCFS2PC629208                                                                                                                                           main.py:87
+[01/16/25 16:01:37] WARNING  No SOH data for LRWYGCFS2PC629208                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS3PC578673                                                                                                                                           main.py:87
-[01/16/25 15:50:38] WARNING  No SOH data for LRWYGCFS3PC783944                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRWYGCFS3PC863681                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRWYGCFS3PC783944                                                                                                                                           main.py:87
+[01/16/25 16:01:38] WARNING  No SOH data for LRWYGCFS3PC863681                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS4PC637018                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS5PC056451                                                                                                                                           main.py:87
-[01/16/25 15:50:39] WARNING  No SOH data for LRWYGCFS5PC635049                                                                                                                                           main.py:87
-                    WARNING  No SOH data for LRWYGCFS5PC714883                                                                                                                                           main.py:87
+                    WARNING  No SOH data for LRWYGCFS5PC635049                                                                                                                                           main.py:87
+[01/16/25 16:01:39] WARNING  No SOH data for LRWYGCFS5PC714883                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS5PC738584                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS5PC867635                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS5PC886427                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS6PC552861                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS6PC636940                                                                                                                                           main.py:87
-[01/16/25 15:50:40] WARNING  No SOH data for LRWYGCFS7PC635022                                                                                                                                           main.py:87
+[01/16/25 16:01:40] WARNING  No SOH data for LRWYGCFS7PC635022                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS7PC742698                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS8PC579138                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS8PC579219                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS8PC579222                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS8PC579494                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS8PC626121                                                                                                                                           main.py:87
-[01/16/25 15:50:41] WARNING  No SOH data for LRWYGCFS8PC863191                                                                                                                                           main.py:87
+[01/16/25 16:01:41] WARNING  No SOH data for LRWYGCFS8PC863191                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS9PC627228                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS9PC629187                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS9PC674193                                                                                                                                           main.py:87
                     WARNING  No SOH data for LRWYGCFS9PC998650                                                                                                                                           main.py:87
-[01/16/25 15:50:42] WARNING  No SOH data for LRWYGCFSXPC886391                                                                                                                                           main.py:87
+[01/16/25 16:01:42] WARNING  No SOH data for LRWYGCFSXPC886391                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEJ1PB195103                                                                                                                                           main.py:87
-[01/16/25 15:50:43] WARNING  No SOH data for XP7YGCEJ9PB199948                                                                                                                                           main.py:87
-[01/16/25 15:50:44] WARNING  No SOH data for XP7YGCEK0RB319406                                                                                                                                           main.py:87
+[01/16/25 16:01:43] WARNING  No SOH data for XP7YGCEJ9PB199948                                                                                                                                           main.py:87
+[01/16/25 16:01:44] WARNING  No SOH data for XP7YGCEK0RB319406                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK0RB322659                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK1RB338840                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK1RB391022                                                                                                                                           main.py:87
-[01/16/25 15:50:45] WARNING  No SOH data for XP7YGCEK1RB524992                                                                                                                                           main.py:87
+                    WARNING  No SOH data for XP7YGCEK1RB524992                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK1RB525690                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK1SB538297                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK2PB095181                                                                                                                                           main.py:87
-                    WARNING  No SOH data for XP7YGCEK2PB116546                                                                                                                                           main.py:87
+[01/16/25 16:01:45] WARNING  No SOH data for XP7YGCEK2PB116546                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK2PB170686                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK2PB226383                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK2RB267034                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK2RB299773                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK2SB561541                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK2SB575374                                                                                                                                           main.py:87
-[01/16/25 15:50:46] WARNING  No SOH data for XP7YGCEK4PB101479                                                                                                                                           main.py:87
+[01/16/25 16:01:46] WARNING  No SOH data for XP7YGCEK4PB101479                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK4PB138483                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK4RB423476                                                                                                                                           main.py:87
-[01/16/25 15:50:47] WARNING  No SOH data for XP7YGCEK5RB405777                                                                                                                                           main.py:87
+[01/16/25 16:01:47] WARNING  No SOH data for XP7YGCEK5RB405777                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK5RB445275                                                                                                                                           main.py:87
-[01/16/25 15:50:48] WARNING  No SOH data for XP7YGCEK6RB391453                                                                                                                                           main.py:87
+                    WARNING  No SOH data for XP7YGCEK6RB391453                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK6RB428890                                                                                                                                           main.py:87
-                    WARNING  No SOH data for XP7YGCEK6SB538277                                                                                                                                           main.py:87
+[01/16/25 16:01:48] WARNING  No SOH data for XP7YGCEK6SB538277                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK6SB568167                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK7PB200622                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK7RB420801                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK7RB427375                                                                                                                                           main.py:87
-[01/16/25 15:50:49] WARNING  No SOH data for XP7YGCEK8PB174516                                                                                                                                           main.py:87
+[01/16/25 16:01:49] WARNING  No SOH data for XP7YGCEK8PB174516                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK8PB202797                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK8RB301803                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK8SB576903                                                                                                                                           main.py:87
-[01/16/25 15:50:50] WARNING  No SOH data for XP7YGCEK9RB427359                                                                                                                                           main.py:87
+[01/16/25 16:01:50] WARNING  No SOH data for XP7YGCEK9RB427359                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEK9SB579826                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEKXRB510525                                                                                                                                           main.py:87
-[01/16/25 15:50:51] WARNING  No SOH data for XP7YGCEKXSB581908                                                                                                                                           main.py:87
+                    WARNING  No SOH data for XP7YGCEKXSB581908                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEL0NB028486                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEL0PB087511                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEL0PB092370                                                                                                                                           main.py:87
@@ -1294,7 +1318,7 @@ tesla
                     WARNING  No SOH data for XP7YGCEL1RB318919                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEL1RB388162                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEL1RB392857                                                                                                                                           main.py:87
-                    WARNING  No SOH data for XP7YGCEL1RB404120                                                                                                                                           main.py:87
+[01/16/25 16:01:51] WARNING  No SOH data for XP7YGCEL1RB404120                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEL1RB409804                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEL1SB543685                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCEL1SB553035                                                                                                                                           main.py:87
@@ -1481,11 +1505,11 @@ tesla
                     WARNING  No SOH data for XP7YGCER1SB581650                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER1SB581941                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER1SB584693                                                                                                                                           main.py:87
-[01/16/25 15:50:52] WARNING  No SOH data for XP7YGCER2SB574951                                                                                                                                           main.py:87
+                    WARNING  No SOH data for XP7YGCER2SB574951                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER2SB580748                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER2SB580930                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER2SB583035                                                                                                                                           main.py:87
-                    WARNING  No SOH data for XP7YGCER3SB578345                                                                                                                                           main.py:87
+[01/16/25 16:01:52] WARNING  No SOH data for XP7YGCER3SB578345                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER3SB584873                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER4SB578824                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER4SB579486                                                                                                                                           main.py:87
@@ -1500,9 +1524,9 @@ tesla
                     WARNING  No SOH data for XP7YGCER7SB578302                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER7SB578929                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER7SB582382                                                                                                                                           main.py:87
-[01/16/25 15:50:53] WARNING  No SOH data for XP7YGCER8SB576879                                                                                                                                           main.py:87
+                    WARNING  No SOH data for XP7YGCER8SB576879                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER8SB584691                                                                                                                                           main.py:87
-                    WARNING  No SOH data for XP7YGCER9SB579936                                                                                                                                           main.py:87
+[01/16/25 16:01:53] WARNING  No SOH data for XP7YGCER9SB579936                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER9SB581279                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCER9SB582349                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCERXRB445317                                                                                                                                           main.py:87
@@ -1516,41 +1540,41 @@ tesla
                     WARNING  No SOH data for XP7YGCERXSB586264                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCERXSB586359                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES0RB455485                                                                                                                                           main.py:87
-[01/16/25 15:50:54] WARNING  No SOH data for XP7YGCES0SB534225                                                                                                                                           main.py:87
+[01/16/25 16:01:54] WARNING  No SOH data for XP7YGCES0SB534225                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES0SB539845                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES1RB251889                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES1RB452742                                                                                                                                           main.py:87
-[01/16/25 15:50:55] WARNING  No SOH data for XP7YGCES1SB561482                                                                                                                                           main.py:87
+[01/16/25 16:01:55] WARNING  No SOH data for XP7YGCES1SB561482                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES2SB538874                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES2SB553584                                                                                                                                           main.py:87
-                    WARNING  No SOH data for XP7YGCES3RB250808                                                                                                                                           main.py:87
-[01/16/25 15:50:56] WARNING  No SOH data for XP7YGCES3RB255233                                                                                                                                           main.py:87
+[01/16/25 16:01:56] WARNING  No SOH data for XP7YGCES3RB250808                                                                                                                                           main.py:87
+                    WARNING  No SOH data for XP7YGCES3RB255233                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES3RB399946                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES3RB422657                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES3RB457912                                                                                                                                           main.py:87
-[01/16/25 15:50:57] WARNING  No SOH data for XP7YGCES4RB415278                                                                                                                                           main.py:87
+[01/16/25 16:01:57] WARNING  No SOH data for XP7YGCES4RB415278                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES4RB416205                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES4RB437832                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES4SB539332                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES4SB540562                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES4SB548743                                                                                                                                           main.py:87
-[01/16/25 15:50:58] WARNING  No SOH data for XP7YGCES5SB533880                                                                                                                                           main.py:87
+[01/16/25 16:01:58] WARNING  No SOH data for XP7YGCES5SB533880                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES5SB537959                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES5SB538545                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES6RB418988                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES6RB447004                                                                                                                                           main.py:87
-[01/16/25 15:50:59] WARNING  No SOH data for XP7YGCES6SB546461                                                                                                                                           main.py:87
+[01/16/25 16:01:59] WARNING  No SOH data for XP7YGCES6SB546461                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES6SB555872                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES7PB249464                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES7RB413895                                                                                                                                           main.py:87
-[01/16/25 15:51:00] WARNING  No SOH data for XP7YGCES7SB538997                                                                                                                                           main.py:87
+[01/16/25 16:02:00] WARNING  No SOH data for XP7YGCES7SB538997                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES7SB551944                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES8RB263442                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES8RB441754                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES8RB452222                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES8RB454858                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES8RB473233                                                                                                                                           main.py:87
-[01/16/25 15:51:01] WARNING  No SOH data for XP7YGCES8SB543805                                                                                                                                           main.py:87
+[01/16/25 16:02:01] WARNING  No SOH data for XP7YGCES8SB543805                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES8SB544114                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES8SB551841                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES9SB533798                                                                                                                                           main.py:87
@@ -1558,31 +1582,97 @@ tesla
                     WARNING  No SOH data for XP7YGCES9SB538872                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES9SB539584                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCES9SB541352                                                                                                                                           main.py:87
-                    WARNING  No SOH data for XP7YGCES9SB548558                                                                                                                                           main.py:87
+[01/16/25 16:02:02] WARNING  No SOH data for XP7YGCES9SB548558                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCESXRB250594                                                                                                                                           main.py:87
-[01/16/25 15:51:02] WARNING  No SOH data for XP7YGCESXRB415575                                                                                                                                           main.py:87
+                    WARNING  No SOH data for XP7YGCESXRB415575                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCESXRB419979                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCESXRB430660                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCESXRB436877                                                                                                                                           main.py:87
                     WARNING  No SOH data for XP7YGCESXSB557396                                                                                                                                           main.py:87
-[01/16/25 15:51:03] WARNING  No SOH data for XP7YGCFS3RB394129                                                                                                                                           main.py:87
-soh
-1.0    9027
-0.0    3905
-Name: count, dtype: int64
-ford
-[01/16/25 15:51:25] INFO     Processing ford raw tss.                                                                                                                                     ProcessedTimeSeries.py:28
-[01/16/25 15:51:28] INFO     safe_locate called.                                                                                                                                                pandas_utils.py:214
-                    INFO     safe_astype called.                                                                                                                                                pandas_utils.py:171
-[01/16/25 15:51:30] INFO     Computing ['in_charge', 'in_discharge'] idx from masks.                                                                                                     ProcessedTimeSeries.py:115
-[01/16/25 15:51:31] INFO     Trimming off trailing soc of ['in_charge', 'in_discharge'] masks.                                                                                           ProcessedTimeSeries.py:106
-                    INFO     Computing ['trimmed_in_charge', 'trimmed_in_discharge'] idx from masks.                                                                                     ProcessedTimeSeries.py:115
-soh
-1.0    35
-Name: count, dtype: int64
-volvo
-soh
-1.0    27
-0.0     6
-Name: count, dtype: int64
+[01/16/25 16:02:03] WARNING  No SOH data for XP7YGCFS3RB394129                                                                                                                                           main.py:87
+[01/16/25 16:02:05] DEBUG    Filtering out of bounds SoH results.                                                                                                                                 stats_utils.py:24
+                    DEBUG    Filtered results, removed 11571(30.75%) rows:                                                                                                                        stats_utils.py:41
+                                                  vin  level_1       date       odometer       soh    model version   raw_soh  max_valid_soh  min_valid_soh  soh_is_valid                                          
+                             0      5YJ3E7EA0KF318942        0 2024-12-05  185584.953125       NaN  model 3     RWD       NaN       1.005556       0.528830         False                                          
+                             1      5YJ3E7EA0KF318942        1 2024-12-19  187321.000000       NaN  model 3     RWD       NaN       1.005556       0.525358         False                                          
+                             2      5YJ3E7EA0KF318942        2 2025-01-09  188925.140625       NaN  model 3     RWD       NaN       1.005556       0.522150         False                                          
+                             3      5YJ3E7EA0KF369714        3 2024-11-28  138509.671875  0.856130  model 3     rwd  0.856130       1.005556       0.622981          True                                          
+                             4      5YJ3E7EA0KF369714        4 2024-12-05  139793.406250  0.856087  model 3     rwd  0.856087       1.005556       0.620413          True                                          
+                             ...                  ...      ...        ...            ...       ...      ...     ...       ...            ...            ...           ...                                          
+                             37626  XP7YGCFSXRB439132    51255 2024-12-05   14358.436523  0.873592  model y     rwd  0.873592       1.005556       0.871283          True                                          
+                             37627  XP7YGCFSXRB439132    51256 2024-12-26   14855.967773  0.873592  model y     rwd  0.873592       1.005556       0.870288          True                                          
+                             37628  XP7YGCFSXRB439163    51258 2024-12-05   25672.933594  0.852875  model y     rwd  0.852875       1.005556       0.848654          True                                          
+                             37629  XP7YGCFSXRB439163    51259 2024-12-12   26495.246094  0.852832  model y     rwd  0.852832       1.005556       0.847009          True                                          
+                             37630  XP7YGCFSXRB439163    51261 2025-01-09   28152.126953  0.852790  model y     rwd  0.852790       1.005556       0.843696          True                                          
+                                                                                                                                                                                                                   
+                             [37631 rows x 11 columns]                                                                                                                                                             
+[01/16/25 16:02:25] INFO     Getting results for Ford.                                                                                                                                           ford_results.py:13
+[01/16/25 16:02:27] INFO     left_merge called.                                                                                                                                                 pandas_utils.py:112
+                    DEBUG    src_cols: ['max_battery_energy'], dest_cols: ['max_battery_energy']                                                                                                pandas_utils.py:121
+[01/16/25 16:02:29] DEBUG    Assigning values.                                                                                                                                                  pandas_utils.py:143
+[01/16/25 16:02:31] INFO     Processing ford results.                                                                                                                                                    main.py:45
+[01/16/25 16:02:33] DEBUG    Filtering out of bounds SoH results.                                                                                                                                 stats_utils.py:24
+                    DEBUG    Filtered results, removed 0(0.00%) rows:                                                                                                                             stats_utils.py:41
+                                                vin  level_1       date  odometer       soh           model                   version   raw_soh  max_valid_soh  min_valid_soh  soh_is_valid                        
+                             0    WF0EXXTTRBNB19272        1 2024-10-03   49695.0  0.941677       e-transit                      <NA>  0.941677       1.005556       0.800610          True                        
+                             1    WF0EXXTTRBNB19272        2 2024-10-10   50302.0  0.941629       e-transit                      <NA>  0.941629       1.005556       0.799396          True                        
+                             2    WF0EXXTTRBNB19272        3 2024-10-17   50885.0  0.941582       e-transit                      <NA>  0.941582       1.005556       0.798230          True                        
+                             3    WF0EXXTTRBNB19272        4 2024-10-24   51103.0  0.941535       e-transit                      <NA>  0.941535       1.005556       0.797794          True                        
+                             4    WF0EXXTTRBNB19272        5 2024-10-31   51103.0  0.941488       e-transit                      <NA>  0.941488       1.005556       0.797794          True                        
+                             ..                 ...      ...        ...       ...       ...             ...                       ...       ...            ...            ...           ...                        
+                             433  WF0TK3SU8MMA46439      518 2024-12-05   77863.0  0.892189  mustang mach-e  98kwh extended range awd  0.892189       1.005556       0.744274          True                        
+                             434  WF0TK3SU8MMA46439      520 2024-12-19   77863.0  0.892145  mustang mach-e  98kwh extended range awd  0.892145       1.005556       0.744274          True                        
+                             435  WF0TK3SU8MMA46439      521 2024-12-26   77863.0  0.892100  mustang mach-e  98kwh extended range awd  0.892100       1.005556       0.744274          True                        
+                             436  WF0TK3SU8MMA46439      522 2025-01-02   77863.0  0.892056  mustang mach-e  98kwh extended range awd  0.892056       1.005556       0.744274          True                        
+                             437  WF0TK3SU8MMA46439      523 2025-01-09   77863.0  0.892011  mustang mach-e  98kwh extended range awd  0.892011       1.005556       0.744274          True                        
+                                                                                                                                                                                                                   
+                             [438 rows x 11 columns]                                                                                                                                                               
+                    INFO     Getting Volvo results                                                                                                                                              volvo_results.py:30
+[01/16/25 16:02:34] INFO     Processing volvo results.                                                                                                                                                   main.py:45
+                    DEBUG    Filtering out of bounds SoH results.                                                                                                                                 stats_utils.py:24
+                    DEBUG    Filtered results, removed 47(19.75%) rows:                                                                                                                           stats_utils.py:41
+                                                vin  level_1       date      odometer       soh          model                    version   raw_soh  max_valid_soh  min_valid_soh  soh_is_valid                    
+                             0    YV1XKEFV0P2029953        0 2024-11-14  30539.099609  0.865892   c40 recharge  pure electric 170 kw plus  0.865892       1.005556       0.838922          True                    
+                             1    YV1XKEFV0P2029953        1 2024-11-21  30644.201172  0.865892   c40 recharge  pure electric 170 kw plus  0.865892       1.005556       0.838712          True                    
+                             2    YV1XKEFV0P2029953        3 2024-12-05  30910.701172  0.865849   c40 recharge  pure electric 170 kw plus  0.865849       1.005556       0.838179          True                    
+                             3    YV1XKEFV0P2029953        4 2024-12-12  31086.300781  0.865849   c40 recharge  pure electric 170 kw plus  0.865849       1.005556       0.837827          True                    
+                             4    YV1XKEFV0P2029953        6 2024-12-26  31323.000000  0.865849   c40 recharge  pure electric 170 kw plus  0.865849       1.005556       0.837354          True                    
+                             ..                 ...      ...        ...           ...       ...            ...                        ...       ...            ...            ...           ...                    
+                             233  YV1XZEFV4P2961598      293 2024-12-05  45686.800781  0.957147  xc40 recharge         pure electric plus  0.957147       1.005556       0.808626          True                    
+                             234  YV1XZEFV4P2961598      294 2024-12-12  46398.300781  0.957099  xc40 recharge         pure electric plus  0.957099       1.005556       0.807203          True                    
+                             235  YV1XZEFV4P2961598      295 2024-12-19  46885.500000  0.957051  xc40 recharge         pure electric plus  0.957051       1.005556       0.806229          True                    
+                             236  YV1XZEFV4P2961598      297 2025-01-02  47721.300781  0.957003  xc40 recharge         pure electric plus  0.957003       1.005556       0.804557          True                    
+                             237  YV1XZEFV4P2961598      298 2025-01-09  48782.902344  0.956955  xc40 recharge         pure electric plus  0.956955       1.005556       0.802434          True                    
+                                                                                                                                                                                                                   
+                             [238 rows x 11 columns]                                                                                                                                                               
+[01/16/25 16:02:34] INFO     Left merging 104350 rows with vehicle on vin and vin                                                                                                                  sql_utils.py:118
+[01/16/25 16:02:35] INFO     left_merge called.                                                                                                                                                 pandas_utils.py:112
+                    DEBUG    src_cols: ['id'], dest_cols: ['vehicle_id']                                                                                                                        pandas_utils.py:121
+[01/16/25 16:02:36] DEBUG    Assigning values.                                                                                                                                                  pandas_utils.py:143
+                    INFO     Right union merging 104350 rows on rdb table 'vehicle_data'.                                                                                                          sql_utils.py:123
+[01/16/25 16:02:40] DEBUG    "id" column is a mandatory not null col in rdb table vehicle_data but is not in lhs. Adding id column to lhs.                                                         sql_utils.py:148
+[01/16/25 16:02:41] DEBUG    Inserting 92775(91.71%) rows.                                                                                                                                         sql_utils.py:165
+                    DEBUG    Updating 8388(8.29%) rows.                                                                                                                                            sql_utils.py:166
+                               vehicle_id            timestamp       soh      odometer                                    id
+0    56d71a3d-40fd-4819-bb56-f0d15a3c63d5  2024-09-05 00:00:00       NaN  70068.000000  76b5a84f-14eb-4288-a23b-7f8a4d82ed28
+1    56d71a3d-40fd-4819-bb56-f0d15a3c63d5  2024-09-12 00:00:00       NaN  70110.000000  47b6845b-79a5-478f-8936-794db1936949
+2    56d71a3d-40fd-4819-bb56-f0d15a3c63d5  2024-09-19 00:00:00       NaN  70824.000000  f4488198-02fb-41f2-9bec-a8d33872ff43
+3    56d71a3d-40fd-4819-bb56-f0d15a3c63d5  2024-09-26 00:00:00       NaN  71429.000000  6a5acb97-f9eb-423d-9e35-67b882ca011d
+4    56d71a3d-40fd-4819-bb56-f0d15a3c63d5  2024-10-03 00:00:00       NaN  71429.000000  59b0aef1-5978-4c60-97fc-096483115953
+..                                    ...                  ...       ...           ...                                   ...
+377  c24292b6-8d6a-445a-8aed-f6c1c349e9e2  2024-12-19 00:00:00  0.957051  46885.500000  90e22221-0d76-4866-b0d1-49cb767b74bf
+378  c24292b6-8d6a-445a-8aed-f6c1c349e9e2  2024-12-26 00:00:00  0.957051  46885.500000  354c6fbf-1e55-4ba9-a429-f425f105182e
+379  c24292b6-8d6a-445a-8aed-f6c1c349e9e2  2025-01-02 00:00:00  0.957003  47721.300781  1fa1eb8f-9de4-4fe0-ac88-2f3fd7d0a761
+380  c24292b6-8d6a-445a-8aed-f6c1c349e9e2  2025-01-09 00:00:00  0.956955  48782.902344  2883b9ca-7e6d-4e8a-bd48-d494f35ea29f
+381  c24292b6-8d6a-445a-8aed-f6c1c349e9e2  2025-01-16 00:00:00  0.956955  48782.902344  1457f505-3eeb-4857-b912-dfef10cabefd
+
+[101163 rows x 5 columns]
+sanity check:
+             dtypes  nuniques                                       value_counts   count   density  memory_usage_in_MB          mean           std        min            max        median
+vehicle_id   object   12698.0  {a5859752-2e32-40b6-89a0-0b7f5e157e2e: 26, eb1...  101163  1.000000            0.809304           NaN           NaN        NaN            NaN           NaN
+timestamp    object      26.0  {'2025-01-09 00:00:00': 12698, '2025-01-16 00:...  101163  1.000000            0.809304           NaN           NaN        NaN            NaN           NaN
+soh         float64   27775.0  {0.7058100763662358: 24, 0.9347707655357644: 2...   74653  0.737948            0.809304      0.929560      0.043133   0.582676       0.999999      0.933107
+odometer    float32   38856.0  {37461.0: 23, 65097.0: 23, 37334.0: 23, 26461....  101117  0.999545            0.404652  57598.023438  48939.468750  22.942944  287362.625000  43457.996094
+id           object  101163.0  {76b5a84f-14eb-4288-a23b-7f8a4d82ed28: 1, cb66...  101163  1.000000            0.809304           NaN           NaN        NaN            NaN           NaN
+total memory usage: 4.45MB.
 
