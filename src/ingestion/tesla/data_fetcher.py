@@ -11,68 +11,12 @@ from data_processor import extract_relevant_data
 from s3_handler import save_data_to_s3
 from data_utils import (
     get_token, 
-    wake_up_vehicle, 
     refresh_token_and_retry_request, 
     get_token_from_auth_code, 
-    WAKE_UP_WAIT_TIME, 
     update_token_from_slack
 )
 from fleet_manager import VehiclePool
 import random
-
-async def handle_wake_up(session, headers, vehicle_id, access_token, vehicle_pool):
-    """Gère le réveil d'un véhicule avec le VehiclePool"""
-    max_retries = 2
-    retry_count = 0
-    
-    if vehicle_id in vehicle_pool.wake_up_tasks:
-        logging.info(f"Wake-up already in progress for vehicle {vehicle_id}")
-        try:
-            await vehicle_pool.wake_up_tasks[vehicle_id]
-            return True
-        except Exception:
-            return False
-    
-    # Ajouter le Content-Type aux headers
-    headers = {
-        **headers,
-        'Content-Type': 'application/json'
-    }
-    
-    wake_up_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/wake_up"
-    
-    while retry_count < max_retries:
-        try:
-            async with session.post(wake_up_url, headers=headers) as response:
-                if response.status == 200:
-                    logging.info(f"Wake up command sent successfully to vehicle {vehicle_id}, waiting for vehicle to wake up")
-                    await asyncio.sleep(WAKE_UP_WAIT_TIME * (retry_count + 1))
-                    
-                    check_url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles/{vehicle_id}/vehicle_data"
-                    async with session.get(check_url, headers=headers) as check_response:
-                        if check_response.status == 200:
-                            logging.info(f"Vehicle {vehicle_id} is now awake")
-                            return True
-                        else:
-                            logging.info(f"Vehicle {vehicle_id} is still waking up (status: {check_response.status})")
-                    
-                elif response.status == 429:
-                    return 'rate_limit'
-                elif response.status == 406:
-                    logging.error(f"Content-Type error (406) for vehicle {vehicle_id}")
-                    return False
-            
-            retry_count += 1
-            if retry_count < max_retries:
-                await asyncio.sleep(WAKE_UP_WAIT_TIME)
-        except Exception as e:
-            logging.error(f"Error during wake up for vehicle {vehicle_id}: {str(e)}")
-            retry_count += 1
-            if retry_count < max_retries:
-                await asyncio.sleep(WAKE_UP_WAIT_TIME)
-    
-    logging.info(f"Vehicle {vehicle_id} wake up command sent, vehicle will be checked again in 10 minutes")
-    return False
 
 async def fetch_vehicle_data_with_retry(session, url, headers, max_retries=3, base_delay=1):
     """Fonction utilitaire pour les appels API Tesla avec retry"""
@@ -119,13 +63,7 @@ async def fetch_vehicle_data(vehicle_id, access_token, refresh_token, access_tok
             status, data = await fetch_vehicle_data_with_retry(session, url, headers)
             
             if status == 408:
-                logging.info(f"Vehicle {vehicle_id} is sleeping, attempting wake up")
-                wake_up_result = await handle_wake_up(session, headers, vehicle_id, access_token, vehicle_pool)
-                if wake_up_result == True:
-                    # Réessayer de récupérer les données après le réveil
-                    status, data = await fetch_vehicle_data_with_retry(session, url, headers)
-                    if status == 200:
-                        return data
+                logging.info(f"Vehicle {vehicle_id} is sleeping")
                 return 'sleeping'
             elif status == 405:
                 logging.info(f"Vehicle {vehicle_id} is offline or unavailable")
@@ -252,15 +190,9 @@ async def job(vehicle_id, access_token_key, refresh_token_key, vehicle_pool, aut
             if vehicle_data == 'rate_limit':
                 logging.warning(f"Rate limit hit for vehicle {vehicle_id}")
                 vehicle_pool.update_vehicle_status(vehicle_id, False)
-            elif vehicle_data == 'sleeping':
+            elif vehicle_data in ['sleeping', 'offline']:
                 vehicle_pool.update_vehicle_status(vehicle_id, True, is_sleeping=True)
-                next_check = datetime.now() + timedelta(minutes=10)
-                logging.info(f"Vehicle {vehicle_id} is sleeping, next check at {next_check.strftime('%H:%M:%S')}")
-            elif vehicle_data == 'offline':
-                # Traiter les véhicules hors ligne comme endormis
-                vehicle_pool.update_vehicle_status(vehicle_id, True, is_sleeping=True)
-                next_check = datetime.now() + timedelta(minutes=10)
-                logging.info(f"Vehicle {vehicle_id} is offline, next check at {next_check.strftime('%H:%M:%S')}")
+                logging.info(f"Vehicle {vehicle_id} is {vehicle_data}")
             elif vehicle_data:
                 relevant_data = extract_relevant_data(vehicle_data, vehicle_id)
                 if relevant_data:

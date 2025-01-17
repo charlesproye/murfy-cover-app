@@ -12,21 +12,7 @@ class VehiclePool:
         self.last_success = defaultdict(lambda: None)
         self.sleep_until = defaultdict(lambda: None)
         self.failed_attempts = defaultdict(int)
-        self.wake_up_tasks = {}
         self.processing = set()
-
-    async def process_wake_up(self, vehicle_id, access_token):
-        """Gère le réveil d'un véhicule de manière asynchrone"""
-        if vehicle_id in self.wake_up_tasks:
-            return
-            
-        self.wake_up_tasks[vehicle_id] = asyncio.create_task(
-            wake_up_vehicle(access_token, vehicle_id)
-        )
-        try:
-            await self.wake_up_tasks[vehicle_id]
-        finally:
-            del self.wake_up_tasks[vehicle_id]
 
     def add_vehicle(self, vehicle):
         """Ajoute un véhicule au pool"""
@@ -79,8 +65,6 @@ class VehiclePool:
         if success:
             self.last_success[vehicle_id] = current_time
             self.failed_attempts[vehicle_id] = 0
-            if is_sleeping:
-                self.sleep_until[vehicle_id] = current_time + timedelta(minutes=10)
         else:
             self.failed_attempts[vehicle_id] += 1
             if self.failed_attempts[vehicle_id] > 3:

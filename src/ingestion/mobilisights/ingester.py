@@ -60,6 +60,10 @@ class MobilisightsIngester:
             The time of day at which to compress the S3 data
             default: "00:00"
         """
+        self.__ingester_logger = logging.getLogger("INGESTER")
+        self.__scheduler_logger = logging.getLogger("SCHEDULER")
+        self.__is_compressing = False 
+
         dotenv.load_dotenv()
         MS_BASE_URL = os.getenv("MS_BASE_URL")
         if MS_BASE_URL is None:
@@ -115,10 +119,6 @@ class MobilisightsIngester:
         self.rate_limit = rate_limit or self.rate_limit
         self.compress_time = compress_time or self.compress_time
         self.max_workers = max_workers or self.max_workers
-
-        self.__ingester_logger = logging.getLogger("INGESTER")
-        self.__scheduler_logger = logging.getLogger("SCHEDULER")
-        self.__is_compressing = False 
 
         signal.signal(signal.SIGTERM, self.__handle_shutdown_signal)
         signal.signal(signal.SIGINT, self.__handle_shutdown_signal)
