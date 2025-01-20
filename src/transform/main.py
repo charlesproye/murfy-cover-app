@@ -15,6 +15,7 @@ from transform.raw_tss.main import update_all_raw_tss
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from transform.results.main import fill_vehicle_data_table_with_results
 from transform.vehicle_info.main import VehicleInfoProcessor
+from transform.front_utils.main import FrontUtils
 
 
 logger = getLogger("transform.main")
@@ -60,6 +61,9 @@ def run_entire_pipeline():
 
         VehicleInfoProcessor().process_all_vehicles()
         logging.info("Vehicle info update completed")
+
+        FrontUtils().update_scoring()
+        logging.info("SOH comparison update completed")
         
         end_time = DT.now()
         duration = end_time - start_time
