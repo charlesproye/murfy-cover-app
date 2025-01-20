@@ -56,7 +56,6 @@ def run_entire_pipeline():
         ProcessedTimeSeries.update_all_tss()
         logging.info("Processed TSS update completed")
 
-        update_vehicle_data_table()
         logging.info("Results update completed")
 
         VehicleInfoProcessor().process_all_vehicles()
