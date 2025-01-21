@@ -51,12 +51,13 @@ def run_entire_pipeline():
         logging.info("Starting pipeline execution")
         start_time = DT.now()
         
-        update_all_raw_tss()
-        logging.info("Raw TSS update completed")
+        # update_all_raw_tss()
+        # logging.info("Raw TSS update completed")
         
-        ProcessedTimeSeries.update_all_tss()
-        logging.info("Processed TSS update completed")
+        # ProcessedTimeSeries.update_all_tss()
+        # logging.info("Processed TSS update completed")
 
+        fill_vehicle_data_table_with_results()
         logging.info("Results update completed")
 
         VehicleInfoProcessor().process_all_vehicles()
