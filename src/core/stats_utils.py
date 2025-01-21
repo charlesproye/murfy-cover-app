@@ -33,8 +33,7 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         .eval(f"max_valid_soh = odometer * {max_slope:f} + {max_intercept:f}")
         .eval(f"min_valid_soh = odometer * {min_slope:f} + {min_intercept:f}")
         .eval(f"soh_is_valid = soh <= max_valid_soh & soh >= min_valid_soh & soh > 0.5 & soh < 1.0")
-        .query("soh_is_valid")
-        .dropna(subset=["soh", "odometer"], how="any")
+        .assign(soh = lambda df: np.where(df.soh_is_valid, df.soh, np.nan))
     )
     nb_rows_removed = results.shape[0] - filtered_results.shape[0]
     if results.shape[0]:
