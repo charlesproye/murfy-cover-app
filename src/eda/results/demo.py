@@ -47,7 +47,7 @@ def get_processed_results() -> DF:
             "soh": "median",
             "model": "first",
         })
-        .pipe(filter_results_by_lines_bounds, VALID_SOH_LINE_BOUNDS, logger=logger)
+        .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
         .reset_index()
         .sort_values(["vin", "odometer"])
     )

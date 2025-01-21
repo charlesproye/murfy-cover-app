@@ -17,6 +17,10 @@ The process is the following :
     c. We add the model that still don't exist into the database vehicle_model
     d. We load the vehicle with the right ownership and vehicle_model
 3. We load the date in the database with the right ownership
+4. We cleanup the unused models
+5. We list the used models
+6. We find the models needing completion
+7. We force the existing model_name and type into lowercase
 
 
 

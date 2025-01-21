@@ -6,6 +6,7 @@ from scipy.optimize import minimize
 
 from core.pandas_utils import * 
 
+
 logger = getLogger("core.stats_utils")
 
 def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Logger=logger) -> DF:
@@ -21,7 +22,10 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         The must contain 4 points that define the slope bounds of minimum and maximum SOH ranges.
         View 
     """
-    logger.debug("Filtering out of bounds SoH results.")
+    if results["soh"].isna().all():
+        logger.debug("No SOH values to filter, column is all NaN returning as is.")
+        return results
+    logger.debug("Filtering results.")
     max_intercept, max_slope = intercept_and_slope_from_points(valid_soh_points.xs("max", level=0, drop_level=True))
     min_intercept, min_slope = intercept_and_slope_from_points(valid_soh_points.xs("min", level=0, drop_level=True))
     results = (
@@ -38,7 +42,7 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         if nb_rows_removed == results.shape[0]:
             logger.warning(f"All results were removed, check the valid SOH points.")
         else:
-            logger.debug(f"Filtered results, removed {nb_rows_removed}({rows_removed_pct:.2f}%) rows:\n{results}")
+            logger.debug(f"Filtered results, removed {nb_rows_removed}({rows_removed_pct:.2f}%)")
     else: 
         logger.warning("No results to filter.")
     return results
