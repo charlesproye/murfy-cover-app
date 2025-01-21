@@ -154,7 +154,7 @@ class FrontUtils:
         print(f"\nMise à jour terminée! {total_updated} lignes mises à jour au total.")
 
 def main():
-    # Get configuration from environment variables
+    
     FrontUtils().update_scoring()
 
 
