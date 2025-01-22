@@ -34,6 +34,7 @@ def get_results() -> DF:
         .query("trimmed_in_charge")
         .groupby(["vin", "trimmed_in_charge_idx"])
         .agg(
+            charger_power=pd.NamedAgg("charger_power", "max"),
             energy_added=pd.NamedAgg("charge_energy_added", series_start_end_diff),
             soc_diff=pd.NamedAgg("soc", series_start_end_diff),
             soc_start=pd.NamedAgg("soc", "first"),
