@@ -55,6 +55,17 @@ def get_results() -> DF:
         .groupby('model', group_keys=False)
         .apply(apply_model_calculation)
         .sort_values(["vin", "date"])
+        .pipe(charge_levels)
+    )
+
+def charge_levels(tss:DF) -> DF:
+    tss_grp = tss.groupby("vin")
+    return (
+        tss
+        .assign(soc_diff=tss_grp["soc"].diff())
+        .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER)")
+        .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER))")
+        .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER)")
     )
 
 def fill_vars(tss:DF, cols:list[str]) -> DF:
