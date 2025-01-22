@@ -13,3 +13,7 @@ MAKES_WITHOUT_SOH = [
   'bmw',
   'kia',
 ]
+
+LEVEL_1_MAX_POWER = 2.5
+LEVEL_2_MAX_POWER = 19.5
+
