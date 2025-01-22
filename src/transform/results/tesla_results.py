@@ -13,8 +13,10 @@ logger = getLogger("transform.results.tesla_results")
 @main_decorator
 def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform.results")
+    df = get_results()
+    df.to_csv("tesla_results.csv")
     df = (
-        get_results()
+        df
         .dropna(subset=["odometer", "soh"])
         .eval("date = date.dt.date")
         .groupby(["vin", "date"])
@@ -30,10 +32,11 @@ def main():
 
 def get_results() -> DF:
     return (
-        ProcessedTimeSeries("tesla")
+        pd.read_parquet("tesla_tss.parquet")
         .query("trimmed_in_charge")
         .groupby(["vin", "trimmed_in_charge_idx"])
         .agg(
+            charger_power=pd.NamedAgg("charger_power", "max"),
             energy_added=pd.NamedAgg("charge_energy_added", series_start_end_diff),
             soc_diff=pd.NamedAgg("soc", series_start_end_diff),
             soc_start=pd.NamedAgg("soc", "first"),
@@ -50,6 +53,9 @@ def get_results() -> DF:
         .reset_index(drop=False)
         .eval("soh = energy_added / (soc_diff / 100 * capacity)")
         .eval("model_version = model + version")
+        .eval("level_1 = soc_diff * (charger_power < @LEVEL_1_MAX_POWER)")
+        .eval("level_2 = soc_diff * (charger_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER))")
+        .eval("level_3 = soc_diff * (charger_power > @LEVEL_2_MAX_POWER)")
         .query("soc_diff > 20")
     )
 

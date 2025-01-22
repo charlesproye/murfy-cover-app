@@ -28,15 +28,15 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
     logger.debug("Filtering results.")
     max_intercept, max_slope = intercept_and_slope_from_points(valid_soh_points.xs("max", level=0, drop_level=True))
     min_intercept, min_slope = intercept_and_slope_from_points(valid_soh_points.xs("min", level=0, drop_level=True))
-    filtered_results = (
+    results = (
         results
+        .eval("raw_soh = soh")
         .eval(f"max_valid_soh = odometer * {max_slope:f} + {max_intercept:f}")
         .eval(f"min_valid_soh = odometer * {min_slope:f} + {min_intercept:f}")
-        .eval(f"soh_is_valid = soh <= max_valid_soh & soh >= min_valid_soh & soh > 0.5 & soh < 1.0")
-        .query("soh_is_valid")
-        .dropna(subset=["soh", "odometer"], how="any")
+        .eval(f"soh_is_valid = soh.between(min_valid_soh, max_valid_soh) & soh.between(0.5, 1.0)")
+        .assign(soh = lambda df: np.where(df.soh_is_valid, df.soh, np.nan))
     )
-    nb_rows_removed = results.shape[0] - filtered_results.shape[0]
+    nb_rows_removed = results["soh_is_valid"].eq(False).sum()
     if results.shape[0]:
         rows_removed_pct = 100 * nb_rows_removed / results.shape[0]
         if nb_rows_removed == results.shape[0]:
@@ -45,7 +45,7 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
             logger.debug(f"Filtered results, removed {nb_rows_removed}({rows_removed_pct:.2f}%)")
     else: 
         logger.warning("No results to filter.")
-    return filtered_results
+    return results
 
 def intercept_and_slope_from_points(points: DF) -> tuple[float, float]:
     slope = (points.at["B", "soh"] - points.at["A", "soh"]) / (points.at["B", "odometer"] - points.at["A", "odometer"])
