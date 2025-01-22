@@ -366,7 +366,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     else:
                         vehicle_model_id = str(uuid.uuid4())
                         cursor.execute("""
-                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id)
+                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id,make_id)
                             VALUES (%s, %s, %s, %s, %s)
                             RETURNING id
                         """, (
@@ -374,7 +374,8 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                             options['model_name'],
                             options['type'],
                             options['version'],
-                            '98809ac9-acb5-4cca-b67a-c1f6c489035a'
+                            '98809ac9-acb5-4cca-b67a-c1f6c489035a',
+                            '22d426b6-89bb-422e-a50b-26ecf7473247'
                         ))
                         vehicle_model_id = cursor.fetchone()[0]
                         logging.info(f"Created new vehicle_model for {options['model_name']} {options['type']} version {options['version']}")
