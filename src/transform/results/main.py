@@ -18,7 +18,7 @@ GET_RESULTS_FUNCS = {
     #"bmw": lambda: agg_last_odometer("bmw"),
     #"kia": lambda: agg_last_odometer("kia"),
     #"mercedes-benz": get_mercedes_results,
-    #"renault": get_renault_results,
+    "renault": get_renault_results,
     "tesla": lambda : pd.read_csv("tesla_results.csv"), # get_tesla_results,
     #"volvo": get_volvo_results,
     #"ford": get_ford_results,
@@ -54,7 +54,7 @@ def get_processed_results(brand:str) -> DF:
         .apply(make_soh_presentable, include_groups=False)
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
         .groupby("vin")
-        .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
+        .apply(add_lines_up_to_today_for_single_vehicle, include_groups=False)
         .reset_index()
         .sort_values(["vin", "date"])
     )
@@ -84,10 +84,6 @@ def agg_results_by_update_frequency(results:DF) -> DF:
             level_2=pd.NamedAgg("level_2", "sum"),
             level_3=pd.NamedAgg("level_3", "sum"),
         )
-        .eval("total_charge_soc_diff = level_1 + level_2 + level_3")
-        .eval("level_1 = level_1 / total_charge_soc_diff")
-        .eval("level_2 = level_2 / total_charge_soc_diff")
-        .eval("level_3 = level_3 / total_charge_soc_diff")
         .reset_index()
     )
 
@@ -103,16 +99,16 @@ def make_soh_presentable(df:DF) -> DF:
         df["soh"] = force_monotonic_decrease(df["soh"])
     return df
 
-def add_lines_up_to_today_for_vehicle(results:DF) -> DF:
+def add_lines_up_to_today_for_single_vehicle(results:DF) -> DF:
     last_date = pd.Timestamp.now().floor(UPDATE_FREQUENCY).date()
     dates_up_to_last_date = pd.date_range(results["date"].min(), last_date, freq=UPDATE_FREQUENCY, name="date")
-    test = (
+    return (
         results
         .set_index("date")
         .sort_index()
         .reindex(dates_up_to_last_date, method="ffill")
     )
-    return test
+    
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")

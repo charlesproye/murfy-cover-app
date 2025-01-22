@@ -19,7 +19,21 @@ def get_results() -> DF:
         # Since discharge_perf_idx is declared as discharge_perf_mask.diff().cumsum(), it increases per discharge AND charge, i.e 2 per discharge
         # So we check that the max is superiror or equal to 3 * 2
         .filter(lambda ts: ts["trimmed_in_discharge_idx"].max() >= 6)
+        .pipe(charge_levels)
     )
+    #.query("trimmed_in_charge")
+    #.groupby(["vin", "trimmed_in_charge_idx"])
+
+def charge_levels(tss:DF) -> DF:
+    tss_grp = tss.groupby("vin")
+    return (
+        tss
+        .assign(soc_diff=tss_grp["soc"].diff())
+        .eval("level_1 = soc_diff * (charging_rate < @LEVEL_1_MAX_POWER)")
+        .eval("level_2 = soc_diff * (charging_rate.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER))")
+        .eval("level_3 = soc_diff * (charging_rate > @LEVEL_2_MAX_POWER)")
+    )
+
 
 if __name__ == "__main__":
     df = get_results().dropna(subset=["odometer", "soh"])

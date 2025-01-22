@@ -53,9 +53,10 @@ def get_results() -> DF:
         .reset_index(drop=False)
         .eval("soh = energy_added / (soc_diff / 100 * capacity)")
         .eval("model_version = model + version")
-        .eval("level_1 = soc_diff * (charger_power < @LEVEL_1_MAX_POWER)")
-        .eval("level_2 = soc_diff * (charger_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER))")
-        .eval("level_3 = soc_diff * (charger_power > @LEVEL_2_MAX_POWER)")
+        #boolean expression evaluates to 0 when False
+        .eval("level_1 = soc_diff * (charger_power < @LEVEL_1_MAX_POWER) / 100")
+        .eval("level_2 = soc_diff * (charger_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER)) / 100")
+        .eval("level_3 = soc_diff * (charger_power > @LEVEL_2_MAX_POWER) / 100")
         .query("soc_diff > 20")
     )
 
