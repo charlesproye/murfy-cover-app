@@ -280,7 +280,7 @@ class Charging(WithTimestamp):
         return res
 
 
-class Electricity(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class Electricity(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     capacity: Optional[TimestampedValueWithUnit[float, CapacityUnit]] = None
     charging: Optional[Charging] = None
     engine: Optional[EngineSmall] = None
@@ -304,6 +304,7 @@ class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_default
     charging: list[Charging] = []
     engine_speed: list[TimestampedValueWithUnit[float, EngineSpeedUnit]] = []
     stateOfHealth: list[TimestampedValue[float]] = []
+    battery: list[dict] = []  # Pour stocker les données battery brutes
 
     @classmethod
     def from_list(cls, lst: list[Electricity]) -> Self:
@@ -334,6 +335,11 @@ class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_default
         res.stateOfHealth = TimestampedValue.merge_list(
             [x for x in map(lambda e: e.stateOfHealth, lst) if x is not None]
         )
+        # Ajout de la gestion du champ battery
+        res.battery = [
+            x for x in map(lambda e: getattr(e, 'battery', None), lst)
+            if x is not None
+        ]
         return res
 
 
@@ -862,11 +868,11 @@ class Maintenance(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True
     odometer: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
 
 
-class Crash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class Crash(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     auto_ecall: Optional[TimestampedValue[bool]] = None
     pedestrian: Optional[TimestampedValue[bool]] = None
     tipped_over: Optional[TimestampedValue[bool]] = None
-    rear: Optional[TimestampedValue[bool | dict]] = None 
+    rear: Optional[TimestampedValue[dict]] = None  # Changed to dict to accept any fields
 
 
 class MergedCrash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
