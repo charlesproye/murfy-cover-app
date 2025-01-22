@@ -15,13 +15,13 @@ from transform.results.odometer_aggregation import agg_last_odometer
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
-    "bmw": lambda: agg_last_odometer("bmw"),
-    "kia": lambda: agg_last_odometer("kia"),
-    "mercedes-benz": get_mercedes_results,
-    "renault": get_renault_results,
-    "tesla": get_tesla_results,
-    "ford": get_ford_results,
-    "volvo": get_volvo_results,
+    #"bmw": lambda: agg_last_odometer("bmw"),
+    #"kia": lambda: agg_last_odometer("kia"),
+    #"mercedes-benz": get_mercedes_results,
+    #"renault": get_renault_results,
+    "tesla": lambda : pd.read_csv("tesla_results.csv"), # get_tesla_results,
+    #"volvo": get_volvo_results,
+    #"ford": get_ford_results,
 }
 
 def update_vehicle_data_table():
@@ -34,7 +34,7 @@ def update_vehicle_data_table():
             "vehicle_data",
             left_on=["vehicle_id", "date"],
             right_on=["vehicle_id", "timestamp"],
-            src_dest_cols=["soh", "odometer"]
+            src_dest_cols=["soh", "odometer", "level_1", "level_2", "level_3"]
         )
     )
 
@@ -52,7 +52,6 @@ def get_processed_results(brand:str) -> DF:
         .pipe(agg_results_by_update_frequency)
         .groupby('vin')
         .apply(make_soh_presentable, include_groups=False)
-        .reset_index(drop=False)
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
         .groupby("vin")
         .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
@@ -76,18 +75,25 @@ def agg_results_by_update_frequency(results:DF) -> DF:
     return (
         results
         .groupby(["vin", "date"])
-        .agg({
-            "odometer": "last",    
-            "soh": "median",
-            "model": "first",
-            "version": "first",
-        })
+        .agg(
+            odometer=pd.NamedAgg("odometer", "last"),
+            soh=pd.NamedAgg("soh", "median"),
+            model=pd.NamedAgg("model", "first"),
+            version=pd.NamedAgg("version", "first"),
+            level_1=pd.NamedAgg("level_1", "sum"),
+            level_2=pd.NamedAgg("level_2", "sum"),
+            level_3=pd.NamedAgg("level_3", "sum"),
+        )
+        .eval("total_charge_soc_diff = level_1 + level_2 + level_3")
+        .eval("level_1 = level_1 / total_charge_soc_diff")
+        .eval("level_2 = level_2 / total_charge_soc_diff")
+        .eval("level_3 = level_3 / total_charge_soc_diff")
         .reset_index()
     )
 
 def make_soh_presentable(df:DF) -> DF:
     if df["soh"].isna().all():
-        logger.warning(f"No SOH data for {df.name}")
+        #logger.warning(f"No SOH data for {df.name}")
         return df
     if len(df) > 3:
         outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
