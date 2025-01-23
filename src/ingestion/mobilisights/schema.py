@@ -47,12 +47,19 @@ class TimestampedValueWithUnit(WithTimestamp, Generic[T, U]):
         return res
 
 
-
-class Percentage(msgspec.Struct, forbid_unknown_fields=False):
+class Percentage(WithTimestamp, forbid_unknown_fields=False):
     percentage: str | float
 
     def __post_init__(self):
         self.percentage = float(self.percentage)
+
+    @classmethod
+    def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
+        res: list[Self] = []
+        for el in lst:
+            if el.datetime not in set(map(lambda e: e.datetime, res)):
+                res.append(el)
+        return res
 
 
 class DurationUnit(StrEnum):
