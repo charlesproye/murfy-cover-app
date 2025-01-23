@@ -47,8 +47,9 @@ class TimestampedValueWithUnit(WithTimestamp, Generic[T, U]):
         return res
 
 
-class Percentage(WithTimestamp, forbid_unknown_fields=False):
+class Percentage(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     percentage: str | float
+    datetime: Optional[dt] = None
 
     def __post_init__(self):
         self.percentage = float(self.percentage)
@@ -377,10 +378,11 @@ class VoltageUnit(StrEnum):
     volts = "V"
 
 
-class EngineBattery(WithTimestamp):
+class EngineBattery(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     capacity: Optional[Percentage] = None
     resistance: Optional[object] = None
     voltage: Optional[TimestampedValueWithUnit[float, VoltageUnit]] = None
+    datetime: Optional[dt] = None
 
     @classmethod
     def merge_list(cls, lst: Iterable[Self]) -> list[Self]:
@@ -866,7 +868,7 @@ class Crash(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, ren
     auto_ecall: Optional[TimestampedValue[bool]] = None
     pedestrian: Optional[TimestampedValue[bool]] = None
     tipped_over: Optional[TimestampedValue[bool]] = None
-    rear: Optional[TimestampedValue[dict]] = None  # Changed to dict to accept any fields
+    rear: Optional[dict] = None  # Changed to dict to accept any fields without timestamp requirement
 
 
 class MergedCrash(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
