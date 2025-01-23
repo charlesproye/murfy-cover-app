@@ -110,8 +110,8 @@ class HMIngester:
             aws_access_key_id=S3_KEY,
             aws_secret_access_key=S3_SECRET,
             config=boto3.session.Config(
-                signature_version='s3v4',  # Forcer la version de signature
-                s3={'addressing_style': 'virtual'}  # Style d'adressage virtuel
+                signature_version='s3',  # Changed from s3v4 to s3
+                s3={'addressing_style': 'path'}  # Changed from 'virtual' to 'path'
             )
         )
         self.__bucket = S3_BUCKET
@@ -347,7 +347,11 @@ class HMIngester:
 
     def test_s3_connection(self):
         try:
-            # Test simple d'écriture
+            # Ajout de logs pour le debugging
+            self.__ingester_logger.info(f"Testing S3 connection with endpoint: {self.__s3.meta.endpoint_url}")
+            self.__ingester_logger.info(f"Using region: {self.__s3._client_config.region_name}")
+            self.__ingester_logger.info(f"Using signature version: {self.__s3._client_config.signature_version}")
+            
             test_key = "test/connection_test.txt"
             self.__s3.put_object(
                 Bucket=self.__bucket,
