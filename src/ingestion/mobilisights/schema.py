@@ -280,20 +280,18 @@ class Charging(WithTimestamp, forbid_unknown_fields=False):
 
 
 class Battery(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
-    stateOfHealth: Optional[TimestampedValue[float]] = None
+    stateOfHealth: Optional[Percentage] = None
 
 
 class MergedBattery(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
-    stateOfHealth: list[TimestampedValue[float]] = []
+    stateOfHealth: list[Percentage] = []
 
     @classmethod
     def from_list(cls, lst: list[Battery]) -> Optional[Self]:
         if not lst:
             return None
         res = cls()
-        res.stateOfHealth = TimestampedValue.merge_list(
-            [x for x in map(lambda e: e.stateOfHealth, lst) if x is not None]
-        )
+        res.stateOfHealth = [x for x in map(lambda e: e.stateOfHealth, lst) if x is not None]
         return res
 
 
