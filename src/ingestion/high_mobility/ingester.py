@@ -347,16 +347,6 @@ class HMIngester:
 
     def test_s3_connection(self):
         try:
-            # Vérifier l'heure système
-            current_time = datetime.now()
-            self.__ingester_logger.info(f"Current system time: {current_time}")
-            
-            # Vérifier si l'année est future
-            if current_time.year > 2024:
-                self.__ingester_logger.error(f"System clock appears to be incorrect (year: {current_time.year})")
-                self.__ingester_logger.error("Please correct the system time before continuing")
-                raise RuntimeError("Incorrect system time detected")
-            
             # Test simple d'écriture
             test_key = "test/connection_test.txt"
             self.__s3.put_object(
