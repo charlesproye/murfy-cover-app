@@ -278,30 +278,52 @@ class HMIngester:
                     f"Parsed response for vehicle with VIN {vehicle.vin} correctly"
                 )
                 filename = f"response/{vehicle.brand}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
+                
+                # Ajout de logs pour le debugging S3
+                self.__ingester_logger.info(f"S3 Configuration - Endpoint: {self.__s3.meta.endpoint_url}, Region: {self.__s3._client_config.region_name}")
+                
                 try:
                     encoded = msgspec.json.encode(decoded)
+                    self.__ingester_logger.info(f"Attempting to upload to S3 - Bucket: {self.__bucket}, Key: {filename}")
+                    
+                    # Log de la taille des données
+                    data_size = len(encoded)
+                    self.__ingester_logger.info(f"Data size to upload: {data_size} bytes")
+                    
+                    try:
+                        uploaded = self.__s3.put_object(
+                            Body=encoded,
+                            Bucket=self.__bucket,
+                            Key=filename,
+                        )
+                        
+                        # Log détaillé de la réponse S3
+                        self.__ingester_logger.info(f"S3 Response: {uploaded['ResponseMetadata']}")
+                        
+                        match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
+                            case 200:
+                                self.__ingester_logger.info(
+                                    f"Successfully uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
+                                )
+                            case _:
+                                self.__ingester_logger.error(
+                                    f"Error uploading info for vehicle with VIN {vehicle.vin}: Status {uploaded['ResponseMetadata']['HTTPStatusCode']}"
+                                )
+                    except ClientError as e:
+                        # Log détaillé de l'erreur S3
+                        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+                        error_message = e.response.get('Error', {}).get('Message', 'No message')
+                        request_id = e.response.get('ResponseMetadata', {}).get('RequestId', 'No request ID')
+                        self.__ingester_logger.error(
+                            f"S3 ClientError for VIN {vehicle.vin}:\n"
+                            f"Error Code: {error_code}\n"
+                            f"Error Message: {error_message}\n"
+                            f"Request ID: {request_id}\n"
+                            f"Full error response: {e.response}"
+                        )
                 except msgspec.EncodeError as e:
                     self.__ingester_logger.error(f"Failed to encode vehicle data: {e}")
                     return
-                try:
-                    uploaded = self.__s3.put_object(
-                        Body=encoded,
-                        Bucket=self.__bucket,
-                        Key=filename,
-                    )
-                    match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
-                        case 200:
-                            self.__ingester_logger.info(
-                                f"Uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
-                            )
-                        case _:
-                            self.__ingester_logger.error(
-                                f"Error uploading info for vehicle with VIN {vehicle.vin}: {uploaded['Error']['Message']}"
-                            )
-                except ClientError as e:
-                    self.__ingester_logger.error(
-                        f"Error uploading info for vehicle with VIN {vehicle.vin}: {e.response['Error']['Message']}"
-                    )
                 return
             case _:
                 log_error(info)
