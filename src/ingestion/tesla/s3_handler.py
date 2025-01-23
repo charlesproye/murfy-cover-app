@@ -17,6 +17,10 @@ async def compress_data():
         endpoint_url=os.getenv("S3_ENDPOINT"),
         aws_access_key_id=os.getenv("S3_KEY"),
         aws_secret_access_key=os.getenv("S3_SECRET"),
+        config=boto3.session.Config(
+            signature_version='s3',
+            s3={'addressing_style': 'path'}
+        )
     ) as s3:
         bucket_name = os.getenv("S3_BUCKET")
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")

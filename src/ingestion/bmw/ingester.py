@@ -124,6 +124,10 @@ class BMWIngester:
             endpoint_url=S3_ENDPOINT,
             aws_access_key_id=S3_KEY,
             aws_secret_access_key=S3_SECRET,
+            config=boto3.session.Config(
+                signature_version='s3',
+                s3={'addressing_style': 'path'}
+            )
         )
         self.__bucket = S3_BUCKET
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)

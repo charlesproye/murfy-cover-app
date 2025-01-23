@@ -110,8 +110,8 @@ class HMIngester:
             aws_access_key_id=S3_KEY,
             aws_secret_access_key=S3_SECRET,
             config=boto3.session.Config(
-                signature_version='s3',  # Changed from s3v4 to s3
-                s3={'addressing_style': 'path'}  # Changed from 'virtual' to 'path'
+                signature_version='s3',
+                s3={'addressing_style': 'path'}
             )
         )
         self.__bucket = S3_BUCKET
@@ -278,52 +278,30 @@ class HMIngester:
                     f"Parsed response for vehicle with VIN {vehicle.vin} correctly"
                 )
                 filename = f"response/{vehicle.brand}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
-                
-                # Ajout de logs pour le debugging S3
-                self.__ingester_logger.info(f"S3 Configuration - Endpoint: {self.__s3.meta.endpoint_url}, Region: {self.__s3._client_config.region_name}")
-                
                 try:
                     encoded = msgspec.json.encode(decoded)
-                    self.__ingester_logger.info(f"Attempting to upload to S3 - Bucket: {self.__bucket}, Key: {filename}")
-                    
-                    # Log de la taille des données
-                    data_size = len(encoded)
-                    self.__ingester_logger.info(f"Data size to upload: {data_size} bytes")
-                    
-                    try:
-                        uploaded = self.__s3.put_object(
-                            Body=encoded,
-                            Bucket=self.__bucket,
-                            Key=filename,
-                        )
-                        
-                        # Log détaillé de la réponse S3
-                        self.__ingester_logger.info(f"S3 Response: {uploaded['ResponseMetadata']}")
-                        
-                        match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
-                            case 200:
-                                self.__ingester_logger.info(
-                                    f"Successfully uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
-                                )
-                            case _:
-                                self.__ingester_logger.error(
-                                    f"Error uploading info for vehicle with VIN {vehicle.vin}: Status {uploaded['ResponseMetadata']['HTTPStatusCode']}"
-                                )
-                    except ClientError as e:
-                        # Log détaillé de l'erreur S3
-                        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
-                        error_message = e.response.get('Error', {}).get('Message', 'No message')
-                        request_id = e.response.get('ResponseMetadata', {}).get('RequestId', 'No request ID')
-                        self.__ingester_logger.error(
-                            f"S3 ClientError for VIN {vehicle.vin}:\n"
-                            f"Error Code: {error_code}\n"
-                            f"Error Message: {error_message}\n"
-                            f"Request ID: {request_id}\n"
-                            f"Full error response: {e.response}"
-                        )
                 except msgspec.EncodeError as e:
                     self.__ingester_logger.error(f"Failed to encode vehicle data: {e}")
                     return
+                try:
+                    uploaded = self.__s3.put_object(
+                        Body=encoded,
+                        Bucket=self.__bucket,
+                        Key=filename,
+                    )
+                    match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
+                        case 200:
+                            self.__ingester_logger.info(
+                                f"Uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
+                            )
+                        case _:
+                            self.__ingester_logger.error(
+                                f"Error uploading info for vehicle with VIN {vehicle.vin}: {uploaded['Error']['Message']}"
+                            )
+                except ClientError as e:
+                    self.__ingester_logger.error(
+                        f"Error uploading info for vehicle with VIN {vehicle.vin}: {e.response['Error']['Message']}"
+                    )
                 return
             case _:
                 log_error(info)
@@ -345,41 +323,8 @@ class HMIngester:
             else:
                 time.sleep(1)
 
-    def test_s3_connection(self):
-        try:
-            # Ajout de logs pour le debugging
-            self.__ingester_logger.info(f"Testing S3 connection with endpoint: {self.__s3.meta.endpoint_url}")
-            self.__ingester_logger.info(f"Using region: {self.__s3._client_config.region_name}")
-            self.__ingester_logger.info(f"Using signature version: {self.__s3._client_config.signature_version}")
-            
-            test_key = "test/connection_test.txt"
-            self.__s3.put_object(
-                Bucket=self.__bucket,
-                Key=test_key,
-                Body="Test connection"
-            )
-            self.__ingester_logger.info("S3 connection test successful")
-            
-            # Tenter de lire le fichier
-            response = self.__s3.get_object(
-                Bucket=self.__bucket,
-                Key=test_key
-            )
-            self.__ingester_logger.info("S3 read test successful")
-            
-            # Supprimer le fichier de test
-            self.__s3.delete_object(
-                Bucket=self.__bucket,
-                Key=test_key
-            )
-            self.__ingester_logger.info("S3 delete test successful")
-            
-        except ClientError as e:
-            self.__ingester_logger.error(f"S3 connection test failed: {str(e)}")
-            self.__ingester_logger.error(f"Error response: {e.response}")
 
     def run(self):
-            self.test_s3_connection()
             if os.getenv("COMPRESS_ONLY") and os.getenv("COMPRESS_ONLY") == "1":
                 self.__ingester_logger.info("COMPRESS_ONLY flag set. Running compression first.")
                 self.__is_compressing = True
