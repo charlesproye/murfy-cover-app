@@ -9,7 +9,7 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 
-class WithTimestamp(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class WithTimestamp(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     datetime: dt
 
 
@@ -25,7 +25,7 @@ class TimestampedValue(WithTimestamp, Generic[T]):
         return res
 
 
-class ValueWithUnit(msgspec.Struct, Generic[T, U], forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class ValueWithUnit(msgspec.Struct, Generic[T, U], forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     value: T
     unit: U
 
@@ -48,7 +48,7 @@ class TimestampedValueWithUnit(WithTimestamp, Generic[T, U]):
 
 
 
-class Percentage(msgspec.Struct):
+class Percentage(msgspec.Struct, forbid_unknown_fields=False):
     percentage: str | float
 
     def __post_init__(self):
@@ -87,7 +87,7 @@ class DistanceUnit(StrEnum):
     miles = "mi"
 
 
-class Geolocation(WithTimestamp):
+class Geolocation(WithTimestamp, forbid_unknown_fields=False):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     source: Optional[GpsSource] = None
@@ -178,7 +178,7 @@ class Fuel(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, renam
     engine: Optional[EngineSmall] = None
 
 
-class MergedFuel(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedFuel(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     average_consumption: list[TimestampedValueWithUnit[float, FuelConsumptionUnit]] = []
     instant_consumption: list[TimestampedValueWithUnit[float, FuelConsumptionUnit]] = []
     total_consumption: list[TimestampedValueWithUnit[float, VolumeUnit]] = []
@@ -211,7 +211,6 @@ class MergedFuel(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True,
                 if x is not None
             ]
         )
-
         return res
 
 
@@ -263,7 +262,7 @@ class ChargingMode(StrEnum):
     no = "no" 
 
 
-class Charging(WithTimestamp):
+class Charging(WithTimestamp, forbid_unknown_fields=False):
     plugged: Optional[bool] = None
     status: Optional[ChargingStatus] = None
     remainingTime: Optional[int] = None
@@ -280,6 +279,24 @@ class Charging(WithTimestamp):
         return res
 
 
+class Battery(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
+    stateOfHealth: Optional[TimestampedValue[float]] = None
+
+
+class MergedBattery(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
+    stateOfHealth: list[TimestampedValue[float]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Battery]) -> Optional[Self]:
+        if not lst:
+            return None
+        res = cls()
+        res.stateOfHealth = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.stateOfHealth, lst) if x is not None]
+        )
+        return res
+
+
 class Electricity(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     capacity: Optional[TimestampedValueWithUnit[float, CapacityUnit]] = None
     charging: Optional[Charging] = None
@@ -287,7 +304,7 @@ class Electricity(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=Tru
     residual_autonomy: Optional[TimestampedValueWithUnit[float, DistanceUnit]] = None
     level: Optional[EnergyConsumptionLevel] = None
     instant_consumption: Optional[TimestampedValueWithUnit[float, EnergyConsumptionUnit]] = None
-    stateOfHealth: Optional[TimestampedValue[float]] = None
+    battery: Optional[Battery] = None
 
     @classmethod
     def __struct_from_dict__(cls, d):
@@ -296,20 +313,18 @@ class Electricity(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=Tru
         return super().__struct_from_dict__(d)
 
 
-class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedElectricity(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     instant_consumption: list[TimestampedValueWithUnit[float, EnergyConsumptionUnit]] = []
     level: list[EnergyConsumptionLevel] = []
     residual_autonomy: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
     battery_capacity: list[TimestampedValueWithUnit[float, CapacityUnit]] = []
     charging: list[Charging] = []
     engine_speed: list[TimestampedValueWithUnit[float, EngineSpeedUnit]] = []
-    stateOfHealth: list[TimestampedValue[float]] = []
-    battery: list[dict] = []  # Pour stocker les données battery brutes
+    battery: Optional[MergedBattery] = None
 
     @classmethod
     def from_list(cls, lst: list[Electricity]) -> Self:
         res = cls()
-        # Correction ici : on vérifie d'abord si l'objet existe
         res.instant_consumption = TimestampedValueWithUnit.merge_list(
             [x for x in map(lambda e: getattr(e, 'instant_consumption', None), lst) if x is not None]
         )
@@ -332,14 +347,9 @@ class MergedElectricity(msgspec.Struct, forbid_unknown_fields=True, omit_default
                 if x is not None
             ]
         )
-        res.stateOfHealth = TimestampedValue.merge_list(
-            [x for x in map(lambda e: e.stateOfHealth, lst) if x is not None]
+        res.battery = MergedBattery.from_list(
+            [x for x in map(lambda e: e.battery, lst) if x is not None]
         )
-        # Ajout de la gestion du champ battery
-        res.battery = [
-            x for x in map(lambda e: getattr(e, 'battery', None), lst)
-            if x is not None
-        ]
         return res
 
 
@@ -392,7 +402,7 @@ class Engine(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, ren
     coolant: Optional[EngineCoolant] = None
 
 
-class MergedEngine(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedEngine(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     oil_temperature: list[TimestampedValueWithUnit[float, TemperatureUnit]] = []
     oil_pressure: list[TimestampedValueWithUnit[float, PressureUnit]] = []
     contact: list[TimestampedValue[bool]] = []
@@ -455,7 +465,7 @@ class ParkAssistValue(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=
     muted: Optional[TimestampedValue[bool]] = None
 
 
-class MergedParkAssistValue(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedParkAssistValue(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     alarm: list[TimestampedValue[bool]] = []
     muted: list[TimestampedValue[bool]] = []
 
@@ -476,7 +486,7 @@ class ParkAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True,
     rear: ParkAssistValue
 
 
-class MergedParkAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedParkAssist(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     front: Optional[MergedParkAssistValue] = None
     rear: Optional[MergedParkAssistValue] = None
 
@@ -501,7 +511,7 @@ class Lane(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, renam
     keep_assist: Optional[KeepAssist] = None
 
 
-class MergedLaneKeepAssist(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedLaneKeepAssist(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     right: list[TimestampedValue[bool]] = []
     left: list[TimestampedValue[bool]] = []
 
@@ -539,7 +549,7 @@ class Adas(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, renam
     sli: Optional[TimestampedValueWithUnit[float, SpeedUnit]] = None
 
 
-class MergedAdas(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedAdas(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     park_assist: Optional[MergedParkAssist] = None
     lane_keep_assist: Optional[MergedLaneKeepAssist] = None
     esp: list[TimestampedValue[bool]] = []
@@ -591,7 +601,7 @@ class Lights(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, ren
     warnings: Optional[TimestampedValue[bool]] = None
 
 
-class MergedLights(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedLights(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     fog_front: list[TimestampedValue[bool]] = []
     fog_rear: list[TimestampedValue[bool]] = []
     turn: list[TimestampedValue[Turn]] = []
@@ -623,7 +633,7 @@ class MergedLights(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=Tru
         return res
 
 
-class RearPassengerSeatbelt(msgspec.Struct):
+class RearPassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=False):
     left: Optional[TimestampedValue[bool]] = None
     right: Optional[TimestampedValue[bool]] = None
     center: Optional[TimestampedValue[bool]] = None
@@ -646,7 +656,7 @@ class RearPassengerSeatbelt(msgspec.Struct):
         return bool(value)
 
 
-class PassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class PassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     front: Optional[TimestampedValue[bool]] = None
     rear: Optional[RearPassengerSeatbelt] = None
 
@@ -657,7 +667,7 @@ class PassengerSeatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_default
             d['front']['value'] = d['front']['value'].lower() == 'true'
         return super().__struct_from_dict__(d)
 
-class Seatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class Seatbelt(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     driver: Optional[TimestampedValue[bool]] = None
     passenger: Optional[PassengerSeatbelt] = None
 
@@ -668,7 +678,7 @@ class Seatbelt(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, r
             d['driver']['value'] = d['driver']['value'].lower() == 'true'
         return super().__struct_from_dict__(d)
 
-class MergedSeatbelt(msgspec.Struct):
+class MergedSeatbelt(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     driver: list[TimestampedValue[bool]] = []
     passenger_front: list[TimestampedValue[bool]] = []
     passenger_rear_left: list[TimestampedValue[bool]] = []
@@ -676,7 +686,7 @@ class MergedSeatbelt(msgspec.Struct):
     passenger_rear_center: list[TimestampedValue[bool]] = []
 
     @classmethod
-    def from_list(cls, lst: Iterable[Seatbelt]) -> Optional[Self]:
+    def from_list(cls, lst: list[Seatbelt]) -> Optional[Self]:
         if not lst:
             return None
         res = cls()
@@ -691,39 +701,18 @@ class MergedSeatbelt(msgspec.Struct):
             [x for x in map(lambda e: e.passenger.front if e.passenger else None, lst) if x is not None]
         )
         
-        # Gestion des passagers arrière avec vérification à chaque niveau
-        res.passenger_rear_left = TimestampedValue.merge_list([
-            x for x in map(
-                lambda e: (
-                    e.passenger.rear.left 
-                    if e.passenger and e.passenger.rear 
-                    else None
-                ), 
-                lst
-            ) if x is not None
-        ])
+        # Gestion des passagers arrière
+        res.passenger_rear_left = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.passenger.rear.left if e.passenger and e.passenger.rear else None, lst) if x is not None]
+        )
         
-        res.passenger_rear_right = TimestampedValue.merge_list([
-            x for x in map(
-                lambda e: (
-                    e.passenger.rear.right 
-                    if e.passenger and e.passenger.rear 
-                    else None
-                ), 
-                lst
-            ) if x is not None
-        ])
+        res.passenger_rear_right = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.passenger.rear.right if e.passenger and e.passenger.rear else None, lst) if x is not None]
+        )
         
-        res.passenger_rear_center = TimestampedValue.merge_list([
-            x for x in map(
-                lambda e: (
-                    e.passenger.rear.center 
-                    if e.passenger and e.passenger.rear 
-                    else None
-                ), 
-                lst
-            ) if x is not None
-        ])
+        res.passenger_rear_center = TimestampedValue.merge_list(
+            [x for x in map(lambda e: e.passenger.rear.center if e.passenger and e.passenger.rear else None, lst) if x is not None]
+        )
         
         return res
 
@@ -739,7 +728,7 @@ class TirePressure(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=Tru
 
 
 
-class MergedTirePressure(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedTirePressure(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     front_left: list[TimestampedValueWithUnit[float, PressureUnit]] = []
     front_right: list[TimestampedValueWithUnit[float, PressureUnit]] = []
     rear_left: list[TimestampedValueWithUnit[float, PressureUnit]] = []
@@ -821,7 +810,7 @@ class Setup(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rena
     adas: Optional[SetupAdas] = None
 
 
-class MergedSetup(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedSetup(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     privacy: list[TimestampedValue[bool]] = []
     privacy_state: list[TimestampedValue[PrivacyState]] = []
     requested_privacy: list[TimestampedValue[bool]] = []
@@ -875,7 +864,7 @@ class Crash(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, ren
     rear: Optional[TimestampedValue[dict]] = None  # Changed to dict to accept any fields
 
 
-class MergedCrash(msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"):
+class MergedCrash(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
     auto_ecall: list[TimestampedValue[bool]] = []
     pedestrian: list[TimestampedValue[bool]] = []
     tipped_over: list[TimestampedValue[bool]] = []
@@ -950,6 +939,7 @@ class MergedCarState(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=
     maintenance_date: list[TimestampedValue[datetime.date]] = []
     maintenance_odometer: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
     crash: Optional[MergedCrash] = None
+    seatbelt: Optional[MergedSeatbelt] = None  # Ajout du champ seatbelt
 
     @classmethod
     def from_list(cls, lst: list[CarState]) -> Optional[Self]:
@@ -1024,6 +1014,9 @@ class MergedCarState(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=
         )
         res.crash = MergedCrash.from_list(
             [x for x in map(lambda e: e.crash, lst) if x is not None]
+        )
+        res.seatbelt = MergedSeatbelt.from_list(
+            [x for x in map(lambda e: e.seatbelt, lst) if x is not None]
         )
         return res
 
