@@ -345,8 +345,37 @@ class HMIngester:
             else:
                 time.sleep(1)
 
+    def test_s3_connection(self):
+        try:
+            # Test simple d'écriture
+            test_key = "test/connection_test.txt"
+            self.__s3.put_object(
+                Bucket=self.__bucket,
+                Key=test_key,
+                Body="Test connection"
+            )
+            self.__ingester_logger.info("S3 connection test successful")
+            
+            # Tenter de lire le fichier
+            response = self.__s3.get_object(
+                Bucket=self.__bucket,
+                Key=test_key
+            )
+            self.__ingester_logger.info("S3 read test successful")
+            
+            # Supprimer le fichier de test
+            self.__s3.delete_object(
+                Bucket=self.__bucket,
+                Key=test_key
+            )
+            self.__ingester_logger.info("S3 delete test successful")
+            
+        except ClientError as e:
+            self.__ingester_logger.error(f"S3 connection test failed: {str(e)}")
+            self.__ingester_logger.error(f"Error response: {e.response}")
 
     def run(self):
+            self.test_s3_connection()
             if os.getenv("COMPRESS_ONLY") and os.getenv("COMPRESS_ONLY") == "1":
                 self.__ingester_logger.info("COMPRESS_ONLY flag set. Running compression first.")
                 self.__is_compressing = True
