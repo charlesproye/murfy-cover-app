@@ -11,6 +11,7 @@ from typing import Optional
 import msgspec
 from .schema import BMWInfo, BMWMergedInfo
 from multithreading import MergedInfoWrapper
+import botocore.config
 
 class BMWCompresser:
     def __init__(
@@ -28,6 +29,11 @@ class BMWCompresser:
         self.batch_size = batch_size
         self.max_workers = max_workers or mp.cpu_count()
         
+        # Configure boto3 to use signature version 4
+        self.__config = botocore.config.Config(
+            signature_version='s3v4',
+            retries={'max_attempts': 3}
+        )
         self.__session = aioboto3.Session()
         self.__s3_keys_by_vin = {}
         self.__shutdown_requested = asyncio.Event()
@@ -53,36 +59,54 @@ class BMWCompresser:
         return files_by_date
 
     async def list_objects(self):
-        async with self.__session.client(
-            "s3",
-            region_name=self.__s3.meta.region_name,
-            aws_access_key_id=self.__s3._request_signer._credentials.access_key,
-            aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
-        ) as s3:
-            paginator = s3.get_paginator("list_objects_v2")
-            brand_name = "bmw"
-            s3_keys = set()
-            
-            async for page in paginator.paginate(
-                Bucket=self.__bucket, 
-                Prefix=f"response/{brand_name.lower()}"
-            ):
-                if 'Contents' in page:
-                    s3_keys.update(obj["Key"] for obj in page["Contents"])
-            
-            # Process VINs in parallel
-            vins = set(
-                filter(lambda v: len(v) == 17, map(lambda v: v.split("/")[2], s3_keys))
-            )
-            
-            self.__s3_keys_by_vin[brand_name.lower()] = {
-                vin: set(filter(
-                    lambda e: e.startswith(f"response/{brand_name.lower()}/{vin}/temp/"),
-                    s3_keys
-                ))
-                for vin in vins
-        }
+        self.__logger.info("Starting to list objects from S3...")
+        try:
+            async with self.__session.client(
+                "s3",
+                region_name=self.__s3.meta.region_name,
+                aws_access_key_id=self.__s3._request_signer._credentials.access_key,
+                aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
+                endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
+                config=self.__config
+            ) as s3:
+                self.__logger.info(f"S3 client created with endpoint: {self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else 'default'}")
+                paginator = s3.get_paginator("list_objects_v2")
+                brand_name = "bmw"
+                s3_keys = set()
+                
+                prefix = f"response/{brand_name.lower()}"
+                self.__logger.info(f"Listing objects with prefix: {prefix}")
+                
+                async for page in paginator.paginate(
+                    Bucket=self.__bucket, 
+                    Prefix=prefix
+                ):
+                    if 'Contents' in page:
+                        s3_keys.update(obj["Key"] for obj in page["Contents"])
+                
+                self.__logger.info(f"Found {len(s3_keys)} total objects")
+                
+                # Process VINs in parallel
+                vins = set(
+                    filter(lambda v: len(v) == 17, map(lambda v: v.split("/")[2], s3_keys))
+                )
+                
+                self.__logger.info(f"Found {len(vins)} unique VINs")
+                
+                self.__s3_keys_by_vin[brand_name.lower()] = {
+                    vin: set(filter(
+                        lambda e: e.startswith(f"response/{brand_name.lower()}/{vin}/temp/"),
+                        s3_keys
+                    ))
+                    for vin in vins
+                }
+                
+                total_temp_files = sum(len(files) for files in self.__s3_keys_by_vin[brand_name.lower()].values())
+                self.__logger.info(f"Found {total_temp_files} total temp files to process")
+                
+        except Exception as e:
+            self.__logger.error(f"Error listing objects: {str(e)}", exc_info=True)
+            raise
 
     async def __process_batch(self, vin: str, batch: list[str], date: str):
         async with self.__session.client(
@@ -90,7 +114,8 @@ class BMWCompresser:
             region_name=self.__s3.meta.region_name,
             aws_access_key_id=self.__s3._request_signer._credentials.access_key,
             aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
+            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
+            config=self.__config
         ) as s3:
             merged = MergedInfoWrapper[BMWInfo, BMWMergedInfo](BMWMergedInfo)
             
