@@ -27,7 +27,7 @@ class BMWIngester:
     __scheduler_logger: logging.Logger
 
     __api: BMWApi
-    __s3 = boto3.client("s3")
+    __s3: Optional[boto3.client] = None
     __bucket: str
     __compresser: BMWCompresser
 
@@ -339,13 +339,13 @@ class BMWIngester:
                 )
                 filename = f"response/{vehicle.brand.lower()}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
                 try:
-                    encoded = msgspec.json.encode(decoded)
+                    encoded = msgspec.json.encode(decoded)  # Premier encodage
                 except msgspec.EncodeError as e:
                     self.__ingester_logger.error(f"Failed to encode vehicle data: {e}")
                     return
                 try:
                     uploaded = self.__s3.put_object(
-                        Body=decoded,
+                        Body=encoded,
                         Bucket=self.__bucket,
                         Key=filename,
                     )
