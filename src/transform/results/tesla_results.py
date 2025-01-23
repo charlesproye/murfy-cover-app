@@ -33,7 +33,7 @@ def main():
 
 def get_results() -> DF:
     return (
-        pd.read_parquet("tesla_tss.parquet")
+        ProcessedTimeSeries("tesla")
         .query("trimmed_in_charge")
         .groupby(["vin", "trimmed_in_charge_idx"])
         .agg(
