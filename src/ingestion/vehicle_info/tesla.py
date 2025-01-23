@@ -14,6 +14,7 @@ from core.sql_utils import get_connection
 from fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
 import datetime
+from datetime import timedelta
 
 load_dotenv()
 
@@ -293,7 +294,43 @@ async def get_vehicle_options(session: aiohttp.ClientSession, access_token: str,
         logging.error(f"Error fetching options for VIN {vin}: {str(e)}")
         return {'vin': vin, 'model_name': 'unknown', 'type': 'unknown', 'version': 'unknown'}
 
-async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, account_vins: List[str]) -> List[Dict]:
+async def get_start_date(session: aiohttp.ClientSession, access_token: str, vin: str) -> str:
+    """Récupère la warranty expiration date et le coverageAgeInYears et fait leur différence pour calculer la start_date"""
+    url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/dx/warranty/details?vin={vin}"
+    headers = {'Authorization': f'Bearer {access_token}'}
+
+    try:
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                activeWarranty = data.get("activeWarranty")
+
+                if activeWarranty:  # Ensures there is one active warranty
+                    warranty = activeWarranty[0]  # Only one active warranty, so directly get the first one
+                    expirationDate = warranty.get("expirationDate")
+                    coverageAgeInYears = warranty.get("coverageAgeInYears")
+
+                    if expirationDate and coverageAgeInYears is not None:
+                        # Convert expirationDate to a datetime object
+                        expiration_date_obj = datetime.fromisoformat(expirationDate.replace("Z", "+00:00"))
+
+                        # Subtract coverageAgeInYears from the expiration date
+                        start_date_obj = expiration_date_obj - timedelta(days=coverageAgeInYears * 365.25)  # Approximate years with 365.25 days per year
+
+                        # Convert the start date back to ISO format string
+                        start_date_str = start_date_obj.isoformat()
+
+                        return start_date_str
+                    else:
+                        return "Missing expirationDate or coverageAgeInYears"
+                else:
+                    return "No active warranty data available"
+            else:
+                return f"Error: {response.status}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, start_date : str, account_vins: List[str]) -> List[Dict]:
 
     def convert_date_format(date_str):
         if pd.isna(date_str):
@@ -406,7 +443,6 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 vehicle_exists = cursor.fetchone()
 
                 end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
-                start_date = convert_date_format(vehicle_data['start_date'])
                 
                 if vehicle_exists:
                     cursor.execute("""
