@@ -330,7 +330,7 @@ async def get_start_date(session: aiohttp.ClientSession, access_token: str, vin:
     except Exception as e:
         return f"Error: {str(e)}"
 
-async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, start_date : str, account_vins: List[str]) -> List[Dict]:
+async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, account_vins: List[str]) -> List[Dict]:
 
     def convert_date_format(date_str):
         if pd.isna(date_str):
@@ -443,6 +443,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 vehicle_exists = cursor.fetchone()
 
                 end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
+                start_date = get_start_date(session, token_key,vin)
                 
                 if vehicle_exists:
                     cursor.execute("""
