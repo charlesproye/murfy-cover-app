@@ -305,8 +305,8 @@ async def get_start_date(session: aiohttp.ClientSession, access_token: str, vin:
                 data = await response.json()
                 activeWarranty = data.get("activeWarranty")
 
-                if activeWarranty:  # Ensures there is one active warranty
-                    warranty = activeWarranty[0]  # Only one active warranty, so directly get the first one
+                if activeWarranty:  
+                    warranty = activeWarranty[0]  
                     expirationDate = warranty.get("expirationDate")
                     coverageAgeInYears = warranty.get("coverageAgeInYears")
 
@@ -318,17 +318,17 @@ async def get_start_date(session: aiohttp.ClientSession, access_token: str, vin:
                         start_date_obj = expiration_date_obj - timedelta(days=coverageAgeInYears * 365.25)  # Approximate years with 365.25 days per year
 
                         # Convert the start date back to ISO format string
-                        start_date_str = start_date_obj.isoformat()
-
+                        start_date_str = start_date_obj.strftime('%Y-%m-%d')
                         return start_date_str
                     else:
-                        return "Missing expirationDate or coverageAgeInYears"
+                        return None
                 else:
-                    return "No active warranty data available"
+                    return None
             else:
-                return f"Error: {response.status}"
+                return None
     except Exception as e:
         return f"Error: {str(e)}"
+        return None
 
 async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, account_vins: List[str]) -> List[Dict]:
 
@@ -356,6 +356,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
         
     """Process only VINs that belong to this account"""
     access_token = await get_token_from_slack(session, token_key)
+    
     if not access_token:
         logging.error(f"Could not get access token for {account_name}")
         return []
@@ -443,7 +444,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 vehicle_exists = cursor.fetchone()
 
                 end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
-                start_date = get_start_date(session, token_key,vin)
+                start_date = await get_start_date(session, token_key,vin)
                 
                 if vehicle_exists:
                     cursor.execute("""
