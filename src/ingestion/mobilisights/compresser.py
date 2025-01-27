@@ -26,12 +26,27 @@ class MobilisightsCompresser:
         self.__vehicles = {}
         self.__shutdown_requested = threading.Event()
         
-        config = Config(
-            signature_version='s3',
-            s3={'addressing_style': 'path'}
-        )
+        import os
+        import dotenv
+        dotenv.load_dotenv()
         
-        self.__s3 = s3 if s3 else boto3.client("s3", config=config)
+        S3_ENDPOINT = os.getenv("S3_ENDPOINT")
+        S3_REGION = os.getenv("S3_REGION")
+        S3_KEY = os.getenv("S3_KEY")
+        S3_SECRET = os.getenv("S3_SECRET")
+        self.__s3 = boto3.client(
+            "s3",
+            region_name=S3_REGION,
+            endpoint_url=S3_ENDPOINT,
+            aws_access_key_id=S3_KEY,
+            aws_secret_access_key=S3_SECRET,
+            config=Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+                retries={'max_attempts': 3}
+            )
+        )
+            
         self.__bucket = bucket
         self.threaded = threaded
         self.max_workers = max_workers
@@ -86,11 +101,7 @@ class MobilisightsCompresser:
                     region_name=self.__s3.meta.region_name,
                     aws_access_key_id=self.__s3._request_signer._credentials.access_key,
                     aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-                    endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
-                    config=boto3.session.Config(
-                        signature_version='s3',
-                        s3={'addressing_style': 'path'}
-                    )
+                    endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
                 ) as s3:
                     try:
                         temp_files = set()
@@ -201,11 +212,7 @@ class MobilisightsCompresser:
             region_name=self.__s3.meta.region_name,
             aws_access_key_id=self.__s3._request_signer._credentials.access_key,
             aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
-            config=boto3.session.Config(
-                signature_version='s3',
-                s3={'addressing_style': 'path'}
-            )
+            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
         ) as s3:
             successful_processes = []
             merged_states = []
@@ -254,11 +261,7 @@ class MobilisightsCompresser:
             region_name=self.__s3.meta.region_name,
             aws_access_key_id=self.__s3._request_signer._credentials.access_key,
             aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
-            config=boto3.session.Config(
-                signature_version='s3',
-                s3={'addressing_style': 'path'}
-            )
+            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
         ) as s3:
             try:
                 sending_date = merged.datetimeSending.date() if merged.datetimeSending else datetime.today().date()

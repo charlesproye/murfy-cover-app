@@ -8,8 +8,8 @@ import aioboto3
 import boto3
 import dotenv
 import msgspec
-from botocore.client import ClientError
 from botocore.credentials import threading
+from botocore.client import Config
 from ingestion.high_mobility.multithreading import MergedInfoWrapper
 from ingestion.high_mobility.schema import all_brands
 
@@ -34,17 +34,21 @@ class HMCompresser:
             raise ValueError("Missing required S3 configuration")
 
         # Initialize S3 client with config
-        config = boto3.session.Config(
-            signature_version='s3',
-            s3={'addressing_style': 'path'}
-        )
+        S3_ENDPOINT = os.getenv("S3_ENDPOINT")
+        S3_REGION = os.getenv("S3_REGION")
+        S3_KEY = os.getenv("S3_KEY")
+        S3_SECRET = os.getenv("S3_SECRET")
         self.__s3 = boto3.client(
             "s3",
-            region_name=self.__s3_config['region'],
-            endpoint_url=self.__s3_config['endpoint'],
-            aws_access_key_id=self.__s3_config['key'],
-            aws_secret_access_key=self.__s3_config['secret'],
-            config=config
+            region_name=S3_REGION,
+            endpoint_url=S3_ENDPOINT,
+            aws_access_key_id=S3_KEY,
+            aws_secret_access_key=S3_SECRET,
+            config=Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+                retries={'max_attempts': 3}
+            )
         )
         self.__bucket = self.__s3_config['bucket']
         

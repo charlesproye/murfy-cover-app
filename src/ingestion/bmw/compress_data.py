@@ -7,7 +7,10 @@ import multiprocessing as mp
 from datetime import datetime, timedelta
 import time
 import logging
+import os
+from botocore.client import Config
 from typing import Optional
+import boto3
 import msgspec
 from .schema import BMWInfo, BMWMergedInfo
 from multithreading import MergedInfoWrapper
@@ -23,17 +26,33 @@ class BMWCompresser:
         batch_size: int = 50
     ) -> None:
         self.__logger = logging.getLogger("COMPRESSER")
-        self.__s3 = s3
+        S3_ENDPOINT = os.getenv("S3_ENDPOINT")
+        S3_REGION = os.getenv("S3_REGION")
+        S3_KEY = os.getenv("S3_KEY")
+        S3_SECRET = os.getenv("S3_SECRET")
+        self.__s3 = boto3.client(
+            "s3",
+            region_name=S3_REGION,
+            endpoint_url=S3_ENDPOINT,
+            aws_access_key_id=S3_KEY,
+            aws_secret_access_key=S3_SECRET,
+            config=Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+                retries={'max_attempts': 3}
+            )
+        )
         self.__bucket = bucket
         self.threaded = threaded
         self.batch_size = batch_size
         self.max_workers = max_workers or mp.cpu_count()
         
         # Configure boto3 to use signature version 4
-        self.__config = botocore.config.Config(
-            signature_version='s3',
-            s3={'addressing_style': 'path'}
-        )
+        self.__config = Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+                retries={'max_attempts': 3}
+            )
         self.__session = aioboto3.Session()
         self.__s3_keys_by_vin = {}
         self.__shutdown_requested = asyncio.Event()

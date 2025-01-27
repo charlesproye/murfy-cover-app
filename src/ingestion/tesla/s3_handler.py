@@ -7,6 +7,7 @@ import boto3
 import re
 from botocore.exceptions import ClientError
 import asyncio
+from botocore.client import Config
 import random
 
 async def compress_data():
@@ -17,10 +18,11 @@ async def compress_data():
         endpoint_url=os.getenv("S3_ENDPOINT"),
         aws_access_key_id=os.getenv("S3_KEY"),
         aws_secret_access_key=os.getenv("S3_SECRET"),
-        config=boto3.session.Config(
-            signature_version='s3',
-            s3={'addressing_style': 'path'}
-        )
+        config=Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+                retries={'max_attempts': 3}
+            )
     ) as s3:
         bucket_name = os.getenv("S3_BUCKET")
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
