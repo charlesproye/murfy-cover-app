@@ -207,8 +207,21 @@ class MobilisightsIngester:
 
     def __compress(self):
         self.__ingester_logger.info("Starting compression job")
+        # Recréer le client S3 avec la bonne configuration
+        s3_config = boto3.session.Config(
+            signature_version='s3',
+            s3={'addressing_style': 'path'}
+        )
+        s3_client = boto3.client(
+            "s3",
+            region_name=self.__s3.meta.region_name,
+            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
+            aws_access_key_id=self.__s3._request_signer._credentials.access_key,
+            aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
+            config=s3_config
+        )
         compresser = MobilisightsCompresser(
-            self.__s3,
+            s3_client,
             self.__bucket,
             threaded=False,
             max_workers=self.max_workers,
