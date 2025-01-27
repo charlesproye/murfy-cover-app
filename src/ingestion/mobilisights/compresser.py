@@ -86,7 +86,11 @@ class MobilisightsCompresser:
                     region_name=self.__s3.meta.region_name,
                     aws_access_key_id=self.__s3._request_signer._credentials.access_key,
                     aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-                    endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
+                    endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
+                    config=boto3.session.Config(
+                        signature_version='s3',
+                        s3={'addressing_style': 'path'}
+                    )
                 ) as s3:
                     try:
                         temp_files = set()
@@ -197,7 +201,11 @@ class MobilisightsCompresser:
             region_name=self.__s3.meta.region_name,
             aws_access_key_id=self.__s3._request_signer._credentials.access_key,
             aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
+            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
+            config=boto3.session.Config(
+                signature_version='s3',
+                s3={'addressing_style': 'path'}
+            )
         ) as s3:
             successful_processes = []
             merged_states = []
@@ -246,7 +254,11 @@ class MobilisightsCompresser:
             region_name=self.__s3.meta.region_name,
             aws_access_key_id=self.__s3._request_signer._credentials.access_key,
             aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
+            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
+            config=boto3.session.Config(
+                signature_version='s3',
+                s3={'addressing_style': 'path'}
+            )
         ) as s3:
             try:
                 sending_date = merged.datetimeSending.date() if merged.datetimeSending else datetime.today().date()
