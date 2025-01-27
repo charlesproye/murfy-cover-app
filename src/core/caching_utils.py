@@ -84,9 +84,9 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
             elif on == "local_storage":
                 if force_update or not exists(path):                                         # Check if we need to update the cache or if the cache does not exist
                     data: pd.DataFrame = data_gen_func(*args, **kwargs)                      # Generate the data using the wrapped function
-                    save_cache_locally_to(data, path)                                                # Save the data locally
+                    save_cache_locally_to(data, path)                                        # Save the data locally
                     return data
-                return pd.read_parquet(path)                                                 # Read cached data from local file
+                return pd.read_parquet(path, engine="pyarrow")                                                 # Read cached data from local file
         return wrapper
     return decorator
 
