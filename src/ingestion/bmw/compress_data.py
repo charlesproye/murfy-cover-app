@@ -31,8 +31,8 @@ class BMWCompresser:
         
         # Configure boto3 to use signature version 4
         self.__config = botocore.config.Config(
-            signature_version='s3v4',
-            retries={'max_attempts': 3}
+            signature_version='s3',
+            s3={'addressing_style': 'path'}
         )
         self.__session = aioboto3.Session()
         self.__s3_keys_by_vin = {}

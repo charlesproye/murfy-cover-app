@@ -27,10 +27,8 @@ class MobilisightsCompresser:
         self.__shutdown_requested = threading.Event()
         
         config = Config(
-            max_pool_connections=10,
-            retries=dict(max_attempts=3),
-            read_timeout=30,
-            connect_timeout=30
+            signature_version='s3',
+            s3={'addressing_style': 'path'}
         )
         
         self.__s3 = s3 if s3 else boto3.client("s3", config=config)

@@ -33,13 +33,18 @@ class HMCompresser:
         if not self.__s3_config:
             raise ValueError("Missing required S3 configuration")
 
-        # Initialize S3 client
+        # Initialize S3 client with config
+        config = boto3.session.Config(
+            signature_version='s3',
+            s3={'addressing_style': 'path'}
+        )
         self.__s3 = boto3.client(
             "s3",
             region_name=self.__s3_config['region'],
             endpoint_url=self.__s3_config['endpoint'],
             aws_access_key_id=self.__s3_config['key'],
             aws_secret_access_key=self.__s3_config['secret'],
+            config=config
         )
         self.__bucket = self.__s3_config['bucket']
         

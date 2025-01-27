@@ -219,6 +219,10 @@ async def consolidate_all_tesla_files():
         endpoint_url=os.getenv("S3_ENDPOINT"),
         aws_access_key_id=os.getenv("S3_KEY"),
         aws_secret_access_key=os.getenv("S3_SECRET"),
+        config=boto3.session.Config(
+            signature_version='s3',
+            s3={'addressing_style': 'path'}
+        )
     ) as s3:
         bucket_name = os.getenv("S3_BUCKET")
         tesla_prefix = "response/tesla/"
@@ -347,6 +351,10 @@ async def save_data_to_s3(data, vehicle_id):
         endpoint_url=os.getenv("S3_ENDPOINT"),
         aws_access_key_id=os.getenv("S3_KEY"),
         aws_secret_access_key=os.getenv("S3_SECRET"),
+        config=boto3.session.Config(
+            signature_version='s3',
+            s3={'addressing_style': 'path'}
+        )
     ) as s3:
         bucket_name = os.getenv("S3_BUCKET")
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
