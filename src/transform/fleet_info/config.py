@@ -3,11 +3,11 @@ SELECT * FROM vehicle
 JOIN vehicle_model ON vehicle.vehicle_model_id = vehicle_model.id
 JOIN oem ON vehicle_model.oem_id = oem.id
 JOIN fleet ON vehicle.fleet_id = fleet.id
+JOIN region ON vehicle.region_id = region.id
 """
 COLS_NAME_MAPPING = {
     "model_name": "model",
     "oem_name": "make",
-    "region_name": "region",
     "type": "version",
     "version": "tesla_code",
     "autonomy": "range",
@@ -24,6 +24,7 @@ COLS_TO_KEEP = [
     "range",
     "tesla_code",
     "make",
+    "region_name",
 ]
 COL_DTYPES = {
     "end_of_contract_date": "datetime64[ns]",
@@ -37,4 +38,6 @@ COL_DTYPES = {
     "range": "float",
     "tesla_code": "string",
     "make": "string",
+    "region_name": "string",
 }
+
