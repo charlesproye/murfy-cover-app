@@ -13,8 +13,7 @@ import re
 from core.sql_utils import get_connection
 from fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
-import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 load_dotenv()
 
