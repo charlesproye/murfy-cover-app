@@ -19,7 +19,7 @@ GET_RESULTS_FUNCS = {
     #"kia": lambda: agg_last_odometer("kia"),
     #"mercedes-benz": get_mercedes_results,
     "renault": get_renault_results,
-    "tesla": lambda : pd.read_csv("tesla_results.csv"), # get_tesla_results,
+    "tesla":  get_tesla_results,
     #"volvo": get_volvo_results,
     #"ford": get_ford_results,
 }
