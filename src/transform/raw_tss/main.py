@@ -13,10 +13,10 @@ from transform.raw_tss.mobilisight_raw_tss import get_raw_tss as mobilisight_get
 
 GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3_Bucket], DF]] = {
     # Stellantis brands
-    "opel":             mobilisight_get_raw_tss,
-    "ds":               mobilisight_get_raw_tss,
-    "fiat":             mobilisight_get_raw_tss,
-    "peugeot":          mobilisight_get_raw_tss,
+    "stellantis":             mobilisight_get_raw_tss,
+    # "ds":               mobilisight_get_raw_tss,
+    # "fiat":             mobilisight_get_raw_tss,
+    # "peugeot":          mobilisight_get_raw_tss,
     # BMW
     "bmw":              bmw_get_raw_tss,
     # Tesla
