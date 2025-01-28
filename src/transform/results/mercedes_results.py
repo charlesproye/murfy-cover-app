@@ -63,9 +63,9 @@ def charge_levels(tss:DF) -> DF:
     return (
         tss
         .assign(soc_diff=tss_grp["soc"].diff())
-        .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER)")
-        .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER))")
-        .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER)")
+        .eval("level_1 = soc_diff * (charging_rate < @LEVEL_1_MAX_POWER)")
+        .eval("level_2 = soc_diff * (charging_rate.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER))")
+        .eval("level_3 = soc_diff * (charging_rate > @LEVEL_2_MAX_POWER)")
     )
 
 def fill_vars(tss:DF, cols:list[str]) -> DF:

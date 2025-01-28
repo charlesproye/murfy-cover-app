@@ -17,7 +17,7 @@ logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
     #"bmw": lambda: agg_last_odometer("bmw"),
     #"kia": lambda: agg_last_odometer("kia"),
-    #"mercedes-benz": get_mercedes_results,
+    "mercedes-benz": get_mercedes_results,
     "renault": get_renault_results,
     "tesla":  get_tesla_results,
     #"volvo": get_volvo_results,
@@ -44,8 +44,8 @@ def get_all_processed_results() -> DF:
     )
 
 def get_processed_results(brand:str) -> DF:
-    results = GET_RESULTS_FUNCS[brand]()
     logger.info(f"Processing {brand} results.")
+    results = GET_RESULTS_FUNCS[brand]()
     results =  (
         results
         .sort_values(["vin", "date"])

@@ -101,6 +101,7 @@ COL_DTYPES = {
     "coolant_temperature": "float32",
     "kombi_remaining_electric_range": "float32",
     # Tesla
+    "battery_heater": "bool",
     "battery_heater_no_power": "bool",
     "fast_charger_present": "bool",
     "power": "float32",
@@ -183,11 +184,11 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
+    "tesla",
     "bmw",
     "mercedes-benz",
     "ford",
     "volvo-cars",
-    "tesla",
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [

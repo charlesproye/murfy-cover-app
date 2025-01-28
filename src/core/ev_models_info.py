@@ -12,7 +12,7 @@ def get_ev_models_infos() -> DF:
         .rename(columns=MODEL_INFO_NAME_MAP)
         .pipe(safe_locate, col_loc=MODEL_INFO_DTYPES.keys())
         .astype(MODEL_INFO_DTYPES)
-        .pipe(set_all_str_cols_to_lower)
+        .pipe(set_all_str_cols_to_lower, but=["tesla_code"])
         .sort_values(by=["manufacturer", "model", "version", "tesla_code"])
     )
 

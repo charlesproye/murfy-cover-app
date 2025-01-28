@@ -13,4 +13,5 @@ fleet_info = (
 
 if __name__ == "__main__":
     print(fleet_info)
+    print(fleet_info.columns)
     print(sanity_check(fleet_info))
