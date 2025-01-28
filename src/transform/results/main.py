@@ -15,11 +15,11 @@ from transform.results.odometer_aggregation import agg_last_odometer
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
+    "tesla": get_tesla_results,
     "bmw": lambda: agg_last_odometer("bmw"),
     "kia": lambda: agg_last_odometer("kia"),
     "mercedes-benz": get_mercedes_results,
     "renault": get_renault_results,
-    "tesla": get_tesla_results,
     "volvo": get_volvo_results,
     "ford": get_ford_results,
 }
