@@ -15,13 +15,13 @@ from transform.results.odometer_aggregation import agg_last_odometer
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
-    #"bmw": lambda: agg_last_odometer("bmw"),
-    #"kia": lambda: agg_last_odometer("kia"),
+    "bmw": lambda: agg_last_odometer("bmw"),
+    "kia": lambda: agg_last_odometer("kia"),
     "mercedes-benz": get_mercedes_results,
     "renault": get_renault_results,
-    "tesla":  get_tesla_results,
-    #"volvo": get_volvo_results,
-    #"ford": get_ford_results,
+    "tesla": get_tesla_results,
+    "volvo": get_volvo_results,
+    "ford": get_ford_results,
 }
 
 def update_vehicle_data_table():
@@ -74,6 +74,12 @@ def agg_results_by_update_frequency(results:DF) -> DF:
     )
     return (
         results
+        # Setting level columns to 0 if they don't exist.
+        .assign(
+            level_1=results.get("level_1", 0),
+            level_2=results.get("level_2", 0),
+            level_3=results.get("level_3", 0),
+        )
         .groupby(["vin", "date"])
         .agg(
             odometer=pd.NamedAgg("odometer", "last"),
