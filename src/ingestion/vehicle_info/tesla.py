@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 
 load_dotenv()
 
-current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+current_date = datetime.now().strftime('%Y-%m-%d')
 current_dir = os.path.dirname(os.path.abspath(__file__))
 log_dir = os.path.join(current_dir, 'logs')
 os.makedirs(log_dir, exist_ok=True)
@@ -31,7 +31,7 @@ logging.basicConfig(
     ]
 )
 
-current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+current_date = datetime.now().strftime('%Y-%m-%d')
 current_dir = os.path.dirname(os.path.abspath(__file__))
 log_dir = os.path.join(current_dir, 'logs')
 os.makedirs(log_dir, exist_ok=True)
@@ -298,36 +298,36 @@ async def get_start_date(session: aiohttp.ClientSession, access_token: str, vin:
     url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/dx/warranty/details?vin={vin}"
     headers = {'Authorization': f'Bearer {access_token}'}
 
-    try:
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                data = await response.json()
-                activeWarranty = data.get("activeWarranty")
+    retries = 3
+    while retries > 0:
+        try:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    activeWarranty = data.get("activeWarranty")
 
-                if activeWarranty:  
-                    warranty = activeWarranty[0]  
-                    expirationDate = warranty.get("expirationDate")
-                    coverageAgeInYears = warranty.get("coverageAgeInYears")
+                    if activeWarranty:
+                        warranty = activeWarranty[0]
+                        expirationDate = warranty.get("expirationDate")
+                        coverageAgeInYears = warranty.get("coverageAgeInYears")
 
-                    if expirationDate and coverageAgeInYears is not None:
-                        # Convert expirationDate to a datetime object
-                        expiration_date_obj = datetime.fromisoformat(expirationDate.replace("Z", "+00:00"))
-
-                        # Subtract coverageAgeInYears from the expiration date
-                        start_date_obj = expiration_date_obj - timedelta(days=coverageAgeInYears * 365.25)  # Approximate years with 365.25 days per year
-
-                        # Convert the start date back to ISO format string
-                        start_date_str = start_date_obj.strftime('%Y-%m-%d')
-                        return start_date_str
-                    else:
-                        return None
-                else:
+                        if expirationDate and coverageAgeInYears is not None:
+                            expiration_date_obj = datetime.fromisoformat(expirationDate.replace("Z", "+00:00"))
+                            start_date_obj = expiration_date_obj - timedelta(days=int(coverageAgeInYears * 365.25))
+                            return start_date_obj.strftime('%d-%m-%Y')
+                    
+                    logging.warning(f"No valid warranty data for VIN {vin}")
                     return None
-            else:
-                return None
-    except Exception as e:
-        return f"Error: {str(e)}"
-        return None
+                else:
+                    logging.warning(f"HTTP {response.status} error fetching warranty for VIN {vin}, retries left: {retries-1}")
+                    retries -= 1  # Wait 2 seconds before retrying
+
+        except Exception as e:
+            logging.error(f"Exception getting start date for VIN {vin}: {str(e)}")
+            return None
+
+    logging.error(f"Failed to fetch start date for VIN {vin} after 3 retries")
+    return None
 
 async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, account_vins: List[str]) -> List[Dict]:
 
@@ -404,7 +404,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_model_id = str(uuid.uuid4())
                         cursor.execute("""
                             INSERT INTO vehicle_model (id, model_name, type, version, oem_id,make_id)
-                            VALUES (%s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s)
                             RETURNING id
                         """, (
                             vehicle_model_id,
@@ -443,7 +443,9 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 vehicle_exists = cursor.fetchone()
 
                 end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
-                start_date = await get_start_date(session, token_key,vin)
+                start_date = await get_start_date(session, access_token,vin)
+                start_date = convert_date_format(start_date)
+                print(f'start date is {start_date}')
                 
                 if vehicle_exists:
                     cursor.execute("""
@@ -480,12 +482,11 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     ))
                     logging.info(f"Inserted new vehicle with VIN: {vin}")
                 
-                await asyncio.sleep(RATE_LIMIT_DELAY)
                 
             except Exception as e:
                 logging.error(f"Error processing VIN {vin}: {str(e)}")
                 continue
-        con.commit()
+            con.commit()
     
     return []
 
