@@ -64,7 +64,6 @@ def get_results() -> DF:
             outside_temp=pd.NamedAgg("outside_temp", "mean"),
             capacity=pd.NamedAgg("capacity", "first"),
             odometer=pd.NamedAgg("odometer", "first"),
-            fast_charger_type=pd.NamedAgg("fast_charger_type", "first"),
             size=pd.NamedAgg("soc", "size"),
             model=pd.NamedAgg("model", "first"),
             version=pd.NamedAgg("version", "first"),
