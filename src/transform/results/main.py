@@ -44,7 +44,7 @@ def get_all_processed_results() -> DF:
     )
 
 def get_processed_results(brand:str) -> DF:
-    logger.info(f"Processing {brand} results.")
+    logger.info(f"==================Processing {brand} results.==================")
     results = GET_RESULTS_FUNCS[brand]()
     results =  (
         results
