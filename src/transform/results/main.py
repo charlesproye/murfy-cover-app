@@ -50,6 +50,7 @@ def get_processed_results(brand:str) -> DF:
         results
         .sort_values(["vin", "date"])
         .pipe(agg_results_by_update_frequency)
+        .pipe(make_charge_levels_presentable)
         .groupby('vin')
         .apply(make_soh_presentable, include_groups=False)
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
@@ -92,6 +93,14 @@ def agg_results_by_update_frequency(results:DF) -> DF:
         )
         .reset_index()
     )
+
+def make_charge_levels_presentable(results:DF) -> DF:
+    negative_charge_levels = results[["level_1", "level_2", "level_3"]].lt(0)
+    nb_negative_levels = negative_charge_levels.sum().sum()
+    if nb_negative_levels > 0:
+        logger.debug(f"There are {nb_negative_levels}({100*nb_negative_levels/len(results):2f}%) negative charge levels, setting them to 0.")
+    results[["level_1", "level_2", "level_3"]] = negative_charge_levels.mask(negative_charge_levels, 0)
+    return results
 
 def make_soh_presentable(df:DF) -> DF:
     if df["soh"].isna().all():
