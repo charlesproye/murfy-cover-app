@@ -21,8 +21,6 @@ def get_results() -> DF:
         .filter(lambda ts: ts["trimmed_in_discharge_idx"].max() >= 6)
         .pipe(charge_levels)
     )
-    #.query("trimmed_in_charge")
-    #.groupby(["vin", "trimmed_in_charge_idx"])
 
 def charge_levels(tss:DF) -> DF:
     tss_grp = tss.groupby("vin")
