@@ -41,7 +41,6 @@ def get_results() -> DF:
             temp=pd.NamedAgg("inside_temp", "mean"),
             capacity=pd.NamedAgg("capacity", "first"),
             odometer=pd.NamedAgg("odometer", "first"),
-            fast_charger_type=pd.NamedAgg("fast_charger_type", Series.mode),
             size=pd.NamedAgg("soc", "size"),
             model=pd.NamedAgg("model", "first"),
             version=pd.NamedAgg("version", "first"),
