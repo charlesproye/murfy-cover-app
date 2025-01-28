@@ -78,7 +78,6 @@ def fill_vars(tss:DF, cols:list[str]) -> DF:
     return tss
 
 def compute_charging_rate(tss:DF) -> DF:
-    print("compute_charging_rate called")
     tss_grp = tss.groupby("vin")
     tss = (
         tss
@@ -103,3 +102,4 @@ def update_in_charge_idx(tss:DF) -> DF:
 
 if __name__ == "__main__":
     main()
+
