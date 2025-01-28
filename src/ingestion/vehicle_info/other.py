@@ -76,20 +76,37 @@ async def process_vehicles(df: pd.DataFrame):
         cursor = con.cursor()
         for index, vehicle in df.iterrows():
             try:
-            # Gestion de la marque
-                make_lower = vehicle['make'].lower()
+
+            # Gestion de l'oem
+                oem_lower = vehicle['oem'].lower()
                 
                 cursor.execute("""
-                    SELECT id FROM oem 
+                    SELECT id FROM oem
                     WHERE LOWER(oem_name) = %s
-                """, (make_lower,))
+                """, (oem_lower,))
                 
                 oem_result = cursor.fetchone()
                 
                 if not oem_result:
-                    logging.error(f"OEM non trouvé pour la marque: {vehicle['make']} (mappé à {make_lower})")
+                    logging.error(f"OEM non trouvé pour la marque: {vehicle['oem']} (mappé à {oem_lower})")
                     continue
-                oem_id = oem_result[0]
+                oem_id = oem_result[0]      
+
+            # Gestion de la marque
+                make_lower = vehicle['make'].lower()
+                
+                cursor.execute("""
+                    SELECT id FROM make 
+                    WHERE LOWER(make_name) = %s
+                """, (make_lower,))
+                
+                make_result = cursor.fetchone()
+                
+                if not make_result:
+                    logging.error(f"MAKE non trouvé pour la marque: {vehicle['make']} (mappé à {make_lower})")
+                    continue
+                make_id = make_result[0]
+
                 # Standardisation du modèle et type
                 model_name = vehicle['model'].strip() if pd.notna(vehicle['model']) else None
                 type_value = vehicle['version'].strip() if pd.notna(vehicle['version']) else None
@@ -107,9 +124,9 @@ async def process_vehicles(df: pd.DataFrame):
                         (LOWER(type) = %s AND %s IS NOT NULL)
                         OR (type IS NULL AND %s IS NULL)
                     )
-                    AND oem_id = %s
+                    AND make_id = %s AND oem_id = %s
                 """, (model_name.lower(), type_value.lower() if type_value else None, 
-                        type_value, type_value, oem_id))
+                        type_value, type_value, make_id,oem_id))
                 
                 result = cursor.fetchone()
                 if result:
@@ -119,28 +136,30 @@ async def process_vehicles(df: pd.DataFrame):
                     vehicle_model_id = str(uuid.uuid4())
                     if type_value:
                         cursor.execute("""
-                            INSERT INTO vehicle_model (id, model_name, type, oem_id)
-                            VALUES (%s, %s, %s, %s)
+                            INSERT INTO vehicle_model (id, model_name, type, make_id,oem_id)
+                            VALUES (%s, %s, %s, %s,%s)
                             RETURNING id
                         """, (
                             vehicle_model_id,
                             model_name.lower(),
                             type_value.lower(),
+                            make_id,
                             oem_id
                         ))
                     else:
                         cursor.execute("""
-                            INSERT INTO vehicle_model (id, model_name, oem_id)
-                            VALUES (%s, %s, %s)
+                            INSERT INTO vehicle_model (id, model_name, make_id,oem_id)
+                            VALUES (%s, %s, %s,%s)
                             RETURNING id
                         """, (
                             vehicle_model_id,
                             model_name.lower(),
+                            make_id,
                             oem_id
                         ))
                     vehicle_model_id = cursor.fetchone()[0]
                 
-                    logging.info(f"Créé nouveau modèle: {model_name} {type_value or ''} pour {vehicle['make']}") 
+                    logging.info(f"Créé nouveau modèle: {model_name} {type_value or ''} pour {vehicle['make']} du contructeur {vehicle['oem']}") 
                 # Récupération fleet_id
                 cursor.execute("""
                     SELECT id FROM fleet 
@@ -231,7 +250,7 @@ async def get_existing_model_metadata():
         
         cursor.execute("""
             SELECT 
-                o.oem_name,
+                m.make_name,
                 vm.model_name,
                 vm.type,
                 vm.url_image,
@@ -239,12 +258,12 @@ async def get_existing_model_metadata():
                 vm.warranty_date,
                 vm.capacity
             FROM vehicle_model vm
-            JOIN oem o ON vm.oem_id = o.id
+            JOIN make m ON vm.make_id = o.id
             WHERE vm.url_image IS NOT NULL 
                OR vm.warranty_km IS NOT NULL 
                OR vm.warranty_date IS NOT NULL 
                OR vm.capacity IS NOT NULL
-            ORDER BY o.oem_name, vm.model_name, vm.type
+            ORDER BY m.make_name, vm.model_name, vm.type
         """)
         
         results = cursor.fetchall()
@@ -255,8 +274,8 @@ async def get_existing_model_metadata():
             print("Marque | Modèle | Type | URL | Garantie km | Garantie années | Capacité")
             print("--------------------------------------------------------------------------------")
             for row in results:
-                oem, model, type_value, url, warranty_km, warranty_date, capacity = row
-                print(f"{oem} | {model} | {type_value or 'N/A'} | {url or 'N/A'} | {warranty_km or 'N/A'} | {warranty_date or 'N/A'} | {capacity or 'N/A'}")
+                make, model, type_value, url, warranty_km, warranty_date, capacity = row
+                print(f"{make} | {model} | {type_value or 'N/A'} | {url or 'N/A'} | {warranty_km or 'N/A'} | {warranty_date or 'N/A'} | {capacity or 'N/A'}")
             print("--------------------------------------------------------------------------------")
         else:
             print("Aucune métadonnée trouvée dans la base")
