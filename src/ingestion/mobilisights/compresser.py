@@ -23,6 +23,9 @@ class MobilisightsCompresser:
         max_workers: Optional[int] = 8, batch_size: int = 50
     ) -> None:
         self.__logger = logging.getLogger("COMPRESSER")
+        # Filter out botocore checksum warnings
+        logging.getLogger('botocore.httpchecksum').setLevel(logging.ERROR)
+        
         self.__vehicles = {}
         self.__shutdown_requested = threading.Event()
         
@@ -42,7 +45,7 @@ class MobilisightsCompresser:
             aws_secret_access_key=S3_SECRET,
             config=Config(
                 signature_version='s3v4',
-                s3={'addressing_style': 'path'},
+                s3={'addressing_style': 'path', 'payload_signing_enabled': True},
                 retries={'max_attempts': 3}
             )
         )
