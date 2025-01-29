@@ -119,6 +119,6 @@ def save_cache_locally_to(data: DF, path:str, **kwargs):
 
 def ensure_that_local_dirs_exist(path:str):
     dir_path = dirname(path)
-    if not exists(dir_path):
+    if not exists(dir_path) and dir_path != "":
         makedirs(dir_path)
 
