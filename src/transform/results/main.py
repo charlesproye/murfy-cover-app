@@ -99,14 +99,14 @@ def make_charge_levels_presentable(results:DF) -> DF:
     nb_negative_levels = negative_charge_levels.sum().sum()
     if nb_negative_levels > 0:
         logger.debug(f"There are {nb_negative_levels}({100*nb_negative_levels/len(results):2f}%) negative charge levels, setting them to 0.")
-    results[["level_1", "level_2", "level_3"]] = negative_charge_levels.mask(negative_charge_levels, 0)
+    results[["level_1", "level_2", "level_3"]] = results[["level_1", "level_2", "level_3"]].mask(negative_charge_levels, 0)
     return results
 
 def make_soh_presentable(df:DF) -> DF:
     if df["soh"].isna().all():
         #logger.warning(f"No SOH data for {df.name}")
         return df
-    if len(df) > 3:
+    if df["soh"].count() > 3:
         outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
         assert outliser_mask.sum() > 0, f"There seems to be only outliers???: {df['soh'].quantile(0.05)}, {df['soh'].quantile(0.95)}\n{df['soh']}"
         df = df[outliser_mask].copy()
