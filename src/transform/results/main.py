@@ -15,23 +15,26 @@ from transform.results.tesla_results import get_results as get_tesla_results
 from transform.results.renault_results import get_results as get_renault_results
 from transform.results.mercedes_results import get_results as get_mercedes_results
 from transform.results.odometer_aggregation import agg_last_odometer
-
+from transform.results.stellantis_results import get_results as get_stellantis_results
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
-    "bmw": lambda: agg_last_odometer("bmw"),
-    "kia": lambda: agg_last_odometer("kia"),
-    "mercedes-benz": get_mercedes_results,
-    "renault": get_renault_results,
-    "tesla": get_tesla_results,
-    "ford": get_ford_results,
-    "volvo": get_volvo_results,
+    # "bmw": lambda: agg_last_odometer("bmw"),
+    # "kia": lambda: agg_last_odometer("kia"),
+    # "mercedes-benz": get_mercedes_results,
+    # "renault": get_renault_results,
+    # "tesla": get_tesla_results,
+    # "ford": get_ford_results,
+    # "volvo": get_volvo_results,
+    "stellantis": get_stellantis_results,
 }
 
 def fill_vehicle_data_table_with_results():
     logger.info("Filling 'vehicle_data' table with results.")
+    all = get_all_processed_results()
+    print(all)
     return (
-        get_all_processed_results()
+        all
         .pipe(left_merge_rdb_table, "vehicle", "vin", "vin", {"id": "vehicle_id"})
         .pipe(
             right_union_merge_rdb_table,

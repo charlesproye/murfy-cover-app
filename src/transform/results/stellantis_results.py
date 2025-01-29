@@ -1,7 +1,7 @@
 from logging import Logger, getLogger
 
 import plotly.express as px
-
+import pandas as pd
 from core.pandas_utils import *
 from core.console_utils import main_decorator
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
@@ -22,17 +22,18 @@ def main():
         .reset_index()
     )
     print(df)
-    if not df.empty:
-        fig = px.line(df, x="date", y="soh", color="vin")
-        fig.show()
+    # if not df.empty:
+    #     fig = px.line(df, x="date", y="soh", color="vin")
+    #     fig.show()
 
 def get_results() -> DF:
-    logger.info("Getting Volvo results")
+    logger.info("Getting Stellantis results")
     return (
         ProcessedTimeSeries("stellantis")
         .eval("odometer = odometer.ffill().bfill()")
-        .eval("soh_oem = soh_oem.ffill().bfill()")
-        .query("soc > 0.7")
+        # .assign(soh=pd.NA)
+        .eval("soh = soc.ffill().bfill()")
+        # .query("soc > 0.7")
     )
 
 if __name__ == "__main__":

@@ -12,12 +12,12 @@ logger = getLogger("core.stats_utils")
 def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Logger=logger) -> DF:
     """
     ### Description:
-    Filter results based on the valid SOH points.
+    Filter results based on the valid SoH points.
     ### Arguments:
     results: DF
         The results to filter must contain the columns "soh" and "odometer".
     valid_soh_points: DF
-        The valid SOH points.
+        The valid SoH points.
         Must contain the columns "bound", "point", "soh" and "odometer".
         The must contain 4 points that define the slope bounds of minimum and maximum SOH ranges.
         View 
