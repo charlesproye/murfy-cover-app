@@ -23,7 +23,7 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         View 
     """
     if results["soh"].isna().all():
-        logger.debug("No SOH values to filter, column is all NaN returning as is.")
+        logger.debug("No SoH values to filter, column is all NaN returning as is.")
         return results
     logger.debug("Filtering results.")
     max_intercept, max_slope = intercept_and_slope_from_points(valid_soh_points.xs("max", level=0, drop_level=True))
@@ -67,10 +67,12 @@ def force_monotonic_decrease(values:Series) -> Series:
     Ajuste les valeurs de SoH pour garantir une décroissance tout en minimisant 
     l'écart avec les valeurs brutes.
     """
-    n = len(values)
+    values = values.copy()
+    notna_values = values[values.notna()]
+    n = len(notna_values)
     # Fonction objectif : minimiser l'écart quadratique entre les valeurs ajustées et les valeurs brutes
     def objectif(adjusted_values:np.ndarray) -> float:
-        return np.sum((adjusted_values - values) ** 2)
+        return np.sum((adjusted_values - notna_values) ** 2)
    # Contraintes : SoH doit être non-croissant et l'écart hebdomadaire doit être inférieur à 0,1%
     # constraints = []
     constraints = [{'type': 'ineq', 'fun': lambda x, i=i: (x[i - 1] - x[i]) * 0.00001} for i in range(1, n)] 
@@ -79,10 +81,11 @@ def force_monotonic_decrease(values:Series) -> Series:
     bounds = [(0, 100)] * n
     # Initialisation des valeurs ajustées (on commence par les valeurs brutes)
     # Résolution de l'optimisation
-    result = minimize(objectif, values, constraints=constraints, bounds=bounds, method="SLSQP")
+    results = minimize(objectif, notna_values, constraints=constraints, bounds=bounds, method="SLSQP")
+    values[values.notna()] = results.x
 
-    if result.success:
-        return result.x 
+    if results.success:
+        return values
     else:
-        raise ValueError("Optimisation failed:\n", result.message)
+        raise ValueError("Optimisation failed:\n", results.message)
 
