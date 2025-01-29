@@ -207,13 +207,17 @@ class MobilisightsIngester:
 
     def __compress(self):
         self.__ingester_logger.info("Starting compression job")
-        compresser = MobilisightsCompresser(
-            self.__s3,
-            self.__bucket,
-            threaded=False,
-            max_workers=self.max_workers,
-        )
-        compresser.run()
+        try:
+            compresser = MobilisightsCompresser(
+                threaded=self.compress_threaded,
+                max_workers=self.max_workers
+            )
+            compresser.run()  # Using run() instead of start()
+            self.__ingester_logger.info("Compression job completed successfully")
+        except Exception as e:
+            self.__ingester_logger.error(f"Error during compression: {e}")
+        finally:
+            self.__is_compressing = False
 
     def __schedule_tasks(self):
         self.__fetch_scheduler.every(self.rate_limit).seconds.do(

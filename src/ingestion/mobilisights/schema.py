@@ -920,6 +920,7 @@ class CarState(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, 
     setup: Optional[Setup] = None
     maintenance: Optional[Maintenance] = None
     crash: Optional[Crash] = None
+    seatbelt: Optional[Seatbelt] = None
 
 
 class MergedCarState(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"):
@@ -946,7 +947,7 @@ class MergedCarState(msgspec.Struct, forbid_unknown_fields=False, omit_defaults=
     maintenance_date: list[TimestampedValue[datetime.date]] = []
     maintenance_odometer: list[TimestampedValueWithUnit[float, DistanceUnit]] = []
     crash: Optional[MergedCrash] = None
-    seatbelt: Optional[MergedSeatbelt] = None  # Ajout du champ seatbelt
+    seatbelt: Optional[MergedSeatbelt] = None
 
     @classmethod
     def from_list(cls, lst: list[CarState]) -> Optional[Self]:

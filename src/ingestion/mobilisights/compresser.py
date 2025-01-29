@@ -1,38 +1,40 @@
 import asyncio
 import logging
-from datetime import datetime
-from typing import Optional, List, Set
+import os
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict
 
 import aioboto3
 import boto3
+import dotenv
 import msgspec
-from botocore.client import Config
 from botocore.credentials import threading
-from ingestion.mobilisights.schema import CarState, MergedCarState
+from botocore.client import Config
+from .schema import CarState, MergedCarState
 
+# Configure botocore logger to be less verbose
+logging.getLogger('botocore.httpchecksum').setLevel(logging.WARNING)
 
 class MobilisightsCompresser:
     __logger: logging.Logger
     __s3: boto3.client
     __bucket: str
-    __vehicles: dict[str, set[str]]
+    __s3_keys_by_vin: dict[str, dict[str, set[str]]] = {}
     __shutdown_requested: threading.Event
+    __s3_config: Dict[str, str]
 
-    def __init__(
-        self, s3=None, bucket=None, threaded: bool = False, 
-        max_workers: Optional[int] = 8, batch_size: int = 50
-    ) -> None:
+    def __init__(self, threaded: bool = True, max_workers: int = 8):
+        """Initialize the compressor with S3 credentials and configuration"""
         self.__logger = logging.getLogger("COMPRESSER")
-        # Filter out botocore checksum warnings
-        logging.getLogger('botocore.httpchecksum').setLevel(logging.ERROR)
-        
-        self.__vehicles = {}
         self.__shutdown_requested = threading.Event()
         
-        import os
-        import dotenv
+        # Load environment variables
         dotenv.load_dotenv()
-        
+        self.__s3_config = self.__load_s3_config()
+        if not self.__s3_config:
+            raise ValueError("Missing required S3 configuration")
+
+        # Initialize S3 client with config
         S3_ENDPOINT = os.getenv("S3_ENDPOINT")
         S3_REGION = os.getenv("S3_REGION")
         S3_KEY = os.getenv("S3_KEY")
@@ -45,321 +47,276 @@ class MobilisightsCompresser:
             aws_secret_access_key=S3_SECRET,
             config=Config(
                 signature_version='s3v4',
-                s3={'addressing_style': 'path', 'payload_signing_enabled': True},
+                s3={'addressing_style': 'path'},
                 retries={'max_attempts': 3}
             )
         )
-            
-        self.__bucket = bucket
+        self.__bucket = self.__s3_config['bucket']
+        
         self.threaded = threaded
         self.max_workers = max_workers
-        self.batch_size = batch_size
+
+    def __load_s3_config(self) -> Optional[Dict[str, str]]:
+        """Load S3 configuration from environment variables"""
+        required_vars = {
+            'endpoint': 'S3_ENDPOINT',
+            'region': 'S3_REGION',
+            'bucket': 'S3_BUCKET',
+            'key': 'S3_KEY',
+            'secret': 'S3_SECRET'
+        }
+        
+        config = {}
+        for key, env_var in required_vars.items():
+            value = os.getenv(env_var)
+            if value is None:
+                self.__logger.error(f"{env_var} environment variable not found")
+                return None
+            config[key] = value
+        
+        return config
 
     def shutdown(self):
         self.__logger.info("Shutting down compresser")
         self.__shutdown_requested.set()
 
-    async def list_and_process(self):
-        self.__logger.info("Starting to list and process bucket objects")
-        paginator = self.__s3.get_paginator("list_objects_v2")
-        
-        # Liste des VINs avec pagination
-        vins = set()
-        prefix = "response/stellantis/"
-        processing_tasks = []
-        
-        for page in paginator.paginate(
-            Bucket=self.__bucket, 
-            Prefix=prefix,
-            Delimiter='/',
-            PaginationConfig={'PageSize': 1000}
-        ):
-            if 'CommonPrefixes' in page:
-                for prefix_obj in page['CommonPrefixes']:
-                    vin = prefix_obj['Prefix'].split('/')[2]
-                    if len(vin) == 17:
-                        vins.add(vin)
-                        # Démarrer le traitement des fichiers temp pour ce VIN immédiatement
-                        task = asyncio.create_task(self.__list_and_process_vin(vin))
-                        processing_tasks.append(task)
-        
-        self.__logger.info(f"Found {len(vins)} VINs, waiting for processing to complete")
-        await asyncio.gather(*processing_tasks)
-
-    async def list_and_process(self):
-        self.__logger.info("Starting to list and process bucket objects")
-        paginator = self.__s3.get_paginator("list_objects_v2")
-        
-        # Liste des VINs avec pagination
-        vins = set()
-        prefix = "response/stellantis/"
-        processing_tasks = []
-        semaphore = asyncio.Semaphore(20)  # Limite à 20 VINs traités simultanément
-        
-        async def process_vin_complete(vin: str):
-            async with semaphore:
-                session = aioboto3.Session()
-                async with session.client(
-                    "s3",
-                    region_name=self.__s3.meta.region_name,
-                    aws_access_key_id=self.__s3._request_signer._credentials.access_key,
-                    aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-                    endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
-                ) as s3:
-                    try:
-                        temp_files = set()
-                        temp_prefix = f"response/stellantis/{vin}/temp/"
+    def list_objects(self):
+        """List all objects in S3 bucket for Stellantis"""
+        self.__logger.info("Starting to list objects from S3...")
+        try:
+            paginator = self.__s3.get_paginator("list_objects_v2")
+            brand_name = "stellantis"
+            
+            # Use delimiter to list only VINs first
+            prefix = f"response/{brand_name.lower()}/"
+            self.__logger.info(f"Listing VINs with prefix: {prefix}")
+            
+            vins = set()
+            for page in paginator.paginate(
+                Bucket=self.__bucket,
+                Prefix=prefix,
+                Delimiter='/'
+            ):
+                if 'CommonPrefixes' in page:
+                    for prefix_obj in page['CommonPrefixes']:
+                        vin = prefix_obj['Prefix'].split('/')[2]
+                        if len(vin) == 17:  # Valid VIN length
+                            vins.add(vin)
+            
+            self.__logger.info(f"Found {len(vins)} unique VINs")
+            
+            # Initialize the dictionary for the brand
+            self.__s3_keys_by_vin[brand_name.lower()] = {}
+            
+            # Process VINs in batches
+            batch_size = 30
+            vin_batches = [list(vins)[i:i + batch_size] for i in range(0, len(vins), batch_size)]
+            
+            for batch_idx, vin_batch in enumerate(vin_batches, 1):
+                self.__logger.info(f"Processing VIN batch {batch_idx}/{len(vin_batches)}")
+                
+                for vin in vin_batch:
+                    if self.__shutdown_requested.is_set():
+                        return
                         
-                        # Liste les fichiers temp pour ce VIN
+                    temp_prefix = f"response/{brand_name.lower()}/{vin}/temp/"
+                    temp_files = set()
+                    
+                    try:
                         for page in paginator.paginate(
                             Bucket=self.__bucket,
                             Prefix=temp_prefix,
-                            PaginationConfig={'PageSize': 3000}
+                            PaginationConfig={'PageSize': 1000}
                         ):
                             if 'Contents' in page:
-                                temp_files.update(obj['Key'] for obj in page['Contents'])
+                                temp_files.update(obj["Key"] for obj in page["Contents"])
                         
                         if temp_files:
+                            self.__s3_keys_by_vin[brand_name.lower()][vin] = temp_files
                             self.__logger.info(f"Found {len(temp_files)} temp files for VIN {vin}")
-                            
-                            # Grouper les fichiers par datetimeSending
-                            files_by_date = {}
-                            
-                            # Traiter tous les fichiers pour les grouper par date
-                            for temp_file in temp_files:
-                                try:
-                                    response = await s3.get_object(Bucket=self.__bucket, Key=temp_file)
-                                    async with response['Body'] as stream:
-                                        content = await stream.read()
-                                        car_state = msgspec.json.decode(content, type=CarState)
-                                        
-                                    if car_state.datetimeSending:
-                                        sending_date = car_state.datetimeSending.date()
-                                        if sending_date not in files_by_date:
-                                            files_by_date[sending_date] = []
-                                        files_by_date[sending_date].append((temp_file, car_state))
-                                except Exception as e:
-                                    self.__logger.error(f"Error processing temp file {temp_file}: {e}")
-                                    continue
-                            
-                            # Traiter chaque groupe de date séparément
-                            for sending_date, file_data in files_by_date.items():
-                                if self.__shutdown_requested.is_set():
-                                    return
-                                    
-                                try:
-                                    temp_files = [f[0] for f in file_data]
-                                    car_states = [f[1] for f in file_data]
-                                    
-                                    self.__logger.info(f"Processing {len(car_states)} states for VIN {vin} date {sending_date}")
-                                    
-                                    # Créer le fichier compressé pour cette date
-                                    merged = MergedCarState.from_list(car_states)
-                                    if merged:
-                                        compressed_key = f"response/stellantis/{vin}/{sending_date}.json"
-                                        encoded = msgspec.json.encode(merged)
-                                        
-                                        # Sauvegarder le fichier compressé
-                                        await s3.put_object(
-                                            Bucket=self.__bucket,
-                                            Key=compressed_key,
-                                            Body=encoded
-                                        )
-                                        
-                                        # Supprimer les fichiers temp de cette date
-                                        chunk_size = 50
-                                        for i in range(0, len(temp_files), chunk_size):
-                                            if self.__shutdown_requested.is_set():
-                                                return
-                                            chunk = temp_files[i:i + chunk_size]
-                                            delete_tasks = [
-                                                s3.delete_object(Bucket=self.__bucket, Key=temp_key)
-                                                for temp_key in chunk
-                                            ]
-                                            await asyncio.gather(*delete_tasks)
-                                            
-                                        self.__logger.info(f"Processed and cleaned up {len(temp_files)} files for VIN {vin} date {sending_date}")
-                                        
-                                except Exception as e:
-                                    self.__logger.error(f"Error processing date group {sending_date} for VIN {vin}: {e}")
-                                    continue
+                        
                     except Exception as e:
-                        self.__logger.error(f"Error processing VIN {vin}: {e}")
-        
-        # Lister tous les VINs
-        for page in paginator.paginate(
-            Bucket=self.__bucket, 
-            Prefix=prefix,
-            Delimiter='/',
-            PaginationConfig={'PageSize': 3000}
-        ):
-            if self.__shutdown_requested.is_set():
-                break
+                        self.__logger.error(f"Error listing temp files for VIN {vin}: {e}")
+                        continue
                 
-            if 'CommonPrefixes' in page:
-                for prefix_obj in page['CommonPrefixes']:
-                    vin = prefix_obj['Prefix'].split('/')[2]
-                    if len(vin) == 17:
-                        vins.add(vin)
-                        # Démarrer le traitement complet immédiatement
-                        task = asyncio.create_task(process_vin_complete(vin))
-                        processing_tasks.append(task)
-        
-        self.__logger.info(f"Found {len(vins)} VINs, processing in parallel")
-        await asyncio.gather(*processing_tasks)
+            total_temp_files = sum(len(files) for files in self.__s3_keys_by_vin[brand_name.lower()].values())
+            self.__logger.info(f"Found {total_temp_files} total temp files to process")
+                
+        except Exception as e:
+            self.__logger.error(f"Error listing objects: {str(e)}", exc_info=True)
+            raise
 
-    async def __process_batch_async(self, batch: List[str], vin: str):
+    async def __process_batch_async(self, batch: List[str], vin: str, date: str):
+        """Process a batch of files asynchronously"""
         session = aioboto3.Session()
         async with session.client(
             "s3",
-            region_name=self.__s3.meta.region_name,
-            aws_access_key_id=self.__s3._request_signer._credentials.access_key,
-            aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
+            region_name=self.__s3_config['region'],
+            endpoint_url=self.__s3_config['endpoint'],
+            aws_access_key_id=self.__s3_config['key'],
+            aws_secret_access_key=self.__s3_config['secret']
         ) as s3:
+            car_states = []
             successful_processes = []
-            merged_states = []
+            
+            # Process all files in batch
+            tasks = []
+            for s3_key in batch:
+                if self.__shutdown_requested.is_set():
+                    return [], None
+                
+                task = asyncio.create_task(self.__process_one_async(s3, s3_key))
+                tasks.append((s3_key, task))
 
-            # Traiter les fichiers par petits groupes pour éviter trop de tâches simultanées
-            chunk_size = 50
-            for i in range(0, len(batch), chunk_size):
-                chunk = batch[i:i + chunk_size]
-                tasks = []
-                
-                for s3_key in chunk:
-                    if self.__shutdown_requested.is_set():
-                        return [], None
-                    tasks.append(self.__process_one_async(s3, s3_key))
-                
-                # Attendre que toutes les tâches du chunk soient terminées
+            for s3_key, task in tasks:
                 try:
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-                    for s3_key, result in zip(chunk, results):
-                        if isinstance(result, Exception):
-                            self.__logger.error(f"Error processing {s3_key}: {result}")
-                        elif result:
-                            successful_processes.append(s3_key)
-                            merged_states.append(result)
+                    car_state = await task
+                    if car_state:
+                        car_states.append(car_state)
+                        successful_processes.append(s3_key)
                 except Exception as e:
-                    self.__logger.error(f"Error processing chunk for VIN {vin}: {e}")
+                    self.__logger.error(f"Error processing {s3_key}: {e}")
 
-            return successful_processes, merged_states
+            # Merge and upload if we have states
+            if car_states:
+                merged = MergedCarState.from_list(car_states)
+                if merged:
+                    try:
+                        encoded = msgspec.json.encode(merged)
+                        await s3.put_object(
+                            Bucket=self.__bucket,
+                            Key=f"response/stellantis/{vin}/{date}.json",
+                            Body=encoded
+                        )
+                        
+                        # Delete processed files
+                        delete_tasks = []
+                        for temp_key in successful_processes:
+                            task = asyncio.create_task(
+                                s3.delete_object(Bucket=self.__bucket, Key=temp_key)
+                            )
+                            delete_tasks.append(task)
+                        
+                        await asyncio.gather(*delete_tasks)
+                        
+                        self.__logger.info(f"Processed and merged {len(batch)} files for VIN {vin} on date {date}")
+                        return successful_processes, merged
+                        
+                    except Exception as e:
+                        self.__logger.error(f"Error uploading/deleting for VIN {vin} on date {date}: {e}")
+                        
+            return [], None
 
     async def __process_one_async(self, s3, s3_key: str):
+        """Process a single file asynchronously"""
         try:
             response = await s3.get_object(Bucket=self.__bucket, Key=s3_key)
             async with response['Body'] as stream:
                 content = await stream.read()
-                content = content.decode('utf-8')
             
             return msgspec.json.decode(content, type=CarState)
+                
         except Exception as e:
-            self.__logger.error(f"Error in process_one_async for {s3_key}: {e}")
+            self.__logger.error(f"Error processing {s3_key}: {e}")
             return None
 
-    async def __save_compressed_data(self, successful_processes: List[str], merged: MergedCarState, vin: str):
-        session = aioboto3.Session()
-        async with session.client(
-            "s3",
-            region_name=self.__s3.meta.region_name,
-            aws_access_key_id=self.__s3._request_signer._credentials.access_key,
-            aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None
-        ) as s3:
-            try:
-                sending_date = merged.datetimeSending.date() if merged.datetimeSending else datetime.today().date()
-                encoded = msgspec.json.encode(merged)
-                compressed_key = f"response/stellantis/{vin}/{sending_date}.json"
-                
-                await s3.put_object(
-                    Bucket=self.__bucket,
-                    Key=compressed_key,
-                    Body=encoded
-                )
+    def _get_date_from_filename(self, filename: str) -> str:
+        """Extract date from timestamp filename"""
+        try:
+            timestamp = int(filename.split('/')[-1].split('.')[0])
+            return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
+        except Exception as e:
+            self.__logger.error(f"Error parsing date from filename {filename}: {e}")
+            return None
 
-                # Supprimer les fichiers par petits groupes
-                chunk_size = 50
-                for i in range(0, len(successful_processes), chunk_size):
-                    chunk = successful_processes[i:i + chunk_size]
-                    delete_tasks = [
-                        s3.delete_object(Bucket=self.__bucket, Key=temp_key)
-                        for temp_key in chunk
-                    ]
-                    await asyncio.gather(*delete_tasks)
-                    self.__logger.info(f"Deleted {len(chunk)} files for VIN {vin}")
-                
-            except Exception as e:
-                self.__logger.error(f"Error saving compressed data for VIN {vin}: {e}")
+    def _group_files_by_date(self, temp_files: set[str]) -> dict[str, set[str]]:
+        """Group files by their date"""
+        files_by_date = {}
+        for file in temp_files:
+            date = self._get_date_from_filename(file)
+            if date:
+                if date not in files_by_date:
+                    files_by_date[date] = set()
+                files_by_date[date].add(file)
+        return files_by_date
 
-    async def __process_vin(self, vin: str, temp_data: Set[str]):
-        if self.__shutdown_requested.is_set():
+    async def process_vin(self, vin: str, temp_data: set[str]):
+        """Process all files for a single VIN"""
+        if not temp_data:
             return
 
-        self.__logger.info(f"Processing VIN {vin} with {len(temp_data)} files")
-        
-        # Traitement par lots
-        batch_size = 3000
-        temp_data_list = list(temp_data)
-        batches = [temp_data_list[i:i + batch_size] 
-                  for i in range(0, len(temp_data_list), batch_size)]
-        
-        self.__logger.info(f"Split data into {len(batches)} batches of size {batch_size}")
-        
-        # Lancer tous les batches en parallèle immédiatement
-        batch_tasks = []
-        for batch_index, batch in enumerate(batches):
-            if self.__shutdown_requested.is_set():
-                break
+        try:
+            # Group files by date
+            files_by_date = self._group_files_by_date(temp_data)
             
-            task = asyncio.create_task(self.__process_batch_async(batch, vin))
-            batch_tasks.append((batch_index, task))
-        
-        # Traiter les résultats au fur et à mesure qu'ils arrivent
-        all_car_states = []
-        all_successful_processes = []
-        
-        for batch_index, task in batch_tasks:
-            if self.__shutdown_requested.is_set():
-                break
+            # Process each date separately
+            for date, date_files in files_by_date.items():
+                if self.__shutdown_requested.is_set():
+                    return
+
+                # Process in batches
+                batch_size = 50
+                date_files_list = list(date_files)
+                batches = [date_files_list[i:i + batch_size] 
+                          for i in range(0, len(date_files_list), batch_size)]
                 
-            successful_processes, car_states = await task
-            if car_states:
-                all_car_states.extend(car_states)
-                all_successful_processes.extend(successful_processes)
-            
-            self.__logger.info(f"Processed batch {batch_index + 1}/{len(batches)} for VIN {vin}")
+                # Process batches concurrently
+                tasks = []
+                for batch in batches:
+                    if self.__shutdown_requested.is_set():
+                        break
+                        
+                    task = asyncio.create_task(
+                        self.__process_batch_async(batch, vin, date)
+                    )
+                    tasks.append(task)
 
-        if all_car_states:
-            merged = MergedCarState.from_list(all_car_states)
-            await self.__save_compressed_data(all_successful_processes, merged, vin)
-            self.__logger.info(f"Successfully compressed data for VIN {vin}")
-
-    async def compress_async(self):
-        concurrent_vins = 20  # Nombre de VINs traités en parallèle
-        items = list(self.__vehicles.items())
-        
-        for i in range(0, len(items), concurrent_vins):
-            if self.__shutdown_requested.is_set():
-                break
+                # Wait for all batch processing to complete
+                results = await asyncio.gather(*tasks, return_exceptions=True)
                 
-            batch = items[i:i + concurrent_vins]
-            tasks = [self.__process_vin(vin, temp_data) for vin, temp_data in batch]
-            await asyncio.gather(*tasks)
-            
-            processed = min(i + concurrent_vins, len(items))
-            self.__logger.info(f"Global progress: {processed}/{len(items)} VINs processed")
+                successful_batches = 0
+                for result in results:
+                    if isinstance(result, tuple) and result[0]:
+                        successful_batches += 1
+                
+                self.__logger.info(f"Completed processing for VIN {vin} on date {date}: {successful_batches}/{len(batches)} batches successful")
+                
+        except Exception as e:
+            self.__logger.error(f"Error in process_vin for {vin}: {e}")
 
-    def compress(self):
-        asyncio.run(self.compress_async())
+    async def run_async(self):
+        """Run the compression process asynchronously"""
+        self.list_objects()
+        self.__logger.info("Starting Stellantis data compression")
+        
+        brand_name = "stellantis"
+        if self.__s3_keys_by_vin.get(brand_name):
+            # Process VINs concurrently with a limit
+            max_concurrent_vins = 5
+            vin_items = list(self.__s3_keys_by_vin[brand_name].items())
+            
+            for i in range(0, len(vin_items), max_concurrent_vins):
+                batch = vin_items[i:i + max_concurrent_vins]
+                tasks = []
+                
+                for vin, temp_data in batch:
+                    if self.__shutdown_requested.is_set():
+                        break
+                        
+                    task = asyncio.create_task(self.process_vin(vin, temp_data))
+                    tasks.append((vin, task))
+                
+                for vin, task in tasks:
+                    try:
+                        await task
+                        self.__logger.info(f"Completed processing for VIN {vin}")
+                    except Exception as e:
+                        self.__logger.error(f"Error processing VIN {vin}: {e}")
+            
+            self.__logger.info("Completed Stellantis data compression")
+        else:
+            self.__logger.warning("No data to compress for Stellantis")
 
     def run(self):
-        try:
-            self.__logger.info("Starting Stellantis data compression")
-            asyncio.run(self.list_and_process())
-            self.__logger.info("Compressed Stellantis vehicle data")
-        except KeyboardInterrupt:
-            self.__logger.info("Received shutdown signal")
-            self.__shutdown_requested.set()
-        except Exception as e:
-            self.__logger.error(f"Error during compression: {e}")
-            raise
+        """Main entry point to run the compression process"""
+        asyncio.run(self.run_async())
