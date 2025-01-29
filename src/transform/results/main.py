@@ -110,7 +110,7 @@ def make_soh_presentable(df:DF) -> DF:
         outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
         assert outliser_mask.sum() > 0, f"There seems to be only outliers???: {df['soh'].quantile(0.05)}, {df['soh'].quantile(0.95)}\n{df['soh']}"
         df = df[outliser_mask].copy()
-    if len(df) >= 2:
+    if df["soh"].count() >= 2:
         df["soh"] = force_monotonic_decrease(df["soh"])
     return df
 
