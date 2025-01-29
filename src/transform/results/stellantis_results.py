@@ -1,7 +1,7 @@
 from logging import Logger, getLogger
 
 import plotly.express as px
-import pandas as pd
+import numpy as np
 from core.pandas_utils import *
 from core.console_utils import main_decorator
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
@@ -31,8 +31,8 @@ def get_results() -> DF:
     return (
         ProcessedTimeSeries("stellantis")
         .eval("odometer = odometer.ffill().bfill()")
-        # .assign(soh=pd.NA)
-        .eval("soh = soc.ffill().bfill()")
+        .assign(soh=np.nan)
+        # .eval("soh = soc.ffill().bfill()")
         # .query("soc > 0.7")
     )
 
