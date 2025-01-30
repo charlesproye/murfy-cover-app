@@ -25,11 +25,12 @@ def main():
         .agg({
             "soh": "median",
             "odometer": "last",
+            "tesla_code": "first",
         })
         .reset_index()
     )
     if not df.empty:
-        fig = px.scatter(df, x="odometer", y="soh", color="vin")
+        fig = px.scatter(df, x="odometer", y="soh", color="tesla_code", opacity=0.2)
         fig.show()
 
 USE_COLS = [
@@ -50,12 +51,14 @@ USE_COLS = [
 ]
 
 def get_results() -> DF:
-    charges:DF = (
+    return (
         TeslaProcessedTimeSeries("tesla", use_cols=USE_COLS)
         .query("trimmed_in_charge")
         .groupby(["vin", "trimmed_in_charge_idx"])
         .agg(
-            energy_added=pd.NamedAgg("charge_energy_added", series_start_end_diff),
+            #energy_added=pd.NamedAgg("charge_energy_added", series_start_end_diff),
+            energy_added_min=pd.NamedAgg("charge_energy_added", "min"),
+            energy_added_end=pd.NamedAgg("charge_energy_added", "last"),
             soc_diff=pd.NamedAgg("soc", series_start_end_diff),
             inside_temp=pd.NamedAgg("inside_temp", "mean"),
             capacity=pd.NamedAgg("capacity", "first"),
@@ -68,20 +71,16 @@ def get_results() -> DF:
             tesla_code=pd.NamedAgg("tesla_code", "first"),
         )
         .reset_index(drop=False)
+        .eval("energy_added = energy_added_end - energy_added_min")
         .eval("soh = energy_added / (soc_diff / 100.0 * capacity)")
         .query("soc_diff > 20 & soh.between(0.75, 1.0)")
-    )
-    mean_soh = charges["soh"].mean()
-    inside_temp_soh_lr = lr_params_as_series(charges, "inside_temp", "soh")
-    inside_temp_soh_lr
-    return (
-        charges
-        .eval("soh_offset_pred = inside_temp * @inside_temp_soh_lr['slope'] + @inside_temp_soh_lr['intercept']")
-        .eval("soh = soh - soh_offset_pred + @mean_soh")
         .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER)) / 100")
         .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER) / 100")
-
+	    .eval("bottom_soh = soh.between(0.75, 0.9)")
+        .eval("fixed_soh_min_end = soh.mask(tesla_code == 'MTY13', soh / 0.96)")
+        .eval("fixed_soh_min_end = fixed_soh_min_end.mask(bottom_soh, fixed_soh_min_end + 0.08)")
+        .eval("soh = fixed_soh_min_end")
     )
 
 if __name__ == "__main__":
