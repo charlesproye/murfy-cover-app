@@ -15,10 +15,10 @@ from transform.results.odometer_aggregation import agg_last_odometer
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
-    "tesla": get_tesla_results,
-    "bmw": lambda: agg_last_odometer("bmw"),
-    "kia": lambda: agg_last_odometer("kia"),
     "mercedes-benz": get_mercedes_results,
+    "bmw": lambda: agg_last_odometer("bmw"),
+    "tesla": get_tesla_results,
+    "kia": lambda: agg_last_odometer("kia"),
     "renault": get_renault_results,
     "volvo": get_volvo_results,
     "ford": get_ford_results,
@@ -52,7 +52,7 @@ def get_processed_results(brand:str) -> DF:
         .pipe(agg_results_by_update_frequency)
         .pipe(make_charge_levels_presentable)
         .groupby('vin')
-        .apply(make_soh_presentable, include_groups=False)
+        .apply(make_soh_presentable_per_vehicle, include_groups=False)
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
         .groupby("vin")
         .apply(add_lines_up_to_today_for_single_vehicle, include_groups=False)
@@ -63,6 +63,7 @@ def get_processed_results(brand:str) -> DF:
     results["soh"] = results.groupby("vin")["soh"].bfill()
     results["odometer"] = results.groupby("vin")["odometer"].ffill()
     results["odometer"] = results.groupby("vin")["odometer"].bfill()
+
     return results
 
 def agg_results_by_update_frequency(results:DF) -> DF:
@@ -102,16 +103,15 @@ def make_charge_levels_presentable(results:DF) -> DF:
     results[["level_1", "level_2", "level_3"]] = results[["level_1", "level_2", "level_3"]].mask(negative_charge_levels, 0)
     return results
 
-def make_soh_presentable(df:DF) -> DF:
+def make_soh_presentable_per_vehicle(df:DF) -> DF:
     if df["soh"].isna().all():
-        #logger.warning(f"No SOH data for {df.name}")
         return df
     if df["soh"].count() > 3:
         outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
         assert outliser_mask.sum() > 0, f"There seems to be only outliers???: {df['soh'].quantile(0.05)}, {df['soh'].quantile(0.95)}\n{df['soh']}"
         df = df[outliser_mask].copy()
     if df["soh"].count() >= 2:
-        df["soh"] = force_monotonic_decrease(df["soh"])
+        df["soh"] = force_monotonic_decrease(df["soh"]).values
     return df
 
 def add_lines_up_to_today_for_single_vehicle(results:DF) -> DF:
