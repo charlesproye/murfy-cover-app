@@ -39,12 +39,12 @@ def update_vehicle_data_table():
     )
 
 def get_all_processed_results() -> DF:
-    return (
-        pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
-    )
+    return pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
 
 def get_processed_results(brand:str) -> DF:
-    logger.info(f"==================Processing {brand} results.==================")
+    NB_SEP = 18
+    log_end_sep = "=" * (NB_SEP - len(brand))
+    logger.info(f"==================Processing {brand} results.{log_end_sep}")
     results = GET_RESULTS_FUNCS[brand]()
     results =  (
         results
@@ -123,7 +123,7 @@ def add_lines_up_to_today_for_single_vehicle(results:DF) -> DF:
         .sort_index()
         .reindex(dates_up_to_last_date, method="ffill")
     )
-    
+
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
