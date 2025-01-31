@@ -30,11 +30,10 @@ def update_vehicle_data_table():
         get_all_processed_results()
         .pipe(left_merge_rdb_table, "vehicle", "vin", "vin", {"id": "vehicle_id"})
         .pipe(
-            right_union_merge_rdb_table,
+            truncate_rdb_table_and_insert_df,
             "vehicle_data",
-            left_on=["vehicle_id", "date"],
-            right_on=["vehicle_id", "timestamp"],
-            src_dest_cols=["soh", "odometer", "level_1", "level_2", "level_3"]
+            src_dest_cols=VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS,
+            logger=logger,
         )
     )
 
