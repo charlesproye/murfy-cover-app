@@ -91,10 +91,10 @@ TESLA_PATTERNS = {
     },
     'model y': {
         'patterns': [
-            (r'.*rear.?wheel drive.*', 'RWD'),
             (r'.*long range.*rwd.*', 'Long Range RWD'),
             (r'.*long range.*all.?wheel drive.*', 'Long Range AWD'),
             (r'.*performance.*awd.*', 'Performance'),
+            (r'.*rear.?wheel drive.*', 'RWD'),
         ]
     }
 }
