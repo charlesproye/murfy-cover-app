@@ -5,7 +5,7 @@ import plotly.express as px
 from core.caching_utils import cache_result
 from core.pandas_utils import *
 from core.stats_utils import *
-from transform.results.config import *
+from transform.raw_results.config import *
 from transform.results.ford_results import get_results as get_results_raw
 
 @cache_result("data_cache/ford_res.parquet", on="local_storage")

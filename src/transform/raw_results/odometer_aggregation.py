@@ -3,7 +3,7 @@ import numpy as np
 
 from core.pandas_utils import *
 from core.console_utils import main_decorator
-from transform.results.config import *
+from transform.raw_results.config import *
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries as TSS
 
 @main_decorator

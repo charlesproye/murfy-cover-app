@@ -7,7 +7,7 @@ from core.constants import KWH_TO_KJ
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
-from transform.results.config import *
+from transform.raw_results.config import *
 
 logger = getLogger("transform.results.mercedes_results")
 

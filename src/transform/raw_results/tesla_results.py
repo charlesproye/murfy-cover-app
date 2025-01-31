@@ -5,7 +5,7 @@ import plotly.express as px
 from core.pandas_utils import *
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
-from transform.results.config import *
+from transform.raw_results.config import *
 from transform.processed_tss.ProcessedTimeSeries import TeslaProcessedTimeSeries
 
 

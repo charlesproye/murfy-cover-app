@@ -5,7 +5,7 @@ import plotly.express as px
 from core.pandas_utils import *
 from core.console_utils import main_decorator
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
-from transform.results.config import *
+from transform.raw_results.config import *
 
 logger = getLogger("transform.results.volvo_results")
 
