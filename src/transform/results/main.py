@@ -52,10 +52,8 @@ def get_processed_results(brand:str) -> DF:
         .pipe(make_charge_levels_presentable)
         .groupby('vin')
         .apply(make_soh_presentable_per_vehicle, include_groups=False)
+        .reset_index(level=0)
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
-        .groupby("vin")
-        .apply(add_lines_up_to_today_for_single_vehicle, include_groups=False)
-        .reset_index()
         .sort_values(["vin", "date"])
     )
     results["soh"] = results.groupby("vin")["soh"].ffill()
@@ -112,17 +110,6 @@ def make_soh_presentable_per_vehicle(df:DF) -> DF:
     if df["soh"].count() >= 2:
         df["soh"] = force_monotonic_decrease(df["soh"]).values
     return df
-
-def add_lines_up_to_today_for_single_vehicle(results:DF) -> DF:
-    last_date = pd.Timestamp.now().floor(UPDATE_FREQUENCY).date()
-    dates_up_to_last_date = pd.date_range(results["date"].min(), last_date, freq=UPDATE_FREQUENCY, name="date")
-    return (
-        results
-        .set_index("date")
-        .sort_index()
-        .reindex(dates_up_to_last_date, method="ffill")
-    )
-
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
