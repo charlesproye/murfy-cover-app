@@ -50,6 +50,9 @@ def run_entire_pipeline():
     try:
         logging.info("Starting pipeline execution")
         start_time = DT.now()
+
+        VehicleInfoProcessor().process_all_vehicles()
+        logging.info("Vehicle info update completed")
         
         # update_all_raw_tss()
         # logging.info("Raw TSS update completed")
@@ -57,11 +60,8 @@ def run_entire_pipeline():
         # ProcessedTimeSeries.update_all_tss()
         # logging.info("Processed TSS update completed")
 
-        update_vehicle_data_table()
-        logging.info("Results update completed")
-
-        VehicleInfoProcessor().process_all_vehicles()
-        logging.info("Vehicle info update completed")
+        # fill_vehicle_data_table_with_results()
+        # logging.info("Results update completed")
 
         FrontUtils().update_scoring()
         logging.info("SOH comparison update completed")

@@ -12,19 +12,17 @@ from transform.raw_tss.main import get_raw_tss
 from transform.fleet_info.main import fleet_info
 
 
-logger = getLogger("transform.processed_tss")
-
 class ProcessedTimeSeries(CachedETL):
     _metadata = ['make', "logger", "id_col", "max_td"]
 
-    def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False):
+    def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False, use_cols:list[str]=None):
         self.make = make
         logger_name = f"transform.processed_tss.{make}"
         self.logger = getLogger(logger_name)
         set_level_of_loggers_with_prefix(log_level, logger_name)
         self.id_col = id_col
         self.max_td = max_td
-        super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update)
+        super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update, use_cols=use_cols)
 
     def run(self) -> DF:
         self.logger.info(f"==================Processing {self.make} raw tss.==================")
@@ -139,15 +137,14 @@ class ProcessedTimeSeries(CachedETL):
                 cls = TeslaProcessedTimeSeries
             else:
                 cls = ProcessedTimeSeries
-            print(cls)
             cls(make, force_update=True, **kwargs)
 
 class TeslaProcessedTimeSeries(ProcessedTimeSeries):
 
-    def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False):
+    def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False, use_cols:list[str]=None):
         self.logger = getLogger(make)
         self.logger.info(f"Initializing TeslaProcessedTimeSeries for {make}.")
-        super().__init__(make, id_col, log_level, max_td, force_update)
+        super().__init__(make, id_col, log_level, max_td, force_update, use_cols=use_cols)
     
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (

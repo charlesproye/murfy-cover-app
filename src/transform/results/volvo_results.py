@@ -27,7 +27,7 @@ def main():
         fig.show()
 
 def get_results() -> DF:
-    logger.info("Getting Volvo results")
+    logger.debug("Getting Volvo results")
     return (
         ProcessedTimeSeries("volvo-cars")
         .eval("odometer = odometer.ffill().bfill()")

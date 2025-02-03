@@ -19,7 +19,7 @@ P = ParamSpec('P')
 logger = logging.getLogger("caching_utils")
 
 class CachedETL(DF, ABC):
-    def __init__(self, path: str, on: str, force_update: bool = False, bucket: S3_Bucket = bucket):
+    def __init__(self, path: str, on: str, force_update: bool = False, use_cols:list[str]=None, bucket: S3_Bucket = bucket):
         """
         Initialize a CachedETL with caching capabilities.
 
@@ -41,11 +41,13 @@ class CachedETL(DF, ABC):
                 data.to_parquet(path)
         else:
             if on == "s3":
-                data = bucket.read_parquet_df(path)
+                data = bucket.read_parquet_df(path, use_cols=use_cols)
             elif on == "local_storage":
-                data = pd.read_parquet(path)
+                data = pd.read_parquet(path, columns=use_cols)
 
-        # Initialize the DataFrame with the cached or newly generated data
+        if use_cols:
+            data = data[use_cols]
+
         super().__init__(data)
 
     @abstractmethod
@@ -117,6 +119,6 @@ def save_cache_locally_to(data: DF, path:str, **kwargs):
 
 def ensure_that_local_dirs_exist(path:str):
     dir_path = dirname(path)
-    if not exists(dir_path):
+    if not exists(dir_path) and dir_path != "":
         makedirs(dir_path)
 

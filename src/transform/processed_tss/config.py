@@ -61,6 +61,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "electricity.batteryCapacity":"battery_energy",
     # Mercedes
     "charging.max_range": "max_range",
+    "charging.charging_rate": "charging_rate",
     # BMW
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
@@ -72,6 +73,9 @@ RENAME_COLS_DICT:dict[str, str] = {
     "battery_level": "soc",
     "readable_date": "date",
     "charging_state": "charging_status",
+    "fast_charger_type": "charging_method",
+    "charge_rate": "charging_rate",
+    "charger_power": "charging_power",
 }
 
 # The keys will be used to determine what columns to keep.
@@ -117,7 +121,7 @@ COL_DTYPES = {
     "charge_rate": "float32",
     "charger_actual_current": "float32",
     "charger_pilot_current": "float32",
-    "charger_power": "float32",
+    "charging_power": "float32",
     "charger_voltage": "float32",
     "est_battery_range": "float32",
     "inside_temp": "float32",
