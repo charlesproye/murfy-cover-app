@@ -11,7 +11,7 @@ import time
 import re
 
 from core.sql_utils import get_connection
-from fleet_info import read_fleet_info as fleet_info
+from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
 import datetime
 
@@ -416,7 +416,8 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                             vehicle_model_id = %s,
                             licence_plate = %s,
                             end_of_contract_date = %s,
-                            start_date = %s
+                            start_date = %s,
+                            activation_status = %s,
                         WHERE vin = %s
                     """, (
                         fleet_id,
@@ -425,6 +426,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_data['licence_plate'],
                         end_of_contract,
                         start_date,
+                        vehicle_data['activation'],
                         vin
                     ))
                     logging.info(f"Updated vehicle with VIN: {vin}")
@@ -433,13 +435,14 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     cursor.execute("""
                         INSERT INTO vehicle (
                             id, vin, fleet_id, region_id, vehicle_model_id,
-                            licence_plate, end_of_contract_date, start_date
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            licence_plate, end_of_contract_date, start_date, activation_status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s,%s)
                     """, (
                         vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
                         vehicle_data['licence_plate'],
                         end_of_contract,
-                        start_date
+                        start_date,
+                        vehicle_data['activation']
                     ))
                     logging.info(f"Inserted new vehicle with VIN: {vin}")
                 
