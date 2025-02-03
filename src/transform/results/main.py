@@ -30,21 +30,20 @@ def update_vehicle_data_table():
         get_all_processed_results()
         .pipe(left_merge_rdb_table, "vehicle", "vin", "vin", {"id": "vehicle_id"})
         .pipe(
-            right_union_merge_rdb_table,
+            truncate_rdb_table_and_insert_df,
             "vehicle_data",
-            left_on=["vehicle_id", "date"],
-            right_on=["vehicle_id", "timestamp"],
-            src_dest_cols=["soh", "odometer", "level_1", "level_2", "level_3"]
+            src_dest_cols=VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS,
+            logger=logger,
         )
     )
 
 def get_all_processed_results() -> DF:
-    return (
-        pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
-    )
+    return pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
 
 def get_processed_results(brand:str) -> DF:
-    logger.info(f"==================Processing {brand} results.==================")
+    NB_SEP = 18
+    log_end_sep = "=" * (NB_SEP - len(brand))
+    logger.info(f"==================Processing {brand} results.{log_end_sep}")
     results = GET_RESULTS_FUNCS[brand]()
     results =  (
         results
@@ -53,10 +52,8 @@ def get_processed_results(brand:str) -> DF:
         .pipe(make_charge_levels_presentable)
         .groupby('vin')
         .apply(make_soh_presentable_per_vehicle, include_groups=False)
+        .reset_index(level=0)
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
-        .groupby("vin")
-        .apply(add_lines_up_to_today_for_single_vehicle, include_groups=False)
-        .reset_index()
         .sort_values(["vin", "date"])
     )
     results["soh"] = results.groupby("vin")["soh"].ffill()
@@ -113,17 +110,6 @@ def make_soh_presentable_per_vehicle(df:DF) -> DF:
     if df["soh"].count() >= 2:
         df["soh"] = force_monotonic_decrease(df["soh"]).values
     return df
-
-def add_lines_up_to_today_for_single_vehicle(results:DF) -> DF:
-    last_date = pd.Timestamp.now().floor(UPDATE_FREQUENCY).date()
-    dates_up_to_last_date = pd.date_range(results["date"].min(), last_date, freq=UPDATE_FREQUENCY, name="date")
-    return (
-        results
-        .set_index("date")
-        .sort_index()
-        .reindex(dates_up_to_last_date, method="ffill")
-    )
-    
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
