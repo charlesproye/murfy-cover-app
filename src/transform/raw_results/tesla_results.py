@@ -3,18 +3,19 @@ from logging import getLogger
 import plotly.express as px
 
 from core.pandas_utils import *
+from core.caching_utils import cache_result
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
-from transform.results.config import *
+from transform.raw_results.config import *
 from transform.processed_tss.ProcessedTimeSeries import TeslaProcessedTimeSeries
 
 
-logger = getLogger("transform.results.tesla_results")
+logger = getLogger("transform.raw_results.tesla_results")
 
 @main_decorator
 def main():
-    set_level_of_loggers_with_prefix("DEBUG", "transform.results")
-    results = get_results()
+    set_level_of_loggers_with_prefix("DEBUG", "transform.raw_results")
+    results = get_results(force_update=True)
     print("Saving tesla results as parquet to data_cache/tesla_results.parquet.")
     results.to_parquet("data_cache/tesla_results.parquet")
     # df = (
@@ -50,8 +51,10 @@ USE_COLS = [
     "version",
 ]
 
+@cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla"), "s3")
 def get_results() -> DF:
-    return (
+    logger.info("Processing raw tesla results.")
+    results = (
         TeslaProcessedTimeSeries("tesla", use_cols=USE_COLS)
         .query("trimmed_in_charge")
         .groupby(["vin", "trimmed_in_charge_idx"])
@@ -77,12 +80,16 @@ def get_results() -> DF:
         .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER)) / 100")
         .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER) / 100")
-	    .eval("bottom_soh = soh.between(0.75, 0.9)")
+	.eval("bottom_soh = soh.between(0.75, 0.9)")
         .eval("fixed_soh_min_end = soh.mask(tesla_code == 'MTY13', soh / 0.96)")
         .eval("fixed_soh_min_end = fixed_soh_min_end.mask(bottom_soh & tesla_code == 'MTY13', fixed_soh_min_end + 0.08)")
         .eval("soh = fixed_soh_min_end")
         .sort_values(["tesla_code", "vin", "date"])
     )
+    logger.debug("Sanity check of the results:")
+    logger.debug(sanity_check(results))
+
+    return results
 
 if __name__ == "__main__":
     main()

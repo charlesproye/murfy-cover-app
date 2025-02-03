@@ -1,13 +1,12 @@
 from logging import Logger, getLogger
 
 import plotly.express as px
-
+import numpy as np
 from core.pandas_utils import *
 from core.console_utils import main_decorator
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
-from transform.results.config import *
 
-logger = getLogger("transform.results.volvo_results")
+logger = getLogger("transform.results.stellantis_results")
 
 @main_decorator
 def main():
@@ -22,17 +21,15 @@ def main():
         .reset_index()
     )
     print(df)
-    if not df.empty:
-        fig = px.line(df, x="date", y="soh", color="vin")
-        fig.show()
 
 def get_results() -> DF:
-    logger.debug("Getting Volvo results")
+    logger.info("Getting Stellantis results")
     return (
-        ProcessedTimeSeries("volvo-cars")
+        ProcessedTimeSeries("stellantis")
         .eval("odometer = odometer.ffill().bfill()")
-        .eval("soh = estimated_range / soc / range / 0.87")
-        .query("soc > 0.7")
+        .assign(soh=np.nan)
+        # .eval("soh = soc.ffill().bfill()")
+        # .query("soc > 0.7")
     )
 
 if __name__ == "__main__":

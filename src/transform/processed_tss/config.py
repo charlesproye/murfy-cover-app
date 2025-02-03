@@ -6,17 +6,6 @@ S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss.par
 ODOMETER_MILES_TO_KM = {
     "tesla": 1.60934,
 }
-# High mobility 
-HIGH_MOBILITY_BRANDS = [
-    "kia",
-    "mercedes-benz",
-    "ford",
-    "renault",
-    "opel",
-    "ds",
-    "fiat",
-    "peugeot",
-]
 
 COLS_TO_CPY_FROM_FLEET_INFO = [
     "make",
@@ -49,7 +38,6 @@ RENAME_COLS_DICT:dict[str, str] = {
     "engine.coolantTemperature": "coolant_temp",
     "externalTemperature": "outside_temp",
     "electricity.residualAutonomy": "estimated_range",
-    "electricity.residualAutonomy": "estimated_range",
     "electricity.batteryCapacity": "battery_energy",
     "electricity.charging.plugged": "charging_plug_connected",
     "electricity.charging.status": "charging_status",
@@ -58,7 +46,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "electricity.charging.planned": "charging_planned",
     "electricity.charging.rate": "charging_rate",
     "electricity.engineSpeed": "engine_speed",
-    "electricity.batteryCapacity":"battery_energy",
+    "electricity.battery.stateOfHealth": "soh_oem",
     # Mercedes
     "charging.max_range": "max_range",
     "charging.charging_rate": "charging_rate",
@@ -132,6 +120,7 @@ COL_DTYPES = {
     "charging_planned": "float32",
     "charging_rate": "float32",
     "engine_speed": "float32",
+    "soh_oem": "float32",
 }
 
 DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
@@ -189,6 +178,8 @@ CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
     "mercedes-benz",
     "ford",
     "volvo-cars",
+    "tesla",
+    "stellantis"
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
