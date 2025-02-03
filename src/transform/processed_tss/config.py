@@ -49,6 +49,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "electricity.battery.stateOfHealth": "soh_oem",
     # Mercedes
     "charging.max_range": "max_range",
+    "charging.charging_rate": "charging_rate",
     # BMW
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
@@ -60,6 +61,9 @@ RENAME_COLS_DICT:dict[str, str] = {
     "battery_level": "soc",
     "readable_date": "date",
     "charging_state": "charging_status",
+    "fast_charger_type": "charging_method",
+    "charge_rate": "charging_rate",
+    "charger_power": "charging_power",
 }
 
 # The keys will be used to determine what columns to keep.
@@ -85,6 +89,7 @@ COL_DTYPES = {
     "coolant_temperature": "float32",
     "kombi_remaining_electric_range": "float32",
     # Tesla
+    "battery_heater": "bool",
     "battery_heater_no_power": "bool",
     "fast_charger_present": "bool",
     "power": "float32",
@@ -104,7 +109,7 @@ COL_DTYPES = {
     "charge_rate": "float32",
     "charger_actual_current": "float32",
     "charger_pilot_current": "float32",
-    "charger_power": "float32",
+    "charging_power": "float32",
     "charger_voltage": "float32",
     "est_battery_range": "float32",
     "inside_temp": "float32",
@@ -168,6 +173,7 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
+    "tesla",
     "bmw",
     "mercedes-benz",
     "ford",

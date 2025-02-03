@@ -1,6 +1,3 @@
-import warnings
-warnings.filterwarnings("error", category=RuntimeWarning)
-
 from logging import getLogger
 
 from core.sql_utils import *
@@ -10,127 +7,113 @@ from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.results.config import *
 from transform.results.ford_results import get_results as get_ford_results
-from transform.results.volvo_results import get_results as get_volvo_results
 from transform.results.tesla_results import get_results as get_tesla_results
 from transform.results.renault_results import get_results as get_renault_results
 from transform.results.mercedes_results import get_results as get_mercedes_results
+from transform.results.volvo_results import get_results as get_volvo_results
 from transform.results.odometer_aggregation import agg_last_odometer
 from transform.results.stellantis_results import get_results as get_stellantis_results
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
-    "bmw": lambda: agg_last_odometer("bmw"),
-    "kia": lambda: agg_last_odometer("kia"),
     "mercedes-benz": get_mercedes_results,
-    "renault": get_renault_results,
+    "bmw": lambda: agg_last_odometer("bmw"),
     "tesla": get_tesla_results,
-    "ford": get_ford_results,
+    "kia": lambda: agg_last_odometer("kia"),
+    "renault": get_renault_results,
     "volvo": get_volvo_results,
     "stellantis": get_stellantis_results,
 }
 
-def fill_vehicle_data_table_with_results():
-    logger.info("Filling 'vehicle_data' table with results.")
-    all = get_all_processed_results()
-    print(all)
+def update_vehicle_data_table():
+    logger.info("Updating 'vehicle_data' table.")
     return (
         all
         .pipe(left_merge_rdb_table, "vehicle", "vin", "vin", {"id": "vehicle_id"})
         .pipe(
-            right_union_merge_rdb_table,
+            truncate_rdb_table_and_insert_df,
             "vehicle_data",
-            left_on=["vehicle_id", "date"],
-            right_on=["vehicle_id", "timestamp"],
-            src_dest_cols=["soh", "odometer"]
+            src_dest_cols=VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS,
+            logger=logger,
         )
     )
 
 def get_all_processed_results() -> DF:
-    return (
-        pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
-        .groupby("vin")
-        .apply(add_lines_up_to_today_for_vehicle, include_groups=False)
-        .reset_index()
-    )
-
-def add_lines_up_to_today_for_vehicle(results:DF) -> DF:
-    last_date = pd.Timestamp.now().floor(UPDATE_FREQUENCY).date()
-    dates_up_to_last_date = pd.date_range(results["date"].min(), last_date, freq=UPDATE_FREQUENCY, name="date")
-    return (
-        results
-        .set_index("date")
-        .sort_index()
-        .reindex(dates_up_to_last_date, method="ffill")
-    )
+    return pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
 
 def get_processed_results(brand:str) -> DF:
+    NB_SEP = 18
+    log_end_sep = "=" * (NB_SEP - len(brand))
+    logger.info(f"==================Processing {brand} results.{log_end_sep}")
     results = GET_RESULTS_FUNCS[brand]()
-    logger.info(f"Processing results for {brand}.")
-    if brand != "tesla":
-        results = agg_results_by_update_frequncy(results)
-    return (
+    results =  (
         results
-        .dropna(subset=["odometer"], how="any")
-        .reset_index()
+        .sort_values(["vin", "date"])
+        .pipe(agg_results_by_update_frequency)
+        .pipe(make_charge_levels_presentable)
         .groupby('vin')
-        .apply(make_soh_presentable, include_groups=False)
-        .reset_index(drop=False)  # Supprime l'index 'vin' créé par le groupby
-        .pipe(set_floored_day_date)
-        .groupby(["vin", "date"])
-        .agg({
-            "odometer": "last",    
-            "soh": "median",
-            "model": "first",
-            "version": "first",
-        })
-        .reset_index()
+        .apply(make_soh_presentable_per_vehicle, include_groups=False)
+        .reset_index(level=0)
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
-        .sort_values(["vin", "odometer"])
+        .sort_values(["vin", "date"])
     )
+    results["soh"] = results.groupby("vin")["soh"].ffill()
+    results["soh"] = results.groupby("vin")["soh"].bfill()
+    results["odometer"] = results.groupby("vin")["odometer"].ffill()
+    results["odometer"] = results.groupby("vin")["odometer"].bfill()
 
-def set_floored_day_date(df:DF, date_col:str="date") -> DF:
-    df[date_col] = (
-        pd.to_datetime(df[date_col], format='mixed')
+    return results
+
+def agg_results_by_update_frequency(results:DF) -> DF:
+    results["date"] = (
+        pd.to_datetime(results["date"], format='mixed')
         .dt.floor(UPDATE_FREQUENCY)
         .dt.tz_localize(None)
         .dt.date
         .astype('datetime64[ns]')
     )
-    return df
+    return (
+        results
+        # Setting level columns to 0 if they don't exist.
+        .assign(
+            level_1=results.get("level_1", 0),
+            level_2=results.get("level_2", 0),
+            level_3=results.get("level_3", 0),
+        )
+        .groupby(["vin", "date"])
+        .agg(
+            odometer=pd.NamedAgg("odometer", "last"),
+            soh=pd.NamedAgg("soh", "median"),
+            model=pd.NamedAgg("model", "first"),
+            version=pd.NamedAgg("version", "first"),
+            level_1=pd.NamedAgg("level_1", "sum"),
+            level_2=pd.NamedAgg("level_2", "sum"),
+            level_3=pd.NamedAgg("level_3", "sum"),
+        )
+        .reset_index()
+    )
 
-def make_soh_presentable(df:DF) -> DF:
+def make_charge_levels_presentable(results:DF) -> DF:
+    negative_charge_levels = results[["level_1", "level_2", "level_3"]].lt(0)
+    nb_negative_levels = negative_charge_levels.sum().sum()
+    if nb_negative_levels > 0:
+        logger.debug(f"There are {nb_negative_levels}({100*nb_negative_levels/len(results):2f}%) negative charge levels, setting them to 0.")
+    results[["level_1", "level_2", "level_3"]] = results[["level_1", "level_2", "level_3"]].mask(negative_charge_levels, 0)
+    return results
+
+def make_soh_presentable_per_vehicle(df:DF) -> DF:
     if df["soh"].isna().all():
         return df
-    if len(df) > 3:
+    if df["soh"].count() > 3:
         outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
         assert outliser_mask.sum() > 0, f"There seems to be only outliers???: {df['soh'].quantile(0.05)}, {df['soh'].quantile(0.95)}\n{df['soh']}"
         df = df[outliser_mask].copy()
-    if len(df) >= 2:
-        df["soh"] = force_monotonic_decrease(df["soh"])
+    if df["soh"].count() >= 2:
+        df["soh"] = force_monotonic_decrease(df["soh"]).values
     return df
-
-def agg_results_by_update_frequncy(results:DF) -> DF:
-    """
-    Some results have the same amount of rows as the make's time series length.
-    So we aggregate the results by update frequency to prevent memory overload.
-    """
-    return (
-        results
-        .eval("floored_date = date.dt.floor(@UPDATE_FREQUENCY)")
-        .groupby(["vin", "floored_date"])
-        .agg({
-            "soh": "median",
-            "odometer": "last",
-            "date": "last",
-            "date": "first",
-            "model": "first",
-            "version": "first",
-        })
-        .reset_index()
-    )
 
 if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
     set_level_of_loggers_with_prefix("DEBUG", "transform.results")
-    single_dataframe_script_main(fill_vehicle_data_table_with_results)
+    single_dataframe_script_main(update_vehicle_data_table)
 

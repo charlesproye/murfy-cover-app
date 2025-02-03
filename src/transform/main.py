@@ -13,7 +13,7 @@ from transform.config import *
 
 from transform.raw_tss.main import update_all_raw_tss
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
-from transform.results.main import fill_vehicle_data_table_with_results
+from transform.results.main import update_vehicle_data_table
 from transform.vehicle_info.main import VehicleInfoProcessor
 from transform.front_utils.main import FrontUtils
 
@@ -60,8 +60,8 @@ def run_entire_pipeline():
         # ProcessedTimeSeries.update_all_tss()
         # logging.info("Processed TSS update completed")
 
-        fill_vehicle_data_table_with_results()
-        logging.info("Results update completed")
+        # fill_vehicle_data_table_with_results()
+        # logging.info("Results update completed")
 
         FrontUtils().update_scoring()
         logging.info("SOH comparison update completed")
