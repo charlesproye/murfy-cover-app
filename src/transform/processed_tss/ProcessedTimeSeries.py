@@ -15,17 +15,17 @@ from transform.fleet_info.main import fleet_info
 class ProcessedTimeSeries(CachedETL):
     _metadata = ['make', "logger", "id_col", "max_td"]
 
-    def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False):
+    def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False, use_cols:list[str]=None):
         self.make = make
         logger_name = f"transform.processed_tss.{make}"
         self.logger = getLogger(logger_name)
         set_level_of_loggers_with_prefix(log_level, logger_name)
         self.id_col = id_col
         self.max_td = max_td
-        super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update)
+        super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update, use_cols=use_cols)
 
     def run(self) -> DF:
-        self.logger.info(f"Processing {self.make} raw tss.")
+        self.logger.info(f"==================Processing {self.make} raw tss.==================")
         return (
             get_raw_tss(self.make)
             .rename(columns=RENAME_COLS_DICT, errors="ignore")
@@ -35,15 +35,22 @@ class ProcessedTimeSeries(CachedETL):
             .sort_values(by=["vin", "date"])
             .pipe(set_all_str_cols_to_lower, but=["vin"])
             .pipe(self.compute_date_vars)
+            .pipe(self.compute_charge_n_discharge_vars)
+            .merge(fleet_info, on="vin", how="left")
+            .eval("age = date.dt.tz_localize(None) - start_date.dt.tz_localize(None)")
+        )
+
+    def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
+        return (
+            tss
             .pipe(self.compute_charge_n_discharge_masks, IN_CHARGE_CHARGING_STATUS_VALS, IN_DISCHARGE_CHARGING_STATUS_VALS)
             .pipe(self.compute_idx_from_masks, ["in_charge", "in_discharge"])
             .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
             .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
             .pipe(self.compute_cum_var, "power", "cum_energy")
             .pipe(self.compute_cum_var, "charger_power", "cum_charge_energy_added")
-            .merge(fleet_info, on="vin", how="left")
         )
-    
+
     def metric_normalize(self, tss:DF) -> DF:
         tss["odometer"] = tss["odometer"] * ODOMETER_MILES_TO_KM.get(self.make, 1)
         return tss
@@ -126,8 +133,41 @@ class ProcessedTimeSeries(CachedETL):
     @classmethod
     def update_all_tss(cls, **kwargs):
         for make in ALL_MAKES:
-            print(f"Updating {make} tss.")
+            if make == "tesla":
+                cls = TeslaProcessedTimeSeries
+            else:
+                cls = ProcessedTimeSeries
             cls(make, force_update=True, **kwargs)
+
+class TeslaProcessedTimeSeries(ProcessedTimeSeries):
+
+    def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False, use_cols:list[str]=None):
+        self.logger = getLogger(make)
+        self.logger.info(f"Initializing TeslaProcessedTimeSeries for {make}.")
+        super().__init__(make, id_col, log_level, max_td, force_update, use_cols=use_cols)
+    
+    def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
+        return (
+            tss
+            .pipe(self.compute_charge_n_discharge_masks, IN_CHARGE_CHARGING_STATUS_VALS, IN_DISCHARGE_CHARGING_STATUS_VALS)
+            .pipe(self.compute_in_charge_idx)
+            .pipe(self.compute_idx_from_masks, ["in_discharge"])
+            .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
+            .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
+            .pipe(self.compute_cum_var, "power", "cum_energy")
+            .pipe(self.compute_cum_var, "charger_power", "cum_charge_energy_added")
+        )
+    
+    def compute_in_charge_idx(self, tss:DF) -> DF:
+        self.logger.info(f"Computing tesla specific in_charge_idx.")
+        tss_grp = tss.groupby(self.id_col)
+        shifted_vars = tss_grp[["in_charge", "charge_energy_added"]].shift(fill_value=False)
+        tss["new_charge_period_mask"] = shifted_vars["in_charge"].ne(tss["in_charge"]) | shifted_vars["charge_energy_added"].lt(tss["charge_energy_added"])
+        tss["in_charge_idx"] = tss_grp["new_charge_period_mask"].cumsum().astype("uint16")
+        tss = tss.drop(columns=["new_charge_period_mask"])
+        monotonically_increasing_charges_value_counts = tss.groupby([self.id_col, "in_charge_idx"])["charge_energy_added"].is_monotonic_increasing.value_counts()
+        self.logger.debug(f"All charge periods have monotonically increasing charge energy added:\n{monotonically_increasing_charges_value_counts}")
+        return tss
 
 @main_decorator
 def main():

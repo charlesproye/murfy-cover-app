@@ -196,8 +196,8 @@ def sanity_check(df:DF) -> DF:
             
     return DF({
         "dtypes": df.dtypes.astype("string"),
-        "nuniques": Series(nunique_dict).astype("float"),
         "value_counts": Series(value_counts_dict),
+        "nuniques": Series(nunique_dict).fillna(0).astype("int"),
         "count": df.count(),
         "density": df.count().div(len(df)),
         "memory_usage_in_MB": df.memory_usage().div(1e6),

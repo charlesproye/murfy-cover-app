@@ -22,6 +22,7 @@ class S3_Bucket():
         assert "S3_ENDPOINT" in os.environ, "S3_ENDPOINT variable is not in the environement."
         if creds is None:
             creds = S3_Bucket.get_creds_from_dot_env()
+        self.creds = creds
 
         self._s3_client = boto3.client(
             "s3",
@@ -134,7 +135,8 @@ class S3_Bucket():
 
         return keys_as_series
 
-    def read_parquet_df(self, key:str) -> DF:
+    def read_parquet_df(self, key:str, use_cols:list[str]=None) -> DF:
+
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
 
         parquet_bytes = response["Body"].read()
@@ -142,7 +144,7 @@ class S3_Bucket():
         parquet_buffer = BytesIO(parquet_bytes)
         
         # Use pyarrow to read the buffer
-        table = pq.read_table(parquet_buffer)
+        table = pq.read_table(parquet_buffer, columns=use_cols)
         
         # Convert the table to a pandas DataFrame
         df = table.to_pandas()
