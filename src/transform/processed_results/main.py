@@ -11,6 +11,7 @@ from transform.raw_results.tesla_results import get_results as get_tesla_results
 from transform.raw_results.renault_results import get_results as get_renault_results
 from transform.raw_results.mercedes_results import get_results as get_mercedes_results
 from transform.raw_results.volvo_results import get_results as get_volvo_results
+from transform.raw_results.stellantis_results import get_results as get_stellantis_results
 from transform.raw_results.odometer_aggregation import agg_last_odometer
 
 logger = getLogger("transform.results.main")
@@ -21,13 +22,13 @@ GET_RESULTS_FUNCS = {
     "kia": lambda: agg_last_odometer("kia"),
     "renault": get_renault_results,
     "volvo": get_volvo_results,
-    "ford": get_ford_results,
+    "stellantis": get_stellantis_results,
 }
 
 def update_vehicle_data_table():
     logger.info("Updating 'vehicle_data' table.")
     return (
-        get_all_processed_results()
+        all
         .pipe(left_merge_rdb_table, "vehicle", "vin", "vin", {"id": "vehicle_id"})
         .pipe(
             truncate_rdb_table_and_insert_df,
