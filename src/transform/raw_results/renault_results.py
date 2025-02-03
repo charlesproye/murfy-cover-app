@@ -3,12 +3,15 @@ from logging import Logger, getLogger
 import plotly.express as px
 
 from core.pandas_utils import *
+from core.caching_utils import cache_result
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from transform.raw_results.config import *
 
-logger = getLogger("transform.results.renault_results")
+logger = getLogger("transform.raw_results.renault_results")
 
+@cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="renault"), "s3")
 def get_results() -> DF:
+    logger.info("Processing raw renault results.")
     return (
         ProcessedTimeSeries("renault")
         .eval("expected_battery_energy = capacity * soc")
@@ -34,7 +37,7 @@ def charge_levels(tss:DF) -> DF:
 
 
 if __name__ == "__main__":
-    df = get_results().dropna(subset=["odometer", "soh"])
+    df = get_results(force_update=True).dropna(subset=["odometer", "soh"])
     print(df)
     if not df.empty:
         fig = px.scatter(df, x="date", y="soh", color="vin")

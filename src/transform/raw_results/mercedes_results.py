@@ -4,17 +4,18 @@ import plotly.express as px
 
 from core.pandas_utils import *
 from core.constants import KWH_TO_KJ
+from core.caching_utils import cache_result
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from transform.raw_results.config import *
 
-logger = getLogger("transform.results.mercedes_results")
+logger = getLogger("transform.raw_results.mercedes_results")
 
 @main_decorator
 def main():
-    set_level_of_loggers_with_prefix("DEBUG", "transform.results")
-    results = get_results()
+    set_level_of_loggers_with_prefix("DEBUG", "transform.raw_results")
+    results = get_results(force_update=True)
     assert not results.empty, "Results dataframe is empty, something went wrong..."
     soh_per_vehicle = (
         results
@@ -44,14 +45,10 @@ def main():
     ).show()
 
 
-def apply_soh_model_calculation(group:DF) -> DF:
-    model = group.name
-    calculation = MERCEDES_SOH_MODEL_CALCULATIONS.get(model, MERCEDES_SOH_MODEL_CALCULATIONS['default'])
-    group['soh'] = group.eval(calculation)
-    return group
-
+@cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="mercedes-benz"), "s3")
 def get_results() -> DF:
-    return (
+    logger.info("Processing raw mercedes-benz results.")
+    results = (
         ProcessedTimeSeries("mercedes-benz")
         .pipe(fill_vars, cols=["soc", "estimated_range", "range"])
         .assign(discharge_size = lambda df: df.groupby(["vin", "in_discharge_idx"]).transform("size"))
@@ -65,6 +62,15 @@ def get_results() -> DF:
         .pipe(compute_charging_power)
         .pipe(charge_levels)
     )
+    logger.debug("Sanity check of the results:")
+    logger.debug(sanity_check(results))
+    return results
+
+def apply_soh_model_calculation(group:DF) -> DF:
+    model = group.name
+    calculation = MERCEDES_SOH_MODEL_CALCULATIONS.get(model, MERCEDES_SOH_MODEL_CALCULATIONS['default'])
+    group['soh'] = group.eval(calculation)
+    return group
 
 def charge_levels(tss:DF) -> DF:
     return (
