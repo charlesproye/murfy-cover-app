@@ -168,18 +168,18 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
-    # "bmw",
-    # "mercedes-benz",
-    # "ford",
-    # "volvo-cars",
-    # "tesla",
+    "bmw",
+    "mercedes-benz",
+    "ford",
+    "volvo-cars",
+    "tesla",
     "stellantis"
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
-    # "kia",
-    # "renault",
-    # "bmw",
+    "kia",
+    "renault",
+    "bmw",
 ]
 MAX_TD = TD(hours=1, minutes=30)
 

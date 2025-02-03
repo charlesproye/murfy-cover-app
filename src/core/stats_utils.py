@@ -22,7 +22,6 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         The must contain 4 points that define the slope bounds of minimum and maximum SOH ranges.
         View 
     """
-    print("results", results)
     if results["soh"].isna().all():
         logger.debug("No SOH values to filter, column is all NaN returning as is.")
         return results

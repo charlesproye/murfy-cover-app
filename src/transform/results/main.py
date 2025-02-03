@@ -19,13 +19,13 @@ from transform.results.stellantis_results import get_results as get_stellantis_r
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
-    # "bmw": lambda: agg_last_odometer("bmw"),
-    # "kia": lambda: agg_last_odometer("kia"),
-    # "mercedes-benz": get_mercedes_results,
-    # "renault": get_renault_results,
-    # "tesla": get_tesla_results,
-    # "ford": get_ford_results,
-    # "volvo": get_volvo_results,
+    "bmw": lambda: agg_last_odometer("bmw"),
+    "kia": lambda: agg_last_odometer("kia"),
+    "mercedes-benz": get_mercedes_results,
+    "renault": get_renault_results,
+    "tesla": get_tesla_results,
+    "ford": get_ford_results,
+    "volvo": get_volvo_results,
     "stellantis": get_stellantis_results,
 }
 
