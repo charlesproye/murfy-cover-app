@@ -327,11 +327,10 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
     vins = account_df['vin'].unique().tolist()
     logging.info(f"Processing {len(vins)} vehicles from fleet info for {account_name}")
     
-    with get_connection() as con:
-        cursor = con.cursor()
-    
-        for vin in vins:
+    for vin in vins:
+        with get_connection() as con:
             try:
+                cursor = con.cursor()
                 vehicle_data = df[df['vin'] == vin].iloc[0]
                 options = await get_vehicle_options(session, access_token, vin)
                 
@@ -366,8 +365,8 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     else:
                         vehicle_model_id = str(uuid.uuid4())
                         cursor.execute("""
-                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id,make_id)
-                            VALUES (%s, %s, %s, %s, %s)
+                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id, make_id)
+                            VALUES (%s, %s, %s, %s, %s, %s)
                             RETURNING id
                         """, (
                             vehicle_model_id,
@@ -388,6 +387,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 fleet_result = cursor.fetchone()
                 if not fleet_result:
                     logging.error(f"Fleet not found for ownership: {vehicle_data['owner']}")
+                    con.rollback()
                     continue
                 fleet_id = fleet_result[0]
                 
@@ -399,6 +399,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 region_result = cursor.fetchone()
                 if not region_result:
                     logging.error(f"Region not found for country: {vehicle_data['country']}")
+                    con.rollback()
                     continue
                 region_id = region_result[0]
                 
@@ -417,7 +418,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                             licence_plate = %s,
                             end_of_contract_date = %s,
                             start_date = %s,
-                            activation_status = %s,
+                            activation_status = %s
                         WHERE vin = %s
                     """, (
                         fleet_id,
@@ -436,7 +437,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         INSERT INTO vehicle (
                             id, vin, fleet_id, region_id, vehicle_model_id,
                             licence_plate, end_of_contract_date, start_date, activation_status
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s,%s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
                         vehicle_data['licence_plate'],
@@ -446,12 +447,13 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     ))
                     logging.info(f"Inserted new vehicle with VIN: {vin}")
                 
+                con.commit()
                 await asyncio.sleep(RATE_LIMIT_DELAY)
                 
             except Exception as e:
+                con.rollback()
                 logging.error(f"Error processing VIN {vin}: {str(e)}")
                 continue
-        con.commit()
     
     return []
 
@@ -476,8 +478,47 @@ async def main(df: pd.DataFrame):
     except Exception as e:
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
+async def update_activation_status(df: pd.DataFrame):
+    """Update only the activation status of vehicles that have activation=True in the DataFrame."""
+    try:
+        with get_connection() as con:
+            cursor = con.cursor()
+            
+            # Filter DataFrame to only get vehicles with activation=True
+            active_vehicles = df[df['activation'] == True]
+            logging.info(f"Found {len(active_vehicles)} vehicles with activation=True")
+            
+            # Process only active vehicles
+            for _, vehicle_data in active_vehicles.iterrows():
+                try:
+                    vin = vehicle_data['vin']
+                    
+                    cursor.execute("""
+                        UPDATE vehicle 
+                        SET activation_status = true
+                        WHERE vin = %s
+                    """, (vin,))
+                    
+                    if cursor.rowcount > 0:
+                        logging.info(f"Updated activation status for VIN {vin} to True")
+                    else:
+                        logging.warning(f"No vehicle found with VIN {vin}")
+                    
+                    con.commit()
+                    
+                except Exception as e:
+                    con.rollback()
+                    logging.error(f"Error updating activation status for VIN {vin}: {str(e)}")
+                    continue
+                    
+    except Exception as e:
+        logging.error(f"Error in update_activation_status: {str(e)}")
+
 if __name__ == "__main__":
-
     df = asyncio.run(fleet_info())
-
-    asyncio.run(main(df))
+    
+    # Uniquement l'activation status
+    asyncio.run(update_activation_status(df))
+    
+    # Full update
+    # asyncio.run(main(df))

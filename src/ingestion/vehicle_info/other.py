@@ -10,6 +10,10 @@ from core.sql_utils import get_connection
 from fleet_info import read_fleet_info as fleet_info
 from config import *
 
+MAKE_MAPPING = {
+    'mercedes-benz': 'mercedes',
+}
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -93,7 +97,7 @@ async def process_vehicles(df: pd.DataFrame):
                 oem_id = oem_result[0]      
 
             # Gestion de la marque
-                make_lower = vehicle['make'].lower()
+                make_lower = MAKE_MAPPING.get(vehicle['make'].lower(), vehicle['make'].lower())
                 
                 cursor.execute("""
                     SELECT id FROM make 
@@ -242,7 +246,7 @@ async def process_vehicles(df: pd.DataFrame):
                     logging.info(f"Nouveau véhicule inséré avec VIN: {vehicle['vin']}")
                 
             except Exception as e:
-                logging.error(f"Erreur lors du traitement du véhicule {vehicle['VIN']}: {str(e)}")
+                logging.error(f"Erreur lors du traitement du véhicule {vehicle['vin']}: {str(e)}")
                 continue
         con.commit()
 
