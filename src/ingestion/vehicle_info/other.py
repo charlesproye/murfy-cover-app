@@ -10,6 +10,10 @@ from core.sql_utils import get_connection
 from fleet_info import read_fleet_info as fleet_info
 from config import *
 
+MAKE_MAPPING = {
+    'mercedes-benz': 'mercedes',
+}
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -93,7 +97,7 @@ async def process_vehicles(df: pd.DataFrame):
                 oem_id = oem_result[0]      
 
             # Gestion de la marque
-                make_lower = vehicle['make'].lower()
+                make_lower = MAKE_MAPPING.get(vehicle['make'].lower(), vehicle['make'].lower())
                 
                 cursor.execute("""
                     SELECT id FROM make 
@@ -207,7 +211,8 @@ async def process_vehicles(df: pd.DataFrame):
                             vehicle_model_id = %s,
                             licence_plate = %s,
                             end_of_contract_date = %s,
-                            start_date = %s
+                            start_date = %s,
+                            activation_status = %s
                         WHERE vin = %s
                     """, (
                         fleet_id,
@@ -216,6 +221,7 @@ async def process_vehicles(df: pd.DataFrame):
                         vehicle['licence_plate'],
                         end_of_contract,
                         start_date,
+                        vehicle['activation'],
                         vehicle['vin']
                     ))
                     logging.info(f"Véhicule mis à jour avec VIN: {vehicle['vin']}")
@@ -224,8 +230,8 @@ async def process_vehicles(df: pd.DataFrame):
                     cursor.execute("""
                         INSERT INTO vehicle (
                             id, vin, fleet_id, region_id, vehicle_model_id,
-                            licence_plate, end_of_contract_date, start_date
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            licence_plate, end_of_contract_date, start_date, activation_status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s,%s)
                     """, (
                         vehicle_id,
                         vehicle['vin'],
@@ -234,12 +240,13 @@ async def process_vehicles(df: pd.DataFrame):
                         vehicle_model_id,
                         vehicle['licence_plate'],
                         end_of_contract,
-                        start_date
+                        start_date,
+                        vehicle['activation']
                     ))
                     logging.info(f"Nouveau véhicule inséré avec VIN: {vehicle['vin']}")
                 
             except Exception as e:
-                logging.error(f"Erreur lors du traitement du véhicule {vehicle['VIN']}: {str(e)}")
+                logging.error(f"Erreur lors du traitement du véhicule {vehicle['vin']}: {str(e)}")
                 continue
         con.commit()
 

@@ -1,10 +1,9 @@
 import asyncio
-from fleet_info import read_fleet_info as fleet_info
-from other import main as other_main
-from tesla import main as tesla_main
+from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
+from ingestion.vehicle_info.other import main as other_main
+from ingestion.vehicle_info.tesla import main as tesla_main
 
 from core.sql_utils import get_connection
-from fleet_info import read_fleet_info as fleet_info
 import logging
 
 logging.basicConfig(

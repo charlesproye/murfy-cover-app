@@ -11,13 +11,13 @@ import time
 import re
 
 from core.sql_utils import get_connection
-from fleet_info import read_fleet_info as fleet_info
+from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
-import datetime
+from datetime import datetime, timedelta
 
 load_dotenv()
 
-current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+current_date = datetime.now().strftime('%Y-%m-%d')
 current_dir = os.path.dirname(os.path.abspath(__file__))
 log_dir = os.path.join(current_dir, 'logs')
 os.makedirs(log_dir, exist_ok=True)
@@ -31,7 +31,7 @@ logging.basicConfig(
     ]
 )
 
-current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+current_date = datetime.now().strftime('%Y-%m-%d')
 current_dir = os.path.dirname(os.path.abspath(__file__))
 log_dir = os.path.join(current_dir, 'logs')
 os.makedirs(log_dir, exist_ok=True)
@@ -293,6 +293,42 @@ async def get_vehicle_options(session: aiohttp.ClientSession, access_token: str,
         logging.error(f"Error fetching options for VIN {vin}: {str(e)}")
         return {'vin': vin, 'model_name': 'unknown', 'type': 'unknown', 'version': 'unknown'}
 
+async def get_start_date(session: aiohttp.ClientSession, access_token: str, vin: str) -> str:
+    """Récupère la warranty expiration date et le coverageAgeInYears et fait leur différence pour calculer la start_date"""
+    url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/dx/warranty/details?vin={vin}"
+    headers = {'Authorization': f'Bearer {access_token}'}
+
+    retries = 3
+    while retries > 0:
+        try:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    activeWarranty = data.get("activeWarranty")
+
+                    if activeWarranty:
+                        warranty = activeWarranty[0]
+                        expirationDate = warranty.get("expirationDate")
+                        coverageAgeInYears = warranty.get("coverageAgeInYears")
+
+                        if expirationDate and coverageAgeInYears is not None:
+                            expiration_date_obj = datetime.fromisoformat(expirationDate.replace("Z", "+00:00"))
+                            start_date_obj = expiration_date_obj - timedelta(days=int(coverageAgeInYears * 365.25))
+                            return start_date_obj.strftime('%d-%m-%Y')
+                    
+                    logging.warning(f"No valid warranty data for VIN {vin}")
+                    return None
+                else:
+                    logging.warning(f"HTTP {response.status} error fetching warranty for VIN {vin}, retries left: {retries-1}")
+                    retries -= 1  # Wait 2 seconds before retrying
+
+        except Exception as e:
+            logging.error(f"Exception getting start date for VIN {vin}: {str(e)}")
+            return None
+
+    logging.error(f"Failed to fetch start date for VIN {vin} after 3 retries")
+    return None
+
 async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, account_vins: List[str]) -> List[Dict]:
 
     def convert_date_format(date_str):
@@ -319,6 +355,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
         
     """Process only VINs that belong to this account"""
     access_token = await get_token_from_slack(session, token_key)
+    
     if not access_token:
         logging.error(f"Could not get access token for {account_name}")
         return []
@@ -327,11 +364,10 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
     vins = account_df['vin'].unique().tolist()
     logging.info(f"Processing {len(vins)} vehicles from fleet info for {account_name}")
     
-    with get_connection() as con:
-        cursor = con.cursor()
-    
-        for vin in vins:
+    for vin in vins:
+        with get_connection() as con:
             try:
+                cursor = con.cursor()
                 vehicle_data = df[df['vin'] == vin].iloc[0]
                 options = await get_vehicle_options(session, access_token, vin)
                 
@@ -365,17 +401,32 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_model_id = result[0]
                     else:
                         vehicle_model_id = str(uuid.uuid4())
+
+                        cursor.execute("SELECT id FROM oem WHERE oem_name = %s", ('tesla'))
+                        oem_id = cursor.fetchone()
+                        if oem_id:
+                            oem_id = oem_id[0]
+                        else:
+                            logging.error("OEM 'tesla' not found in the database")
+
+                        cursor.execute("SELECT id FROM make WHERE make_name = %s", ('tesla'))
+                        make_id = cursor.fetchone()
+                        if make_id:
+                            make_id = make_id[0]
+                        else:
+                            logging.error("Make 'tesla' not found in the database")
+
                         cursor.execute("""
-                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id,make_id)
-                            VALUES (%s, %s, %s, %s, %s)
+                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id, make_id)
+                            VALUES (%s, %s, %s, %s, %s, %s)
                             RETURNING id
                         """, (
                             vehicle_model_id,
                             options['model_name'],
                             options['type'],
                             options['version'],
-                            '98809ac9-acb5-4cca-b67a-c1f6c489035a',
-                            '22d426b6-89bb-422e-a50b-26ecf7473247'
+                            oem_id,
+                            make_id
                         ))
                         vehicle_model_id = cursor.fetchone()[0]
                         logging.info(f"Created new vehicle_model for {options['model_name']} {options['type']} version {options['version']}")
@@ -388,6 +439,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 fleet_result = cursor.fetchone()
                 if not fleet_result:
                     logging.error(f"Fleet not found for ownership: {vehicle_data['owner']}")
+                    con.rollback()
                     continue
                 fleet_id = fleet_result[0]
                 
@@ -399,6 +451,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 region_result = cursor.fetchone()
                 if not region_result:
                     logging.error(f"Region not found for country: {vehicle_data['country']}")
+                    con.rollback()
                     continue
                 region_id = region_result[0]
                 
@@ -406,7 +459,9 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 vehicle_exists = cursor.fetchone()
 
                 end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
-                start_date = convert_date_format(vehicle_data['start_date'])
+                start_date = await get_start_date(session, access_token,vin)
+                start_date = convert_date_format(start_date)
+                print(f'start date is {start_date}')
                 
                 if vehicle_exists:
                     cursor.execute("""
@@ -416,7 +471,8 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                             vehicle_model_id = %s,
                             licence_plate = %s,
                             end_of_contract_date = %s,
-                            start_date = %s
+                            start_date = %s,
+                            activation_status = %s
                         WHERE vin = %s
                     """, (
                         fleet_id,
@@ -425,6 +481,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_data['licence_plate'],
                         end_of_contract,
                         start_date,
+                        vehicle_data['activation'],
                         vin
                     ))
                     logging.info(f"Updated vehicle with VIN: {vin}")
@@ -433,22 +490,24 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     cursor.execute("""
                         INSERT INTO vehicle (
                             id, vin, fleet_id, region_id, vehicle_model_id,
-                            licence_plate, end_of_contract_date, start_date
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            licence_plate, end_of_contract_date, start_date, activation_status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
                         vehicle_data['licence_plate'],
                         end_of_contract,
-                        start_date
+                        start_date,
+                        vehicle_data['activation']
                     ))
                     logging.info(f"Inserted new vehicle with VIN: {vin}")
                 
+                con.commit()
                 await asyncio.sleep(RATE_LIMIT_DELAY)
                 
             except Exception as e:
+                con.rollback()
                 logging.error(f"Error processing VIN {vin}: {str(e)}")
                 continue
-        con.commit()
     
     return []
 
@@ -473,8 +532,53 @@ async def main(df: pd.DataFrame):
     except Exception as e:
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
+async def update_activation_status(df: pd.DataFrame):
+    """Print VINs that are in DataFrame but not in account_vins_mapping."""
+    try:
+        # Filter DataFrame for Ayvens Tesla vehicles with activation=True
+        filtered_df = df[
+            (df['activation'] == True) & 
+            (df['owner'] == 'Ayvens') &
+            (df['oem'] == 'TESLA')
+        ]
+        
+        # Load account_vins_mapping
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        mapping_file = os.path.join(current_dir, 'data', 'account_vins_mapping.json')
+        
+        if not os.path.exists(mapping_file):
+            logging.error("account_vins_mapping.json file not found")
+            return
+            
+        with open(mapping_file, 'r') as f:
+            account_vins_mapping = json.load(f)
+        
+        # Get all VINs from mapping file for Ayvens accounts
+        all_mapping_vins = set()
+        for account_name in account_vins_mapping:
+            if 'AYVENS' in account_name:
+                all_mapping_vins.update(account_vins_mapping[account_name])
+        
+        # Get VINs that are in DataFrame but not in mapping
+        df_vins = set(filtered_df['vin'].tolist())
+        missing_vins = df_vins - all_mapping_vins
+        
+        if missing_vins:
+            print("\nVINs in DataFrame but not in mapping file:")
+            for vin in sorted(missing_vins):
+                print(vin)
+            print(f"\nTotal missing VINs: {len(missing_vins)}")
+        else:
+            print("No VINs found in DataFrame that are missing from mapping file")
+            
+    except Exception as e:
+        logging.error(f"Error in update_activation_status: {str(e)}")
+
 if __name__ == "__main__":
-
     df = asyncio.run(fleet_info())
-
-    asyncio.run(main(df))
+    
+    # Print missing VINs
+    asyncio.run(update_activation_status(df))
+    
+    # Or run the full update
+    # asyncio.run(main(df))
