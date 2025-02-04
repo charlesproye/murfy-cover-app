@@ -107,6 +107,6 @@ async def process_vins_and_brands(df_in):
 async def main():
     df_in = select_file()  # Get the input DataFrame
     df_out = await process_vins_and_brands(df_in)
-    df_out.to_csv('eligibility_check.csv', index=False)
+    df_out.to_csv('src/utils/eligibility_check.csv', index=False)
 
 asyncio.run(main())
