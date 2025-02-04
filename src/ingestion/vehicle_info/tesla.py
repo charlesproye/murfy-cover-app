@@ -11,7 +11,7 @@ import time
 import re
 
 from core.sql_utils import get_connection
-from fleet_info import read_fleet_info as fleet_info
+from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
@@ -364,11 +364,10 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
     vins = account_df['vin'].unique().tolist()
     logging.info(f"Processing {len(vins)} vehicles from fleet info for {account_name}")
     
-    with get_connection() as con:
-        cursor = con.cursor()
-    
-        for vin in vins:
+    for vin in vins:
+        with get_connection() as con:
             try:
+                cursor = con.cursor()
                 vehicle_data = df[df['vin'] == vin].iloc[0]
                 options = await get_vehicle_options(session, access_token, vin)
                 
@@ -403,7 +402,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     else:
                         vehicle_model_id = str(uuid.uuid4())
                         cursor.execute("""
-                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id,make_id)
+                            INSERT INTO vehicle_model (id, model_name, type, version, oem_id, make_id)
                             VALUES (%s, %s, %s, %s, %s, %s)
                             RETURNING id
                         """, (
@@ -425,6 +424,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 fleet_result = cursor.fetchone()
                 if not fleet_result:
                     logging.error(f"Fleet not found for ownership: {vehicle_data['owner']}")
+                    con.rollback()
                     continue
                 fleet_id = fleet_result[0]
                 
@@ -436,6 +436,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 region_result = cursor.fetchone()
                 if not region_result:
                     logging.error(f"Region not found for country: {vehicle_data['country']}")
+                    con.rollback()
                     continue
                 region_id = region_result[0]
                 
@@ -455,7 +456,8 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                             vehicle_model_id = %s,
                             licence_plate = %s,
                             end_of_contract_date = %s,
-                            start_date = %s
+                            start_date = %s,
+                            activation_status = %s
                         WHERE vin = %s
                     """, (
                         fleet_id,
@@ -464,6 +466,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_data['licence_plate'],
                         end_of_contract,
                         start_date,
+                        vehicle_data['activation'],
                         vin
                     ))
                     logging.info(f"Updated vehicle with VIN: {vin}")
@@ -472,21 +475,24 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     cursor.execute("""
                         INSERT INTO vehicle (
                             id, vin, fleet_id, region_id, vehicle_model_id,
-                            licence_plate, end_of_contract_date, start_date
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            licence_plate, end_of_contract_date, start_date, activation_status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
                         vehicle_data['licence_plate'],
                         end_of_contract,
-                        start_date
+                        start_date,
+                        vehicle_data['activation']
                     ))
                     logging.info(f"Inserted new vehicle with VIN: {vin}")
                 
+                con.commit()
+                await asyncio.sleep(RATE_LIMIT_DELAY)
                 
             except Exception as e:
+                con.rollback()
                 logging.error(f"Error processing VIN {vin}: {str(e)}")
                 continue
-            con.commit()
     
     return []
 
@@ -511,8 +517,53 @@ async def main(df: pd.DataFrame):
     except Exception as e:
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
+async def update_activation_status(df: pd.DataFrame):
+    """Print VINs that are in DataFrame but not in account_vins_mapping."""
+    try:
+        # Filter DataFrame for Ayvens Tesla vehicles with activation=True
+        filtered_df = df[
+            (df['activation'] == True) & 
+            (df['owner'] == 'Ayvens') &
+            (df['oem'] == 'TESLA')
+        ]
+        
+        # Load account_vins_mapping
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        mapping_file = os.path.join(current_dir, 'data', 'account_vins_mapping.json')
+        
+        if not os.path.exists(mapping_file):
+            logging.error("account_vins_mapping.json file not found")
+            return
+            
+        with open(mapping_file, 'r') as f:
+            account_vins_mapping = json.load(f)
+        
+        # Get all VINs from mapping file for Ayvens accounts
+        all_mapping_vins = set()
+        for account_name in account_vins_mapping:
+            if 'AYVENS' in account_name:
+                all_mapping_vins.update(account_vins_mapping[account_name])
+        
+        # Get VINs that are in DataFrame but not in mapping
+        df_vins = set(filtered_df['vin'].tolist())
+        missing_vins = df_vins - all_mapping_vins
+        
+        if missing_vins:
+            print("\nVINs in DataFrame but not in mapping file:")
+            for vin in sorted(missing_vins):
+                print(vin)
+            print(f"\nTotal missing VINs: {len(missing_vins)}")
+        else:
+            print("No VINs found in DataFrame that are missing from mapping file")
+            
+    except Exception as e:
+        logging.error(f"Error in update_activation_status: {str(e)}")
+
 if __name__ == "__main__":
-
     df = asyncio.run(fleet_info())
-
-    asyncio.run(main(df))
+    
+    # Print missing VINs
+    asyncio.run(update_activation_status(df))
+    
+    # Or run the full update
+    # asyncio.run(main(df))
