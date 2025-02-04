@@ -402,14 +402,14 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     else:
                         vehicle_model_id = str(uuid.uuid4())
 
-                        cursor.execute("SELECT id FROM oem WHERE oem_name = %s", ('tesla'))
+                        cursor.execute("SELECT id FROM oem WHERE oem_name = %s", ('tesla',))
                         oem_id = cursor.fetchone()
                         if oem_id:
                             oem_id = oem_id[0]
                         else:
                             logging.error("OEM 'tesla' not found in the database")
 
-                        cursor.execute("SELECT id FROM make WHERE make_name = %s", ('tesla'))
+                        cursor.execute("SELECT id FROM make WHERE make_name = %s", ('tesla',))
                         make_id = cursor.fetchone()
                         if make_id:
                             make_id = make_id[0]
@@ -443,10 +443,27 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                     continue
                 fleet_id = fleet_result[0]
                 
+                # Standardize country name
+                country_mapping = {
+                    'netherlands': 'Netherlands',
+                    'france': 'France',
+                    'belgium': 'Belgium',
+                    'germany': 'Germany',
+                    'luxembourg': 'Luxembourg',
+                    'spain': 'Spain',
+                    'italy': 'Italy',
+                    'portugal': 'Portugal',
+                    'united kingdom': 'United Kingdom',
+                    'uk': 'United Kingdom'
+                }
+                
+                country = vehicle_data['country'].lower().strip()
+                standardized_country = country_mapping.get(country, vehicle_data['country'])
+                
                 cursor.execute("""
                     SELECT id FROM region 
                     WHERE LOWER(region_name) = LOWER(%s)
-                """, (vehicle_data['country'],))
+                """, (standardized_country,))
                 
                 region_result = cursor.fetchone()
                 if not region_result:
@@ -461,9 +478,19 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
                 start_date = await get_start_date(session, access_token,vin)
                 start_date = convert_date_format(start_date)
-                print(f'start date is {start_date}')
                 
                 if vehicle_exists:
+                    update_values = (
+                        fleet_id,
+                        region_id,
+                        vehicle_model_id,
+                        vehicle_data['licence_plate'],
+                        end_of_contract,
+                        start_date,
+                        vehicle_data['activation'],
+                        vin
+                    )
+                    
                     cursor.execute("""
                         UPDATE vehicle 
                         SET fleet_id = %s,
@@ -474,31 +501,26 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                             start_date = %s,
                             activation_status = %s
                         WHERE vin = %s
-                    """, (
-                        fleet_id,
-                        region_id,
-                        vehicle_model_id,
-                        vehicle_data['licence_plate'],
-                        end_of_contract,
-                        start_date,
-                        vehicle_data['activation'],
-                        vin
-                    ))
+                    """, update_values)
                     logging.info(f"Updated vehicle with VIN: {vin}")
                 else:
                     vehicle_id = str(uuid.uuid4())
-                    cursor.execute("""
-                        INSERT INTO vehicle (
-                            id, vin, fleet_id, region_id, vehicle_model_id,
-                            licence_plate, end_of_contract_date, start_date, activation_status
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
+                    insert_values = (
                         vehicle_id, vin, fleet_id, region_id, vehicle_model_id,
                         vehicle_data['licence_plate'],
                         end_of_contract,
                         start_date,
                         vehicle_data['activation']
-                    ))
+                    )
+                    
+                    sql_query = """
+                        INSERT INTO vehicle (
+                            id, vin, fleet_id, region_id, vehicle_model_id,
+                            licence_plate, end_of_contract_date, start_date, activation_status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    
+                    cursor.execute(sql_query, insert_values)
                     logging.info(f"Inserted new vehicle with VIN: {vin}")
                 
                 con.commit()
