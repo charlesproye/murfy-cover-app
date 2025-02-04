@@ -479,46 +479,52 @@ async def main(df: pd.DataFrame):
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
 async def update_activation_status(df: pd.DataFrame):
-    """Update only the activation status of vehicles that have activation=True in the DataFrame."""
+    """Print VINs that are in DataFrame but not in account_vins_mapping."""
     try:
-        with get_connection() as con:
-            cursor = con.cursor()
+        # Filter DataFrame for Ayvens Tesla vehicles with activation=True
+        filtered_df = df[
+            (df['activation'] == True) & 
+            (df['owner'] == 'Ayvens') &
+            (df['oem'] == 'TESLA')
+        ]
+        
+        # Load account_vins_mapping
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        mapping_file = os.path.join(current_dir, 'data', 'account_vins_mapping.json')
+        
+        if not os.path.exists(mapping_file):
+            logging.error("account_vins_mapping.json file not found")
+            return
             
-            # Filter DataFrame to only get vehicles with activation=True
-            active_vehicles = df[df['activation'] == True]
-            logging.info(f"Found {len(active_vehicles)} vehicles with activation=True")
+        with open(mapping_file, 'r') as f:
+            account_vins_mapping = json.load(f)
+        
+        # Get all VINs from mapping file for Ayvens accounts
+        all_mapping_vins = set()
+        for account_name in account_vins_mapping:
+            if 'AYVENS' in account_name:
+                all_mapping_vins.update(account_vins_mapping[account_name])
+        
+        # Get VINs that are in DataFrame but not in mapping
+        df_vins = set(filtered_df['vin'].tolist())
+        missing_vins = df_vins - all_mapping_vins
+        
+        if missing_vins:
+            print("\nVINs in DataFrame but not in mapping file:")
+            for vin in sorted(missing_vins):
+                print(vin)
+            print(f"\nTotal missing VINs: {len(missing_vins)}")
+        else:
+            print("No VINs found in DataFrame that are missing from mapping file")
             
-            # Process only active vehicles
-            for _, vehicle_data in active_vehicles.iterrows():
-                try:
-                    vin = vehicle_data['vin']
-                    
-                    cursor.execute("""
-                        UPDATE vehicle 
-                        SET activation_status = true
-                        WHERE vin = %s
-                    """, (vin,))
-                    
-                    if cursor.rowcount > 0:
-                        logging.info(f"Updated activation status for VIN {vin} to True")
-                    else:
-                        logging.warning(f"No vehicle found with VIN {vin}")
-                    
-                    con.commit()
-                    
-                except Exception as e:
-                    con.rollback()
-                    logging.error(f"Error updating activation status for VIN {vin}: {str(e)}")
-                    continue
-                    
     except Exception as e:
         logging.error(f"Error in update_activation_status: {str(e)}")
 
 if __name__ == "__main__":
     df = asyncio.run(fleet_info())
     
-    # Uniquement l'activation status
+    # Print missing VINs
     asyncio.run(update_activation_status(df))
     
-    # Full update
+    # Or run the full update
     # asyncio.run(main(df))
