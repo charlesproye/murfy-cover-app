@@ -401,6 +401,21 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_model_id = result[0]
                     else:
                         vehicle_model_id = str(uuid.uuid4())
+
+                        cursor.execute("SELECT id FROM oem WHERE oem_name = %s", ('tesla'))
+                        oem_id = cursor.fetchone()
+                        if oem_id:
+                            oem_id = oem_id[0]
+                        else:
+                            logging.error("OEM 'tesla' not found in the database")
+
+                        cursor.execute("SELECT id FROM make WHERE make_name = %s", ('tesla'))
+                        make_id = cursor.fetchone()
+                        if make_id:
+                            make_id = make_id[0]
+                        else:
+                            logging.error("Make 'tesla' not found in the database")
+
                         cursor.execute("""
                             INSERT INTO vehicle_model (id, model_name, type, version, oem_id, make_id)
                             VALUES (%s, %s, %s, %s, %s, %s)
@@ -410,8 +425,8 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                             options['model_name'],
                             options['type'],
                             options['version'],
-                            '98809ac9-acb5-4cca-b67a-c1f6c489035a',
-                            '22d426b6-89bb-422e-a50b-26ecf7473247'
+                            oem_id,
+                            make_id
                         ))
                         vehicle_model_id = cursor.fetchone()[0]
                         logging.info(f"Created new vehicle_model for {options['model_name']} {options['type']} version {options['version']}")
