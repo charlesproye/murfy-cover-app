@@ -518,7 +518,7 @@ async def main(df: pd.DataFrame):
         logging.error(f"Erreur dans le programme principal: {str(e)}")
 
 async def update_activation_status(df: pd.DataFrame):
-    """Print VINs that are in DataFrame but not in account_vins_mapping."""
+    """Update only the activation status of vehicles that have activation=True and owner=Ayvens in the DataFrame."""
     try:
         # Filter DataFrame for Ayvens Tesla vehicles with activation=True
         filtered_df = df[
@@ -526,7 +526,12 @@ async def update_activation_status(df: pd.DataFrame):
             (df['owner'] == 'Ayvens') &
             (df['oem'] == 'TESLA')
         ]
+        logging.info(f"Found {len(filtered_df)} Ayvens Tesla vehicles with activation=True")
         
+        if filtered_df.empty:
+            logging.warning("No matching vehicles found after filtering")
+            return
+            
         # Load account_vins_mapping
         current_dir = os.path.dirname(os.path.abspath(__file__))
         mapping_file = os.path.join(current_dir, 'data', 'account_vins_mapping.json')
@@ -538,23 +543,31 @@ async def update_activation_status(df: pd.DataFrame):
         with open(mapping_file, 'r') as f:
             account_vins_mapping = json.load(f)
         
-        # Get all VINs from mapping file for Ayvens accounts
-        all_mapping_vins = set()
-        for account_name in account_vins_mapping:
-            if 'AYVENS' in account_name:
-                all_mapping_vins.update(account_vins_mapping[account_name])
-        
-        # Get VINs that are in DataFrame but not in mapping
-        df_vins = set(filtered_df['vin'].tolist())
-        missing_vins = df_vins - all_mapping_vins
-        
-        if missing_vins:
-            print("\nVINs in DataFrame but not in mapping file:")
-            for vin in sorted(missing_vins):
-                print(vin)
-            print(f"\nTotal missing VINs: {len(missing_vins)}")
-        else:
-            print("No VINs found in DataFrame that are missing from mapping file")
+        # Process for each Ayvens account in the mapping
+        async with aiohttp.ClientSession() as session:
+            for account_name, token_key in ACCOUNT_TOKEN_KEYS.items():
+                if 'AYVENS' in account_name:  # Process all Ayvens accounts
+                    account_vins = account_vins_mapping.get(account_name, [])
+                    if not account_vins:
+                        logging.warning(f"No VINs found for account {account_name}")
+                        continue
+                    
+                    # Filter DataFrame for this account's VINs
+                    account_df = filtered_df[filtered_df['vin'].isin(account_vins)]
+                    if account_df.empty:
+                        logging.info(f"No matching vehicles found for account {account_name}")
+                        continue
+                        
+                    logging.info(f"Processing {len(account_df)} vehicles for {account_name}")
+                    
+                    # Process the vehicles using process_account
+                    await process_account(
+                        session=session,
+                        account_name=account_name,
+                        token_key=token_key,
+                        df=account_df,
+                        account_vins=account_vins
+                    )
             
     except Exception as e:
         logging.error(f"Error in update_activation_status: {str(e)}")
@@ -562,7 +575,7 @@ async def update_activation_status(df: pd.DataFrame):
 if __name__ == "__main__":
     df = asyncio.run(fleet_info())
     
-    # Print missing VINs
+    # Update activation status for Ayvens Tesla vehicles
     asyncio.run(update_activation_status(df))
     
     # Or run the full update
