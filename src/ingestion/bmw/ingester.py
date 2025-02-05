@@ -345,7 +345,7 @@ class BMWIngester:
                     return
                 try:
                     uploaded = self.__s3.put_object(
-                        Body=decoded,
+                        Body=encoded,
                         Bucket=self.__bucket,
                         Key=filename,
                     )
