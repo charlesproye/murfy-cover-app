@@ -25,6 +25,8 @@ dependencies:
   - aiohttp=3.11.11 
   - rich=13.5.2 # optionnal dependency of pydantic should be deleted in the future
   - pyarrow=19.0.0 # to store in parquet format
+  - gspread
+  - oauth2client
   
   - pip:
     - git+https://bib-batteries-admin@bitbucket.org/bib-batteries/bib-models.git@main#subdirectory=src

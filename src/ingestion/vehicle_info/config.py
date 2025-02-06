@@ -48,10 +48,15 @@ FLEET_INFO_KEY = "fleet_info/fleet_info.csv"
 # AYVENS_FLEET_INFO_PARQUET_KEY = "fleet_info/ayvens/fleet_info.parquet"
 
 FLEET_INFO_COLS_NAME_MAPPING = {
-    "end_of_contract": "end_of_contract",
-    "activated": "activation_status",
-    "type": "version",
-    "ownership_": "owner",
+    "End of Contract": "end_of_contract",
+    "Activation": "activation_status",
+    "Type": "version",
+    "Ownership ": "owner",
+    "Make": "make",
+    "VIN": "vin",
+    "Licence plate": "licence_plate",
+    "Country": "country",
+    "Model": "model"
 }
 MODEL_VERSION_NAME_MAPPING = {
     "R90 Life (batterijkoop) 5d": "R90",
@@ -82,27 +87,29 @@ MAKE_NAME_MAPPING = {
     "Tesla": "tesla",
     "Citroën": "citroën",
     "DS": "ds",
+    # Add more variations
+    "tesla": "tesla",  # Add lowercase version
+    "TESLA": "tesla"   # Ensure uppercase version maps to lowercase
 }
 COUNTRY_NAME_MAPPING = {
     "NL": "netherlands"   
 }
 COL_DTYPES = {
-    "licence plate": "string",
+    "licence_plate": "string",
     "make": "string",
     "model": "string",
     "version": "string",
     # "capacity": "float",
     # "autonomie": "float",
-    "end of contract": "datetime64[ns]",
+    "end_of_contract": "datetime64[ns]",
     "end_of_contract_date": "datetime64[ns]",
     "country": "string",
     "category": "string",
-    "activated": "string",
+    "activation_status": "string",
     "owner": "string",
     # "registration_date": "object",
     "contract_start_date": "datetime64[ns]",
     "vin": "string",
-    "activation_status": "string",
 }
 suffixes_to_remove = ['5d', '4d', '3d', 'auto', 'aut', 'actieauto', 'onze deal', 'business', 'executive', 'edition', 'line', 'r-design']
 mappings = {

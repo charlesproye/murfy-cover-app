@@ -12,6 +12,7 @@ import re
 
 from core.sql_utils import get_connection
 from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
+from ingestion.vehicle_info.utils.google_sheets_utils import update_real_activation_status
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
@@ -329,30 +330,38 @@ async def get_start_date(session: aiohttp.ClientSession, access_token: str, vin:
     logging.error(f"Failed to fetch start date for VIN {vin} after 3 retries")
     return None
 
-async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, account_vins: List[str]) -> List[Dict]:
-
-    def convert_date_format(date_str):
-        if pd.isna(date_str):
-            return None
-        try:
-            date_str = date_str.split()[0]
+def convert_date_format(date_str):
+    if pd.isna(date_str):
+        return None
+    try:
+        # Si c'est déjà un Timestamp, le convertir en string au format YYYY-MM-DD
+        if isinstance(date_str, pd.Timestamp):
+            return date_str.strftime('%Y-%m-%d')
             
-            if '.' in date_str:  # Format DD.MM.YYYY
-                day, month, year = date_str.split('.')
-                return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-            elif '/' in date_str:  # Format MM/DD/YYYY
-                month, day, year = date_str.split('/')
-                return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-            elif '-' in date_str:  # Format DD-MM-YYYY
-                day, month, year = date_str.split('-')
-                return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-            else:
-                logging.warning(f"Unrecognized date format: {date_str}")
-                return None
-        except Exception as e:
-            logging.warning(f"Invalid date format: {date_str}, error: {str(e)}")
-            return None
+        # Sinon, traiter comme avant
+        date_str = str(date_str).split()[0]  # Prend seulement la partie date
         
+        if '.' in date_str:  # Format DD.MM.YYYY
+            day, month, year = date_str.split('.')
+            return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+        elif '/' in date_str:  # Format MM/DD/YYYY
+            month, day, year = date_str.split('/')
+            return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+        elif '-' in date_str:  # Format DD-MM-YYYY ou YYYY-MM-DD
+            parts = date_str.split('-')
+            if len(parts[0]) == 4:  # YYYY-MM-DD
+                return date_str
+            else:  # DD-MM-YYYY
+                day, month, year = parts
+                return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+        else:
+            logging.warning(f"Unrecognized date format: {date_str}")
+            return None
+    except Exception as e:
+        logging.warning(f"Invalid date format: {date_str}, error: {str(e)}")
+        return None
+
+async def process_account(session: aiohttp.ClientSession, account_name: str, token_key: str, df: pd.DataFrame, account_vins: List[str]) -> List[Dict]:
     """Process only VINs that belong to this account"""
     access_token = await get_token_from_slack(session, token_key)
     
@@ -401,21 +410,23 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_model_id = result[0]
                     else:
                         vehicle_model_id = str(uuid.uuid4())
-
+                        
                         cursor.execute("SELECT id FROM oem WHERE oem_name = %s", ('tesla',))
                         oem_id = cursor.fetchone()
                         if oem_id:
                             oem_id = oem_id[0]
                         else:
                             logging.error("OEM 'tesla' not found in the database")
-
+                            continue
+                            
                         cursor.execute("SELECT id FROM make WHERE make_name = %s", ('tesla',))
                         make_id = cursor.fetchone()
                         if make_id:
                             make_id = make_id[0]
                         else:
                             logging.error("Make 'tesla' not found in the database")
-
+                            continue
+                            
                         cursor.execute("""
                             INSERT INTO vehicle_model (id, model_name, type, version, oem_id, make_id)
                             VALUES (%s, %s, %s, %s, %s, %s)
@@ -474,10 +485,13 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                 
                 cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
                 vehicle_exists = cursor.fetchone()
-
+                
                 end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
-                start_date = await get_start_date(session, access_token,vin)
+                start_date = await get_start_date(session, access_token, vin)
                 start_date = convert_date_format(start_date)
+                
+                # Ensure activation_status is a string
+                activation_status = str(vehicle_data.get('activation_status', '')).strip()
                 
                 if vehicle_exists:
                     update_values = (
@@ -487,7 +501,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_data['licence_plate'],
                         end_of_contract,
                         start_date,
-                        vehicle_data['activation'],
+                        activation_status,  # Use the cleaned activation_status
                         vin
                     )
                     
@@ -510,7 +524,7 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
                         vehicle_data['licence_plate'],
                         end_of_contract,
                         start_date,
-                        vehicle_data['activation']
+                        activation_status  # Use the cleaned activation_status
                     )
                     
                     sql_query = """
@@ -536,7 +550,6 @@ async def process_account(session: aiohttp.ClientSession, account_name: str, tok
 
 async def main(df: pd.DataFrame):
     try:
-        
         async with aiohttp.ClientSession() as session:
             account_vins_mapping = await get_account_vins_mapping(session)
             
@@ -546,6 +559,19 @@ async def main(df: pd.DataFrame):
                     if not account_vins:
                         logging.warning(f"No VINs found for account {account_name}")
                         continue
+                    
+                    # Find VINs that are in the sheet but not in this Tesla account
+                    sheet_vins = set(df['vin'].tolist())
+                    vins_to_deactivate = sheet_vins - set(account_vins)
+                    vins_to_activate = sheet_vins.intersection(set(account_vins))
+                    
+                    if vins_to_deactivate:
+                        logger.info(f"Found {len(vins_to_deactivate)} VINs that are not in Tesla account {account_name}. Updating their Real Activation status to FALSE...")
+                        update_real_activation_status(list(vins_to_deactivate), status=False)
+                    
+                    if vins_to_activate:
+                        logger.info(f"Found {len(vins_to_activate)} VINs that are in Tesla account {account_name}. Updating their Real Activation status to TRUE...")
+                        update_real_activation_status(list(vins_to_activate), status=True)
                         
                     await process_account(session, account_name, token_key, df, account_vins)
                 except Exception as e:
@@ -610,10 +636,10 @@ async def update_activation_status(df: pd.DataFrame):
         logging.error(f"Error in update_activation_status: {str(e)}")
 
 if __name__ == "__main__":
-    df = asyncio.run(fleet_info())
+    df = asyncio.run(fleet_info(owner_filter="Ayvens", make_filter="TESLA"))
     
     # Update activation status for Ayvens Tesla vehicles
-    asyncio.run(update_activation_status(df))
+    # asyncio.run(update_activation_status(df))
     
     # Or run the full update
-    # asyncio.run(main(df))
+    asyncio.run(main(df))

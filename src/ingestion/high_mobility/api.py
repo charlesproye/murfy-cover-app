@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from urllib.parse import quote, urlencode
+import json
 
 import requests
 from ingestion.high_mobility.vehicle import Vehicle
@@ -25,20 +26,32 @@ class HMApi:
         self.__fetch_token()
 
     def __fetch_token(self):
-        r = requests.post(
-            f"{self.base_url}/v1/access_tokens",
-            data={
-                "grant_type": "client_credentials",
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-            },
-        ).json()
-        self.__token = r.get("access_token")
-        timestamp = (
-            datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
-        ).total_seconds()
-        expires_in = int(r.get("expires_in"))
-        self.__token_exp = timestamp + expires_in
+        try:
+            r = requests.post(
+                f"{self.base_url}/v1/access_tokens",
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                },
+                timeout=10  # 10 secondes timeout
+            )
+            r.raise_for_status()  # Raise exception for non-200 status codes
+            response_data = r.json()
+            
+            if not response_data.get("access_token"):
+                raise Exception("No access token in response")
+                
+            self.__token = response_data.get("access_token")
+            timestamp = (
+                datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
+            ).total_seconds()
+            expires_in = int(response_data.get("expires_in", 3600))  # Default 1 hour if not specified
+            self.__token_exp = timestamp + expires_in
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Failed to fetch High Mobility API token: {str(e)}")
+        except (KeyError, ValueError, json.JSONDecodeError) as e:
+            raise Exception(f"Invalid response from High Mobility API: {str(e)}")
 
     def __get_token(self):
         timestamp = (
@@ -172,22 +185,22 @@ class HMApi:
         Returns
         -------
         tuple[int, Vehicle | object]
-            A tuple containing the response's status code and the returned vehicle or object
+            A tuple containing the response's status code and None for success, or error details
         """
         token = self.__get_token()
         result = requests.delete(
             f"{self.base_url}/v1/fleets/vehicles/{vin}",
             headers={"Authorization": f"Bearer {token}"},
         )
-        if result.status_code == requests.codes.ok:
-            res = result.json()
-            return result.status_code, Vehicle(
-                vin=res["vin"],
-                brand=res["brand"],
-                clearance_status=res["status"],
-            )
+        if result.status_code == 204:
+            return result.status_code, None
         else:
-            return result.status_code, result.json()
+            if result.text:
+                try:
+                    return result.status_code, result.json()
+                except:
+                    return result.status_code, result.text
+            return result.status_code, None
 
     def get_vehicle_info(self, vin: str) -> tuple[int, bytes]:
         """Get a vehicle's info
@@ -208,4 +221,32 @@ class HMApi:
             headers={"Authorization": f"Bearer {token}"},
         )
         return result.status_code, result.content
+
+    def get_status(self, vin: str) -> tuple[int, dict | object]:
+        """Get the detailed status for a single vehicle
+
+        Arguments
+        ---------
+        vin: str
+            The VIN of the vehicle
+
+        Returns
+        -------
+        tuple[int, dict | object]
+            A tuple containing the response's status code and the vehicle status details
+        """
+        token = self.__get_token()
+        result = requests.get(
+            f"{self.base_url}/v1/fleets/vehicles/{vin}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        if result.status_code == requests.codes.ok:
+            return result.status_code, result.json()
+        else:
+            if result.text:
+                try:
+                    return result.status_code, result.json()
+                except:
+                    return result.status_code, result.text
+            return result.status_code, None
 
