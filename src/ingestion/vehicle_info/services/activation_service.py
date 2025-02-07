@@ -6,6 +6,7 @@ import pandas as pd
 
 from ..api.bmw_client import BMWApi
 from ..api.hm_client import HMApi
+from ..api.stellantis_client import StellantisApi
 from ..config.settings import ACTIVATION_TIMEOUT
 from ..services.google_sheet_service import update_google_sheet_status
 from ..fleet_info import read_fleet_info
@@ -13,9 +14,10 @@ from ..fleet_info import read_fleet_info
 class VehicleActivationService:
     _ayvens_fleet_id = None  # Cache for Ayvens fleet ID
 
-    def __init__(self, bmw_api: BMWApi, hm_api: HMApi):
+    def __init__(self, bmw_api: BMWApi, hm_api: HMApi, stellantis_api: StellantisApi):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
+        self.stellantis_api = stellantis_api
         self.fleet_info_df = None
 
     def set_fleet_info(self, df: pd.DataFrame) -> None:
@@ -330,6 +332,13 @@ class VehicleActivationService:
                     logging.info(f"High Mobility vehicle {vehicle['vin']} already in desired state: {desired_state}")
                     success = desired_state
                     should_update_real_activation = True
+            elif make_lower in ['opel', 'citroën', 'ds', 'fiat', 'peugeot']:
+                logging.info(f"Processing Stellantis vehicle - VIN: {vehicle['vin']}, Make: {make_lower}")
+                # Always check current status first
+                status_code, result = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: self.stellantis_api.get_status(vehicle['vin'])
+                )
+                
             else:
                 logging.info(f"Vehicle brand not supported for activation: {make_lower}")
                 success = False
