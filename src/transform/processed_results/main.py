@@ -23,6 +23,7 @@ GET_RESULTS_FUNCS = {
     "renault": get_renault_results,
     "volvo": get_volvo_results,
     "stellantis": get_stellantis_results,
+    "ford": get_ford_results,
 }
 
 def update_vehicle_data_table():
