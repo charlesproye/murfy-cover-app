@@ -73,7 +73,7 @@ class HMApi:
             vehicles: List of dicts containing 'vin' and 'brand' for each vehicle
         """
         try:
-            url = f"{self.base_url}/v1/fleets/vehicles"
+            url = f"{self.base_url}/v1/vehicle"
             # Ensure each vehicle has required fields in correct format
             formatted_vehicles = [
                 {

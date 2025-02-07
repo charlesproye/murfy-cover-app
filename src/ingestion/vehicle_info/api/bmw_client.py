@@ -54,29 +54,22 @@ class BMWApi:
 
     def check_vehicle_status(self, vin: str) -> Tuple[int, Any]:
         """Check vehicle status in BMW API."""
-        try:
-            url = f"{self.base_url}/vehicle/{vin}"
-            response = requests.get(url, headers=self._get_headers())
-            
-            return response.status_code, response.json() if response.ok else response.text
-        except Exception as e:
-            logging.error(f"Failed to check BMW vehicle status: {str(e)}")
-            return 500, str(e)
+        return self.get_clearance(vin)
 
     def get_clearance(self, vin: str) -> Tuple[int, Any]:
         """Get vehicle clearance status."""
         try:
-            url = f"{self.base_url}/vehicles/{vin}/clearance"
+            url = f"{self.base_url}/vehicle/{vin}"
             response = requests.get(url, headers=self._get_headers())
             return response.status_code, response.json() if response.ok else response.text
         except Exception as e:
             logging.error(f"Failed to get BMW clearance: {str(e)}")
             return 500, str(e)
 
-    def create_clearance(self, vehicles: List[Dict[str, str]]) -> Tuple[int, Any]:
+    def create_clearance(self, vehicles: List) -> Tuple[int, Any]:
         """Create clearance for vehicles."""
         try:
-            url = f"{self.base_url}/fleet/{self.fleet_id}/clearance"
+            url = f"{self.base_url}/vehicle"
             response = requests.post(
                 url,
                 headers=self._get_headers(),
@@ -90,9 +83,35 @@ class BMWApi:
     def delete_clearance(self, vin: str) -> Tuple[int, Any]:
         """Delete vehicle clearance."""
         try:
-            url = f"{self.base_url}/vehicles/{vin}/clearance"
+            url = f"{self.base_url}/vehicle/{vin}"
             response = requests.delete(url, headers=self._get_headers())
-            return response.status_code, response.json() if response.ok else response.text
+            # For DELETE requests, often there is no content returned
+            return response.status_code, response.text if response.text else ""
         except Exception as e:
             logging.error(f"Failed to delete BMW clearance: {str(e)}")
+            return 500, str(e)
+
+    def get_fleets(self) -> Tuple[int, Any]:
+        """Get list of available fleets."""
+        try:
+            url = f"{self.base_url}/fleet"
+            response = requests.get(url, headers=self._get_headers())
+            return response.status_code, response.json() if response.ok else response.text
+        except Exception as e:
+            logging.error(f"Failed to get BMW fleets: {str(e)}")
+            return 500, str(e)
+
+    def add_vehicle_to_fleet(self, fleet_id: str, vin: str) -> Tuple[int, Any]:
+        """Add a vehicle to a fleet.
+        
+        Args:
+            fleet_id: The ID of the fleet to add the vehicle to
+            vin: The VIN of the vehicle to add
+        """
+        try:
+            url = f"{self.base_url}/fleet/{fleet_id}/vehicle/{vin}"
+            response = requests.post(url, headers=self._get_headers())
+            return response.status_code, response.json() if response.ok else response.text
+        except Exception as e:
+            logging.error(f"Failed to add vehicle to BMW fleet: {str(e)}")
             return 500, str(e) 

@@ -88,7 +88,6 @@ async def main(owner_filter: Optional[str] = None):
     try:
         logger.info("Starting vehicle processing...")
         
-        # Initialize API clients
         bmw_api = BMWApi(
             auth_url=BMW_AUTH_URL,
             base_url=BMW_BASE_URL,
@@ -104,19 +103,17 @@ async def main(owner_filter: Optional[str] = None):
             client_secret=HM_CLIENT_SECRET
         )
         
-        # Get fleet information
         df = await fleet_info(owner_filter=owner_filter)
         logger.info(f"Total vehicles in fleet_info: {len(df)}")
         
-        # Filter out Tesla vehicles
         df = df.query("make != 'tesla'")
         logger.info(f"Non-Tesla vehicles to process: {len(df)}")
         
-        # Initialize services
         activation_service = VehicleActivationService(bmw_api, hm_api)
+        activation_service.set_fleet_info(df)
+        
         vehicle_processor = VehicleProcessor(activation_service)
         
-        # Process vehicles
         await vehicle_processor.process_vehicles(df)
         
         # Optionally get model metadata

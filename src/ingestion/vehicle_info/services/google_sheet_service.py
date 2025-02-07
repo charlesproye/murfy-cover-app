@@ -81,7 +81,6 @@ async def update_google_sheet_status(vin: str, real_activation: Optional[bool], 
             if updates:
                 sheet.batch_update(updates)
             
-            logging.info(f"Updated Google Sheet for VIN {vin}: Real Activation={real_activation if real_activation is not None else 'unchanged'}, Error={error_message or ''}")
             return True
             
         except APIError as e:

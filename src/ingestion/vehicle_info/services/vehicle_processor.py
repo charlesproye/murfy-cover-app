@@ -42,23 +42,19 @@ class VehicleProcessor:
                             logging.info(f"Processing vehicle {index + 1}/{len(df)} - VIN: {vehicle['vin']}")
                             cursor.execute(f"SAVEPOINT vehicle_{index}")
                             
-                            # Check for interruption
                             if asyncio.current_task().cancelled():
                                 logging.info("Processing cancelled. Rolling back transaction...")
                                 con.rollback()
                                 return
                             
-                            # Validate vehicle data
                             is_valid, error_message = validate_vehicle_data(vehicle)
                             if not is_valid:
                                 logging.warning(f"Vehicle skipped: {error_message}")
                                 skipped_count += 1
                                 continue
                                 
-                            # Process activation status
                             await self.activation_service.process_vehicle_activation(session, vehicle)
                             
-                            # Process database updates
                             await self._process_database_updates(cursor, vehicle)
                             
                         except Exception as e:
@@ -96,13 +92,10 @@ class VehicleProcessor:
 
     async def _process_database_updates(self, cursor, vehicle: pd.Series) -> None:
         """Process database updates for a single vehicle."""
-        # Handle OEM
         oem_id = await self._get_or_create_oem(cursor, vehicle['oem'])
         
-        # Handle Make
         make_id = await self._get_or_create_make(cursor, vehicle['make'], oem_id)
         
-        # Handle Model
         vehicle_model_id = await self._get_or_create_model(
             cursor, 
             vehicle['model'],
@@ -111,15 +104,12 @@ class VehicleProcessor:
             oem_id
         )
         
-        # Handle Fleet
         fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
         if not fleet_id:
             raise ValueError(f"Fleet not found for owner: {vehicle['owner']}")
             
-        # Handle Region
         region_id = await self._get_or_create_region(cursor, vehicle['country'])
         
-        # Handle Vehicle
         await self._update_or_create_vehicle(
             cursor,
             vehicle['vin'],
@@ -263,7 +253,7 @@ class VehicleProcessor:
                 vehicle_data.get('activation_status'),
                 vin
             ))
-            logging.info(f"Vehicle updated with VIN: {vin}")
+            logging.info(f"Vehicle updated in DB VIN: {vin}")
         else:
             vehicle_id = str(uuid.uuid4())
             cursor.execute("""
@@ -282,4 +272,4 @@ class VehicleProcessor:
                 start_date,
                 vehicle_data.get('activation_status')
             ))
-            logging.info(f"New vehicle inserted with VIN: {vin}") 
+            logging.info(f"New vehicle inserted in DB VIN: {vin}") 
