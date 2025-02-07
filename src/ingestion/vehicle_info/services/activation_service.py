@@ -61,22 +61,33 @@ class VehicleActivationService:
             if self.fleet_info_df is not None:
                 vehicle_info = self.fleet_info_df[self.fleet_info_df['vin'] == vin]
                 if not vehicle_info.empty:
-                    license_plate = str(vehicle_info['license_plate'].iloc[0]) if 'license_plate' in vehicle_info.columns else ""
-                    end_date = str(vehicle_info['End of Contract'].iloc[0]) if 'End of Contract' in vehicle_info.columns else ""
+                    license_plate = str(vehicle_info['licence_plate'].iloc[0]) if 'licence_plate' in vehicle_info.columns else ""
+                    end_date = str(vehicle_info['end_of_contract'].iloc[0]) if 'end_of_contract' in vehicle_info.columns else ""
                     
                     # Convert empty or NaN values to empty string
                     license_plate = "" if pd.isna(license_plate) else license_plate
                     end_date = "" if pd.isna(end_date) else end_date
+                    
+                    logging.info(f"Found vehicle info - VIN: {vin}, License Plate: {license_plate}, End Date: {end_date}")
+                else:
+                    logging.warning(f"No vehicle info found in fleet_info for VIN: {vin}")
+            else:
+                logging.warning("fleet_info_df is None, using empty values for license_plate and end_date")
+            
+            payload = {
+                "vin": vin,
+                "licence_plate": license_plate,
+                "note": "",
+                "contract": {
+                    "end_date": end_date,
+                }
+            }
             
             status_code, result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.bmw_api.create_clearance({
-                    "vin": vin,
-                    "license_plate": license_plate,
-                    "contract": {
-                        "end_date": end_date,
-                    }
-                })
+                None, lambda: self.bmw_api.create_clearance(payload)
             )
+            
+            logging.info(f"Create clearance response - Status: {status_code}, Result: {result}")
             
             if status_code in [200, 201, 204]:
                 # After successful clearance creation, add to fleet
@@ -85,7 +96,7 @@ class VehicleActivationService:
                     return False, fleet_error
                 return True, None
             else:
-                error_msg = f"Failed to activate BMW vehicle: HTTP {status_code}"
+                error_msg = f"Failed to activate BMW vehicle: HTTP {status_code}, Response: {result}"
                 return False, error_msg
                 
         except Exception as e:
@@ -220,15 +231,17 @@ class VehicleActivationService:
         """Process vehicle activation or deactivation based on make and activation status."""
         make_lower = vehicle['make'].lower()
         desired_state = str(vehicle.get('activation', 'FALSE')).upper() == 'TRUE'
-        real_activation = str(vehicle.get('real_activation', '')).upper()
+        real_activation_str = str(vehicle.get('real_activation', '')).upper()
         
-        logging.info(f"Processing vehicle - VIN: {vehicle['vin']}, Make: {make_lower}, Desired State: {desired_state}")
+        logging.info(f"Processing vehicle - VIN: {vehicle['vin']}, Make: {make_lower}, Desired State: {desired_state}, Real State: {real_activation_str}")
         
-        # Only skip if real_activation is explicitly TRUE or FALSE
-        if real_activation in ['TRUE', 'FALSE']:
-            logging.info(f"Skipping API calls for VIN {vehicle['vin']} as Real Activation is already set to: {real_activation}")
-            vehicle['activation_status'] = str(real_activation == 'TRUE')
-            return
+        # Skip only if real_activation has an explicit value and matches desired state
+        if real_activation_str and real_activation_str in ['TRUE', 'FALSE']:
+            real_activation = real_activation_str == 'TRUE'
+            if desired_state == real_activation:
+                logging.info(f"Skipping API calls for VIN {vehicle['vin']} as desired state matches real activation")
+                vehicle['activation_status'] = str(desired_state)
+                return
             
         try:
             success = False

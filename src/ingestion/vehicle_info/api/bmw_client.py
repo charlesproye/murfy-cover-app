@@ -1,5 +1,6 @@
 import logging
 import requests
+import json
 from typing import Tuple, Any, List, Dict
 
 class BMWApi:
@@ -66,14 +67,25 @@ class BMWApi:
             logging.error(f"Failed to get BMW clearance: {str(e)}")
             return 500, str(e)
 
-    def create_clearance(self, vehicles: List) -> Tuple[int, Any]:
-        """Create clearance for vehicles."""
+    def create_clearance(self, vehicle_data: Dict[str, Any]) -> Tuple[int, Any]:
+        """Create clearance for a vehicle.
+        
+        Args:
+            vehicle_data: Dictionary containing vehicle information (vin, licence_plate, note, contract)
+        """
         try:
             url = f"{self.base_url}/vehicle"
-            response = requests.post(
+            # Always use empty string for end_date
+            vehicle_data['contract']['end_date'] = ""
+            
+            payload = json.dumps(vehicle_data)
+            headers = self._get_headers()
+                        
+            response = requests.request(
+                "POST",
                 url,
-                headers=self._get_headers(),
-                json={"vehicles": vehicles}
+                headers=headers,
+                data=payload
             )
             return response.status_code, response.json() if response.ok else response.text
         except Exception as e:
@@ -110,8 +122,10 @@ class BMWApi:
         """
         try:
             url = f"{self.base_url}/fleet/{fleet_id}/vehicle/{vin}"
+            logging.info(f"Adding vehicle to fleet - URL: {url}")
             response = requests.post(url, headers=self._get_headers())
-            return response.status_code, response.json() if response.ok else response.text
+            # For POST to fleet, often there is no content returned
+            return response.status_code, response.text if response.text else ""
         except Exception as e:
             logging.error(f"Failed to add vehicle to BMW fleet: {str(e)}")
             return 500, str(e) 
