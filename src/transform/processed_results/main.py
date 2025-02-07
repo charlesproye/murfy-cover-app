@@ -5,14 +5,14 @@ from core.stats_utils import *
 from core.pandas_utils import *
 from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
-from transform.results.config import *
-from transform.results.ford_results import get_results as get_ford_results
-from transform.results.tesla_results import get_results as get_tesla_results
-from transform.results.renault_results import get_results as get_renault_results
-from transform.results.mercedes_results import get_results as get_mercedes_results
-from transform.results.volvo_results import get_results as get_volvo_results
-from transform.results.odometer_aggregation import agg_last_odometer
-from transform.results.stellantis_results import get_results as get_stellantis_results
+from transform.processed_results.config import *
+from transform.raw_results.ford_results import get_results as get_ford_results
+from transform.raw_results.tesla_results import get_results as get_tesla_results
+from transform.raw_results.renault_results import get_results as get_renault_results
+from transform.raw_results.mercedes_results import get_results as get_mercedes_results
+from transform.raw_results.volvo_results import get_results as get_volvo_results
+from transform.raw_results.stellantis_results import get_results as get_stellantis_results
+from transform.raw_results.odometer_aggregation import agg_last_odometer
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
