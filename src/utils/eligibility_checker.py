@@ -17,13 +17,11 @@ cached_token = None
 supported_brands = [
     'alfa-romeo',
     'bmw',
-    'citroen',
     'citroën',
     'ds',
     'ford',
     'fiat',
     'lexus',
-    'mercedes',
     'mercedes-benz',
     'mini',
     'opel',
@@ -119,10 +117,10 @@ async def process_vins_and_brands(df_in):
         total_vins = len(df_in)
         
         for index, row in df_in.iterrows():
-            vin = row['Chassisnummer']
-            brand = row['Merk'].lower()
+            vin = row['VIN']
+            brand = row['Make'].lower()
             if brand not in supported_brands:
-                eligibility = None
+                eligibility = 'Unsupported'
                 activation_results.append(eligibility)
                 continue
                 
@@ -148,6 +146,6 @@ async def main():
     df_in = select_file()  # Get the input DataFrame
     if df_in is not None:
         df_out = await process_vins_and_brands(df_in)
-        df_out.to_csv('src/utils/eligibility_check.csv', index=False)
+        df_out.to_csv('src/utils/eligibility_checker.csv', index=False)
 
 asyncio.run(main())

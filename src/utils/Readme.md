@@ -12,8 +12,8 @@ A Python script to check vehicle eligibility using the High Mobility API.
 ## Input File Requirements
 
 The script expects a CSV file with the following columns:
-- `Chassisnummer` (VIN number)
-- `Merk` (Brand name)
+- `VIN` (VIN number)
+- `Make` (Brand name)
 
 ## Supported Brands
 
@@ -44,7 +44,7 @@ python3 src/utils/eligibility_check_hm.py
    - Process each vehicle in the CSV
    - Check eligibility via the HM API
    - Display progress in real-time
-   - Save results to `src/utils/eligibility_check.csv`
+   - Save results to `src/utils/eligibility_checker.csv`
 
 ## Output
 
@@ -52,7 +52,7 @@ The script will create a new CSV file with all original columns plus:
 - `Activation`: 
   - `True` - Vehicle is eligible
   - `False` - Vehicle is not eligible
-  - `None` - Brand not supported
+  - `Unsupported` - Brand not supported
 
 ## Example Output Log
 
