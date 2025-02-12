@@ -3,22 +3,27 @@ import asyncio
 import aiohttp
 from typing import Tuple, Optional
 import pandas as pd
+import requests
+import uuid
 
 from ..api.bmw_client import BMWApi
 from ..api.hm_client import HMApi
 from ..api.stellantis_client import StellantisApi
+from ..api.tesla_client import TeslaApi
 from ..config.settings import ACTIVATION_TIMEOUT
 from ..services.google_sheet_service import update_google_sheet_status
-from ..fleet_info import read_fleet_info
+from core.sql_utils import get_connection
 
 class VehicleActivationService:
     _ayvens_fleet_id = None  # Cache for Ayvens fleet ID
 
-    def __init__(self, bmw_api: BMWApi, hm_api: HMApi, stellantis_api: StellantisApi):
+    def __init__(self, bmw_api: BMWApi, hm_api: HMApi, stellantis_api: StellantisApi, tesla_api: TeslaApi):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
+        self.tesla_api = tesla_api
         self.fleet_info_df = None
+        self.db_url = None  # Assuming a db_url attribute is added
 
     def set_fleet_info(self, df: pd.DataFrame) -> None:
         """Set the fleet info DataFrame.
@@ -223,146 +228,681 @@ class VehicleActivationService:
             success = status_code in [200, 204]
             if not success:
                 logging.error(f"Failed to deactivate High Mobility vehicle {vin}: HTTP {status_code}")
+            else:
+                # Si la désactivation est réussie, on met Real Activation à FALSE
+                await update_google_sheet_status(vin, False, None, None, "TRUE")
+                await self._update_vehicle_in_db(vin, False, True, {})
             return success
             
         except Exception as e:
             logging.error(f"Error deactivating High Mobility vehicle {vin}: {str(e)}")
             return False
 
+    async def _process_bmw_vehicle(self, session: aiohttp.ClientSession, vehicle: dict, desired_state: bool) -> None:
+        """Process BMW vehicle activation/deactivation."""
+        vin = vehicle['vin']
+        logging.info(f"Processing BMW vehicle - VIN: {vin}")
+        
+        # Check current status
+        status_code, result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: self.bmw_api.check_vehicle_status(vin)
+        )
+        
+        current_state = False
+        if status_code == 200:
+            current_state = True
+            logging.info(f"BMW is 200 - VIN: {vin}, Active: {current_state}")
+        elif status_code == 404:
+            current_state = False
+            logging.info(f"BMW is 404 - VIN: {vin}, Active: {current_state}")
+        else:
+            error_msg = f"Failed to check vehicle status: HTTP {status_code}"
+            vehicle['activation_status'] = 'false'
+            await update_google_sheet_status(vin, None, error_msg)
+            await self._update_vehicle_in_db(vin, False, True, vehicle)
+            return
+        
+        if current_state == desired_state:
+            logging.info(f"BMW vehicle {vin} already in desired state: {desired_state}")
+            vehicle['activation_status'] = str(desired_state)
+            await update_google_sheet_status(vin, current_state, None, None, "TRUE")
+            await self._update_vehicle_in_db(vin, current_state, True, vehicle)
+            return
+        
+        if desired_state:
+            logging.info(f"Attempting to activate BMW vehicle - VIN: {vin}")
+            success, error_msg = await asyncio.wait_for(
+                self.activate_bmw(session, vin),
+                timeout=ACTIVATION_TIMEOUT
+            )
+            if success:
+                await update_google_sheet_status(vin, True, None, None, "TRUE")
+                await self._update_vehicle_in_db(vin, True, True, vehicle)
+            else:
+                await update_google_sheet_status(vin, False, error_msg, None, "TRUE")
+                await self._update_vehicle_in_db(vin, False, True, vehicle)
+        else:
+            logging.info(f"Attempting to deactivate BMW vehicle - VIN: {vin}")
+            try:
+                deactivation_success = await asyncio.wait_for(
+                    self.deactivate_bmw(session, vin),
+                    timeout=ACTIVATION_TIMEOUT
+                )
+                
+                if deactivation_success:
+                    status_code, _ = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: self.bmw_api.check_vehicle_status(vin)
+                    )
+                    
+                    if status_code == 404:
+                        await update_google_sheet_status(vin, False, None, None, "TRUE")
+                        await self._update_vehicle_in_db(vin, False, True, vehicle)
+                    else:
+                        error_msg = f"Deactivation seemed successful but vehicle is still active (status: {status_code})"
+                        await update_google_sheet_status(vin, True, error_msg, None, "TRUE")
+                        await self._update_vehicle_in_db(vin, True, True, vehicle)
+                else:
+                    error_msg = "Failed to deactivate BMW vehicle - API returned failure"
+                    await update_google_sheet_status(vin, True, error_msg, None, "TRUE")
+                    await self._update_vehicle_in_db(vin, True, True, vehicle)
+            except Exception as e:
+                error_msg = f"Failed to deactivate BMW vehicle - Error: {str(e)}"
+                logging.error(error_msg)
+                await update_google_sheet_status(vin, True, error_msg, None, "TRUE")
+                await self._update_vehicle_in_db(vin, True, True, vehicle)
+
+    async def _process_high_mobility_vehicle(self, session: aiohttp.ClientSession, vehicle: dict, desired_state: bool) -> None:
+        """Process High Mobility vehicle activation/deactivation."""
+        vin = vehicle['vin']
+        make_lower = vehicle['make'].lower()
+        logging.info(f"Processing High Mobility vehicle - VIN: {vin}, Make: {make_lower}")
+        
+        try:
+            status_code, result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: self.hm_api.get_status(vin)
+            )
+            
+            current_state = False
+            if status_code == 200:
+                current_state = result.get('status') == "ACTIVE"
+                logging.info(f"High Mobility vehicle current state - VIN: {vin}, Active: {current_state}")
+            elif status_code == 401:
+                error_msg = "Authentication failed with High Mobility API - Token might be expired"
+                logging.error(error_msg)
+                vehicle['activation_status'] = 'false'
+                await update_google_sheet_status(vin, None, error_msg, None, "TRUE")
+                await self._update_vehicle_in_db(vin, False, True, vehicle)
+                return
+            elif status_code == 404:
+                current_state = False
+                logging.info(f"High Mobility vehicle not found (404) - VIN: {vin}, considering as inactive")
+            else:
+                error_msg = f"Failed to check vehicle status: HTTP {status_code}, Response: {result}"
+                logging.error(error_msg)
+                vehicle['activation_status'] = 'false'
+                await update_google_sheet_status(vin, None, error_msg, None, "TRUE")
+                await self._update_vehicle_in_db(vin, False, True, vehicle)
+                return
+                
+            if current_state == desired_state:
+                logging.info(f"High Mobility vehicle {vin} already in desired state: {desired_state}")
+                vehicle['activation_status'] = str(desired_state)
+                await update_google_sheet_status(vin, current_state, None, None, "TRUE")
+                await self._update_vehicle_in_db(vin, current_state, True, vehicle)
+                return
+                
+            if desired_state:
+                logging.info(f"Attempting to activate High Mobility vehicle - VIN: {vin}")
+                try:
+                    success, error_msg = await asyncio.wait_for(
+                        self.activate_high_mobility(session, vin, make_lower),
+                        timeout=ACTIVATION_TIMEOUT
+                    )
+                    if success:
+                        await update_google_sheet_status(vin, True, None, None, "TRUE")
+                        await self._update_vehicle_in_db(vin, True, True, vehicle)
+                    else:
+                        await update_google_sheet_status(vin, False, error_msg, None, "TRUE")
+                        await self._update_vehicle_in_db(vin, False, True, vehicle)
+                except Exception as e:
+                    error_msg = f"Error activating High Mobility vehicle: {str(e)}"
+                    logging.error(error_msg)
+                    await update_google_sheet_status(vin, False, error_msg, None, "TRUE")
+                    await self._update_vehicle_in_db(vin, False, True, vehicle)
+            else:
+                logging.info(f"Attempting to deactivate High Mobility vehicle - VIN: {vin}")
+                try:
+                    success = await asyncio.wait_for(
+                        self.deactivate_high_mobility(session, vin),
+                        timeout=ACTIVATION_TIMEOUT
+                    )
+                    if not success:
+                        error_msg = "Failed to deactivate High Mobility vehicle"
+                        await update_google_sheet_status(vin, True, error_msg, None, "TRUE")
+                        await self._update_vehicle_in_db(vin, True, True, vehicle)
+                    else:
+                        await update_google_sheet_status(vin, False, None, None, "TRUE")
+                        await self._update_vehicle_in_db(vin, False, True, vehicle)
+                except Exception as e:
+                    error_msg = f"Error deactivating High Mobility vehicle: {str(e)}"
+                    logging.error(error_msg)
+                    await update_google_sheet_status(vin, True, error_msg, None, "TRUE")
+                    await self._update_vehicle_in_db(vin, True, True, vehicle)
+                    
+        except Exception as e:
+            error_msg = f"Error processing High Mobility vehicle: {str(e)}"
+            logging.error(error_msg)
+            vehicle['activation_status'] = 'false'
+            await update_google_sheet_status(vin, None, error_msg, None, "TRUE")
+            await self._update_vehicle_in_db(vin, False, True, vehicle)
+
+    async def _process_stellantis_vehicle(self, session: aiohttp.ClientSession, vehicle: dict, desired_state: bool, eligibility: str) -> None:
+        """Process Stellantis vehicle activation/deactivation."""
+        vin = vehicle['vin']
+        make_lower = vehicle['make'].lower()
+        logging.info(f"Processing Stellantis vehicle - VIN: {vin}, Make: {make_lower}")
+        
+        # Check eligibility via API if not already marked as non-eligible
+        if not eligibility and desired_state:
+            is_eligible = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: self.stellantis_api.is_eligible(vin)
+            )
+            if not is_eligible:
+                logging.info(f"Vehicle {vin} not eligible via API")
+                await self._update_vehicle_in_db(vin, False, False, vehicle)
+                await update_google_sheet_status(vin, False, "Vehicle not eligible", False, "FALSE")
+                return
+        
+        status_code, result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: self.stellantis_api.get_status(vin)
+        )
+        
+        current_state = False
+        contract_id = None
+        if status_code == 200 and result:
+            contract_id = result.get("_id")
+            status = result.get("status", "")
+            current_state = status == "activated"
+            
+            if current_state:
+                logging.info(f"Stellantis vehicle is activated - VIN: {vin}, Contract ID: {contract_id}")
+                await update_google_sheet_status(vin, True, None)
+                
+                if not desired_state:
+                    logging.info(f"Vehicle is activated but deactivation is requested - VIN: {vin}")
+                    if contract_id:
+                        await self._handle_stellantis_deactivation(vin, contract_id, vehicle)
+                    return
+                else:
+                    vehicle['activation_status'] = 'true'
+                    await update_google_sheet_status(vin, True, None, None, "TRUE")
+                    await self._update_vehicle_in_db(vin, True, True, vehicle)
+                    return
+            
+            if status:
+                if status == "cancelled":
+                    if not desired_state:
+                        logging.info(f"Vehicle {vin} is already cancelled (deactivated)")
+                        vehicle['activation_status'] = 'false'
+                        await update_google_sheet_status(vin, False, None, None, "TRUE")
+                        await self._update_vehicle_in_db(vin, False, True, vehicle)
+                        return
+                    else:
+                        logging.info(f"Vehicle {vin} is cancelled but activation is requested")
+                else:
+                    error_msg = f"Contract status is {status}"
+                    vehicle['activation_status'] = 'false'
+                    await update_google_sheet_status(vin, False, error_msg, None, "TRUE")
+                    await self._update_vehicle_in_db(vin, False, True, vehicle)
+                    return
+                    
+            logging.info(f"Stellantis vehicle current state - VIN: {vin}, Status: {status}, Contract ID: {contract_id}")
+        elif status_code != 404:
+            error_msg = f"Failed to check vehicle status: HTTP {status_code}"
+            vehicle['activation_status'] = 'false'
+            await update_google_sheet_status(vin, None, error_msg)
+            await self._update_vehicle_in_db(vin, False, True, vehicle)
+            return
+
+        if current_state != desired_state:
+            if desired_state:
+                await self._handle_stellantis_activation(vin, vehicle)
+            else:
+                if not contract_id:
+                    error_msg = f"Cannot deactivate vehicle {vin}: No active contract found"
+                    await update_google_sheet_status(vin, False, error_msg, None, "TRUE")
+                    await self._update_vehicle_in_db(vin, False, True, vehicle)
+                else:
+                    await self._handle_stellantis_deactivation(vin, contract_id, vehicle)
+
+    async def _handle_stellantis_activation(self, vin: str, vehicle: dict) -> None:
+        """Handle Stellantis vehicle activation."""
+        logging.info(f"Attempting to activate Stellantis vehicle - VIN: {vin}")
+        status_code, result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: self.stellantis_api.create_clearance([{"vin": vin}])
+        )
+        if status_code in [200, 201, 204]:
+            await update_google_sheet_status(vin, True, None, None, "TRUE")
+            await self._update_vehicle_in_db(vin, True, True, vehicle)
+        else:
+            if status_code == 409:
+                error_msg = "Vehicle already has an active contract or activation in progress"
+                await update_google_sheet_status(vin, True, error_msg, None, "TRUE")
+                await self._update_vehicle_in_db(vin, True, True, vehicle)
+            else:
+                error_msg = f"Failed to activate Stellantis vehicle: HTTP {status_code}"
+                await update_google_sheet_status(vin, False, error_msg, None, "TRUE")
+                await self._update_vehicle_in_db(vin, False, True, vehicle)
+
+    async def _handle_stellantis_deactivation(self, vin: str, contract_id: str, vehicle: dict) -> None:
+        """Handle Stellantis vehicle deactivation."""
+        logging.info(f"Attempting to deactivate Stellantis vehicle - VIN: {vin}, Contract: {contract_id}")
+        status_code, result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: self.stellantis_api.delete_clearance(contract_id)
+        )
+        if status_code in [200, 204]:
+            await update_google_sheet_status(vin, False, None, None, "TRUE")
+            await self._update_vehicle_in_db(vin, False, True, vehicle)
+        else:
+            error_msg = f"Failed to deactivate Stellantis vehicle: HTTP {status_code}"
+            await update_google_sheet_status(vin, True, error_msg, None, "TRUE")
+            await self._update_vehicle_in_db(vin, True, True, vehicle)
+
+    async def _process_tesla_vehicle(self, session: aiohttp.ClientSession, vehicle: dict, desired_state: bool) -> None:
+        """Process Tesla vehicle activation/deactivation.
+        
+        For Tesla vehicles:
+        - If vehicle not found in Tesla API:
+            - Set activation_status to False in DB
+            - Set Real Activation to False in Google Sheet
+        - If vehicle exists in DB:
+            - If EValue is False in Google Sheet:
+                - Set activation_status to False and is_displayed to False in DB
+            - Otherwise:
+                - Set activation_status and is_displayed based on Tesla API check
+        - If vehicle doesn't exist in DB:
+            - Set all statuses to False
+        """
+        vin = vehicle['vin']
+        logging.info(f"Processing Tesla vehicle - VIN: {vin}")
+        
+        # Check if vehicle exists in DB
+        with get_connection() as con:
+            cursor = con.cursor()
+            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
+            vehicle_exists = cursor.fetchone() is not None
+        
+        # Get EValue from Google Sheet
+        evalue = str(vehicle.get('EValue', '')).upper()
+        
+        # Find Tesla account for this VIN
+        account = await self.tesla_api.get_account_for_vin(session, vin)
+        if not account:
+            # Vehicle not found in any Tesla account
+            logging.info(f"Tesla vehicle {vin} not found in any Tesla account")
+            await update_google_sheet_status(vin, False, "Vehicle not found in Tesla accounts", None, "TRUE")
+            await self._update_vehicle_in_db(vin, False, True, vehicle)
+            return
+            
+        if vehicle_exists:
+            # Vehicle exists in DB
+            if evalue == 'FALSE':
+                # EValue is False, set activation_status and is_displayed to False
+                logging.info(f"Tesla vehicle {vin} has EValue=FALSE, setting all statuses to False")
+                await update_google_sheet_status(vin, False, None, None, "FALSE")
+                await self._update_vehicle_in_db(vin, False, False, vehicle)
+            else:
+                # Set statuses based on Tesla API check
+                logging.info(f"Tesla vehicle {vin} found in Tesla account {account}, setting activation to True")
+                await update_google_sheet_status(vin, True, None, None, "TRUE")
+                await self._update_vehicle_in_db(vin, True, True, vehicle)
+        else:
+            # Vehicle doesn't exist in DB, set all statuses to False
+            logging.info(f"Tesla vehicle {vin} not found in DB, setting all statuses to False")
+            await update_google_sheet_status(vin, False, None, None, "FALSE")
+            await self._update_vehicle_in_db(vin, False, False, vehicle)
+
     async def process_vehicle_activation(self, session: aiohttp.ClientSession, vehicle: dict) -> None:
         """Process vehicle activation or deactivation based on make and activation status."""
         make_lower = vehicle['make'].lower()
         desired_state = str(vehicle.get('activation', 'FALSE')).upper() == 'TRUE'
         real_activation_str = str(vehicle.get('real_activation', '')).upper()
+        evalue = str(vehicle.get('EValue', '')).upper()
         
-        logging.info(f"Processing vehicle - VIN: {vehicle['vin']}, Make: {make_lower}, Desired State: {desired_state}, Real State: {real_activation_str}")
+        logging.info(f"Processing vehicle - VIN: {vehicle['vin']}, Make: {make_lower}, Desired State: {desired_state}, Real State: {real_activation_str}, EValue: {evalue}")
         
-        # Skip only if real_activation has an explicit value and matches desired state
-        if real_activation_str and real_activation_str in ['TRUE', 'FALSE']:
-            real_activation = real_activation_str == 'TRUE'
-            if desired_state == real_activation:
-                logging.info(f"Skipping API calls for VIN {vehicle['vin']} as desired state matches real activation")
-                vehicle['activation_status'] = str(desired_state)
+        try:
+            # Check if vehicle exists in DB
+            with get_connection() as con:
+                cursor = con.cursor()
+                cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
+                vehicle_exists = cursor.fetchone() is not None
+            
+            # Handle EValue
+            if evalue in ['TRUE', 'FALSE']:
+                logging.info(f"Found EValue for vehicle {vehicle['vin']}: {evalue}")
+                if evalue == 'FALSE':
+                    logging.info(f"Vehicle {vehicle['vin']} marked as not displayed (EValue: FALSE)")
+                    if vehicle_exists:
+                        await self._update_vehicle_in_db(vehicle['vin'], False, False, vehicle)
+                    return
+            
+            # Check Eligibility field
+            eligibility = str(vehicle.get('Eligibility', '')).upper()
+            if eligibility == 'FALSE':
+                logging.info(f"Vehicle {vehicle['vin']} marked as not eligible in CSV")
+                if vehicle_exists:
+                    await self._update_vehicle_in_db(vehicle['vin'], False, False, vehicle)
+                await update_google_sheet_status(vehicle['vin'], False, "Vehicle marked as not eligible", False, "FALSE")
                 return
             
-        try:
-            success = False
-            error_msg = None
-            should_update_real_activation = False
-            status_code = None
+            # Skip if desired state matches real activation
+            if real_activation_str and real_activation_str in ['TRUE', 'FALSE']:
+                real_activation = real_activation_str == 'TRUE'
+                if desired_state == real_activation:
+                    logging.info(f"Skipping API calls for VIN {vehicle['vin']} as desired state matches real activation")
+                    vehicle['activation_status'] = str(desired_state)
+                    await self._update_vehicle_in_db(vehicle['vin'], desired_state, True, vehicle)
+                    return
             
+            # Process based on make
             if make_lower == 'bmw':
-                logging.info(f"Processing BMW vehicle - VIN: {vehicle['vin']}")
-                # Always check current status first
-                status_code, result = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: self.bmw_api.check_vehicle_status(vehicle['vin'])
-                )
-                
-                current_state = False
-                if status_code == 200:
-                    current_state = True
-                    logging.info(f"BMW is 200 - VIN: {vehicle['vin']}, Active: {current_state}")
-                elif status_code == 404:
-                    current_state = False
-                    logging.info(f"BMW is 404 - VIN: {vehicle['vin']}, Active: {current_state}")
-                else:
-                    error_msg = f"Failed to check vehicle status: HTTP {status_code}"
-                    vehicle['activation_status'] = 'false'
-                    await update_google_sheet_status(vehicle['vin'], None, error_msg)
-                    return
-                
-                if current_state != desired_state:
-                    if desired_state:
-                        logging.info(f"Attempting to activate BMW vehicle - VIN: {vehicle['vin']}")
-                        success, error_msg = await asyncio.wait_for(
-                            self.activate_bmw(session, vehicle['vin']),
-                            timeout=ACTIVATION_TIMEOUT
-                        )
-                    else:
-                        logging.info(f"Attempting to deactivate BMW vehicle - VIN: {vehicle['vin']}")
-                        success = await asyncio.wait_for(
-                            self.deactivate_bmw(session, vehicle['vin']),
-                            timeout=ACTIVATION_TIMEOUT
-                        )
-                        if not success:
-                            error_msg = "Failed to deactivate BMW vehicle"
-                        success = not success  # Invert success for deactivation
-                    should_update_real_activation = True
-                else:
-                    logging.info(f"BMW vehicle {vehicle['vin']} already in desired state: {desired_state}")
-                    success = desired_state
-                    should_update_real_activation = True
-                    
+                await self._process_bmw_vehicle(session, vehicle, desired_state)
             elif make_lower in ['ford', 'mercedes', 'kia']:
-                logging.info(f"Processing High Mobility vehicle - VIN: {vehicle['vin']}, Make: {make_lower}")
-                # Always check current status first
-                status_code, result = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: self.hm_api.get_status(vehicle['vin'])
-                )
-                
-                current_state = False
-                if status_code == 200:
-                    current_state = result.get('status') == "ACTIVE"
-                    logging.info(f"High Mobility vehicle current state - VIN: {vehicle['vin']}, Active: {current_state}")
-                elif status_code != 404:
-                    error_msg = f"Failed to check vehicle status: HTTP {status_code}"
-                    vehicle['activation_status'] = 'false'
-                    await update_google_sheet_status(vehicle['vin'], None, error_msg)
-                    return
-                
-                # Only take action if current state doesn't match desired state
-                if current_state != desired_state:
-                    if desired_state:
-                        logging.info(f"Attempting to activate High Mobility vehicle - VIN: {vehicle['vin']}")
-                        success, error_msg = await asyncio.wait_for(
-                            self.activate_high_mobility(session, vehicle['vin'], make_lower),
-                            timeout=ACTIVATION_TIMEOUT
-                        )
-                    else:
-                        logging.info(f"Attempting to deactivate High Mobility vehicle - VIN: {vehicle['vin']}")
-                        success = await asyncio.wait_for(
-                            self.deactivate_high_mobility(session, vehicle['vin']),
-                            timeout=ACTIVATION_TIMEOUT
-                        )
-                        if not success:
-                            error_msg = "Failed to deactivate High Mobility vehicle"
-                        success = not success  # Invert success for deactivation
-                    should_update_real_activation = True
-                else:
-                    logging.info(f"High Mobility vehicle {vehicle['vin']} already in desired state: {desired_state}")
-                    success = desired_state
-                    should_update_real_activation = True
+                await self._process_high_mobility_vehicle(session, vehicle, desired_state)
             elif make_lower in ['opel', 'citroën', 'ds', 'fiat', 'peugeot']:
-                logging.info(f"Processing Stellantis vehicle - VIN: {vehicle['vin']}, Make: {make_lower}")
-                # Always check current status first
-                status_code, result = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: self.stellantis_api.get_status(vehicle['vin'])
-                )
-                
+                await self._process_stellantis_vehicle(session, vehicle, desired_state, eligibility)
+            elif make_lower == 'tesla':
+                await self._process_tesla_vehicle(session, vehicle, desired_state)
             else:
                 logging.info(f"Vehicle brand not supported for activation: {make_lower}")
-                success = False
                 error_msg = "Brand not supported for activation"
-                should_update_real_activation = False
+                await update_google_sheet_status(vehicle['vin'], None, error_msg, None, "TRUE")
+                await self._update_vehicle_in_db(vehicle['vin'], False, True, vehicle)
                 
-            vehicle['activation_status'] = str(success)            
-            # Update Activation Error even if we don't update Real Activation
-            if error_msg:
-                await update_google_sheet_status(vehicle['vin'], None, error_msg)
-            elif should_update_real_activation:
-                # Only update Real Activation for actual activation/deactivation attempts
-                await update_google_sheet_status(vehicle['vin'], success, None)
-            else:
-                logging.info(f"Skipping Real Activation update for VIN {vehicle['vin']} as no activation/deactivation was attempted")
-            
         except asyncio.TimeoutError:
             error_msg = f"Timeout while processing {make_lower} vehicle activation"
             logging.error(error_msg)
             vehicle['activation_status'] = 'false'
             await update_google_sheet_status(vehicle['vin'], None, error_msg)
+            await self._update_vehicle_in_db(vehicle['vin'], False, True, vehicle)
             
         except Exception as e:
             error_msg = f"Error processing {make_lower} vehicle: {str(e)}"
             logging.error(error_msg)
             vehicle['activation_status'] = 'false'
-            await update_google_sheet_status(vehicle['vin'], None, error_msg) 
+            await update_google_sheet_status(vehicle['vin'], None, error_msg)
+            await self._update_vehicle_in_db(vehicle['vin'], False, True, vehicle)
+
+    async def _get_or_create_oem(self, cursor, vehicle: dict) -> str:
+        """Get or create OEM and return its ID."""
+        cursor.execute(
+            "SELECT id FROM oem WHERE LOWER(oem_name) = LOWER(%s)",
+            (vehicle.get('oem', ''),)
+        )
+        oem_result = cursor.fetchone()
+        if not oem_result:
+            oem_id = str(uuid.uuid4())
+            cursor.execute(
+                "INSERT INTO oem (id, oem_name) VALUES (%s, %s) RETURNING id",
+                (oem_id, vehicle.get('oem', ''))
+            )
+            return cursor.fetchone()[0]
+        return oem_result[0]
+
+    async def _get_or_create_make(self, cursor, vehicle: dict, oem_id: str) -> str:
+        """Get or create Make and return its ID."""
+        cursor.execute(
+            "SELECT id FROM make WHERE LOWER(make_name) = LOWER(%s)",
+            (vehicle.get('make', ''),)
+        )
+        make_result = cursor.fetchone()
+        if not make_result:
+            make_id = str(uuid.uuid4())
+            cursor.execute(
+                "INSERT INTO make (id, make_name, oem_id) VALUES (%s, %s, %s) RETURNING id",
+                (make_id, vehicle.get('make', ''), oem_id)
+            )
+            return cursor.fetchone()[0]
+        return make_result[0]
+
+    async def _get_or_create_model(self, cursor, vehicle: dict, make_id: str, oem_id: str) -> str:
+        """Get or create Model and return its ID."""
+        model_name = vehicle.get('model', '').strip().lower() if vehicle.get('model') else None
+        type_value = vehicle.get('type', '').strip().lower() if vehicle.get('type') else None
+        
+        if not model_name:
+            return None
+            
+        cursor.execute("""
+            SELECT id FROM vehicle_model 
+            WHERE LOWER(model_name) = %s 
+            AND (
+                (LOWER(type) = %s AND %s IS NOT NULL)
+                OR (type IS NULL AND %s IS NULL)
+            )
+            AND make_id = %s AND oem_id = %s
+        """, (model_name, type_value, type_value, type_value, make_id, oem_id))
+        
+        model_result = cursor.fetchone()
+        if not model_result:
+            model_id = str(uuid.uuid4())
+            if type_value:
+                cursor.execute("""
+                    INSERT INTO vehicle_model (id, model_name, type, make_id, oem_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (model_id, model_name, type_value, make_id, oem_id))
+            else:
+                cursor.execute("""
+                    INSERT INTO vehicle_model (id, model_name, make_id, oem_id)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                """, (model_id, model_name, make_id, oem_id))
+            return cursor.fetchone()[0]
+        return model_result[0]
+
+    async def _get_fleet_id(self, cursor, vehicle: dict) -> Optional[str]:
+        """Get fleet ID from owner."""
+        cursor.execute(
+            "SELECT id FROM fleet WHERE LOWER(fleet_name) = LOWER(%s)",
+            (vehicle.get('owner', ''),)
+        )
+        fleet_result = cursor.fetchone()
+        if not fleet_result:
+            logging.error(f"Fleet not found for owner: {vehicle.get('owner', '')}")
+            return None
+        return fleet_result[0]
+
+    async def _get_or_create_region(self, cursor, vehicle: dict) -> str:
+        """Get or create Region and return its ID."""
+        cursor.execute(
+            "SELECT id FROM region WHERE LOWER(region_name) = LOWER(%s)",
+            (vehicle.get('country', ''),)
+        )
+        region_result = cursor.fetchone()
+        if not region_result:
+            region_id = str(uuid.uuid4())
+            cursor.execute(
+                "INSERT INTO region (id, region_name) VALUES (%s, %s) RETURNING id",
+                (region_id, vehicle.get('country', ''))
+            )
+            return cursor.fetchone()[0]
+        return region_result[0]
+
+    async def _process_dates(self, vehicle: dict) -> Tuple[Optional[str], Optional[str]]:
+        """Process start_date and end_of_contract dates."""
+        start_date = vehicle.get('start_date')
+        end_of_contract = vehicle.get('end_of_contract')
+        
+        return (
+            None if pd.isna(start_date) else start_date,
+            None if pd.isna(end_of_contract) else end_of_contract
+        )
+
+    async def _update_existing_vehicle(self, cursor, vin: str, vehicle: dict, fleet_id: str, 
+                                     region_id: str, model_id: str, activation_status: bool, 
+                                     is_displayed: bool, start_date: Optional[str], 
+                                     end_of_contract: Optional[str]) -> None:
+        """Update an existing vehicle in the database."""
+        cursor.execute("""
+            UPDATE vehicle 
+            SET fleet_id = %s,
+                region_id = %s,
+                vehicle_model_id = %s,
+                licence_plate = %s,
+                end_of_contract_date = %s,
+                start_date = %s,
+                activation_status = %s,
+                is_displayed = %s
+            WHERE vin = %s
+        """, (
+            fleet_id,
+            region_id,
+            model_id,
+            vehicle.get('licence_plate', ''),
+            end_of_contract,
+            start_date,
+            activation_status,
+            is_displayed,
+            vin
+        ))
+        logging.info(f"Vehicle updated in DB - VIN: {vin}, activation_status: {activation_status}, is_displayed: {is_displayed}")
+
+    async def _create_new_vehicle(self, cursor, vin: str, vehicle: dict, fleet_id: str, 
+                                region_id: str, model_id: str, activation_status: bool, 
+                                is_displayed: bool, start_date: Optional[str], 
+                                end_of_contract: Optional[str]) -> None:
+        """Create a new vehicle in the database."""
+        cursor.execute("""
+            INSERT INTO vehicle (
+                id, vin, fleet_id, region_id, vehicle_model_id,
+                licence_plate, end_of_contract_date, start_date,
+                activation_status, is_displayed
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            str(uuid.uuid4()),
+            vin,
+            fleet_id,
+            region_id,
+            model_id,
+            vehicle.get('licence_plate', ''),
+            end_of_contract,
+            start_date,
+            activation_status,
+            is_displayed
+        ))
+        logging.info(f"New vehicle created in DB - VIN: {vin}, activation_status: {activation_status}, is_displayed: {is_displayed}")
+
+    async def _update_vehicle_in_db(self, vin: str, activation_status: bool, is_displayed: bool, vehicle: dict) -> None:
+        """Update vehicle status in database."""
+        try:
+            with get_connection() as con:
+                cursor = con.cursor()
+                
+                # Check if vehicle exists
+                cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
+                vehicle_exists = cursor.fetchone()
+                
+                # Check eligibility and real activation status
+                eligibility = str(vehicle.get('Eligibility', '')).upper()
+                real_activation = str(vehicle.get('real_activation', '')).upper()
+                evalue = str(vehicle.get('EValue', '')).upper()
+                
+                # Handle EValue override
+                if evalue == 'FALSE':
+                    if vehicle_exists:
+                        cursor.execute("""
+                            UPDATE vehicle 
+                            SET is_displayed = false
+                            WHERE vin = %s AND is_displayed = true
+                        """, (vin,))
+                        if cursor.rowcount > 0:
+                            logging.info(f"Updated is_displayed to false for VIN {vin} because EValue is FALSE")
+                        con.commit()
+                
+                # Handle ineligible or deactivated vehicles
+                if real_activation == 'FALSE' or eligibility == 'FALSE':
+                    if vehicle_exists:
+                        should_display = evalue != 'FALSE'
+                        cursor.execute("""
+                            UPDATE vehicle 
+                            SET activation_status = false,
+                                is_displayed = %s
+                            WHERE vin = %s
+                        """, (should_display, vin))
+                        con.commit()
+                        logging.info(f"Vehicle status updated in DB - VIN: {vin}, activation_status: false, is_displayed: {should_display}")
+                    return
+                
+                # Get or create related entities
+                oem_id = await self._get_or_create_oem(cursor, vehicle)
+                make_id = await self._get_or_create_make(cursor, vehicle, oem_id)
+                model_id = await self._get_or_create_model(cursor, vehicle, make_id, oem_id)
+                fleet_id = await self._get_fleet_id(cursor, vehicle)
+                
+                if not fleet_id:
+                    return
+                    
+                region_id = await self._get_or_create_region(cursor, vehicle)
+                start_date, end_of_contract = await self._process_dates(vehicle)
+                
+                if vehicle_exists:
+                    await self._update_existing_vehicle(
+                        cursor, vin, vehicle, fleet_id, region_id, model_id,
+                        activation_status, is_displayed, start_date, end_of_contract
+                    )
+                else:
+                    # Create new vehicle only if eligible and not explicitly deactivated
+                    if eligibility != 'FALSE' and real_activation != 'FALSE':
+                        await self._create_new_vehicle(
+                            cursor, vin, vehicle, fleet_id, region_id, model_id,
+                            activation_status, is_displayed, start_date, end_of_contract
+                        )
+                
+                con.commit()
+                
+        except Exception as e:
+            logging.error(f"Error updating vehicle in DB - VIN: {vin}, Error: {str(e)}")
+            if 'con' in locals():
+                con.rollback()
+
+    async def _check_vehicle_in_db(self, vin: str) -> bool:
+        """Check if vehicle exists in database."""
+        try:
+            response = requests.get(f"{self.db_url}/vehicles/{vin}")
+            return response.status_code == 200
+        except Exception as e:
+            logging.error(f"Error checking vehicle in DB: {str(e)}")
+            return False
+            
+    async def _update_db_status(self, vin: str, activation_status: bool, is_displayed: bool) -> None:
+        """Update vehicle status in database."""
+        try:
+            data = {
+                "activation_status": activation_status,
+                "is_displayed": is_displayed
+            }
+            response = requests.put(f"{self.db_url}/vehicles/{vin}", json=data)
+            if response.ok:
+                pass
+            else:
+                logging.error(f"Failed to update vehicle in DB - VIN: {vin}, Status: {response.status_code}")
+        except Exception as e:
+            logging.error(f"Error updating vehicle in DB: {str(e)}")
+            
+    async def _create_vehicle_in_db(self, vin: str, activation_status: bool, is_displayed: bool) -> None:
+        """Create new vehicle in database."""
+        try:
+            data = {
+                "vin": vin,
+                "activation_status": activation_status,
+                "is_displayed": is_displayed
+            }
+            response = requests.post(f"{self.db_url}/vehicles", json=data)
+            if response.ok:
+                logging.info(f"Vehicle created in DB VIN: {vin}")
+            else:
+                logging.error(f"Failed to create vehicle in DB - VIN: {vin}, Status: {response.status_code}")
+        except Exception as e:
+            logging.error(f"Error creating vehicle in DB: {str(e)}") 

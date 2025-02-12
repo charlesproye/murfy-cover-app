@@ -11,6 +11,15 @@ class HMApi:
         self.client_id = client_id
         self.client_secret = client_secret
         self._access_token = None
+        self.__token_exp = 0  # Timestamp d'expiration du token
+
+    def _is_token_expired(self) -> bool:
+        """Check if the current token is expired."""
+        if not self._access_token:
+            return True
+        timestamp = (datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
+        # Renouveler 5 minutes avant expiration pour éviter les problèmes de timing
+        return timestamp >= (self.__token_exp - 300)
 
     def _get_auth_token(self) -> str:
         """Get authentication token from High Mobility API."""
@@ -32,6 +41,7 @@ class HMApi:
             ).total_seconds()
             expires_in = int(response_data.get("expires_in", 3600))  # Default 1 hour if not specified
             self.__token_exp = timestamp + expires_in
+            logging.info("Successfully renewed High Mobility auth token")
             return self._access_token
         except Exception as e:
             logging.error(f"Failed to get HM auth token: {str(e)}")
@@ -39,32 +49,68 @@ class HMApi:
 
     def _get_headers(self) -> Dict[str, str]:
         """Get headers for API requests."""
-        if not self._access_token:
+        if self._is_token_expired():
             self._get_auth_token()
         return {
             "Authorization": f"Bearer {self._access_token}",
             "Content-Type": "application/json"
         }
 
+    def _handle_auth_error(self, response: requests.Response, retry_count: int = 0) -> Tuple[int, Any]:
+        """Handle authentication errors by refreshing token and retrying.
+        
+        Args:
+            response: The response that indicated an auth error
+            retry_count: Number of times this request has been retried
+        
+        Returns:
+            Tuple of (status_code, response_data)
+        """
+        if response.status_code == 401 and retry_count < 1:
+            logging.info("Received 401, attempting to refresh token and retry")
+            self._access_token = None  # Force token refresh
+            return None  # Signal to retry the request
+        return response.status_code, response.json() if response.ok else response.text
+
     def get_status(self, vin: str) -> Tuple[int, Any]:
         """Get vehicle status."""
-        try:
-            url = f"{self.base_url}/v1/fleets/vehicles/{vin}"
-            response = requests.get(url, headers=self._get_headers())
-            return response.status_code, response.json() if response.ok else response.text
-        except Exception as e:
-            logging.error(f"Failed to get HM vehicle status: {str(e)}")
-            return 500, str(e)
+        retry_count = 0
+        while retry_count < 2:  # Maximum 1 retry
+            try:
+                url = f"{self.base_url}/v1/fleets/vehicles/{vin}"
+                response = requests.get(url, headers=self._get_headers())
+                
+                if response.status_code == 401:
+                    result = self._handle_auth_error(response, retry_count)
+                    if result is None:
+                        retry_count += 1
+                        continue
+                    return result
+                
+                return response.status_code, response.json() if response.ok else response.text
+            except Exception as e:
+                logging.error(f"Failed to get HM vehicle status: {str(e)}")
+                return 500, str(e)
 
     def get_clearance(self, vin: str) -> Tuple[int, Any]:
         """Get vehicle clearance status."""
-        try:
-            url = f"{self.base_url}/vehicles/{vin}/clearance"
-            response = requests.get(url, headers=self._get_headers())
-            return response.status_code, response.json() if response.ok else response.text
-        except Exception as e:
-            logging.error(f"Failed to get HM clearance: {str(e)}")
-            return 500, str(e)
+        retry_count = 0
+        while retry_count < 2:  # Maximum 1 retry
+            try:
+                url = f"{self.base_url}/vehicles/{vin}/clearance"
+                response = requests.get(url, headers=self._get_headers())
+                
+                if response.status_code == 401:
+                    result = self._handle_auth_error(response, retry_count)
+                    if result is None:
+                        retry_count += 1
+                        continue
+                    return result
+                
+                return response.status_code, response.json() if response.ok else response.text
+            except Exception as e:
+                logging.error(f"Failed to get HM clearance: {str(e)}")
+                return 500, str(e)
 
     def create_clearance(self, vehicles: List[Dict[str, str]]) -> Tuple[int, Any]:
         """Create clearance for vehicles.
@@ -72,33 +118,53 @@ class HMApi:
         Args:
             vehicles: List of dicts containing 'vin' and 'brand' for each vehicle
         """
-        try:
-            url = f"{self.base_url}/v1/vehicle"
-            # Ensure each vehicle has required fields in correct format
-            formatted_vehicles = [
-                {
-                    "vin": vehicle["vin"],
-                    "brand": vehicle["brand"].lower(),
-                }
-                for vehicle in vehicles
-            ]
-            
-            response = requests.post(
-                url,
-                headers=self._get_headers(),
-                json={"vehicles": formatted_vehicles}
-            )
-            return response.status_code, response.json() if response.ok else response.text
-        except Exception as e:
-            logging.error(f"Failed to create HM clearance: {str(e)}")
-            return 500, str(e)
+        retry_count = 0
+        while retry_count < 2:  # Maximum 1 retry
+            try:
+                url = f"{self.base_url}/v1/vehicle"
+                # Ensure each vehicle has required fields in correct format
+                formatted_vehicles = [
+                    {
+                        "vin": vehicle["vin"],
+                        "brand": vehicle["brand"].lower(),
+                    }
+                    for vehicle in vehicles
+                ]
+                
+                response = requests.post(
+                    url,
+                    headers=self._get_headers(),
+                    json={"vehicles": formatted_vehicles}
+                )
+                
+                if response.status_code == 401:
+                    result = self._handle_auth_error(response, retry_count)
+                    if result is None:
+                        retry_count += 1
+                        continue
+                    return result
+                
+                return response.status_code, response.json() if response.ok else response.text
+            except Exception as e:
+                logging.error(f"Failed to create HM clearance: {str(e)}")
+                return 500, str(e)
 
     def delete_clearance(self, vin: str) -> Tuple[int, Any]:
         """Delete vehicle clearance."""
-        try:
-            url = f"{self.base_url}/vehicles/{vin}/clearance"
-            response = requests.delete(url, headers=self._get_headers())
-            return response.status_code, response.json() if response.ok else response.text
-        except Exception as e:
-            logging.error(f"Failed to delete HM clearance: {str(e)}")
-            return 500, str(e) 
+        retry_count = 0
+        while retry_count < 2:  # Maximum 1 retry
+            try:
+                url = f"{self.base_url}/vehicles/{vin}/clearance"
+                response = requests.delete(url, headers=self._get_headers())
+                
+                if response.status_code == 401:
+                    result = self._handle_auth_error(response, retry_count)
+                    if result is None:
+                        retry_count += 1
+                        continue
+                    return result
+                
+                return response.status_code, response.json() if response.ok else response.text
+            except Exception as e:
+                logging.error(f"Failed to delete HM clearance: {str(e)}")
+                return 500, str(e) 

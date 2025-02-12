@@ -28,13 +28,15 @@ def wait_for_rate_limit():
     
     last_request_time = time.time()
 
-async def update_google_sheet_status(vin: str, real_activation: Optional[bool], error_message: Optional[str] = None) -> bool:
+async def update_google_sheet_status(vin: str, real_activation: Optional[bool], error_message: Optional[str] = None, eligibility: Optional[bool] = None, evalue: Optional[str] = None) -> bool:
     """Update Real Activation and Activation Error columns in Google Sheet.
     
     Args:
         vin (str): Vehicle VIN
         real_activation (Optional[bool]): Actual activation status, None means don't update
         error_message (Optional[str]): Error message if any
+        eligibility (Optional[bool]): Eligibility status, None means don't update
+        evalue (Optional[str]): EValue status, None means don't update
         
     Returns:
         bool: True if update was successful, False otherwise
@@ -60,6 +62,8 @@ async def update_google_sheet_status(vin: str, real_activation: Optional[bool], 
             headers = sheet.row_values(1)
             real_activation_col = headers.index("Real Activation") + 1
             error_col = headers.index("Activation Error") + 1
+            eligibility_col = headers.index("Eligibility") + 1
+            evalue_col = headers.index("EValue") + 1
             
             # Prepare batch update
             updates = []
@@ -76,6 +80,20 @@ async def update_google_sheet_status(vin: str, real_activation: Optional[bool], 
                 'range': f'R{cell.row}C{error_col}',
                 'values': [[error_message or ""]]
             })
+            
+            # Update Eligibility status if provided
+            if eligibility is not None:
+                updates.append({
+                    'range': f'R{cell.row}C{eligibility_col}',
+                    'values': [[str(eligibility).upper()]]
+                })
+                
+            # Update EValue status if provided
+            if evalue is not None:
+                updates.append({
+                    'range': f'R{cell.row}C{evalue_col}',
+                    'values': [[evalue]]
+                })
             
             # Execute batch update
             if updates:

@@ -152,7 +152,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         logger.info(f"Retrieved {len(df)} rows from Google Sheets")
         
         # Clean column names
-        df.columns = [col.lower().strip().replace(' ', '_') for col in df.columns]
+        df.columns = [col if col == "EValue" else col.lower().strip().replace(' ', '_') for col in df.columns]
                 
         # Handle potential variations of the owner column name
         owner_column_variants = ['owner', 'ownership', 'ownership_', 'fleet_owner', 'fleet']

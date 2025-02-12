@@ -253,7 +253,6 @@ class VehicleProcessor:
                 vehicle_data.get('activation_status'),
                 vin
             ))
-            logging.info(f"Vehicle updated in DB VIN: {vin}")
         else:
             vehicle_id = str(uuid.uuid4())
             cursor.execute("""
