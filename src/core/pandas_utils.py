@@ -193,7 +193,7 @@ def sanity_check(df:DF) -> DF:
         except:
             value_counts_dict[col] = []
             nunique_dict[col] = np.nan
-            
+    pd.set_option('display.max_rows', None) 
     return DF({
         "dtypes": df.dtypes.astype("string"),
         "value_counts": Series(value_counts_dict),
