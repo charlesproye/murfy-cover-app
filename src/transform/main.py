@@ -10,16 +10,14 @@ from apscheduler.triggers.interval import IntervalTrigger
 from core.console_utils import main_decorator, parse_kwargs
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.config import *
-
 from transform.raw_tss.main import update_all_raw_tss
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
-from transform.results.main import update_vehicle_data_table
+from transform.raw_results.main import update_all_raw_tss
+from transform.processed_results.main import update_vehicle_data_table
 from transform.vehicle_info.main import VehicleInfoProcessor
 from transform.front_utils.main import FrontUtils
 
-
 logger = getLogger("transform.main")
-
 
 @main_decorator
 def main():
@@ -51,8 +49,8 @@ def run_entire_pipeline():
         logging.info("Starting pipeline execution")
         start_time = DT.now()
 
-        VehicleInfoProcessor().process_all_vehicles()
-        logging.info("Vehicle info update completed")
+        # VehicleInfoProcessor().process_all_vehicles()
+        # logging.info("Vehicle info update completed")
         
         # update_all_raw_tss()
         # logging.info("Raw TSS update completed")
