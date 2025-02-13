@@ -12,7 +12,7 @@ from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from core.config import *
 from config import *
-from .utils.google_sheets_utils import get_google_client
+from utils.google_sheets_utils import get_google_client
 
 logger = getLogger("ingestion.vehicle_info")
 
