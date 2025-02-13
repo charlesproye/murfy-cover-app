@@ -121,7 +121,7 @@ class HMApi:
         retry_count = 0
         while retry_count < 2:  # Maximum 1 retry
             try:
-                url = f"{self.base_url}/v1/vehicle"
+                url = f"{self.base_url}/v1/fleets/vehicles"
                 # Ensure each vehicle has required fields in correct format
                 formatted_vehicles = [
                     {
@@ -154,7 +154,7 @@ class HMApi:
         retry_count = 0
         while retry_count < 2:  # Maximum 1 retry
             try:
-                url = f"{self.base_url}/vehicles/{vin}/clearance"
+                url = f"{self.base_url}/v1/fleets/vehicles/{vin}"
                 response = requests.delete(url, headers=self._get_headers())
                 
                 if response.status_code == 401:
