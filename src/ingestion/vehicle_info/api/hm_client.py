@@ -6,6 +6,19 @@ from typing import Tuple, Any, List, Dict
 class HMApi:
     """High Mobility API client for vehicle management."""
     
+    # Brand mapping for HM API
+    BRAND_MAPPING = {
+        'mercedes': 'mercedes-benz',
+        'mercedes-benz': 'mercedes-benz'
+    }
+    
+    # Status mapping for vehicle clearance
+    STATUS_MAPPING = {
+        'approved': True,
+        'revoked': False,
+        'pending': False
+    }
+    
     def __init__(self, base_url: str, client_id: str, client_secret: str):
         self.base_url = base_url
         self.client_id = client_id
@@ -73,7 +86,14 @@ class HMApi:
         return response.status_code, response.json() if response.ok else response.text
 
     def get_status(self, vin: str) -> Tuple[int, Any]:
-        """Get vehicle status."""
+        """Get vehicle status.
+        
+        Returns:
+            Tuple[int, Any]: A tuple containing:
+                - HTTP status code
+                - If successful, a dict with 'has_clearance' boolean and 'status' string
+                  If failed, the error message
+        """
         retry_count = 0
         while retry_count < 2:  # Maximum 1 retry
             try:
@@ -87,7 +107,15 @@ class HMApi:
                         continue
                     return result
                 
-                return response.status_code, response.json() if response.ok else response.text
+                if response.ok:
+                    data = response.json()
+                    status = data.get('status', '').lower()
+                    return response.status_code, {
+                        'has_clearance': self.STATUS_MAPPING.get(status, False),
+                        'status': status
+                    }
+                
+                return response.status_code, response.text
             except Exception as e:
                 logging.error(f"Failed to get HM vehicle status: {str(e)}")
                 return 500, str(e)
@@ -112,24 +140,29 @@ class HMApi:
                 logging.error(f"Failed to get HM clearance: {str(e)}")
                 return 500, str(e)
 
-    def create_clearance(self, vehicles: List[Dict[str, str]]) -> Tuple[int, Any]:
-        """Create clearance for vehicles.
+    def create_clearance(self, vehicles: List[Dict[str, str]]) -> Tuple[int, Dict[str, Any]]:
+        """Create clearance for vehicles and check their real activation status.
         
         Args:
             vehicles: List of dicts containing 'vin' and 'brand' for each vehicle
+            
+        Returns:
+            Tuple[int, Dict[str, Any]]: A tuple containing:
+                - HTTP status code
+                - Dict with creation response and real activation status for each VIN
         """
         retry_count = 0
         while retry_count < 2:  # Maximum 1 retry
             try:
                 url = f"{self.base_url}/v1/fleets/vehicles"
                 # Ensure each vehicle has required fields in correct format
-                formatted_vehicles = [
-                    {
+                formatted_vehicles = []
+                for vehicle in vehicles:
+                    brand = vehicle["brand"].lower()
+                    formatted_vehicles.append({
                         "vin": vehicle["vin"],
-                        "brand": vehicle["brand"].lower(),
-                    }
-                    for vehicle in vehicles
-                ]
+                        "brand": self.BRAND_MAPPING.get(brand, brand),
+                    })
                 
                 response = requests.post(
                     url,
@@ -143,8 +176,21 @@ class HMApi:
                         retry_count += 1
                         continue
                     return result
+
+                # Get real activation status for each vehicle after creation
+                activation_status = {}
+                if response.ok:
+                    for vehicle in formatted_vehicles:
+                        vin = vehicle["vin"]
+                        status_code, status_data = self.get_status(vin)
+                        activation_status[vin] = status_data if status_code == 200 else {'has_clearance': False, 'status': 'error'}
+
+                    return response.status_code, {
+                        'creation_response': response.json(),
+                        'activation_status': activation_status
+                    }
                 
-                return response.status_code, response.json() if response.ok else response.text
+                return response.status_code, response.text
             except Exception as e:
                 logging.error(f"Failed to create HM clearance: {str(e)}")
                 return 500, str(e)
