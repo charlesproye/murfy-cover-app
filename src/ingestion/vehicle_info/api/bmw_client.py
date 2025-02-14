@@ -75,7 +75,6 @@ class BMWApi:
         """
         try:
             url = f"{self.base_url}/vehicle"
-            # Always use empty string for end_date
             vehicle_data['contract']['end_date'] = ""
             
             payload = json.dumps(vehicle_data)
@@ -97,7 +96,6 @@ class BMWApi:
         try:
             url = f"{self.base_url}/vehicle/{vin}"
             response = requests.delete(url, headers=self._get_headers())
-            # For DELETE requests, often there is no content returned
             return response.status_code, response.text if response.text else ""
         except Exception as e:
             logging.error(f"Failed to delete BMW clearance: {str(e)}")
@@ -124,7 +122,6 @@ class BMWApi:
             url = f"{self.base_url}/fleet/{fleet_id}/vehicle/{vin}"
             logging.info(f"Adding vehicle to fleet - URL: {url}")
             response = requests.post(url, headers=self._get_headers())
-            # For POST to fleet, often there is no content returned
             return response.status_code, response.text if response.text else ""
         except Exception as e:
             logging.error(f"Failed to add vehicle to BMW fleet: {str(e)}")

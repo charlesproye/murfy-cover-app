@@ -6,13 +6,11 @@ from typing import Tuple, Any, List, Dict
 class HMApi:
     """High Mobility API client for vehicle management."""
     
-    # Brand mapping for HM API
     BRAND_MAPPING = {
         'mercedes': 'mercedes-benz',
         'mercedes-benz': 'mercedes-benz'
     }
     
-    # Status mapping for vehicle clearance
     STATUS_MAPPING = {
         'approved': True,
         'revoked': False,
@@ -24,14 +22,13 @@ class HMApi:
         self.client_id = client_id
         self.client_secret = client_secret
         self._access_token = None
-        self.__token_exp = 0  # Timestamp d'expiration du token
+        self.__token_exp = 0
 
     def _is_token_expired(self) -> bool:
         """Check if the current token is expired."""
         if not self._access_token:
             return True
         timestamp = (datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
-        # Renouveler 5 minutes avant expiration pour éviter les problèmes de timing
         return timestamp >= (self.__token_exp - 300)
 
     def _get_auth_token(self) -> str:
@@ -52,7 +49,7 @@ class HMApi:
             timestamp = (
                 datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
             ).total_seconds()
-            expires_in = int(response_data.get("expires_in", 3600))  # Default 1 hour if not specified
+            expires_in = int(response_data.get("expires_in", 3600))
             self.__token_exp = timestamp + expires_in
             logging.info("Successfully renewed High Mobility auth token")
             return self._access_token
@@ -81,8 +78,8 @@ class HMApi:
         """
         if response.status_code == 401 and retry_count < 1:
             logging.info("Received 401, attempting to refresh token and retry")
-            self._access_token = None  # Force token refresh
-            return None  # Signal to retry the request
+            self._access_token = None
+            return None
         return response.status_code, response.json() if response.ok else response.text
 
     def get_status(self, vin: str) -> Tuple[int, Any]:
@@ -95,7 +92,7 @@ class HMApi:
                   If failed, the error message
         """
         retry_count = 0
-        while retry_count < 2:  # Maximum 1 retry
+        while retry_count < 2:
             try:
                 url = f"{self.base_url}/v1/fleets/vehicles/{vin}"
                 response = requests.get(url, headers=self._get_headers())
@@ -123,7 +120,7 @@ class HMApi:
     def get_clearance(self, vin: str) -> Tuple[int, Any]:
         """Get vehicle clearance status."""
         retry_count = 0
-        while retry_count < 2:  # Maximum 1 retry
+        while retry_count < 2:
             try:
                 url = f"{self.base_url}/vehicles/{vin}/clearance"
                 response = requests.get(url, headers=self._get_headers())
@@ -152,10 +149,9 @@ class HMApi:
                 - Dict with creation response and real activation status for each VIN
         """
         retry_count = 0
-        while retry_count < 2:  # Maximum 1 retry
+        while retry_count < 2:
             try:
                 url = f"{self.base_url}/v1/fleets/vehicles"
-                # Ensure each vehicle has required fields in correct format
                 formatted_vehicles = []
                 for vehicle in vehicles:
                     brand = vehicle["brand"].lower()
@@ -177,7 +173,6 @@ class HMApi:
                         continue
                     return result
 
-                # Get real activation status for each vehicle after creation
                 activation_status = {}
                 if response.ok:
                     for vehicle in formatted_vehicles:
@@ -198,7 +193,7 @@ class HMApi:
     def delete_clearance(self, vin: str) -> Tuple[int, Any]:
         """Delete vehicle clearance."""
         retry_count = 0
-        while retry_count < 2:  # Maximum 1 retry
+        while retry_count < 2:
             try:
                 url = f"{self.base_url}/v1/fleets/vehicles/{vin}"
                 response = requests.delete(url, headers=self._get_headers())

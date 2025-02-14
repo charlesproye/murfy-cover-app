@@ -9,7 +9,7 @@ class StellantisApi:
     """Stellantis API client for vehicle management."""
     
     def __init__(self, base_url: str, email: str, password: str, fleet_id: str, company_id: str):
-        self.base_url = base_url.rstrip('/')  # Remove trailing slash if present
+        self.base_url = base_url.rstrip('/')
         self.email = email
         self.password = password
         self.fleet_id = fleet_id
@@ -89,13 +89,12 @@ class StellantisApi:
         try:
             url = f"{self.base_url}/connected-fleet/api/contracts"
             
-            # Create conditions for VIN search
             conditions = json.dumps({"car.vin": vin})
             
             params = {
                 "skip": skip,
                 "limit": limit,
-                "conditions": conditions  # requests will automatically URL encode this
+                "conditions": conditions
             }
             
             response = requests.get(
@@ -106,10 +105,8 @@ class StellantisApi:
 
             if response.ok:
                 data = response.json()
-                # If we have contracts, return the first one (most recent)
                 if data and isinstance(data, list) and len(data) > 0:
                     return response.status_code, data[0]
-                # No contracts found
                 return 404, None
             return response.status_code, response.text
         except Exception as e:
@@ -130,10 +127,9 @@ class StellantisApi:
             if not vehicles:
                 return 400, "No vehicles provided"
                 
-            vehicle = vehicles[0]  # We only handle one vehicle at a time
+            vehicle = vehicles[0]
             vin = vehicle["vin"]
             
-            # Check eligibility first
             if not self.is_eligible(vin):
                 error_msg = f"Vehicle {vin} is not eligible for activation"
                 logging.error(error_msg)
@@ -179,11 +175,9 @@ class StellantisApi:
             url = f"{self.base_url}/connected-fleet/api/contracts/{contract_id}"
             response = requests.delete(url, headers=self._get_headers())
             
-            # 204: Successful deletion
             if response.status_code == 204:
                 return response.status_code, None
                 
-            # For error responses (400, 404, 500), try to parse JSON response
             try:
                 error_data = response.json() if response.text else {"message": "No error details available"}
             except json.JSONDecodeError:

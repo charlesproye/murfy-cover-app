@@ -16,7 +16,7 @@ from utils.google_sheets_utils import get_google_client
 
 logger = getLogger("ingestion.vehicle_info")
 
-SPREADSHEET_ID = "1zGwSY41eN00YQbaNf9HNk3g5g6KQaAD1FY7-XS8Uf9w"
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 CREDENTIALS_PATH = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH", "credentials.json")
 
 # Rate limiting settings

@@ -5,14 +5,12 @@ from ..config.settings import SPREADSHEET_ID
 from ..utils.google_sheets_utils import get_google_client
 from gspread.exceptions import APIError
 
-# Rate limiting settings
 MAX_RETRIES = 5
 INITIAL_RETRY_DELAY = 1
 MAX_RETRY_DELAY = 32  # Maximum delay between retries in seconds
 REQUESTS_PER_MINUTE = 50  # Conservative limit to avoid quota issues
 MIN_REQUEST_INTERVAL = 60.0 / REQUESTS_PER_MINUTE  # Minimum time between requests
 
-# Keep track of last request time
 last_request_time = 0
 
 def wait_for_rate_limit():
@@ -46,26 +44,22 @@ async def update_google_sheet_status(vin: str, real_activation: Optional[bool], 
     
     for attempt in range(MAX_RETRIES):
         try:
-            # Wait for rate limit before making request
             wait_for_rate_limit()
             
             client = get_google_client()
             sheet = client.open_by_key(SPREADSHEET_ID).sheet1
             
-            # Find the row with the VIN
             cell = sheet.find(vin)
             if not cell:
                 logging.error(f"VIN {vin} not found in Google Sheet")
                 return False
                 
-            # Get headers to find column indices
             headers = sheet.row_values(1)
             real_activation_col = headers.index("Real Activation") + 1
             error_col = headers.index("Activation Error") + 1
             eligibility_col = headers.index("Eligibility") + 1
             evalue_col = headers.index("EValue") + 1
             
-            # Prepare batch update
             updates = []
             
             # Update Real Activation status only if a value is provided

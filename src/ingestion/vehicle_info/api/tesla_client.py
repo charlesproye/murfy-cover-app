@@ -19,7 +19,6 @@ class TeslaApi:
         'AYVENS_NVA': 'ACCESS_TOKEN_AYVENS_NVA'
     }
     
-    # Patterns pour identifier les types de modèles Tesla
     TESLA_PATTERNS = {
         'model 3': {
             'patterns': [
@@ -62,10 +61,10 @@ class TeslaApi:
         self.base_url = base_url
         self.slack_token = slack_token
         self.slack_channel_id = slack_channel_id
-        self._tokens = {}  # Cache des tokens par compte
-        self._vin_to_account = {}  # Mapping VIN -> compte Tesla
+        self._tokens = {}
+        self._vin_to_account = {}
         self._cache_timestamp = None
-        self._cache_duration = 24 * 3600  # 24 heures en secondes
+        self._cache_duration = 24 * 3600
         
     async def _fetch_slack_messages(self, session) -> List[Dict]:
         """Récupère les messages de Slack contenant les tokens."""
@@ -97,7 +96,7 @@ class TeslaApi:
             logging.info(f"Getting token for {account_key} from Slack...")
             messages = await self._fetch_slack_messages(session)
             
-            for i in range(6):  # Check first 6 messages
+            for i in range(6):
                 try:
                     message_text = messages[i]['blocks'][0]['elements'][0]['elements'][3]['text']
                     response_key = messages[i]['blocks'][0]['elements'][0]['elements'][0]['text'].split(':')[0]
@@ -153,7 +152,7 @@ class TeslaApi:
             try:
                 headers = await self._get_headers(session, account_name)
                 async with session.get(url, headers=headers) as response:
-                    if response.status == 429:  # Rate limit
+                    if response.status == 429:
                         if retries < self.MAX_RETRIES:
                             retries += 1
                             retry_delay = self.RATE_LIMIT_DELAY * 2**retries
@@ -164,10 +163,10 @@ class TeslaApi:
                             logging.error("Max retries reached for rate limiting")
                             break
                             
-                    if response.status == 401:  # Token expired
+                    if response.status == 401:
                         if retries < self.MAX_RETRIES:
                             retries += 1
-                            self._tokens.pop(self.ACCOUNT_TOKEN_KEYS[account_name], None)  # Force token refresh
+                            self._tokens.pop(self.ACCOUNT_TOKEN_KEYS[account_name], None)
                             continue
                         else:
                             logging.error("Max retries reached for authentication")
@@ -182,7 +181,7 @@ class TeslaApi:
                     data = await response.json()
                     vehicles = data.get('response', [])
                     
-                    if not vehicles:  # Empty page = finished
+                    if not vehicles:
                         break
                     
                     vins = [vehicle['vin'] for vehicle in vehicles]
@@ -264,20 +263,16 @@ class TeslaApi:
                     )
                     
                     if model_info:
-                        # Récupérer la version et le code du modèle
                         version = model_info['code'][1:]
                         model_code = version[2]
                         
-                        # Convertir les codes spéciaux
                         if model_code in ["1", "7"]:
                             model_code = "s"
                         model_name = f"model {model_code}".lower()
                         
-                        # Récupérer le nom complet du modèle pour identifier le type
                         display_name = model_info['displayName'].lower()
                         vehicle_type = "unknown"
                         
-                        # Chercher le type en utilisant les patterns
                         if model_name in self.TESLA_PATTERNS:
                             for pattern, type_name in self.TESLA_PATTERNS[model_name]['patterns']:
                                 if re.match(pattern, display_name, re.IGNORECASE):
@@ -328,7 +323,7 @@ class TeslaApi:
                         logging.warning(f"No valid warranty data for VIN {vin}")
                         return None
                     elif response.status == 401:
-                        self._tokens.pop(self.ACCOUNT_TOKEN_KEYS[account], None)  # Force token refresh
+                        self._tokens.pop(self.ACCOUNT_TOKEN_KEYS[account], None)
                     
                     logging.warning(f"HTTP {response.status} error fetching warranty for VIN {vin}, retries left: {retries-1}")
                     retries -= 1

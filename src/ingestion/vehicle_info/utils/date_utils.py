@@ -15,26 +15,24 @@ def convert_date_format(date_str) -> Optional[str]:
         return None
         
     try:
-        # Handle pandas Timestamp
         if isinstance(date_str, pd.Timestamp):
             return date_str.strftime('%Y-%m-%d')
             
-        # Handle string formats
-        date_str = str(date_str).split()[0]  # Take only the date part
+        date_str = str(date_str).split()[0]
         
-        if '.' in date_str:  # DD.MM.YYYY format
+        if '.' in date_str:
             day, month, year = date_str.split('.')
             return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
             
-        elif '/' in date_str:  # MM/DD/YYYY format
+        elif '/' in date_str:
             month, day, year = date_str.split('/')
             return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
             
-        elif '-' in date_str:  # DD-MM-YYYY or YYYY-MM-DD format
+        elif '-' in date_str:
             parts = date_str.split('-')
-            if len(parts[0]) == 4:  # Already YYYY-MM-DD
+            if len(parts[0]) == 4:
                 return date_str
-            else:  # DD-MM-YYYY
+            else:
                 day, month, year = parts
                 return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
                 
