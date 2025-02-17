@@ -6,8 +6,8 @@ import sys
 from typing import Optional
 from functools import partial
 
-from ingestion.vehicle_info.config.settings import LOGGING_CONFIG, BMW_AUTH_URL, BMW_BASE_URL, BMW_CLIENT_ID, BMW_FLEET_ID, \
-    BMW_CLIENT_USERNAME, BMW_CLIENT_PASSWORD, HM_BASE_URL, HM_CLIENT_ID, HM_CLIENT_SECRET, STELLANTIS_BASE_URL, STELLANTIS_EMAIL, STELLANTIS_PASSWORD, STELLANTIS_FLEET_ID, STELLANTIS_COMPANY_ID, SLACK_TOKEN
+from ingestion.vehicle_info.config.settings import LOGGING_CONFIG
+from ingestion.vehicle_info.config.credentials import *
 from ingestion.vehicle_info.api.bmw_client import BMWApi
 from ingestion.vehicle_info.api.hm_client import HMApi
 from ingestion.vehicle_info.api.stellantis_client import StellantisApi

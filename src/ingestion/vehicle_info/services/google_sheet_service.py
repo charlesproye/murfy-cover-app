@@ -1,7 +1,7 @@
 import logging
 import time
 from typing import Optional
-from ..config.settings import SPREADSHEET_ID
+from ..config.credentials import SPREADSHEET_ID
 from ..utils.google_sheets_utils import get_google_client
 from gspread.exceptions import APIError
 

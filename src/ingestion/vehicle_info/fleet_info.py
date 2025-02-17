@@ -11,19 +11,14 @@ from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from core.config import *
-from ingestion.vehicle_info.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES
-from ingestion.vehicle_info.utils.google_sheets_utils import get_google_client
+from .config.credentials import SPREADSHEET_ID 
+from .config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES
+from .config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
+from .utils.google_sheets_utils import get_google_client
+# from config import COL_DTYPES
 
 logger = getLogger("ingestion.vehicle_info")
-
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-CREDENTIALS_PATH = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH", "credentials.json")
-
-# Rate limiting settings
-MAX_RETRIES = 5
-INITIAL_RETRY_DELAY = 1
-MAX_RETRY_DELAY = 32  # Maximum delay between retries in seconds
-
+ 
 
 def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_DELAY) -> List[Dict]:
     """Récupère les données de la Google Sheet avec gestion des rate limits et des erreurs."""
