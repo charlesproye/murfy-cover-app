@@ -1,3 +1,4 @@
+'''
 import asyncio
 import aiohttp
 import json
@@ -643,3 +644,5 @@ if __name__ == "__main__":
     
     # Or run the full update
     asyncio.run(main(df))
+
+'''

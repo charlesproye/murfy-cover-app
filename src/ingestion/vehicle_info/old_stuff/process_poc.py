@@ -1,3 +1,4 @@
+'''
 import pandas as pd
 import asyncio
 import logging
@@ -151,3 +152,5 @@ async def process_vehicles():
 
 if __name__ == "__main__":
     asyncio.run(process_vehicles()) 
+
+'''

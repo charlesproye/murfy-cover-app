@@ -11,8 +11,8 @@ from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from core.config import *
-from config import *
-from utils.google_sheets_utils import get_google_client
+from ingestion.vehicle_info.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES
+from ingestion.vehicle_info.utils.google_sheets_utils import get_google_client
 
 logger = getLogger("ingestion.vehicle_info")
 
@@ -24,45 +24,6 @@ MAX_RETRIES = 5
 INITIAL_RETRY_DELAY = 1
 MAX_RETRY_DELAY = 32  # Maximum delay between retries in seconds
 
-# Constants and Mappings
-OEM_NAME_MAPPING = {
-    'Mercedes': 'mercedes',
-    'MERCEDES': 'mercedes',
-    'mercedes-benz': 'mercedes',
-    'Mercedes-Benz': 'mercedes',
-    'MERCEDES-BENZ': 'mercedes',
-    'Mercedes': 'mercedes',
-    'Stellantis': 'stellantis',
-    'STELLANTIS': 'stellantis',
-    'stellantis': 'stellantis'
-}
-
-COUNTRY_NAME_MAPPING = {
-    'NL': 'Netherlands',
-    'FR': 'France',
-    'BE': 'Belgium',
-    'DE': 'Germany',
-    'LU': 'Luxembourg',
-    'ES': 'Spain',
-    'IT': 'Italy',
-    'PT': 'Portugal',
-    'GB': 'United Kingdom',
-    'UK': 'United Kingdom'
-}
-
-# Column data types
-COL_DTYPES = {
-    'vin': str,
-    'licence_plate': str,
-    'make': str,
-    'model': str,
-    'type': str,
-    'oem': str,
-    'owner': str,
-    'country': str,
-    'activation': bool,
-    'real_activation': bool
-}
 
 def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_DELAY) -> List[Dict]:
     """Récupère les données de la Google Sheet avec gestion des rate limits et des erreurs."""
@@ -177,11 +138,11 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
             logger.info(f"Found {len(df)} vehicles for owner {owner_filter} (filtered from {initial_count})")
             
         # Clean and standardize data
-        df = df.pipe(map_col_to_dict, "country", COUNTRY_NAME_MAPPING)
+        df = df.pipe(map_col_to_dict, "country", COUNTRY_MAPPING)
         
         # Map OEM names
         if 'oem' in df.columns:
-            df['oem'] = df['oem'].apply(lambda x: OEM_NAME_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
+            df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
         
         # Convert dates with explicit format handling
         date_columns = ['start_date', 'end_of_contract']

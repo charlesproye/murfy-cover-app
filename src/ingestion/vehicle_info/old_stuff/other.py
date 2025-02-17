@@ -1,3 +1,4 @@
+'''
 import asyncio
 import logging
 import pandas as pd
@@ -12,11 +13,11 @@ import requests
 
 from core.sql_utils import get_connection
 from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
-from ingestion.vehicle_info.config import *
 from dotenv import load_dotenv
 from ingestion.vehicle_info.utils.google_sheets_utils import get_google_client
 from ingestion.bmw.api import BMWApi
 from ingestion.high_mobility.api import HMApi
+from config.mappings import mappings, suffixes_to_remove, MAKE_MAPPING, OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES
 
 load_dotenv()
 
@@ -36,26 +37,6 @@ hm_api = HMApi(
     client_secret=os.getenv('HM_CLIENT_SECRET')
 )
 
-MAKE_MAPPING = {
-    'mercedes-benz': 'mercedes',
-    'mercedes': 'mercedes',
-    'Mercedes': 'mercedes',
-    'Mercedes-Benz': 'mercedes',
-    'MERCEDES': 'mercedes',
-    'MERCEDES-BENZ': 'mercedes'
-}
-
-OEM_MAPPING = {
-    'Mercedes': 'mercedes',
-    'MERCEDES': 'mercedes',
-    'mercedes-benz': 'mercedes',
-    'Mercedes-Benz': 'mercedes',
-    'MERCEDES-BENZ': 'mercedes',
-    'Mercedes': 'mercedes',
-    'Stellantis': 'stellantis',
-    'STELLANTIS': 'stellantis',
-    'stellantis': 'stellantis'
-}
 
 logging.basicConfig(
     level=logging.INFO,
@@ -744,5 +725,5 @@ if __name__ == "__main__":
     df = asyncio.run(fleet_info(owner_filter="Ayvens"))
     asyncio.run(main(df))
 
-
+'''
 
