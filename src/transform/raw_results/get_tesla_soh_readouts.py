@@ -2,9 +2,11 @@
 We recieved a report of Aviloo SoH estimations from Ayvens on some Teslas.  
 This module facilitates the obtention of these results.  
 """
+from os.path import join, dirname
+
 from core.pandas_utils import *
 
-READOUTS_DF_PATH = "data_cache/aviloo_soh_readouts.csv"
+READOUTS_DF_PATH = join(dirname(__file__), "data_cache/aviloo_soh_readouts.csv")
 
 def get_aviloo_soh_readouts() -> DF:
     return (
