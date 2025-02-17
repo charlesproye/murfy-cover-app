@@ -23,6 +23,7 @@ def get_aviloo_soh_readouts() -> DF:
             }
         )
         .rename(columns={"VIN": "vin", "SoH Readout": "soh_readout"})
+        .eval("soh_readout = soh_readout / 100.0")
     )
 
 if __name__ == "__main__":
