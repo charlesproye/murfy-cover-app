@@ -1,159 +1,160 @@
 import asyncio
-from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
-from ingestion.vehicle_info.other import main as other_main
-from ingestion.vehicle_info.tesla import main as tesla_main
-
-from core.sql_utils import get_connection
 import logging
+import pandas as pd
+import signal
+import sys
+from typing import Optional
+from functools import partial
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+from ingestion.vehicle_info.config.settings import LOGGING_CONFIG
+from ingestion.vehicle_info.config.credentials import *
+from ingestion.vehicle_info.api.bmw_client import BMWApi
+from ingestion.vehicle_info.api.hm_client import HMApi
+from ingestion.vehicle_info.api.stellantis_client import StellantisApi
+from ingestion.vehicle_info.api.tesla_client import TeslaApi
+from ingestion.vehicle_info.services.activation_service import VehicleActivationService
+from ingestion.vehicle_info.services.vehicle_processor import VehicleProcessor
+from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
 
-def list_used_models():
-    """Liste tous les modèles de véhicules présents dans la base de données qui sont utilisés"""
+# Configure logging
+logging.basicConfig(**LOGGING_CONFIG)
+logger = logging.getLogger(__name__)
+
+def handle_sigint(signum, frame, current_task=None):
+    """Handle SIGINT (Ctrl+C) gracefully."""
+    if current_task:
+        logger.info("\nReceived interrupt signal. Cancelling all tasks...")
+        current_task.cancel()
+    else:
+        logger.info("\nReceived interrupt signal. Exiting...")
+        sys.exit(0)
+
+async def cleanup(task):
+    """Clean up any remaining tasks."""
+    try:
+        await task
+    except asyncio.CancelledError:
+        logger.info("Main task was cancelled. Cleaning up...")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {str(e)}")
+    finally:
+        # Cancel all remaining tasks
+        for task in asyncio.all_tasks():
+            if task is not asyncio.current_task():
+                task.cancel()
+        logger.info("All tasks cancelled. Exiting...")
+
+async def get_existing_model_metadata():
+    """Retrieve existing model metadata from the database."""
+    from core.sql_utils import get_connection
+    
     with get_connection() as conn:
         cursor = conn.cursor()
         
         cursor.execute("""
             SELECT 
-                vm.id,
-                o.oem_name,
+                m.make_name,
                 vm.model_name,
                 vm.type,
-                COUNT(v.id) as vehicle_count
+                vm.url_image,
+                vm.warranty_km,
+                vm.warranty_date,
+                vm.capacity
             FROM vehicle_model vm
-            JOIN oem o ON vm.oem_id = o.id
-            JOIN vehicle v ON v.vehicle_model_id = vm.id
-            GROUP BY vm.id, o.oem_name, vm.model_name, vm.type
-            ORDER BY o.oem_name, vm.model_name, vm.type
+            JOIN make m ON vm.make_id = m.id
+            WHERE vm.url_image IS NOT NULL 
+               OR vm.warranty_km IS NOT NULL 
+               OR vm.warranty_date IS NOT NULL 
+               OR vm.capacity IS NOT NULL
+            ORDER BY m.make_name, vm.model_name, vm.type
         """)
         
         results = cursor.fetchall()
         
         if results:
-            print("\nModèles de véhicules utilisés dans la base :")
+            print("\nExisting model metadata:")
             print("--------------------------------------------------------------------------------")
-            print("ID | Marque | Modèle | Type | Nombre de véhicules")
+            print("Make | Model | Type | URL | Warranty km | Warranty years | Capacity")
             print("--------------------------------------------------------------------------------")
-            total_vehicles = 0
             for row in results:
-                model_id, oem, model, type_value, count = row
-                type_str = type_value if type_value else "N/A"
-                print(f"{model_id} | {oem} | {model} | {type_str} | {count}")
-                total_vehicles += count
+                make, model, type_value, url, warranty_km, warranty_date, capacity = row
+                print(f"{make} | {model} | {type_value or 'N/A'} | {url or 'N/A'} | {warranty_km or 'N/A'} | {warranty_date or 'N/A'} | {capacity or 'N/A'}")
             print("--------------------------------------------------------------------------------")
-            print(f"Total : {len(results)} modèles différents")
-            print(f"Total véhicules : {total_vehicles}")
         else:
-            print("Aucun modèle trouvé dans la base")
-
-def cleanup_unused_models():
-    """
-    Supprime les modèles de véhicules qui ne sont liés à aucun véhicule dans la base de données.
-    Retourne le nombre de modèles supprimés.
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        try:
-            # Récupère les modèles non utilisés
-            cursor.execute("""
-                SELECT 
-                    vm.id,
-                    o.oem_name,
-                    vm.model_name,
-                    vm.type
-                FROM vehicle_model vm
-                JOIN oem o ON vm.oem_id = o.id
-                LEFT JOIN vehicle v ON v.vehicle_model_id = vm.id
-                WHERE v.id IS NULL
-            """)
+            print("No metadata found in database")
             
-            unused_models = cursor.fetchall()
-            
-            if unused_models:
-                # Supprime les modèles non utilisés
-                cursor.execute("""
-                    DELETE FROM vehicle_model vm
-                    WHERE NOT EXISTS (
-                        SELECT 1 
-                        FROM vehicle v 
-                        WHERE v.vehicle_model_id = vm.id
-                    )
-                    RETURNING id
-                """)
-                
-                deleted_count = len(cursor.fetchall())
-                conn.commit()
-                
-                # Log les modèles supprimés
-                logging.info(f"Suppression de {deleted_count} modèles non utilisés:")
-                for model in unused_models:
-                    model_id, oem, model_name, type_value = model
-                    type_str = type_value if type_value else "N/A"
-                    logging.info(f"- {oem} | {model_name} | {type_str} (ID: {model_id})")
-                
-                return deleted_count
-            else:
-                logging.info("Aucun modèle non utilisé trouvé dans la base")
-                return 0
-                
-        except Exception as e:
-            conn.rollback()
-            logging.error(f"Erreur lors du nettoyage des modèles non utilisés: {str(e)}")
-            raise
+        return results
 
-def find_models_needing_completion():
-    """
-    Identifier les modèles avec des valeurs NULL.
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
+async def main(owner_filter: Optional[str] = None):
+    """Main entry point for vehicle processing."""
+    try:
+        logger.info("Starting vehicle processing...")
         
-        cursor.execute("""
-            SELECT 
-                       id,
-                       model_name,
-                       type
-            FROM vehicle_model
-            WHERE 
-                       id IS NULL 
-                       OR model_name IS NULL
-                       OR url_image IS NULL 
-                       OR warranty_km IS NULL 
-                       OR warranty_date IS NULL 
-                       OR capacity IS NULL
-                       OR net_capacity IS NULL
-                       OR autonomy IS NULL
-        """)
-        
-        results_completion = cursor.fetchall()
-        
-        if results_completion:
-            print("\nModèles besoin d'être complétés:")
-            print("--------------------------------------------------------------------------------")
-            print("ID | Modèle | Type ")
-            print("--------------------------------------------------------------------------------")
-            for row in results_completion:
-                id, model_name, type = row
-                print(f"{id} | {model_name} | {type}")
-            print("--------------------------------------------------------------------------------")
-            print(f"Total : {len(results_completion)} modèles besoin d'être complétés")
-        else:
-            print("Tout les modèles sont complets")
+        bmw_api = BMWApi(
+            auth_url=BMW_AUTH_URL,
+            base_url=BMW_BASE_URL,
+            client_id=BMW_CLIENT_ID,
+            fleet_id=BMW_FLEET_ID,
+            client_username=BMW_CLIENT_USERNAME,
+            client_password=BMW_CLIENT_PASSWORD
+        )
 
+        hm_api = HMApi(
+            base_url=HM_BASE_URL,
+            client_id=HM_CLIENT_ID,
+            client_secret=HM_CLIENT_SECRET
+        )
+
+        stellantis_api = StellantisApi(
+            base_url=STELLANTIS_BASE_URL,
+            email=STELLANTIS_EMAIL,
+            password=STELLANTIS_PASSWORD,
+            fleet_id=STELLANTIS_FLEET_ID,
+            company_id=STELLANTIS_COMPANY_ID
+        )
+        
+        # Initialize Tesla API with required parameters
+        tesla_api = TeslaApi(
+            base_url="https://fleet-api.prd.eu.vn.cloud.tesla.com",
+            slack_token=SLACK_TOKEN,
+            slack_channel_id="C0816LXFCNL"  # Channel ID from tesla.py
+        )
+        
+        df = await fleet_info(owner_filter=owner_filter)
+        logger.info(f"Total vehicles in fleet_info: {len(df)}")
+                
+        activation_service = VehicleActivationService(bmw_api, hm_api, stellantis_api, tesla_api)
+        activation_service.set_fleet_info(df)
+        
+        vehicle_processor = VehicleProcessor(activation_service)
+        
+        await vehicle_processor.process_vehicles(df)
+        
+        # Optionally get model metadata
+        # await get_existing_model_metadata()
+        
+    except asyncio.CancelledError:
+        logger.info("Processing cancelled by user.")
+        raise
+    except Exception as e:
+        logger.error(f"Error in main program: {str(e)}")
+        raise
 
 if __name__ == "__main__":
-
-    fleet_info = asyncio.run(fleet_info())
-    print(fleet_info)
-    # Get the correct info model for each brand 
-    asyncio.run(tesla_main(fleet_info))
-    #Get the information of the model based on the excel file 
-    asyncio.run(other_main(fleet_info))
-
-    cleanup_unused_models()
-    list_used_models()
-    find_models_needing_completion()
+    try:
+        # Create the main task
+        loop = asyncio.get_event_loop()
+        main_task = loop.create_task(main(owner_filter="Ayvens"))
+        
+        # Set up signal handler with the current task
+        signal.signal(signal.SIGINT, partial(handle_sigint, current_task=main_task))
+        
+        # Run the main task with cleanup
+        loop.run_until_complete(cleanup(main_task))
+        
+    except KeyboardInterrupt:
+        logger.info("\nProcess interrupted by user.")
+    finally:
+        # Close the event loop
+        loop.close()
+        sys.exit(0)

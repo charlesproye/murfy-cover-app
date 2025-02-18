@@ -1,26 +1,96 @@
-Do be able to have all the information about the vehicles we need to store all the static data about the vehicles.
+# Vehicle Information Ingestion
 
-You'll find here some information : https://www.notion.so/bib-batteries/Pipeline-1292de3b75c780328d18eba362868645?pvs=4#1602de3b75c7801289a1e078d9f8aa65
+## Overview
+This module handles the automated collection and processing of vehicle information from multiple OEM (Original Equipment Manufacturer) APIs. It supports BMW, HM, Stellantis, and Tesla vehicles.
 
-Depeding on the brand we will base are dat either on the data from our customer or directly on the data from the OEMs
-At the moment we have the following brands : 
-- Tesla : tesla.py
+## Features
+- Connects to multiple OEM APIs (BMW, HM, Stellantis, Tesla)
+- Processes vehicle data in bulk
+- Handles authentication and API communication
+- Stores vehicle information in a standardized format
+- Supports filtering by owner
 
-For all the others brands we are basing our data on the one given by the leasing company
-- other.py
+## Prerequisites
+The following environment variables need to be set:
+- BMW credentials (AUTH_URL, BASE_URL, CLIENT_ID, FLEET_ID, USERNAME, PASSWORD)
+- HM credentials (BASE_URL, CLIENT_ID, CLIENT_SECRET)
+- Stellantis credentials (BASE_URL, EMAIL, PASSWORD, FLEET_ID, COMPANY_ID)
+- Tesla credentials (via Slack token)
+- Database connection details
 
-The process is the following : 
-1. We list all the VIN and their ownership : fleet_info.py
-2. Depending on the brand we run the right script to get the model information 
-    a. We get the list of the VIN for the particluar brand 
-    b. We do all the API call to get the information of the model 
-    c. We add the model that still don't exist into the database vehicle_model
-    d. We load the vehicle with the right ownership and vehicle_model
-3. We load the date in the database with the right ownership
-4. We cleanup the unused models
-5. We list the used models
-6. We find the models needing completion
-7. We force the existing model_name and type into lowercase
+## Usage
 
+### Basic Usage
+```python
+# Run the ingestion for all vehicles
+python main.py
+
+# Run the ingestion for a specific owner
+python main.py --owner "Ayvens"
+```
+
+### Process Flow
+1. Connects to all OEM APIs
+2. Retrieves fleet information
+3. Processes vehicles through the activation service
+4. Updates vehicle information in the database
+5. Optionally retrieves model metadata
+
+## Error Handling
+- Graceful handling of interrupts (Ctrl+C)
+- Comprehensive logging
+- Cleanup of async tasks on exit
+
+## Components
+- `BMWApi`: Handles BMW vehicle data
+- `HMApi`: Handles HM vehicle data
+- `StellantisApi`: Handles Stellantis vehicle data
+- `TeslaApi`: Handles Tesla vehicle data
+- `VehicleActivationService`: Coordinates data collection from different APIs
+- `VehicleProcessor`: Processes and standardizes vehicle data
+
+## Key Functions
+
+### Main Function
+```python
+async def main(owner_filter: Optional[str] = None)
+```
+The main entry point for vehicle processing. It:
+- Initializes all API clients
+- Retrieves fleet information
+- Processes vehicles through the activation service
+- Optionally filters by owner
+
+### Vehicle Processing
+```python
+async def process_vehicles(df: pd.DataFrame)
+```
+Processes vehicle data by:
+- Validating vehicle information
+- Updating vehicle models in the database
+- Handling vehicle activation status
+
+### Model Metadata
+```python
+async def get_existing_model_metadata()
+```
+Retrieves and displays existing model metadata including:
+- Make and model information
+- Vehicle type
+- Warranty information
+- Vehicle capacity
+- Image URLs
+
+### Cleanup
+```python
+async def cleanup(task)
+```
+Handles graceful shutdown by:
+- Cancelling running tasks
+- Closing connections
+- Logging cleanup status
+
+## Logging
+The module uses Python's built-in logging system with configurable settings through LOGGING_CONFIG.
 
 
