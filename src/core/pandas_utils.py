@@ -28,7 +28,7 @@ def print_data(data: PD_OBJ) -> PD_OBJ:
     return data
 
 def total_MB_memory_usage(df: DF) -> int:
-    return df.memory_usage().sum() / 1e6
+    return df.memory_usage(deep=True).sum() / 1e6
 
 def floor_to(s:Series, quantization:float) -> Series:
     return (
@@ -200,7 +200,7 @@ def sanity_check(df:DF) -> DF:
         "nuniques": Series(nunique_dict).fillna(0).astype("int"),
         "count": df.count(),
         "density": df.count().div(len(df)),
-        "memory_usage_in_MB": df.memory_usage().div(1e6),
+        "memory_usage_in_MB": df.memory_usage(deep=True).div(1e6),
         "mean": df.mean(numeric_only=True),
         "std": df.std(numeric_only=True),
         "min": df.min(numeric_only=True),
