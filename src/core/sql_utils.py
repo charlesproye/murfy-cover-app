@@ -6,7 +6,7 @@ from sqlalchemy import Connection as Con
 from contextlib import contextmanager
 
 from core.pandas_utils import *
-from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR
+from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR, DB_URI_FORMAT_KEYS_PROD, DB_URI_FORMAT_STR_PROD
 from core.env_utils import get_env_var
 
 logger = getLogger("core.sql_utils")
@@ -14,6 +14,13 @@ logger = getLogger("core.sql_utils")
 def get_sqlalchemy_engine() -> Engine:
     db_uri_format_dict = {key: get_env_var(key) for key in DB_URI_FORMAT_KEYS}
     db_uri = DB_URI_FORMAT_STR.format(**db_uri_format_dict)
+    engine = create_engine(db_uri)
+
+    return engine
+
+def get_sqlalchemy_engine_prod() -> Engine:
+    db_uri_format_dict = {key: get_env_var(key) for key in DB_URI_FORMAT_KEYS_PROD}
+    db_uri = DB_URI_FORMAT_STR_PROD.format(**db_uri_format_dict)
     engine = create_engine(db_uri)
 
     return engine
