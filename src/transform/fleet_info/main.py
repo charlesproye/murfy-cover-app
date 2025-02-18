@@ -7,7 +7,7 @@ from transform.fleet_info.config import *
 fleet_info = (
     pd.read_sql_query(TABLE_QUERY, con)
     .rename(columns=COLS_NAME_MAPPING)
-    .loc[:, COLS_TO_KEEP]
+    .loc[:, COL_DTYPES.keys()]
     .astype(COL_DTYPES)
 )
 
