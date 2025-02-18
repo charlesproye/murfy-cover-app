@@ -69,18 +69,18 @@ RENAME_COLS_DICT:dict[str, str] = {
 # The keys will be used to determine what columns to keep.
 COL_DTYPES = {
     # Common
-    "vin": "string",
+    "vin": "category",
     "soc": "float32",
     "odometer": "float32",
     "estimated_range": "float32",
     "outside_temp": "float32",
-    "unit": "string",
+    "unit": "category",
     "date": "datetime64[ns]",
     "battery_energy": "float32",
     "charging_plug_connected": "bool", #BMW and Mobilisight
-    "charging_status": "string", #BMW, Tesla and Mobilisight
+    "charging_status": "category", #BMW, Tesla and Mobilisight
     "minutes_to_full_charge": "float32", #Tesla and Mobilisight
-    "charging_method": "string", #BMW and Mobilisight
+    "charging_method": "category", #BMW and Mobilisight
     # Mercedes
     "max_range": "float32",
     # BMW
@@ -113,7 +113,7 @@ COL_DTYPES = {
     "charger_voltage": "float32",
     "est_battery_range": "float32",
     "inside_temp": "float32",
-    "fast_charger_type": "string",
+    "fast_charger_type": "category",
     # Mobilisight
     "oil_temp": "float32",
     "coolant_temp": "float32",
@@ -178,7 +178,6 @@ CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
     "mercedes-benz",
     "ford",
     "volvo-cars",
-    "tesla",
     "stellantis"
 ]
 
