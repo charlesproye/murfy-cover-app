@@ -33,7 +33,7 @@ class ProcessedTimeSeries(CachedETL):
             .pipe(safe_astype, COL_DTYPES, logger=self.logger)
             .pipe(self.metric_normalize)
             .sort_values(by=["vin", "date"])
-            .pipe(set_all_str_cols_to_lower, but=["vin"])
+            .pipe(str_lower_columns, COLS_TO_STR_LOWER)
             .pipe(self.compute_date_vars)
             .pipe(self.compute_charge_n_discharge_vars)
             .merge(fleet_info, on="vin", how="left")
@@ -72,12 +72,12 @@ class ProcessedTimeSeries(CachedETL):
         )
         tss[cum_var_col] *= KJ_TO_KWH # Convert from kj to kwh
         # Reset value to zero at the start of each vehicle time series
-        tss[cum_var_col] -= tss.groupby(self.id_col)[cum_var_col].transform("first")
+        tss[cum_var_col] -= tss.groupby(self.id_col, observed=False)[cum_var_col].transform("first")
         return tss
 
     def compute_date_vars(self, tss:DF) -> DF:
         self.logger.debug(f"Computing sec_date and sec_date_diff.")
-        tss["time_diff"] = tss.groupby(self.id_col)["date"].diff()
+        tss["time_diff"] = tss.groupby(self.id_col, observed=False)["date"].diff()
         tss["sec_time_diff"] = tss["time_diff"].dt.total_seconds()
         return tss
 
@@ -90,7 +90,7 @@ class ProcessedTimeSeries(CachedETL):
         raise ValueError(MAKE_NOT_SUPPORTED_ERROR.format(make=self.make))
 
     def charge_n_discharging_masks_from_soc_diff(self, tss:DF) -> DF:
-        tss_grp = tss.groupby(self.id_col)
+        tss_grp = tss.groupby(self.id_col, observed=False)
         tss["soc_ffilled"] = tss_grp["soc"].ffill()
         tss["soc_diff"] = tss_grp["soc_ffilled"].diff()
         tss["soc_diff"] /= tss["soc_diff"].abs()
@@ -111,7 +111,7 @@ class ProcessedTimeSeries(CachedETL):
 
     def trim_leading_n_trailing_soc_off_masks(self, tss:DF, masks:list[str]) -> DF:
         self.logger.info(f"Trimming off trailing soc of {masks} masks.")
-        tss_grp = tss.groupby(self.id_col)
+        tss_grp = tss.groupby(self.id_col, observed=False)
         for mask in masks:
             trailing_soc = tss_grp[mask].transform("last")
             leading_soc = tss_grp[mask].transform("first")
@@ -122,11 +122,11 @@ class ProcessedTimeSeries(CachedETL):
         self.logger.info(f"Computing {masks} idx from masks.")
         for mask in masks:
             idx_col_name = f"{mask}_idx"
-            shifted_mask = tss.groupby(self.id_col)[mask].shift(fill_value=False)
+            shifted_mask = tss.groupby(self.id_col, observed=False)[mask].shift(fill_value=False)
             tss["new_period_start_mask"] = shifted_mask.ne(tss[mask]) 
             if self.max_td is not None:
                 tss["new_period_start_mask"] |= (tss["time_diff"] > self.max_td)
-            tss[idx_col_name] = tss.groupby(self.id_col)["new_period_start_mask"].cumsum().astype("uint16")
+            tss[idx_col_name] = tss.groupby(self.id_col, observed=False)["new_period_start_mask"].cumsum().astype("uint16")
             tss.drop(columns=["new_period_start_mask"], inplace=True)
         return tss
 
@@ -160,12 +160,12 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
     
     def compute_in_charge_idx(self, tss:DF) -> DF:
         self.logger.info(f"Computing tesla specific in_charge_idx.")
-        tss_grp = tss.groupby(self.id_col)
+        tss_grp = tss.groupby(self.id_col, observed=False)
         shifted_vars = tss_grp[["in_charge", "charge_energy_added"]].shift(fill_value=False)
         tss["new_charge_period_mask"] = shifted_vars["in_charge"].ne(tss["in_charge"]) | shifted_vars["charge_energy_added"].lt(tss["charge_energy_added"])
         tss["in_charge_idx"] = tss_grp["new_charge_period_mask"].cumsum().astype("uint16")
         tss = tss.drop(columns=["new_charge_period_mask"])
-        monotonically_increasing_charges_value_counts = tss.groupby([self.id_col, "in_charge_idx"])["charge_energy_added"].is_monotonic_increasing.value_counts()
+        monotonically_increasing_charges_value_counts = tss.groupby([self.id_col, "in_charge_idx"], observed=False)["charge_energy_added"].is_monotonic_increasing.value_counts()
         self.logger.debug(f"All charge periods have monotonically increasing charge energy added:\n{monotonically_increasing_charges_value_counts}")
         return tss
 
