@@ -22,7 +22,6 @@ RENAME_COLS_DICT:dict[str, str] = {
     "date_of_value": "date",
     "diagnostics.odometer": "odometer",
     "odometer.value": "odometer",
-    "diagnostics.odometer": "odometer",
     "mileage_km": "odometer",
     "mileage": "odometer",
     "charging.battery_energy": "battery_energy",
@@ -174,12 +173,12 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
-    "tesla",
     "bmw",
     "mercedes-benz",
     "ford",
     "volvo-cars",
-    "stellantis"
+    "stellantis",
+    "tesla",
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
@@ -197,3 +196,9 @@ Please add it to the CHARGE_MASK_WITH_CHARGING_STATUS_MAKES or CHARGE_MASK_WITH_
 
 ALL_MAKES = CHARGE_MASK_WITH_CHARGING_STATUS_MAKES + CHARGE_MASK_WITH_SOC_DIFFS_MAKES
 
+COLS_TO_STR_LOWER = [
+    "unit",
+    "charging_status",
+    "charging_method",
+    "fast_charger_type",
+]
