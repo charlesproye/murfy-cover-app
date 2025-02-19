@@ -1,3 +1,5 @@
+from pandas.api.types import CategoricalDtype
+
 TABLE_QUERY = """
 SELECT * FROM vehicle
 JOIN vehicle_model ON vehicle.vehicle_model_id = vehicle_model.id
@@ -14,17 +16,17 @@ COLS_NAME_MAPPING = {
 }
 COL_DTYPES = {
     "end_of_contract_date": "datetime64[ns]",
-    "fleet_name": "category",
-    "vin": "category",
+    "fleet_name": CategoricalDtype(),
+    "vin": CategoricalDtype(),
     "start_date": "datetime64[ns]",
-    "model": "category",
-    "version": "category",
+    "model": CategoricalDtype(),
+    "version": CategoricalDtype(),
     "capacity": "float",
     "net_capacity": "float",
     "range": "float",
-    "tesla_code": "category",
-    "make": "category",
-    "region_name": "category",
+    "tesla_code": CategoricalDtype(),
+    "make": CategoricalDtype(),
+    "region_name": CategoricalDtype(),
     "activation_status": "bool",
 }
 
