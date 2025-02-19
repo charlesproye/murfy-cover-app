@@ -84,7 +84,8 @@ def str_lower_columns(df:DF, columns:list[str]) -> DF:
     for col_name in df.columns.intersection(columns):
         if str(df[col_name].dtype) == "category":
             df[col_name] = df[col_name].cat.rename_categories(lambda x: x.lower())
-        df[col_name] = df[col_name].str.lower()
+        else:
+            df[col_name] = df[col_name].str.lower()
     return df
 
 # def set_all_str_cols_to_lower(df: DF, but:list[str]=[]) -> DF:
