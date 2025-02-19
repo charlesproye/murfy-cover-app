@@ -38,6 +38,8 @@ class ProcessedTimeSeries(CachedETL):
             .pipe(self.compute_charge_n_discharge_vars)
             .merge(fleet_info, on="vin", how="left")
             .eval("age = date.dt.tz_localize(None) - start_date.dt.tz_localize(None)")
+            # It seems that the reset_index calls don't reset the id_col into a category so we do it here in case it is supposed to be one
+            .astype({self.id_col: COL_DTYPES[self.id_col]})
         )
 
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
