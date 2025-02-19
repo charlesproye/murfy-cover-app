@@ -187,8 +187,7 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     for col in datetime_cols:
         df[col] = pd.to_datetime(df[col], format='mixed').dt.as_unit("s")
     dtypes_dict = df[df.columns.intersection(col_dtypes.keys())].dtypes.to_dict()
-    str_dtype_dict = {key: str(val) for key, val in dtypes_dict.items()}
-    str_col_dtypes = {key: str(val) for key, val in col_dtypes.items()}
+    
     return df
 
 def sanity_check(df:DF) -> DF:
