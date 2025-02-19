@@ -184,7 +184,6 @@ CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
     "kia",
     "renault",
-    "bmw",
 ]
 MAX_TD = TD(hours=1, minutes=30)
 
