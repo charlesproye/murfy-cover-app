@@ -80,11 +80,16 @@ def map_col_to_dict(df:DF, col:str, dict_map:dict) -> DF:
 
     return df
 
-def set_all_str_cols_to_lower(df: DF, but:list[str]=[]) -> DF:
-    str_cols = df.select_dtypes(include='string').columns.difference(but)
-    df.loc[:, str_cols] = df.loc[:, str_cols].apply(lambda col: col.str.lower())
-
+def str_lower_columns(df:DF, columns:list[str]) -> DF:
+    for col_name in df.columns.intersection(columns):
+        df[col_name] = df[col_name].str.lower()
     return df
+
+# def set_all_str_cols_to_lower(df: DF, but:list[str]=[]) -> DF:
+#     str_cols = df.select_dtypes(include='string').columns.difference(but)
+#     df.loc[:, str_cols] = df.loc[:, str_cols].apply(lambda col: col.str.lower())
+
+#     return df
 
 def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str], src_dest_cols: list|dict|None= None, logger:Logger=logger) -> DF:
     """
@@ -181,9 +186,6 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     dtypes_dict = df[df.columns.intersection(col_dtypes.keys())].dtypes.to_dict()
     str_dtype_dict = {key: str(val) for key, val in dtypes_dict.items()}
     str_col_dtypes = {key: str(val) for key, val in col_dtypes.items()}
-    if str_dtype_dict != str_col_dtypes:
-        logger.warning("safe_astype did not succeed in changing all dtypes.")
-        logger.warning(f"final col_dtypes:\n{dtypes_dict}")
     return df
 
 def sanity_check(df:DF) -> DF:
