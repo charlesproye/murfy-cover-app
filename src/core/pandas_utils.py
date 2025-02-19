@@ -167,18 +167,21 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     """
     Warp around pd.astype to ignore errors.
     Removes keys from col_dtypes that are not in df.columns.
+    Further normalize the datetime columns by setting the units as seconds.
     """
     logger.info(f"safe_astype called.")
     col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if col in df.columns}
-    datetime_cols = [col for col, dtype in col_dtypes.items() if "datetime" in dtype]
-    col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in dtype}
+    datetime_cols = [col for col, dtype in col_dtypes.items() if "datetime" in str(dtype)]
+    col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in str(dtype)}
     logger.debug(f"dtypes:\n{col_dtypes}")
     logger.debug(f"datetime_cols:{datetime_cols}")
     df = df.astype(col_dtypes, errors="ignore")
     for col in datetime_cols:
         df[col] = pd.to_datetime(df[col], format='mixed').dt.as_unit("s")
     dtypes_dict = df[df.columns.intersection(col_dtypes.keys())].dtypes.to_dict()
-    if dtypes_dict != col_dtypes:
+    str_dtype_dict = {key: str(val) for key, val in dtypes_dict.items()}
+    str_col_dtypes = {key: str(val) for key, val in col_dtypes.items()}
+    if str_dtype_dict != str_col_dtypes:
         logger.warning("safe_astype did not succeed in changing all dtypes.")
         logger.warning(f"final col_dtypes:\n{dtypes_dict}")
     return df
