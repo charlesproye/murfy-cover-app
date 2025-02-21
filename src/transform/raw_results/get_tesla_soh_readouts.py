@@ -4,13 +4,14 @@ This module facilitates the obtention of these results.
 """
 from os.path import join, dirname
 
+from core.singleton_s3_bucket import bucket
 from core.pandas_utils import *
 
-READOUTS_DF_PATH = join(dirname(__file__), "data_cache/aviloo_soh_readouts.csv")
+READOUTS_DF_PATH =  "miscellaneous/aviloo_soh_readouts.csv"
 
 def get_aviloo_soh_readouts() -> DF:
     return (
-        pd.read_csv(
+        bucket.read_csv_df(
             READOUTS_DF_PATH,
             dtype={
                 "Score Aviloo": "int64",
