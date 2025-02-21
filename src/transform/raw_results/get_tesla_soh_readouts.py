@@ -2,8 +2,6 @@
 We recieved a report of Aviloo SoH estimations from Ayvens on some Teslas.  
 This module facilitates the obtention of these results.  
 """
-from os.path import join, dirname
-
 from core.singleton_s3_bucket import bucket
 from core.pandas_utils import *
 
