@@ -28,7 +28,7 @@ def print_data(data: PD_OBJ) -> PD_OBJ:
     return data
 
 def total_MB_memory_usage(df: DF) -> int:
-    return df.memory_usage().sum() / 1e6
+    return df.memory_usage(deep=True).sum() / 1e6
 
 def floor_to(s:Series, quantization:float) -> Series:
     return (
@@ -80,11 +80,19 @@ def map_col_to_dict(df:DF, col:str, dict_map:dict) -> DF:
 
     return df
 
-def set_all_str_cols_to_lower(df: DF, but:list[str]=[]) -> DF:
-    str_cols = df.select_dtypes(include='string').columns.difference(but)
-    df.loc[:, str_cols] = df.loc[:, str_cols].apply(lambda col: col.str.lower())
-
+def str_lower_columns(df:DF, columns:list[str]) -> DF:
+    for col_name in df.columns.intersection(columns):
+        if str(df[col_name].dtype) == "category":
+            df[col_name] = df[col_name].cat.rename_categories(lambda x: x.lower())
+        else:
+            df[col_name] = df[col_name].str.lower()
     return df
+
+# def set_all_str_cols_to_lower(df: DF, but:list[str]=[]) -> DF:
+#     str_cols = df.select_dtypes(include='string').columns.difference(but)
+#     df.loc[:, str_cols] = df.loc[:, str_cols].apply(lambda col: col.str.lower())
+
+#     return df
 
 def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str], src_dest_cols: list|dict|None= None, logger:Logger=logger) -> DF:
     """
@@ -167,20 +175,19 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     """
     Warp around pd.astype to ignore errors.
     Removes keys from col_dtypes that are not in df.columns.
+    Further normalize the datetime columns by setting the units as seconds.
     """
     logger.info(f"safe_astype called.")
     col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if col in df.columns}
-    datetime_cols = [col for col, dtype in col_dtypes.items() if "datetime" in dtype]
-    col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in dtype}
+    datetime_cols = [col for col, dtype in col_dtypes.items() if "datetime" in str(dtype)]
+    col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in str(dtype)}
     logger.debug(f"dtypes:\n{col_dtypes}")
     logger.debug(f"datetime_cols:{datetime_cols}")
     df = df.astype(col_dtypes, errors="ignore")
     for col in datetime_cols:
         df[col] = pd.to_datetime(df[col], format='mixed').dt.as_unit("s")
     dtypes_dict = df[df.columns.intersection(col_dtypes.keys())].dtypes.to_dict()
-    if dtypes_dict != col_dtypes:
-        logger.warning("safe_astype did not succeed in changing all dtypes.")
-        logger.warning(f"final col_dtypes:\n{dtypes_dict}")
+    
     return df
 
 def sanity_check(df:DF) -> DF:
@@ -200,7 +207,7 @@ def sanity_check(df:DF) -> DF:
         "nuniques": Series(nunique_dict).fillna(0).astype("int"),
         "count": df.count(),
         "density": df.count().div(len(df)),
-        "memory_usage_in_MB": df.memory_usage().div(1e6),
+        "memory_usage_in_MB": df.memory_usage(deep=True).div(1e6),
         "mean": df.mean(numeric_only=True),
         "std": df.std(numeric_only=True),
         "min": df.min(numeric_only=True),
