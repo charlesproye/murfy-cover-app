@@ -37,52 +37,6 @@ def get_connection():
     finally:
         conn.close()
 
-def right_inner_merge(
-    lhs: pd.DataFrame,
-    rhs_name: str,
-    left_on: str|list[str],
-    right_on: str|list[str],
-    update_cols: list[str],
-    logger: logging.Logger = logger,
-):
-    try:
-        # Ensure keys are lists
-        left_on = [left_on] if isinstance(left_on, str) else left_on
-        right_on = [right_on] if isinstance(right_on, str) else right_on
-
-        # Validate column presence
-        for col in left_on + update_cols:
-            if col not in lhs.columns:
-                raise ValueError(f"Column '{col}' not found in DataFrame.")
-
-        # Upload DataFrame to a temporary table
-        TMP_TABLE_NAME = "temp_table"
-        logger.info("Uploading DataFrame to temporary table...")
-        lhs.to_sql(TMP_TABLE_NAME, con, if_exists="replace", index=False)
-
-        # Construct the SQL update query
-        set_clause = ", ".join([f"{col} = temp.{col}" for col in update_cols])
-        join_condition = " AND ".join([f"{rhs_name}.{r} = temp.{l}" for l, r in zip(left_on, right_on)])
-
-        update_query = text(f"""
-        UPDATE {rhs_name}
-        SET {set_clause}
-        FROM {TMP_TABLE_NAME} AS temp
-        WHERE {join_condition};
-        """)
-        logger.info(f"Executing update query:\n{update_query}")
-        with con.begin() as _:
-            con.execute(update_query)
-
-            # Drop the temporary table
-            logger.info("Dropping temporary table...")
-            con.execute(text(f"DROP TABLE IF EXISTS {TMP_TABLE_NAME};"))
-
-        logger.info("Update operation completed successfully.")
-
-    except Exception as e:
-        logger.error(f"An error occurred during the update operation: {e}")
-        raise
 
 def left_merge_rdb_table(
         lhs: DF,
