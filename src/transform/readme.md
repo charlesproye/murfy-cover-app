@@ -1,8 +1,4 @@
 # Transform ETL pipeline
->   Note:   
->       This is more of an aspirational goal of how the pipeline should be structured rather than an actual strict guideline.    
->       As of writting this readme, the pipelines are not exactly implemented in this way.    
-
 ### Content:
 ```
 transform
@@ -12,7 +8,6 @@ transform
 ├── fleet_info
 │   ├── config.py
 │   ├── main.py
-│   └── test.ipynb
 ├── front_utils
 │   ├── main.py
 │   └── readme.md
@@ -23,8 +18,7 @@ transform
 ├── processed_tss
 │   ├── config.py
 │   ├── data_cache
-│   ├── ProcessedTimeSeries.py
-│   └── test.ipynb
+│   └── ProcessedTimeSeries.py
 ├── raw_results
 │   ├── config.py
 │   ├── data_cache
@@ -35,8 +29,6 @@ transform
 │   ├── renault_results.py
 │   ├── stellantis_results.py
 │   ├── tesla_results.py
-│   ├── test.ipynb
-│   ├── test.py
 │   └── volvo_results.py
 ├── raw_tss
 │   ├── bmw_raw_tss.py
@@ -44,70 +36,60 @@ transform
 │   ├── high_mobility_raw_tss.py
 │   ├── main.py
 │   ├── mobilisight_raw_tss.py
-│   ├── tesla_raw_tss.py
-│   └── test.ipynb
+│   └── tesla_raw_tss.py
 └── vehicle_info
     ├── main.py
     └── readme.md
 ```
 ### Pipeline structure  
 The entire pipeline can be considered as a single ETL.  
-It takes in data of the vehicles from the data providers and outputs valuable informations(called `results`) in our database.  
-The ETL consists in multiple sub ETLs, each implemented in a single module.    
-For each step of the pipeline, there is a main function that orchestrates the execution of the step and performs some steps that are common to all the sub ETLs.
-For this reason, you should always get the output of the step from the main module instead of a sub ETL module of the same step even if you won't use the other functions of the other sub ETLs modules.  
-Here "XX" is the name of the data provider.   
+It takes in data time series and static vehicle data and outputs valuable time series data. 
+Static data are data that remain the same throughout the vehicles lifes such as the model, default battery capacity, ect...
+Time series data... you should know what a time series is :left eye brow raised:.
+The ETL consists of multiple sub ETLs, each implemented in a single sub package.    
+
+> Here "XX" is the name of the data provider or a manufacturer.  
 - **main.py**:   
-    goal:    
-        Orchestrate the execution the pipeline.    
-        Runs a blocking schedueler to execute the sub ETLs in the correct order once every day.  
--  **XX_raw_time_series.py**:  
-    goal: Provide data in tabular format.  
-    Input: Json responses from the data provider.  
-    Output: A dataframe that contains unprocessed data. The data should be identical to the responses of the data providers.    
+    Runs a blocking schedueler to execute all the sub ETLs once every day.  
+-  **raw_tss.XX_raw_time_series.py**:  
+    goal: Provide time series data in tabular format.  
+    Input: Json responses from the data providers, one json file per vehicle per day.  
+    Output: A dataframe that contains unprocessed data, one dataframe(.parquet file) per brand/data provider.
     Output location: `raw_tss/XX/time_series/raw_tss.parquet` (should just be `raw_tss/XX_raw_tss.parquet`...)  
     How: Parses json responses into DataFrames and concatenates them into a single one.  
-- **raw_tss.main**:   
-    goal: Implement a function:
-        - `get_processed_tss(brand)`: provides access to any processed time series.
-        - `update_all_processed_tss()`: updates all the processed time series.
-    This module does not perform any extra step on the sub ETLs it orchestrates.  
-    So you *could* directly use the output of the sub ETLs, but you *should* not in case a change is done in this main.
-    Import `raw_tss` from this module to get the raw time series dataframe: `from transform.raw_tss.main import get_raw_tss`.
-    Run it as a script to update all the raw time series.
-- **XX_fleet_info.py**:
-    goal: Provide a dataframe to get the model, version, capacity and range of the vehicles.  
-    Input: (at least one)Table from each client on their fleet.    
-    Output: A single dataframe where each line represents a single vehicle.    
-    Output location: The output is not stored.
-- **fleet_info.main**:  
-    goal: Provide a single fleet info dataframe that represents all the fleets.  
-    Input: fleet infos provided by the sub ETLs.  
-    Output: A single fleet info dataframe that represents all the fleets.  
-    Takes care of updating the "vehicle" table in the database.  
-    How: Concatenates all the fleet info dataframes into a single one and left merges models_info onto the result.  
-    Because of the extra steps performed on the fleet info, you *should* not use the output of the sub ETLs directly but the output of this main.
-    Import `fleet_info` from this module to get the fleet info dataframe: `from transform.fleet_info.main import fleet_info`.
-    Run it as a script to update the vehicle table in the database.
--  **ProcessedTimeSeries.py**:  
-    Input: Raw time series and fleet info.  
-    Output: A dataframe that contains processed data time series.  
-            The dataframe should have a `date`, `soc` and `odometer` columns.  
+    Note: We nickname raw time series to raw_tss and not raw_ts because there are multiple time series per DF (one per vehicle).
+- **raw_tss/main.py**:   
+    Goal:
+        Provide a function to:
+        - Update all the raw time series, `update_all_raw_tss`
+        - provide simple access to any raw_tss `get_raw_tss`
+- **fleet_info/main.py**:
+    Goal: Provide the static data of the vehicles that BIB monitors in a single dataframe, one row per vehicle.
+    Input: Multiple tables from the DB(`vehicle`, `vehicle_model`, ...).
+    Output: Global `fleet_info` dataframe variable.
+    Note: The output is not cached as the ETL is just a series of SQL joins and is fairly fast.
+-  **processed_tss/ProcessedTimeSeries.py**:  
+    Goal: Process the raw time series data.   
+    Input: Raw time series and fleet info.     
+    Output: A dataframe that contains processed time series, one per brand/data provider.     
+    All the processed time series have:   
+    -   Normalized names:   
+            Raw time series columns `diagnostic.odometer` and `car.mileage` will be normalized to `odometer`.   
+    -   Nomralized units: Imperial units will be converted to metric.   
+    -   Segmentation columns: `in_charge`, `in_discharge`, ... masks   
+    -   Segment indexing: `in_discahrge_idx`, `in_discharge_idx`, ...   
+        Segment indexing columns should have the same name as the segment mask column they are indexing + "_idx"
+        These columns are used for Split-Apply-Combine operations.
+    -   Have static data joined to them (this might not be such a good idea as it first seemed...)
     Output location: `processed_tss/time_series/XX/processed_tss.parquet`  
-    Steps:  
-        - Rename columns to be consistent across brands  
-        - Drop unused columns
-        - Set the dtypes of the time series
-        - add missing columns (for ex: in_charge/dishcarge, cum energy added, cum energy spent, ...)  
-        - Merge fleet info into the time series
-- **results.py**:
-    goal: Store the results in the database.
-    Input: The processed time series dataframes.
-    Output: None.
-    Output location: The results table in the database.
-    Steps:
-        - For each vehicle, find the latest date of data in the processed time series.
-        - Update the vehicle table in the database with the latest date of data for each vehicle.
+- **raw_results/XX_results.py**:
+    Goal: Compute "raw" valuable data from processed time series.
+    Note: We call these results "raw" because they have some noise that we cannot directly show on our website.
+        For example, the SoH estimation methods have some noise, 
+        if we were to show the estimations right away, the SoH would some times increase which would look weird.
+    Input: The processed time series.
+    Output: A dataframe per data provider/manufacturer, with the columns `soh`, `level_1`, `level_2` and `level_3`.
+    Level columns correspond to the soc gained in the corresponding charging level since the previous line.
 - **VehicleInfoProcessor.py**:
     goal: Update the vehicle table in the database with the last date of data for each vehicle.
     Input: The processed time series dataframes.
