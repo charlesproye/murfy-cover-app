@@ -6,36 +6,49 @@
 ### Content:
 ```
 transform
-.
 ├── main.py
 ├── config.py
 ├── readme.md
 ├── fleet_info
-│   ├── ayvens_fleet_info.py
 │   ├── config.py
 │   ├── main.py
-│   └── tesla_fleet_info.py
+│   └── test.ipynb
+├── front_utils
+│   ├── main.py
+│   └── readme.md
+├── processed_results
+│   ├── config.py
+│   ├── data_cache
+│   ├── main.py
 ├── processed_tss
-│   ├── bmw_processed_tss.py
 │   ├── config.py
-│   ├── high_mobility_processed_tss.py
+│   ├── data_cache
+│   ├── ProcessedTimeSeries.py
+│   └── test.ipynb
+├── raw_results
+│   ├── config.py
+│   ├── data_cache
+│   ├── ford_results.py
 │   ├── main.py
-│   └── tesla_processed_tss.py
+│   ├── mercedes_results.py
+│   ├── odometer_aggregation.py
+│   ├── renault_results.py
+│   ├── stellantis_results.py
+│   ├── tesla_results.py
+│   ├── test.ipynb
+│   ├── test.py
+│   └── volvo_results.py
 ├── raw_tss
 │   ├── bmw_raw_tss.py
 │   ├── config.py
 │   ├── high_mobility_raw_tss.py
 │   ├── main.py
-│   └── tesla_raw_tss.py
-└── watea
-    ├── data_cache/
-    ├── notes.md
-    ├── readme.md
-    ├── soh_estimation.py
-    ├── watea_config.py
-    ├── watea_fleet_info.py
-    ├── watea_processed_tss.py
-    └── watea_raw_tss.py
+│   ├── mobilisight_raw_tss.py
+│   ├── tesla_raw_tss.py
+│   └── test.ipynb
+└── vehicle_info
+    ├── main.py
+    └── readme.md
 ```
 ### Pipeline structure  
 The entire pipeline can be considered as a single ETL.  
