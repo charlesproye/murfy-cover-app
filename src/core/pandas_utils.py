@@ -210,7 +210,7 @@ def sanity_check(df:DF) -> DF:
     )
 
 def safe_locate(df:DF, col_loc:pd.Index, logger:Logger=logger) -> DF:
-    """Selects the only the specified columns that are present in the data frame without raising an error."""
+    """Selects the only the specified columns that are present in the data frame without raising an error if columns are not in the df."""
     return df[df.columns.intersection(col_loc)]
 
 # WIP: this has only been tested with mobilisight data.
