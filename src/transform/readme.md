@@ -91,6 +91,7 @@ The ETL consists of multiple sub ETLs, each implemented in a single sub package.
     Output: A dataframe per data provider/manufacturer, with the columns `soh`, `level_1`, `level_2` and `level_3`.
     Level columns correspond to the soc gained in the corresponding charging level since the previous line.
     Output Location: `raw_results/XX.parquet` on S3
+    Note: Most raw result implementations have a corresponding notebook that explains the reasoning steps taken to arrive to the implementation.
 - **processed_results/main.py**:
     Goal: Make the results presentable.
     Input: raw results
