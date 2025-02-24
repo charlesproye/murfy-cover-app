@@ -47,11 +47,19 @@ def left_merge_rdb_table(
         con: Con=con,
         logger: Logger=logger,
     ) -> DF:
+    """
+    Reads the rdb table with the name `rhs` and performs a left_merge on the df with it.
+    Take a look at the doc string of `core.pandas_utils.left_merge` to understand how the other arguments are used.
+    """
     logger.info(f"Left merging {lhs.shape[0]} rows with {rhs} on {left_on} and {right_on}")
     rhs = pd.read_sql_table(rhs, con)
     return left_merge(lhs, rhs, left_on, right_on, src_dest_cols, logger)
 
 def truncate_rdb_table_and_insert_df(df: DF, table_name: str, src_dest_cols: dict[str, str]|list[str], logger:Logger=logger) -> DF:
+    """
+    Warp around `DataFram.to_sql`.    
+    Instead of appending on the table or deleting it and creating a new one with the same name, we simply empty the table and fill it with the DF.
+    """
     logger.debug(f"Truncating {table_name} and inserting a new DF in it.")
     # Preprocess input
     if isinstance(src_dest_cols, list):

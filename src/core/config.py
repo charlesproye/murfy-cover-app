@@ -1,3 +1,7 @@
+"""
+Stores all the variables used by the other core modules that would hurt the readablity of the code.  
+This includes Warning/Error messages, path to files, ect...
+"""
 from os.path import join, dirname
 
 import pandas as pd
@@ -8,9 +12,7 @@ PARQUET_EV_MODELS_INFO_PATH = join(dirname(__file__), "data_cache/models_info.pa
 
 # S3 data caching
 KEY_LIST_COLUMN_NAMES = [ "key", "dtype_folder", 'brand', "vin", "file"]
-EMTPY_S3_KEYS_WARNING_MSG = """
-No responses found in {keys_prefix}.
-"""
+EMTPY_S3_KEYS_WARNING_MSG = "No responses found in {keys_prefix}."
 
 # Data caching
 NO_BUCKET_ARG_FOUND = "No bucket argument found in function {func_name}"
