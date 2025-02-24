@@ -35,14 +35,14 @@ ACCOUNTS_JSON='[
     "excel_url": "src/ingestion/tesla/excel/ayvens.csv"
   },
   {
-    "access_token_key": "ACCESS_TOKEN_ROADSTER",
-    "refresh_token_key": "REFRESH_TOKEN_ROADSTER",
-    "professional_account": true
-  },
-  {
     "access_token_key": "ACCESS_TOKEN_OLINO",
     "professional_account": true,
     "code": "d77c548f8b98ca5acbc49e741498a0f1b4784a13152496e22f579f6a67088ad6f296b94f"
+  }
+  {
+    "access_token_key": "ACCESS_TOKEN_CAPFM",
+    "professional_account": true,
+    "code": "d57d04d98e9fc80fcb99cd224498a0f4b7724a1041729ee27e58ca6b6b598882f2ceb019"
   }
 ]'
 
