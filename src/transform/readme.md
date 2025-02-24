@@ -5,15 +5,15 @@ transform
 ├── main.py
 ├── config.py
 ├── readme.md
+├── raw_tss
+│   ├── bmw_raw_tss.py
+│   ├── config.py
+│   ├── high_mobility_raw_tss.py
+│   ├── main.py
+│   ├── mobilisight_raw_tss.py
+│   └── tesla_raw_tss.py
 ├── fleet_info
 │   ├── config.py
-│   ├── main.py
-├── front_utils
-│   ├── main.py
-│   └── readme.md
-├── processed_results
-│   ├── config.py
-│   ├── data_cache
 │   ├── main.py
 ├── processed_tss
 │   ├── config.py
@@ -30,22 +30,22 @@ transform
 │   ├── stellantis_results.py
 │   ├── tesla_results.py
 │   └── volvo_results.py
-├── raw_tss
-│   ├── bmw_raw_tss.py
+├── processed_results
 │   ├── config.py
-│   ├── high_mobility_raw_tss.py
+│   ├── data_cache
+│   └── main.py
+├── front_utils
 │   ├── main.py
-│   ├── mobilisight_raw_tss.py
-│   └── tesla_raw_tss.py
+│   └── readme.md
 └── vehicle_info
     ├── main.py
     └── readme.md
 ```
 ### Pipeline structure  
 The entire pipeline can be considered as a single ETL.  
-It takes in data time series and static vehicle data and outputs valuable time series data. 
-Static data are data that remain the same throughout the vehicles lifes such as the model, default battery capacity, ect...
-Time series data... you should know what a time series is :left eye brow raised:.
+It takes in data time series and static vehicle data and outputs valuable time series data.  
+Static data are data that remain the same throughout the vehicles lifes such as the model, default battery capacity, ect...  
+Time series data... you should know what a time series is :left eye brow raised:.  
 The ETL consists of multiple sub ETLs, each implemented in a single sub package.    
 
 > Here "XX" is the name of the data provider or a manufacturer.  
@@ -62,7 +62,7 @@ The ETL consists of multiple sub ETLs, each implemented in a single sub package.
     Goal:
         Provide a function to:
         - Update all the raw time series, `update_all_raw_tss`
-        - provide simple access to any raw_tss `get_raw_tss`
+        - provide simple access to any raw_tss `get_raw_tss` on S3
 - **fleet_info/main.py**:
     Goal: Provide the static data of the vehicles that BIB monitors in a single dataframe, one row per vehicle.
     Input: Multiple tables from the DB(`vehicle`, `vehicle_model`, ...).
@@ -81,7 +81,7 @@ The ETL consists of multiple sub ETLs, each implemented in a single sub package.
         Segment indexing columns should have the same name as the segment mask column they are indexing + "_idx"
         These columns are used for Split-Apply-Combine operations.
     -   Have static data joined to them (this might not be such a good idea as it first seemed...)
-    Output location: `processed_tss/time_series/XX/processed_tss.parquet`  
+    Output location: `processed_tss/time_series/XX/processed_tss.parquet` on S3
 - **raw_results/XX_results.py**:
     Goal: Compute "raw" valuable data from processed time series.
     Note: We call these results "raw" because they have some noise that we cannot directly show on our website.
@@ -90,6 +90,12 @@ The ETL consists of multiple sub ETLs, each implemented in a single sub package.
     Input: The processed time series.
     Output: A dataframe per data provider/manufacturer, with the columns `soh`, `level_1`, `level_2` and `level_3`.
     Level columns correspond to the soc gained in the corresponding charging level since the previous line.
+    Output Location: `raw_results/XX.parquet` on S3
+- **processed_results/main.py**:
+    Goal: Make the results presentable.
+    Input: raw results
+    Output: Results aggregated by a fixed frequency (per week as of writting this readme) with outliers pruned out or clipped. 
+    Also forces the SoH to be monotically decreasing per vin over odometer.
 - **VehicleInfoProcessor.py**:
     goal: Update the vehicle table in the database with the last date of data for each vehicle.
     Input: The processed time series dataframes.
