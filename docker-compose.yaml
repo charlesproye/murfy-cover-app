@@ -14,31 +14,31 @@ services:
     depends_on:
       - redis
 
-  # bmw_ingestion_service:
-  #   build:
-  #     context: .
-  #     dockerfile: bmw.Dockerfile
-  #   container_name: bmw-ingestion
-  #   env_file:
-  #     - ./.env
-  #     - ./.python.env
-  #   volumes:
-  #     - .:/app
-  #   depends_on:
-  #     - redis
+  bmw_ingestion_service:
+    build:
+      context: .
+      dockerfile: bmw.Dockerfile
+    container_name: bmw-ingestion
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
 
-  # hm_ingestion_service:
-  #   build:
-  #     context: .
-  #     dockerfile: hm.Dockerfile
-  #   container_name: hm-ingestion
-  #   env_file:
-  #     - ./.env
-  #     - ./.python.env
-  #   volumes:
-  #     - .:/app
-  #   depends_on:
-  #     - redis
+  hm_ingestion_service:
+    build:
+      context: .
+      dockerfile: hm.Dockerfile
+    container_name: hm-ingestion
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
 
   ms_ingestion_service:
     build:
