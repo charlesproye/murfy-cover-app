@@ -40,8 +40,8 @@ class ProcessedTimeSeries(CachedETL):
             .pipe(self.compute_charge_n_discharge_vars)
             .merge(fleet_info, on="vin", how="left")
             .eval("age = date.dt.tz_localize(None) - start_date.dt.tz_localize(None)")
-            # It seems that the reset_index calls don't reset the id_col as a category.
-            # To remedy this, we recall astype with just the id_col.
+            # It seems that the reset_index calls doesn't reset the id_col into a category if the groupby's by argument was categorical.
+            # So we recall astype on the id_col  in case it is supposed to be categorical.
             .astype({self.id_col: COL_DTYPES[self.id_col]})
         )
 
