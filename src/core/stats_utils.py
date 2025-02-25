@@ -53,6 +53,8 @@ def intercept_and_slope_from_points(points: DF) -> tuple[float, float]:
 
 def lr_params_as_series(df: DF, x: str, y: str) -> Series:
     df = df.dropna(subset=[x, y], how="any")
+    if df.empty or df[x].eq(df[x].iat[0]).all():
+        return Series(data=[np.nan] * 6, index=["slope", "intercept", "rvalue", "pvalue", "stderr", "r2"])
     s = Series(lr(df[x], df[y]), index=["slope", "intercept", "rvalue", "pvalue", "stderr"])
     s["r2"] = s["rvalue"] ** 2
     return s
