@@ -16,9 +16,9 @@ from transform.raw_results.odometer_aggregation import agg_last_odometer
 
 logger = getLogger("transform.results.main")
 GET_RESULTS_FUNCS = {
+    "tesla": get_tesla_results,
     "mercedes-benz": get_mercedes_results,
     "bmw": lambda: agg_last_odometer("bmw"),
-    "tesla": get_tesla_results,
     "kia": lambda: agg_last_odometer("kia"),
     "renault": get_renault_results,
     "volvo": get_volvo_results,
@@ -40,29 +40,34 @@ def update_vehicle_data_table():
     )
 
 def get_all_processed_results() -> DF:
-    return pd.concat([get_processed_results(brand) for brand in GET_RESULTS_FUNCS.keys()])
+    processed_results = []
+    for brand in GET_RESULTS_FUNCS.keys():
+        try:
+            processed_results.append(get_processed_results(brand))
+        except KeyboardInterrupt: 
+            raise
+        except:
+            logger.error(f"Could not get processed results of {brand}.", exc_info=True)
+    return pd.concat(processed_results)
 
 def get_processed_results(brand:str) -> DF:
-    NB_SEP = 18
-    log_end_sep = "=" * (NB_SEP - len(brand))
-    logger.info(f"==================Processing {brand} results.{log_end_sep}")
-    results = GET_RESULTS_FUNCS[brand]()
+    logger.info(f"{'Processing ' + brand + ' results.':=^{50}}")
     results =  (
-        results
+        GET_RESULTS_FUNCS[brand]()
+        .assign(soh=lambda df: df["soh"].replace([np.inf, -np.inf], np.nan).astype("float64"))
         .sort_values(["vin", "date"])
         .pipe(agg_results_by_update_frequency)
         .pipe(make_charge_levels_presentable)
-        .groupby('vin')
+        .groupby('vin', observed=True)
         .apply(make_soh_presentable_per_vehicle, include_groups=False)
         .reset_index(level=0)
         .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
         .sort_values(["vin", "date"])
     )
-    results["soh"] = results.groupby("vin")["soh"].ffill()
-    results["soh"] = results.groupby("vin")["soh"].bfill()
-    results["odometer"] = results.groupby("vin")["odometer"].ffill()
-    results["odometer"] = results.groupby("vin")["odometer"].bfill()
-
+    results["soh"] = results.groupby("vin", observed=True)["soh"].ffill()
+    results["soh"] = results.groupby("vin", observed=True)["soh"].bfill()
+    results["odometer"] = results.groupby("vin", observed=True)["odometer"].ffill()
+    results["odometer"] = results.groupby("vin", observed=True)["odometer"].bfill()
     return results
 
 # Raw results have different frequency, this function ensures that processed results all have the frequency
@@ -82,7 +87,7 @@ def agg_results_by_update_frequency(results:DF) -> DF:
             level_2=results.get("level_2", 0),
             level_3=results.get("level_3", 0),
         )
-        .groupby(["vin", "date"])
+        .groupby(["vin", "date"], observed=True, as_index=False)
         .agg(
             odometer=pd.NamedAgg("odometer", "last"),
             soh=pd.NamedAgg("soh", "median"),
@@ -92,7 +97,6 @@ def agg_results_by_update_frequency(results:DF) -> DF:
             level_2=pd.NamedAgg("level_2", "sum"),
             level_3=pd.NamedAgg("level_3", "sum"),
         )
-        .reset_index()
     )
 
 def make_charge_levels_presentable(results:DF) -> DF:
@@ -108,7 +112,7 @@ def make_soh_presentable_per_vehicle(df:DF) -> DF:
         return df
     if df["soh"].count() > 3:
         outliser_mask = mask_out_outliers_by_interquartile_range(df["soh"])
-        assert outliser_mask.sum() > 0, f"There seems to be only outliers???: {df['soh'].quantile(0.05)}, {df['soh'].quantile(0.95)}\n{df['soh']}"
+        assert outliser_mask.any(), f"There seems to be only outliers???:\n{df['soh']}."
         df = df[outliser_mask].copy()
     if df["soh"].count() >= 2:
         df["soh"] = force_monotonic_decrease(df["soh"]).values
