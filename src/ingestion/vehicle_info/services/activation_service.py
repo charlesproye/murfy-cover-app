@@ -40,23 +40,23 @@ class VehicleActivationService:
             vin: Vehicle VIN
             
         Returns:
-            The ownership of the vehicle, or 'ayvens' as default if not found
+            The ownership of the vehicle, or 'bib' as default if not found
         """
         try:
             if self.fleet_info_df is None:
-                logging.warning("Fleet info DataFrame not set, defaulting to 'ayvens'")
-                return 'ayvens'
+                logging.warning("Fleet info DataFrame not set, defaulting to 'bib'")
+                return 'bib'
             
             vehicle_info = self.fleet_info_df[self.fleet_info_df['vin'] == vin]
             if not vehicle_info.empty:
                 return vehicle_info['owner'].iloc[0]
             
-            logging.warning(f"Vehicle {vin} not found in fleet info, defaulting to 'ayvens'")
-            return 'ayvens'
+            logging.warning(f"Vehicle {vin} not found in fleet info, defaulting to 'bib'")
+            return 'bib'
             
         except Exception as e:
             logging.error(f"Error getting vehicle ownership: {str(e)}")
-            return 'ayvens'
+            return 'bib'
 
     async def activate_bmw(self, session: aiohttp.ClientSession, vin: str) -> Tuple[bool, Optional[str]]:
         """Activate a BMW vehicle using BMW's API."""
