@@ -11,7 +11,7 @@ The goal of this package is to handle every step of the data analytics service o
 .
 └── src
     ├── core
-    ├── analysis
+    ├── EDA
     ├── transform
     └── ingestion
 ```
@@ -41,8 +41,8 @@ conda env remove --name data_ev && conda env create --name data_ev --file conda-
 ### Core:
 `core` implments the code that is common to any data pipeline.  
 See [core documentation](src/core/readme.md).
-### Analysis:
-'analysis' contains the code to analyze the data(mostly notebooks).
+### EDA:
+`EDA` contains the code to analyze the data(mostly notebooks) and to explain the reasoning steps behind the implementations in `transform`.
 
 ### Ingestion:
 'ingestion' contains the code to ingest the data from the data provider's API.
@@ -53,4 +53,5 @@ Two ways of ingestion are implemented:
 -  Mobilisight
 
 ### Transform:
+`tramsform` contains all the modules, for valorizing the data (cleaning, segmentation, ...).
 See [transform readme](src/transform/readme.md).

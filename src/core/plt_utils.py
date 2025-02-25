@@ -23,6 +23,7 @@ def plt_3d_df(
         height=1000,
         hover_name=None,
     ) -> Figure:
+    """Abstracts away some of the boiler plate code when calling px.scatter_3d."""
     return (
         px.scatter_3d(
             df,
@@ -50,6 +51,7 @@ def plt_3d_df(
     )
 
 def scatter_and_arrow_fig(df: DF, x0:str, x1:str, y0:str, y1:str, id_col:str=None, marker_size:int=8, scatter_kwargs:dict={}, arrow_kwargs:dict={}) -> Figure:
+    """Returns a Figure containing two scatter plots of x0/y0 and x1/y1 as well as arrows from 0 to 1 points."""
     x = df_cols_to_series(df, [x0, x1], id_col)
     y = df_cols_to_series(df, [y0, y1], id_col) 
     return (

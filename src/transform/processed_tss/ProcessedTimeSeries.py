@@ -11,7 +11,8 @@ from transform.processed_tss.config import *
 from transform.raw_tss.main import get_raw_tss
 from transform.fleet_info.main import fleet_info
 
-
+# Here we have implemented the ETL as a class as most raw time series go through the same processing step.
+# To have a processing step specific to a data provider/manufacturer, simply implement a subclass of ProcessedTimeSeries and update update_all_tss.
 class ProcessedTimeSeries(CachedETL):
     _metadata = ['make', "logger", "id_col", "max_td"]
 
@@ -24,6 +25,7 @@ class ProcessedTimeSeries(CachedETL):
         self.max_td = max_td
         super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update, use_cols=use_cols)
 
+    # No need to call run it will be called in CachedETL init.
     def run(self) -> DF:
         self.logger.info(f"==================Processing {self.make} raw tss.==================")
         return (
@@ -31,29 +33,34 @@ class ProcessedTimeSeries(CachedETL):
             .rename(columns=RENAME_COLS_DICT, errors="ignore")
             .pipe(safe_locate, col_loc=list(COL_DTYPES.keys()), logger=self.logger)
             .pipe(safe_astype, COL_DTYPES, logger=self.logger)
-            .pipe(self.metric_normalize)
+            .pipe(self.normalize_units_to_metric)
             .sort_values(by=["vin", "date"])
             .pipe(str_lower_columns, COLS_TO_STR_LOWER)
             .pipe(self.compute_date_vars)
             .pipe(self.compute_charge_n_discharge_vars)
             .merge(fleet_info, on="vin", how="left")
             .eval("age = date.dt.tz_localize(None) - start_date.dt.tz_localize(None)")
-            # It seems that the reset_index calls don't reset the id_col into a category so we do it here in case it is supposed to be one
+            # It seems that the reset_index calls don't reset the id_col as a category.
+            # To remedy this, we recall astype with just the id_col.
             .astype({self.id_col: COL_DTYPES[self.id_col]})
         )
 
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (
             tss
+            # Compute the in_charge and in_discharge masks 
             .pipe(self.compute_charge_n_discharge_masks, IN_CHARGE_CHARGING_STATUS_VALS, IN_DISCHARGE_CHARGING_STATUS_VALS)
+            # Compute the correspding indices to perfrom split-apply-combine ops
             .pipe(self.compute_idx_from_masks, ["in_charge", "in_discharge"])
-            .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
+            # We recompute the masks by trimming off the points that have the first and last soc values
+            # This is done to reduce the noise in the output due to measurments noise.
+            .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"]) 
             .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
             .pipe(self.compute_cum_var, "power", "cum_energy")
             .pipe(self.compute_cum_var, "charger_power", "cum_charge_energy_added")
         )
 
-    def metric_normalize(self, tss:DF) -> DF:
+    def normalize_units_to_metric(self, tss:DF) -> DF:
         tss["odometer"] = tss["odometer"] * ODOMETER_MILES_TO_KM.get(self.make, 1)
         return tss
 
@@ -78,12 +85,13 @@ class ProcessedTimeSeries(CachedETL):
         return tss
 
     def compute_date_vars(self, tss:DF) -> DF:
-        self.logger.debug(f"Computing sec_date and sec_date_diff.")
+        self.logger.debug(f"Computing time_diff and sec_time_diff.")
         tss["time_diff"] = tss.groupby(self.id_col, observed=False)["date"].diff()
         tss["sec_time_diff"] = tss["time_diff"].dt.total_seconds()
         return tss
 
     def compute_charge_n_discharge_masks(self, tss:DF, in_charge_vals:list, in_discharge_vals:list) -> DF:
+        """Computes the `in_charge` and `in_discharge` masks either from the charging_status column or from the evolution of the soc over time."""
         self.logger.debug(f"Computing charging and discharging masks.")
         if self.make in CHARGE_MASK_WITH_CHARGING_STATUS_MAKES:
             return self.charge_n_discharging_masks_from_charging_status(tss, in_charge_vals, in_discharge_vals)

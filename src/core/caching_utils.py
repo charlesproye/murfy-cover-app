@@ -22,6 +22,9 @@ class CachedETL(DF, ABC):
     def __init__(self, path: str, on: str, force_update: bool = False, use_cols:list[str]=None, bucket: S3_Bucket = bucket):
         """
         Initialize a CachedETL with caching capabilities.
+        The calculation of the result of the ETL must be implemented in the abstract `run` method.  
+        Works similarly to the cache_results decorator.  
+        Please take a look at the readme to see how `cache_results` (and therefore CachedEtl) works.
 
         Args:
         - path (str): Path for the cache file.
@@ -57,7 +60,8 @@ class CachedETL(DF, ABC):
 
 def cache_result(path_template: str, on: str, path_params: List[str] = []):
     """
-    Decorator to cache the results either locally or on S3 based on cache_type.
+    Decorator to cache the results either locally or on S3 based on cache_type.  
+    Please take a look at the core/readme to see examples of how to use this decorator.  
 
     Args:
     - path_template (str): Template path for the cache file.
@@ -96,7 +100,7 @@ def get_bucket_from_func_args(func:Callable, *args, **kwargs) -> tuple[S3_Bucket
     signature = inspect.signature(func)                                         # Get the function's signature
     bound_args = signature.bind_partial(*args, **kwargs)                        # Map the positional args to the parameter names
     bound_args.apply_defaults()                                                 # Apply default values to the bound arguments
-    bucket_is_in_func_args = 'bucket' in bound_args.arguments                           # Check if 'bucket' is in the arguments
+    bucket_is_in_func_args = 'bucket' in bound_args.arguments                   # Check if 'bucket' is in the arguments
     if not bucket_is_in_func_args:
         logger.debug(NO_BUCKET_ARG_FOUND.format(func_name=func.__name__))
     bucket_value = bound_args.arguments.get('bucket', bucket)
