@@ -93,7 +93,7 @@ class ProcessedTimeSeries(CachedETL):
 
     def compute_charge_n_discharge_masks(self, tss:DF, in_charge_vals:list, in_discharge_vals:list) -> DF:
         """Computes the `in_charge` and `in_discharge` masks either from the charging_status column or from the evolution of the soc over time."""
-        self.logger.debug(f"Computing charging and discharging masks.")
+        self.logger.debug("Computing charging and discharging masks.")
         if self.make in CHARGE_MASK_WITH_CHARGING_STATUS_MAKES:
             return self.charge_n_discharging_masks_from_charging_status(tss, in_charge_vals, in_discharge_vals)
         if self.make in CHARGE_MASK_WITH_SOC_DIFFS_MAKES:
