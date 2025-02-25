@@ -54,9 +54,7 @@ def get_processed_results(brand:str) -> DF:
     logger.info(f"{'Processing ' + brand + ' results.':=^{50}}")
     results =  (
         GET_RESULTS_FUNCS[brand]()
-        # Some raw estimations may have inf values, this will make mask_out_outliers_by_interquartile_range and force_monotonic_decrease fail
-        # So we replace them by NaNs.
-        .assign(soh=lambda df: df["soh"].replace([np.inf, -np.inf], np.nan))
+        .assign(soh=lambda df: df["soh"].replace([np.inf, -np.inf], np.nan).astype("float64"))
         .sort_values(["vin", "date"])
         .pipe(agg_results_by_update_frequency)
         .pipe(make_charge_levels_presentable)
