@@ -1,8 +1,8 @@
 from logging import Logger, getLogger
 
-from scipy.stats import linregress as lr
 import numpy as np
 from scipy.optimize import minimize
+from scipy.stats import linregress as lr
 
 from core.pandas_utils import * 
 
@@ -20,7 +20,6 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         The valid SoH points.
         Must contain the columns "bound", "point", "soh" and "odometer".
         The must contain 4 points that define the slope bounds of minimum and maximum SOH ranges.
-        View 
     """
     if results["soh"].isna().all():
         logger.debug("No SoH values to filter, column is all NaN returning as is.")
@@ -52,14 +51,24 @@ def intercept_and_slope_from_points(points: DF) -> tuple[float, float]:
     return intercept, slope
 
 def lr_params_as_series(df: DF, x: str, y: str) -> Series:
+    """
+    ### Description:
+    Warp around scipy.stats.linear_regression to input and output pandas objects instead of np.ndarrays.  
+    Additionallym computes the R2 which is not returned by default.  
+    ### Returns:
+    scipy.stats.linear_regression tuple output in a Series with the tuple value names as index.  
+    """
     df = df.dropna(subset=[x, y], how="any")
+    if df.empty or df[x].eq(df[x].iat[0]).all():
+        return Series(data=[np.nan] * 6, index=["slope", "intercept", "rvalue", "pvalue", "stderr", "r2"])
     s = Series(lr(df[x], df[y]), index=["slope", "intercept", "rvalue", "pvalue", "stderr"])
     s["r2"] = s["rvalue"] ** 2
     return s
 
-def mask_out_outliers_by_interquartile_range(soh_values:Series) -> Series:
-    q1, q3 = soh_values.quantile(0.05), soh_values.quantile(0.95)
-    return soh_values.between(q1, q3, inclusive="both")
+def mask_out_outliers_by_interquartile_range(values:Series) -> Series:
+    """Returns a mask that is False for values outside of the [5%, 95%] quantiles interval."""
+    q1, q3 = values.quantile(0.05), values.quantile(0.95)
+    return values.between(q1, q3, inclusive="both")
 
 def force_monotonic_decrease(values:Series) -> Series:
     """

@@ -1,3 +1,7 @@
+"""
+Stores all the variables used by the other core modules that would hurt the readablity of the code.  
+This includes Warning/Error messages, path to files, ect...
+"""
 from os.path import join, dirname
 
 import pandas as pd
@@ -8,9 +12,7 @@ PARQUET_EV_MODELS_INFO_PATH = join(dirname(__file__), "data_cache/models_info.pa
 
 # S3 data caching
 KEY_LIST_COLUMN_NAMES = [ "key", "dtype_folder", 'brand', "vin", "file"]
-EMTPY_S3_KEYS_WARNING_MSG = """
-No responses found in {keys_prefix}.
-"""
+EMTPY_S3_KEYS_WARNING_MSG = "No responses found in {keys_prefix}."
 
 # Data caching
 NO_BUCKET_ARG_FOUND = "No bucket argument found in function {func_name}"
@@ -50,8 +52,15 @@ DB_URI_FORMAT_KEYS = [
     "DB_DATA_PORT",
     "DB_DATA_NAME",
 ]
+DB_URI_FORMAT_KEYS_PROD = [
+    "PROD_DATA_DB_USER",
+    "PROD_DATA_DB_HOST",
+    "PROD_DATA_DB_PASSWORD",
+    "PROD_DATA_DB_PORT",
+    "PROD_DATA_DB_NAME",
+]
 DB_URI_FORMAT_STR = "postgresql+psycopg2://{DB_DATA_USER}:{DB_DATA_PASSWORD}@{DB_DATA_HOST}:{DB_DATA_PORT}/{DB_DATA_NAME}"
-
+DB_URI_FORMAT_STR_PROD = "postgresql+psycopg2://{PROD_DATA_DB_USER}:{PROD_DATA_DB_PASSWORD}@{PROD_DATA_DB_HOST}:{PROD_DATA_DB_PORT}/{PROD_DATA_DB_NAME}"
 valid_soh_points = pd.DataFrame({
   "odometer": [20_000, 200_000, 0, 200_000],
   "soh": [1.0, 0.95, 0.9, 0.6],

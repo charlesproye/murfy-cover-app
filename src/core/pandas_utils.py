@@ -16,19 +16,15 @@ PD_OBJ = TypeVar('T', pd.DataFrame, pd.Series)
 logger = logging.getLogger(__name__)
 
 def debug_df(df: DF, subset: list[str]=None, logger:Logger=logger) -> DF:
+    """Prints or log the DF (or a subset of it) as well as a sanity_check of the DF."""
     show = print if logger is None else logger.debug
     df_to_debug = df if subset is None else df[subset]
     show(f"{df_to_debug}")
     show(sanity_check(df_to_debug))
     return df
 
-def print_data(data: PD_OBJ) -> PD_OBJ:
-    print(data)
-    print(data.dtypes)
-    return data
-
 def total_MB_memory_usage(df: DF) -> int:
-    return df.memory_usage().sum() / 1e6
+    return df.memory_usage(deep=True).sum() / 1e6
 
 def floor_to(s:Series, quantization:float) -> Series:
     return (
@@ -38,6 +34,7 @@ def floor_to(s:Series, quantization:float) -> Series:
     )
 
 def series_start_end_diff(s: Series) -> Any:
+    """Computes the diff between the first notna and last notna value."""
     notna_mask = s.notna()
     s = s.loc[notna_mask]
     if s.empty:
@@ -75,17 +72,17 @@ def concat(objects:list|dict|Series, logger:Logger=logger, **kwargs) -> DF:
     
     raise ValueError(f"pandas_utils.concat recieved inappropriate type: {type(objects)}.\n{objects}")
 
-def map_col_to_dict(df:DF, col:str, dict_map:dict) -> DF:
-    df[col] = df[col].map(dict_map).fillna(df[col])
-
+def str_lower_columns(df:DF, columns:list[str]) -> DF:
+    """Performs and str.lower like action on the specified columns. Handles category columns as well."""
+    for col_name in df.columns.intersection(columns):
+        if str(df[col_name].dtype) == "category":
+            df[col_name] = df[col_name].cat.rename_categories(lambda x: x.lower())
+        else:
+            df[col_name] = df[col_name].str.lower()
     return df
 
-def set_all_str_cols_to_lower(df: DF, but:list[str]=[]) -> DF:
-    str_cols = df.select_dtypes(include='string').columns.difference(but)
-    df.loc[:, str_cols] = df.loc[:, str_cols].apply(lambda col: col.str.lower())
-
-    return df
-
+# Deprecated (always was): This function made sense at some point of the developement when the data sources were messy.  
+# Now we can go back to using DataFrame.merge method instead as it is a lot faster.  
 def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str], src_dest_cols: list|dict|None= None, logger:Logger=logger) -> DF:
     """
     Perform a left merge of two DataFrames based on specified key columns.
@@ -93,6 +90,9 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     This function merges two DataFrames, `lhs` (left-hand side) and `rhs` (right-hand side).  
     It allows for flexible selection of source and destination  
     columns from the right DataFrame to be merged into the left DataFrame.
+
+    The Advantage over pandas' merge function is the the fact that you can specify which column to merge
+    Also, if the column already exists in the dest(lhs) df it gets written on instead of creating a _suffix column.
 
     Parameters:
     - lhs (DF): The left DataFrame to merge into.
@@ -148,6 +148,7 @@ def left_merge(lhs: DF, rhs: DF, left_on: str|list[str], right_on: str|list[str]
     return lhs
 
 def src_dest_for_left_merge(lhs:DF, rhs:DF, left_on:list[str], right_on:list[str], src_dest_cols: list|dict|None) -> tuple[list, list]:
+    """Helper function"""
     if src_dest_cols is None:
         src_cols = [col for col in rhs.columns if col not in right_on]
         dest_cols = [col for col in rhs.columns if col not in right_on]
@@ -167,23 +168,21 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     """
     Warp around pd.astype to ignore errors.
     Removes keys from col_dtypes that are not in df.columns.
+    Further normalize the datetime columns by setting the units as seconds.
     """
     logger.info(f"safe_astype called.")
     col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if col in df.columns}
-    datetime_cols = [col for col, dtype in col_dtypes.items() if "datetime" in dtype]
-    col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in dtype}
+    datetime_cols = [col for col, dtype in col_dtypes.items() if "datetime" in str(dtype)]
+    col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in str(dtype)}
     logger.debug(f"dtypes:\n{col_dtypes}")
     logger.debug(f"datetime_cols:{datetime_cols}")
     df = df.astype(col_dtypes, errors="ignore")
     for col in datetime_cols:
         df[col] = pd.to_datetime(df[col], format='mixed').dt.as_unit("s")
-    dtypes_dict = df[df.columns.intersection(col_dtypes.keys())].dtypes.to_dict()
-    if dtypes_dict != col_dtypes:
-        logger.warning("safe_astype did not succeed in changing all dtypes.")
-        logger.warning(f"final col_dtypes:\n{dtypes_dict}")
     return df
 
 def sanity_check(df:DF) -> DF:
+    """Provides an high level description of the DF. Like DF.describe with more features."""
     nunique_dict = {}
     value_counts_dict = {}
     for col in df.columns:
@@ -200,7 +199,7 @@ def sanity_check(df:DF) -> DF:
         "nuniques": Series(nunique_dict).fillna(0).astype("int"),
         "count": df.count(),
         "density": df.count().div(len(df)),
-        "memory_usage_in_MB": df.memory_usage().div(1e6),
+        "memory_usage_in_MB": df.memory_usage(deep=True).div(1e6),
         "mean": df.mean(numeric_only=True),
         "std": df.std(numeric_only=True),
         "min": df.min(numeric_only=True),
@@ -210,32 +209,9 @@ def sanity_check(df:DF) -> DF:
         index=df.columns
     )
 
-def safe_locate(df:DF, index_loc:pd.Index=None, col_loc:pd.Index=None, logger:Logger=logger) -> DF:
-    logger.info(f"safe_locate called.")
-    logger.debug(f"Initial shape: {df.shape}")
-    if not isinstance(index_loc, pd.Index) and index_loc is not None:
-        index_loc = pd.Index(index_loc)
-    if not isinstance(col_loc, pd.Index) and col_loc is not None:
-        col_loc = pd.Index(col_loc)
-    if index_loc is not None:
-        index_loc = pd.Index(index_loc).intersection(df.index)
-    if col_loc is not None:
-        col_loc = pd.Index(col_loc).intersection(df.columns)
-
-    if col_loc is None and not index_loc is None:
-        return df.loc[index_loc]
-    if not col_loc is None and index_loc is None:
-        logger.debug(f"Final shape: {df.loc[:, col_loc].shape}")
-        return df.loc[:, col_loc]
-    if not col_loc is None and not index_loc is None:
-        return df.loc[index_loc, col_loc]
-        
-    raise ValueError("col_loc and index_loc cannot both be None.")
-
-def dropna_cols(df:DF, logger:Logger=logger) -> DF:
-    logger.info(f"dropna_cols called.")
-    logger.debug(f"notna cols:\n{df.notna().any(axis=0)}")
-    return df.loc[:, df.notna().any(axis=0)]
+def safe_locate(df:DF, col_loc:pd.Index, logger:Logger=logger) -> DF:
+    """Selects the only the specified columns that are present in the data frame without raising an error if columns are not in the df."""
+    return df[df.columns.intersection(col_loc)]
 
 # WIP: this has only been tested with mobilisight data.
 def parse_unstructured_json(json_obj, no_prefix_path:list[str]=[], no_suffix_path:list[str]=[], path:list[str]=[], logger:Logger=logger) -> DF:

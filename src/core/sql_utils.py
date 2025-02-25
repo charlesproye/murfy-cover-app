@@ -6,7 +6,7 @@ from sqlalchemy import Connection as Con
 from contextlib import contextmanager
 
 from core.pandas_utils import *
-from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR
+from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR, DB_URI_FORMAT_KEYS_PROD, DB_URI_FORMAT_STR_PROD
 from core.env_utils import get_env_var
 
 logger = getLogger("core.sql_utils")
@@ -14,6 +14,13 @@ logger = getLogger("core.sql_utils")
 def get_sqlalchemy_engine() -> Engine:
     db_uri_format_dict = {key: get_env_var(key) for key in DB_URI_FORMAT_KEYS}
     db_uri = DB_URI_FORMAT_STR.format(**db_uri_format_dict)
+    engine = create_engine(db_uri)
+
+    return engine
+
+def get_sqlalchemy_engine_prod() -> Engine:
+    db_uri_format_dict = {key: get_env_var(key) for key in DB_URI_FORMAT_KEYS_PROD}
+    db_uri = DB_URI_FORMAT_STR_PROD.format(**db_uri_format_dict)
     engine = create_engine(db_uri)
 
     return engine
@@ -30,52 +37,6 @@ def get_connection():
     finally:
         conn.close()
 
-def right_inner_merge(
-    lhs: pd.DataFrame,
-    rhs_name: str,
-    left_on: str|list[str],
-    right_on: str|list[str],
-    update_cols: list[str],
-    logger: logging.Logger = logger,
-):
-    try:
-        # Ensure keys are lists
-        left_on = [left_on] if isinstance(left_on, str) else left_on
-        right_on = [right_on] if isinstance(right_on, str) else right_on
-
-        # Validate column presence
-        for col in left_on + update_cols:
-            if col not in lhs.columns:
-                raise ValueError(f"Column '{col}' not found in DataFrame.")
-
-        # Upload DataFrame to a temporary table
-        TMP_TABLE_NAME = "temp_table"
-        logger.info("Uploading DataFrame to temporary table...")
-        lhs.to_sql(TMP_TABLE_NAME, con, if_exists="replace", index=False)
-
-        # Construct the SQL update query
-        set_clause = ", ".join([f"{col} = temp.{col}" for col in update_cols])
-        join_condition = " AND ".join([f"{rhs_name}.{r} = temp.{l}" for l, r in zip(left_on, right_on)])
-
-        update_query = text(f"""
-        UPDATE {rhs_name}
-        SET {set_clause}
-        FROM {TMP_TABLE_NAME} AS temp
-        WHERE {join_condition};
-        """)
-        logger.info(f"Executing update query:\n{update_query}")
-        with con.begin() as _:
-            con.execute(update_query)
-
-            # Drop the temporary table
-            logger.info("Dropping temporary table...")
-            con.execute(text(f"DROP TABLE IF EXISTS {TMP_TABLE_NAME};"))
-
-        logger.info("Update operation completed successfully.")
-
-    except Exception as e:
-        logger.error(f"An error occurred during the update operation: {e}")
-        raise
 
 def left_merge_rdb_table(
         lhs: DF,
@@ -86,11 +47,19 @@ def left_merge_rdb_table(
         con: Con=con,
         logger: Logger=logger,
     ) -> DF:
+    """
+    Reads the rdb table with the name `rhs` and performs a left_merge on the df with it.
+    Take a look at the doc string of `core.pandas_utils.left_merge` to understand how the other arguments are used.
+    """
     logger.info(f"Left merging {lhs.shape[0]} rows with {rhs} on {left_on} and {right_on}")
     rhs = pd.read_sql_table(rhs, con)
     return left_merge(lhs, rhs, left_on, right_on, src_dest_cols, logger)
 
 def truncate_rdb_table_and_insert_df(df: DF, table_name: str, src_dest_cols: dict[str, str]|list[str], logger:Logger=logger) -> DF:
+    """
+    Warp around `DataFram.to_sql`.    
+    Instead of appending on the table or deleting it and creating a new one with the same name, we simply empty the table and fill it with the DF.
+    """
     logger.debug(f"Truncating {table_name} and inserting a new DF in it.")
     # Preprocess input
     if isinstance(src_dest_cols, list):

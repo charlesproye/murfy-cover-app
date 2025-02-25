@@ -70,12 +70,13 @@ class S3_Bucket():
             else:
                 raise e
 
+    # This should be moved else wehere as this is a method specific to the way BIB oragnizes its responses.  
+    # Ideally this would be moved to transform.raw_tss.
     def list_responses_keys_of_brand(self, brand:str="") -> DF:
         """
-        ### Descriptions:
-        *Warning:Ayvens x BIB POC specific method. This may not work on other projects.*  
         ### Returns:
         A dataframe where each row represents the key of a response.  
+        The columns are key(absolute path), vin, make, file(filename).
         """
         self.logger.debug(f"Listing responses keys of {brand}...")
         keys = self.list_keys(f"response/{brand}/")

@@ -65,6 +65,7 @@ def get_processed_results(brand:str) -> DF:
 
     return results
 
+# Raw results have different frequency, this function ensures that processed results all have the frequency
 def agg_results_by_update_frequency(results:DF) -> DF:
     results["date"] = (
         pd.to_datetime(results["date"], format='mixed')
@@ -98,7 +99,7 @@ def make_charge_levels_presentable(results:DF) -> DF:
     negative_charge_levels = results[["level_1", "level_2", "level_3"]].lt(0)
     nb_negative_levels = negative_charge_levels.sum().sum()
     if nb_negative_levels > 0:
-        logger.debug(f"There are {nb_negative_levels}({100*nb_negative_levels/len(results):2f}%) negative charge levels, setting them to 0.")
+        logger.warning(f"There are {nb_negative_levels}({100*nb_negative_levels/len(results):2f}%) negative charge levels, setting them to 0.")
     results[["level_1", "level_2", "level_3"]] = results[["level_1", "level_2", "level_3"]].mask(negative_charge_levels, 0)
     return results
 
