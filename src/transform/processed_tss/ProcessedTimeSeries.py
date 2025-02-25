@@ -58,6 +58,7 @@ class ProcessedTimeSeries(CachedETL):
             .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
             .pipe(self.compute_cum_var, "power", "cum_energy")
             .pipe(self.compute_cum_var, "charger_power", "cum_charge_energy_added")
+            .pipe(self.compute_status_col)
         )
 
     def normalize_units_to_metric(self, tss:DF) -> DF:
@@ -81,7 +82,7 @@ class ProcessedTimeSeries(CachedETL):
         )
         tss[cum_var_col] *= KJ_TO_KWH # Convert from kj to kwh
         # Reset value to zero at the start of each vehicle time series
-        tss[cum_var_col] -= tss.groupby(self.id_col, observed=False)[cum_var_col].transform("first")
+        tss[cum_var_col] -= tss.groupby(self.id_col, observed=True)[cum_var_col].transform("first")
         return tss
 
     def compute_date_vars(self, tss:DF) -> DF:
@@ -100,7 +101,7 @@ class ProcessedTimeSeries(CachedETL):
         raise ValueError(MAKE_NOT_SUPPORTED_ERROR.format(make=self.make))
 
     def charge_n_discharging_masks_from_soc_diff(self, tss:DF) -> DF:
-        tss_grp = tss.groupby(self.id_col, observed=False)
+        tss_grp = tss.groupby(self.id_col, observed=True)
         tss["soc_ffilled"] = tss_grp["soc"].ffill()
         tss["soc_diff"] = tss_grp["soc_ffilled"].diff()
         tss["soc_diff"] /= tss["soc_diff"].abs()
@@ -120,24 +121,38 @@ class ProcessedTimeSeries(CachedETL):
         )
 
     def trim_leading_n_trailing_soc_off_masks(self, tss:DF, masks:list[str]) -> DF:
-        self.logger.info(f"Trimming off trailing soc of {masks} masks.")
-        tss_grp = tss.groupby(self.id_col, observed=False)
+        self.logger.debug(f"Computing trimmed masks of{masks}.")
         for mask in masks:
-            trailing_soc = tss_grp[mask].transform("last")
-            leading_soc = tss_grp[mask].transform("first")
+            tss["naned_soc"] = tss["soc"].where(tss[mask])
+            soc_grp = tss.groupby(["vin", mask + "_idx"], observed=True)["naned_soc"]
+            trailing_soc = soc_grp.transform("first")
+            leading_soc = soc_grp.transform("last")
+            tss["trailing_soc"] = trailing_soc
+            tss["leading_soc"] = leading_soc
             tss[f"trimmed_{mask}"] = tss[mask] & (tss["soc"] != trailing_soc) & (tss["soc"] != leading_soc)
+        tss = tss.drop(columns="naned_soc")
         return tss
-
+    
     def compute_idx_from_masks(self, tss: DF, masks:list[str]) -> DF:
         self.logger.info(f"Computing {masks} idx from masks.")
         for mask in masks:
             idx_col_name = f"{mask}_idx"
-            shifted_mask = tss.groupby(self.id_col, observed=False)[mask].shift(fill_value=False)
+            shifted_mask = tss.groupby(self.id_col, observed=True)[mask].shift(fill_value=False)
             tss["new_period_start_mask"] = shifted_mask.ne(tss[mask]) 
             if self.max_td is not None:
                 tss["new_period_start_mask"] |= (tss["time_diff"] > self.max_td)
-            tss[idx_col_name] = tss.groupby(self.id_col, observed=False)["new_period_start_mask"].cumsum().astype("uint16")
+            tss[idx_col_name] = tss.groupby(self.id_col, observed=True)["new_period_start_mask"].cumsum().astype("uint16")
             tss.drop(columns=["new_period_start_mask"], inplace=True)
+        return tss
+
+    def compute_status_col(self, tss:DF) -> DF:
+        self.logger.debug("Computing status column.")
+        tss_grp = tss.groupby("vin", observed=True)
+        status = tss["in_charge"].map({True: "charging", False:"discharging", pd.NA:"unknown"})
+        tss["status"] = status.mask(
+            tss["in_charge"].eq(False, fill_value=True),
+            np.where(tss_grp["odometer"].diff() > 0, "moving", "idle_discharging"),
+        )
         return tss
 
     @classmethod
@@ -159,28 +174,36 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (
             tss
-            .pipe(self.compute_charge_n_discharge_masks, IN_CHARGE_CHARGING_STATUS_VALS, IN_DISCHARGE_CHARGING_STATUS_VALS)
-            .pipe(self.compute_in_charge_idx)
+            .pipe(self.compute_charge_n_discharge_masks)
+            .pipe(self.compute_charge_idx)
             .pipe(self.compute_idx_from_masks, ["in_discharge"])
             .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
             .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
             .pipe(self.compute_cum_var, "power", "cum_energy")
         )
 
-    def compute_in_charge_idx(self, tss:DF) -> DF:
-        tss_grp = tss.groupby(self.id_col, observed=False)
-        shifted_vars = tss_grp[["in_charge", "charge_energy_added"]].shift(fill_value=False)
-        tss["new_charge_period_mask"] = shifted_vars["in_charge"].ne(tss["in_charge"]) 
-        # Edge case to take care of when there is no discharge points in between charge points.
-        # This causes the base ProcessedTimeSeries to sometimes count two charges as one. 
-        # To fix this we check that the charge_energy_added does not decrease as it is cumulative per charge.
-        tss["new_charge_period_mask"] |= (
-            shifted_vars["charge_energy_added"].gt(tss["charge_energy_added"])
-            & shifted_vars["in_charge"]
-            & tss["in_charge"]
+    def compute_charge_n_discharge_masks(self, tss:DF) -> DF:
+        charging = (
+            Series(pd.NA, index=tss.index, dtype="boolean")
+            .mask(tss["charging_status"].isin(IN_CHARGE_CHARGING_STATUS_VALS), True)
+            .mask(tss["charging_status"].isin(IN_DISCHARGE_CHARGING_STATUS_VALS), False)
         )
-        tss["in_charge_idx"] = tss_grp["new_charge_period_mask"].cumsum().astype("uint16")
-        tss = tss.drop(columns=["new_charge_period_mask"])
+        ffill_base = charging.groupby(tss["vin"], observed=True).ffill()
+        bfill_base = charging.groupby(tss["vin"], observed=True).bfill()
+        charging = charging.mask(ffill_base.eq(bfill_base), ffill_base)
+        charging = charging.mask(tss["soc"] >= 98)
+        tss["in_charge"] = charging.notna() & charging
+        tss["in_discharge"] = charging.notna() & ~charging
+        return tss
+
+    def compute_charge_idx(self, tss:DF) -> DF:
+        self.logger.debug("Computing Tesla specific charge index.")
+        tss_grp = tss.groupby(self.id_col, observed=True)
+        tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
+        power_loss = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
+        MIN_POWER_LOSS = 0.0001
+        new_charge_mask = tss["in_charge"] & (power_loss.lt(MIN_POWER_LOSS, fill_value=0) | tss["time_diff"].gt(TD(days=1)))
+        tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
         return tss
 
 @main_decorator
