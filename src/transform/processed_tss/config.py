@@ -134,7 +134,8 @@ COLS_TO_FILL = [
 MAX_TIME_DIFF_TO_FILL = pd.Timedelta(minutes=45)
 
 IN_CHARGE_CHARGING_STATUS_VALS = [
-    'charging',
+    'charging', # Tesla
+    # 'nopower', # Tesla
     'chargingactive',
     'slow_charging',
     'fast_charging',
@@ -147,7 +148,7 @@ IN_DISCHARGE_CHARGING_STATUS_VALS = [
     'nocharging',
     'chargingerror',
     'cable_unplugged',
-    'disconnected'
+    'disconnected', # Tesla
 ]
 
 CHARGING_STATUS_VAL_TO_MASK = {
