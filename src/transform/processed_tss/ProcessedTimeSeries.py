@@ -182,29 +182,46 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             .pipe(self.compute_cum_var, "power", "cum_energy")
         )
 
-    def compute_charge_n_discharge_masks(self, tss:DF) -> DF:
-        charging = (
-            Series(pd.NA, index=tss.index, dtype="boolean")
-            .mask(tss["charging_status"].isin(IN_CHARGE_CHARGING_STATUS_VALS), True)
-            .mask(tss["charging_status"].isin(IN_DISCHARGE_CHARGING_STATUS_VALS), False)
-        )
-        ffill_base = charging.groupby(tss["vin"], observed=True).ffill()
-        bfill_base = charging.groupby(tss["vin"], observed=True).bfill()
-        charging = charging.mask(ffill_base.eq(bfill_base), ffill_base)
-        charging = charging.mask(tss["soc"] >= 98)
-        tss["in_charge"] = charging.notna() & charging
-        tss["in_discharge"] = charging.notna() & ~charging
-        return tss
+def compute_charge_n_discharge_masks(tss:DF) -> DF:
+    # We use a nullable boolean Series to represnet the rows where:
+    tss["nan_charging"] = (
+        Series(pd.NA, index=tss.index, dtype="boolean")# We are not sure of anything.
+        .mask(tss["charging_status"].isin(IN_CHARGE_CHARGING_STATUS_VALS), True)# We are sure that the vehicle is in charge.
+        .mask(tss["charging_status"].isin(IN_DISCHARGE_CHARGING_STATUS_VALS), False)# We are sure that the vehicle is not in charge.
+    )
+    # If a period of uncertainty (NaN) is surrounded by equal periods of certainties (True-NaN-True or False-NaN-False),
+    # We will fill them to the value of these certainties.
+    # However there are edge cases that have multiple days of uncertainties periods (I can't find the VIN but I'm sure you can ;-) )
+    # Interestingly enough the charge_energy_adde variable does not get forwared that far and gets reset to zero. 
+    # This would create outliers in our charge SoH estimation as we estimate the energy_gained as the diff between the last(0) and first value of charge_energy_added.
+    # So we set a maximal uncertainty period duration over which we don't fill it.
+    tss["nan_date"] = tss["date"].mask(tss["nan_charging"].isna())
+    tss[["ffill_charging", "ffill_date"]] = tss.groupby("vin", observed=True)[["nan_charging", "nan_date"]].ffill()
+    tss[["bfill_charging", "bfill_date"]] = tss.groupby("vin", observed=True)[["nan_charging", "nan_date"]].bfill()
+    nan_period_duration:Series = tss.eval("bfill_date - ffill_date")
+    fill_unknown_period = tss.eval("ffill_charging.eq(bfill_charging) & @nan_period_duration.le(@MAX_CHARGE_TD)")
+    tss["nan_charging"] = tss["nan_charging"].mask(fill_unknown_period, tss["ffill_charging"])
+    # As mentioned before, the SoC oscillates at [charge_limit_soc - ~3%, charge_limit_soc] so we set these periods to NaN as well.
+    tss["nan_charging"] = tss["nan_charging"].mask(tss["soc"] >= (tss["charge_limit_soc"] - 3))
+    # Then we seperate the Series into two, more explicit, columns.
+    tss["in_charge"] = tss.eval("nan_charging.notna() & nan_charging")
+    tss["in_discharge"] = tss.eval("nan_charging.notna() & ~nan_charging")
+    return tss.drop(columns=["nan_charging"])
 
-    def compute_charge_idx(self, tss:DF) -> DF:
-        self.logger.debug("Computing Tesla specific charge index.")
-        tss_grp = tss.groupby(self.id_col, observed=True)
-        tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
-        power_loss = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
-        MIN_POWER_LOSS = 0.0001
-        new_charge_mask = tss["in_charge"] & (power_loss.lt(MIN_POWER_LOSS, fill_value=0) | tss["time_diff"].gt(TD(days=1)))
-        tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
-        return tss
+def compute_charge_idx(tss:DF) -> DF:
+    tss_grp = tss.groupby("vin", observed=False)
+    tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
+    energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
+    # charge_energy_added is cummulative and forward filled, 
+    # We check that the charge_energy_added decreases too fast to make sure that  correctly indentify two charging periods before and after a gap as two separate charging periods.
+    new_charge_mask = energy_added_over_time.lt(MIN_POWER_LOSS, fill_value=0) 
+    # For the same reason, we ensure that there are no gaps bigger than MAX_CHARGE_TD in between to rows of the same charging period.
+    new_charge_mask |= tss["time_diff"].gt(MAX_CHARGE_TD) 
+    # And of course we also check that there is no change of status. 
+    new_charge_mask |= (~tss_grp["in_charge"].shift() & tss["in_charge"]) 
+    tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
+    return tss
+
 
 @main_decorator
 def main():
