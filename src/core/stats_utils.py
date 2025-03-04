@@ -65,10 +65,12 @@ def lr_params_as_series(df: DF, x: str, y: str) -> Series:
     s["r2"] = s["rvalue"] ** 2
     return s
 
-def mask_out_outliers_by_interquartile_range(values:Series) -> Series:
+def mask_out_outliers_by_interquartile_range(soh_values:Series) -> Series:
     """Returns a mask that is False for values outside of the [5%, 95%] quantiles interval."""
-    q1, q3 = values.quantile(0.05), values.quantile(0.95)
-    return values.between(q1, q3, inclusive="both")
+    valid_float_soh_values = soh_values.dropna()
+    q1, q3 = valid_float_soh_values.quantile(0.05), valid_float_soh_values.quantile(0.95)
+    return soh_values.between(q1, q3, inclusive="both")
+
 
 def force_monotonic_decrease(values:Series) -> Series:
     """
@@ -89,7 +91,7 @@ def force_monotonic_decrease(values:Series) -> Series:
     # Initialisation des valeurs ajustées (on commence par les valeurs brutes)
     # Résolution de l'optimisation
     results = minimize(objectif, notna_values, constraints=constraints, bounds=bounds, method="SLSQP")
-    values[values.notna()] = results.x
+    values.loc[values.notna()] = results.x.astype("float32")
 
     if results.success:
         return values
