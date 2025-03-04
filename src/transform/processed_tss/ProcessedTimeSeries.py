@@ -14,6 +14,7 @@ from transform.fleet_info.main import fleet_info
 # Here we have implemented the ETL as a class as most raw time series go through the same processing step.
 # To have a processing step specific to a data provider/manufacturer, simply implement a subclass of ProcessedTimeSeries and update update_all_tss.
 class ProcessedTimeSeries(CachedETL):
+    # Declare that the following variable names are not dataframe(parent class) columns
     _metadata = ['make', "logger", "id_col", "max_td"]
 
     def __init__(self, make:str, id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False, **kwargs):
@@ -25,25 +26,23 @@ class ProcessedTimeSeries(CachedETL):
         self.max_td = max_td
         super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update, **kwargs)
 
-    # No need to call run it will be called in CachedETL init.
+    # No need to call run, it will be called in CachedETL init.
     def run(self) -> DF:
-        self.logger.info(f"==================Processing {self.make} raw tss.==================")
-        return (
-            get_raw_tss(self.make)
-            .rename(columns=RENAME_COLS_DICT, errors="ignore")
-            .pipe(safe_locate, col_loc=list(COL_DTYPES.keys()), logger=self.logger)
-            .pipe(safe_astype, COL_DTYPES, logger=self.logger)
-            .pipe(self.normalize_units_to_metric)
-            .sort_values(by=["vin", "date"])
-            .pipe(str_lower_columns, COLS_TO_STR_LOWER)
-            .pipe(self.compute_date_vars)
-            .pipe(self.compute_charge_n_discharge_vars)
-            .merge(fleet_info, on="vin", how="left")
-            .eval("age = date.dt.tz_localize(None) - start_date.dt.tz_localize(None)")
-            # It seems that the reset_index calls doesn't reset the id_col into a category if the groupby's by argument was categorical.
-            # So we recall astype on the id_col  in case it is supposed to be categorical.
-            .astype({self.id_col: COL_DTYPES[self.id_col]})
-        )
+        self.logger.info(f"{'Processing ' + self.make + ' raw tss.':=^{50}}")
+        tss = get_raw_tss(self.make)
+        tss = tss.rename(columns=RENAME_COLS_DICT, errors="ignore")
+        tss = tss.pipe(safe_locate, col_loc=list(COL_DTYPES.keys()), logger=self.logger)
+        tss = tss.pipe(safe_astype, COL_DTYPES, logger=self.logger)
+        tss = tss.pipe(self.normalize_units_to_metric)
+        tss = tss.sort_values(by=["vin", "date"])
+        tss = tss.pipe(str_lower_columns, COLS_TO_STR_LOWER)
+        tss = tss.pipe(self.compute_date_vars)
+        tss = tss.pipe(self.compute_charge_n_discharge_vars)
+        tss = tss.merge(fleet_info, on="vin", how="left")
+        tss = tss.eval("age = date.dt.tz_localize(None) - start_date.dt.tz_localize(None)")
+        # It seems that the reset_index calls doesn't reset the id_col into a category if the groupby's by argument was categorical.
+        # So we recall astype on the id_col  in case it is supposed to be categorical.
+        tss = tss.astype({self.id_col: COL_DTYPES[self.id_col]})
 
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (
@@ -82,6 +81,7 @@ class ProcessedTimeSeries(CachedETL):
         )
         tss[cum_var_col] *= KJ_TO_KWH # Convert from kj to kwh
         # Reset value to zero at the start of each vehicle time series
+        # This is better than performing a groupby.apply with cumulative_trapezoid
         tss[cum_var_col] -= tss.groupby(self.id_col, observed=True)[cum_var_col].transform("first")
         return tss
 
@@ -179,53 +179,63 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             .pipe(self.compute_idx_from_masks, ["in_discharge"])
             .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
             .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
-            .pipe(self.compute_cum_var, "power", "cum_energy")
+            # .pipe(self.compute_cum_var, "power", "cum_energy")
         )
 
-def compute_charge_n_discharge_masks(tss:DF) -> DF:
-    # We use a nullable boolean Series to represnet the rows where:
-    tss["nan_charging"] = (
-        Series(pd.NA, index=tss.index, dtype="boolean")# We are not sure of anything.
-        .mask(tss["charging_status"].isin(IN_CHARGE_CHARGING_STATUS_VALS), True)# We are sure that the vehicle is in charge.
-        .mask(tss["charging_status"].isin(IN_DISCHARGE_CHARGING_STATUS_VALS), False)# We are sure that the vehicle is not in charge.
-    )
-    # If a period of uncertainty (NaN) is surrounded by equal periods of certainties (True-NaN-True or False-NaN-False),
-    # We will fill them to the value of these certainties.
-    # However there are edge cases that have multiple days of uncertainties periods (I can't find the VIN but I'm sure you can ;-) )
-    # Interestingly enough the charge_energy_adde variable does not get forwared that far and gets reset to zero. 
-    # This would create outliers in our charge SoH estimation as we estimate the energy_gained as the diff between the last(0) and first value of charge_energy_added.
-    # So we set a maximal uncertainty period duration over which we don't fill it.
-    tss["nan_date"] = tss["date"].mask(tss["nan_charging"].isna())
-    tss[["ffill_charging", "ffill_date"]] = tss.groupby("vin", observed=True)[["nan_charging", "nan_date"]].ffill()
-    tss[["bfill_charging", "bfill_date"]] = tss.groupby("vin", observed=True)[["nan_charging", "nan_date"]].bfill()
-    nan_period_duration:Series = tss.eval("bfill_date - ffill_date")
-    fill_unknown_period = tss.eval("ffill_charging.eq(bfill_charging) & @nan_period_duration.le(@MAX_CHARGE_TD)")
-    tss["nan_charging"] = tss["nan_charging"].mask(fill_unknown_period, tss["ffill_charging"])
-    # As mentioned before, the SoC oscillates at [charge_limit_soc - ~3%, charge_limit_soc] so we set these periods to NaN as well.
-    tss["nan_charging"] = tss["nan_charging"].mask(tss["soc"] >= (tss["charge_limit_soc"] - 3))
-    # Then we seperate the Series into two, more explicit, columns.
-    tss["in_charge"] = tss.eval("nan_charging.notna() & nan_charging")
-    tss["in_discharge"] = tss.eval("nan_charging.notna() & ~nan_charging")
-    return tss.drop(columns=["nan_charging"])
+    def compute_charge_n_discharge_masks(self, tss:DF) -> DF:
+        # We use a nullable boolean Series to represnet the rows where:
+        tss["nan_charging"] = (
+            Series(pd.NA, index=tss.index, dtype="boolean")# We are not sure of anything.
+            .mask(tss["charging_status"].isin(IN_CHARGE_CHARGING_STATUS_VALS), True)# We are sure that the vehicle is in charge.
+            .mask(tss["charging_status"].isin(IN_DISCHARGE_CHARGING_STATUS_VALS), False)# We are sure that the vehicle is not in charge.
+        )
+        # If a period of uncertainty (NaN) is surrounded by equal periods of certainties (True-NaN-True or False-NaN-False),
+        # We will fill them to the value of these certainties.
+        # However there are edge cases that have multiple days of uncertainties periods (I can't find the VIN but I'm sure you can ;-) )
+        # Interestingly enough the charge_energy_added variable does not get forwared that far and gets reset to zero. 
+        # This would create outliers in our charge SoH estimation as we estimate the energy_gained as the diff between the last(0) and first value of charge_energy_added.
+        # So we set a maximal uncertainty period duration over which we don't fill it.
+        tss["nan_date"] = tss["date"].mask(tss["nan_charging"].isna())
+        tss[["ffill_charging", "ffill_date"]] = tss.groupby("vin", observed=True)[["nan_charging", "nan_date"]].ffill()
+        tss[["bfill_charging", "bfill_date"]] = tss.groupby("vin", observed=True)[["nan_charging", "nan_date"]].bfill()
+        nan_period_duration:Series = tss.eval("bfill_date - ffill_date")
+        fill_unknown_period = tss.eval("ffill_charging.eq(bfill_charging) & @nan_period_duration.le(@MAX_CHARGE_TD)")
+        tss["nan_charging"] = tss["nan_charging"].mask(fill_unknown_period, tss["ffill_charging"])
+        # As mentioned before, the SoC oscillates at [charge_limit_soc - ~3%, charge_limit_soc] so we set these periods to NaN as well.
+        tss["nan_charging"] = tss["nan_charging"].mask(tss["soc"] >= (tss["charge_limit_soc"] - 3))
+        # Then we seperate the Series into two, more explicit, columns.
+        tss["in_charge"] = tss.eval("nan_charging.notna() & nan_charging")
+        tss["in_discharge"] = tss.eval("nan_charging.notna() & ~nan_charging")
+        return tss.drop(columns=["nan_charging", "ffill_charging", "bfilbfill_chargingl_date", "ffill_date", "bfill_date"])
 
-def compute_charge_idx(tss:DF) -> DF:
-    tss_grp = tss.groupby("vin", observed=False)
-    tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
-    energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
-    # charge_energy_added is cummulative and forward filled, 
-    # We check that the charge_energy_added decreases too fast to make sure that  correctly indentify two charging periods before and after a gap as two separate charging periods.
-    new_charge_mask = energy_added_over_time.lt(MIN_POWER_LOSS, fill_value=0) 
-    # For the same reason, we ensure that there are no gaps bigger than MAX_CHARGE_TD in between to rows of the same charging period.
-    new_charge_mask |= tss["time_diff"].gt(MAX_CHARGE_TD) 
-    # And of course we also check that there is no change of status. 
-    new_charge_mask |= (~tss_grp["in_charge"].shift() & tss["in_charge"]) 
-    tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
-    return tss
+    def compute_charge_idx(self, tss:DF) -> DF:
+        tss_grp = tss.groupby("vin", observed=False)
+        tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
+        energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
+        # charge_energy_added is cummulative and forward filled, 
+        # We check that the charge_energy_added decreases too fast to make sure that  correctly indentify two charging periods before and after a gap as two separate charging periods.
+        new_charge_mask = energy_added_over_time.lt(MIN_POWER_LOSS, fill_value=0) 
+        # For the same reason, we ensure that there are no gaps bigger than MAX_CHARGE_TD in between to rows of the same charging period.
+        new_charge_mask |= tss["time_diff"].gt(MAX_CHARGE_TD) 
+        # And of course we also check that there is no change of status. 
+        new_charge_mask |= (~tss_grp["in_charge"].shift() & tss["in_charge"]) 
+        tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum().astype("uint16")
+        return tss
 
 
 @main_decorator
 def main():
-    ProcessedTimeSeries.update_all_tss()
+    import argparse
+    import logging
+
+    parser = argparse.ArgumentParser(description="Process time series data.")
+    parser.add_argument('--log_level', type=str, default='INFO', help='Set the logging level (default: INFO)')
+    args = parser.parse_args()
+
+    log_level = getattr(logging, args.log_level.upper(), logging.INFO)
+    logging.basicConfig(level=log_level)
+
+    ProcessedTimeSeries.update_all_tss(log_level=log_level)
 
 if __name__ == "__main__":
     main()
