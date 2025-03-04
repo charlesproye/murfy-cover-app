@@ -183,6 +183,7 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         )
 
     def compute_charge_n_discharge_masks(self, tss:DF) -> DF:
+        self.logger.debug("Computing tesla specific charge and discharge masks")
         # We use a nullable boolean Series to represnet the rows where:
         tss["nan_charging"] = (
             Series(pd.NA, index=tss.index, dtype="boolean")# We are not sure of anything.
@@ -206,9 +207,10 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         # Then we seperate the Series into two, more explicit, columns.
         tss["in_charge"] = tss.eval("nan_charging.notna() & nan_charging")
         tss["in_discharge"] = tss.eval("nan_charging.notna() & ~nan_charging")
-        return tss.drop(columns=["nan_charging", "ffill_charging", "bfilbfill_chargingl_date", "ffill_date", "bfill_date"])
+        return tss.drop(columns=["nan_charging", "ffill_charging", "bfill_charging", "ffill_date", "bfill_date"])
 
     def compute_charge_idx(self, tss:DF) -> DF:
+        self.logger.debug("Computing tesla specific charge index.")
         tss_grp = tss.groupby("vin", observed=False)
         tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
         energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
@@ -219,7 +221,9 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         new_charge_mask |= tss["time_diff"].gt(MAX_CHARGE_TD) 
         # And of course we also check that there is no change of status. 
         new_charge_mask |= (~tss_grp["in_charge"].shift() & tss["in_charge"]) 
-        tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum().astype("uint16")
+        tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
+        print(tss["in_charge_idx"].count() / len(tss))
+        tss["in_charge_idx"] = tss["in_charge_idx"].fillna(-1).astype("uint16")
         return tss
 
 
@@ -233,7 +237,6 @@ def main():
     args = parser.parse_args()
 
     log_level = getattr(logging, args.log_level.upper(), logging.INFO)
-    logging.basicConfig(level=log_level)
 
     ProcessedTimeSeries.update_all_tss(log_level=log_level)
 
