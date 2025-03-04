@@ -174,12 +174,12 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
+    "tesla",
     "bmw",
     "mercedes-benz",
     "ford",
     "volvo-cars",
     "stellantis",
-    "tesla",
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
