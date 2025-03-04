@@ -203,3 +203,8 @@ COLS_TO_STR_LOWER = [
     "charging_method",
     "fast_charger_type",
 ]
+
+# Tesla specific vars:
+MIN_POWER_LOSS = -0.0005
+MAX_CHARGE_TD = TD(days=1)
+
