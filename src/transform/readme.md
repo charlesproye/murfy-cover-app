@@ -47,8 +47,27 @@ It takes in data time series and static vehicle data and outputs valuable time s
 Static data are data that remain the same throughout the vehicles lifes such as the model, default battery capacity, ect...  
 Time series data... you should know what a time series is :left eye brow raised:.  
 The ETL consists of multiple sub ETLs, each implemented in a single sub package.    
+From a high level point of view, the ETL computes the following steps(each arrow is a step):
+```
+json API responses in S3         static data in DB    
+         |                           |   
+         V                           V   
+parquet raw time series in S3     single fleet_info dataframe (not cached)   
+         |                           |   
+         \                           /   
+          \                         /   
+           \                       /   
+            parquet processed_tss in S3   
+                    |   
+                    V   
+            parquet raw_results in S3   
+                    |   
+                    V   
+    parquet processed_results in vehicle_data   
+```
 
 > Here "XX" is the name of the data provider or a manufacturer.  
+
 - **main.py**:   
     Runs a blocking schedueler to execute all the sub ETLs once every day.  
 -  **raw_tss.XX_raw_time_series.py**:  
