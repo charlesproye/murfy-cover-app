@@ -12,6 +12,7 @@ from pandas import DataFrame as DF
 from pandas import Series
 
 from core.config import *
+from core.env_utils import get_env_var
 from core.pandas_utils import str_split_and_retain_src
 
 load_dotenv()
@@ -27,7 +28,7 @@ class S3_Bucket():
         self._s3_client = boto3.client(
             "s3",
             region_name="fr-par",
-            endpoint_url=os.getenv("S3_ENDPOINT"),
+            endpoint_url=get_env_var("S3_ENDPOINT"),
             aws_access_key_id=creds["aws_access_key_id"],
             aws_secret_access_key=creds["aws_secret_access_key"],
         )
@@ -36,15 +37,11 @@ class S3_Bucket():
 
     @classmethod
     def get_creds_from_dot_env(cls) -> dict[str, str]:
-        assert "S3_SECRET" in os.environ, "S3_SECRET variable is not in the environement."
-        assert "S3_BUCKET" in os.environ, "S3_BUCKET variable is not in the environement."
-        assert "S3_KEY" in os.environ, "S3_KEY variable is not in the environement."
-
         return {
-            "endpoint_url": os.getenv("S3_ENDPOINT"),
-            "aws_access_key_id": os.getenv("S3_KEY"),
-            "aws_secret_access_key": os.getenv("S3_SECRET"),
-            "bucket_name": os.getenv("S3_BUCKET"),
+            "endpoint_url": get_env_var("S3_ENDPOINT"),
+            "aws_access_key_id": get_env_var("S3_KEY"),
+            "aws_secret_access_key": get_env_var("S3_SECRET"),
+            "bucket_name": get_env_var("S3_BUCKET"),
         }
 
     def save_df_as_parquet(self, df:DF, key:str):
@@ -136,7 +133,7 @@ class S3_Bucket():
 
         return keys_as_series
 
-    def read_parquet_df(self, key:str, use_cols:list[str]=None) -> DF:
+    def read_parquet_df(self, key:str, **kwargs) -> DF:
 
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
 
@@ -145,7 +142,7 @@ class S3_Bucket():
         parquet_buffer = BytesIO(parquet_bytes)
         
         # Use pyarrow to read the buffer
-        table = pq.read_table(parquet_buffer, columns=use_cols)
+        table = pq.read_table(parquet_buffer, **kwargs)
         
         # Convert the table to a pandas DataFrame
         df = table.to_pandas()
@@ -217,7 +214,7 @@ class S3_Bucket():
     
     def generate_folder_presigned_url(self, folder_name):
         # s3 = S3_Bucket()
-        # bucket_name = os.getenv("S3_BUCKET")
+        # bucket_name = get_env_var("S3_BUCKET")
         # folder_name = 'response/ituran/'
         
         response = self.generate_presigned_post(

@@ -19,7 +19,7 @@ P = ParamSpec('P')
 logger = logging.getLogger("caching_utils")
 
 class CachedETL(DF, ABC):
-    def __init__(self, path: str, on: str, force_update: bool = False, use_cols:list[str]=None, bucket: S3_Bucket = bucket):
+    def __init__(self, path: str, on: str, force_update: bool = False, bucket: S3_Bucket = bucket, **kwargs):
         """
         Initialize a CachedETL with caching capabilities.
         The calculation of the result of the ETL must be implemented in the abstract `run` method.  
@@ -32,7 +32,7 @@ class CachedETL(DF, ABC):
         - force_update (bool): If True, regenerate and cache the result even if it exists.
         - bucket_instance (S3_Bucket): S3 bucket instance, defaults to the global bucket.
         """
-        assert on in ["s3", "local_storage"], "on must be 's3' or 'local_storage'"
+        assert on in ["s3", "local_storage"], "CachedETL's 'on' argument must be 's3' or 'local_storage'"
         assert path.endswith(".parquet"), "Path must end with '.parquet'"
 
         # Determine if we need to update the cache
@@ -44,12 +44,9 @@ class CachedETL(DF, ABC):
                 data.to_parquet(path)
         else:
             if on == "s3":
-                data = bucket.read_parquet_df(path, use_cols=use_cols)
+                data = bucket.read_parquet_df(path, **kwargs)
             elif on == "local_storage":
-                data = pd.read_parquet(path, columns=use_cols)
-
-        if use_cols:
-            data = data[use_cols]
+                data = pd.read_parquet(path, **kwargs)
 
         super().__init__(data)
 
@@ -73,7 +70,8 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
     assert on in ["s3", "local_storage"], "cache_type must be 's3' or 'local_storage'"
     def decorator(data_gen_func: Callable[..., pd.DataFrame]):
         @wraps(data_gen_func)
-        def wrapper(*args, force_update=False, **kwargs) -> pd.DataFrame:
+        def wrapper(*args, force_update=False, read_parquet_kwargs={}, **kwargs) -> pd.DataFrame:
+            
             all_args = data_gen_func.__code__.co_varnames                                   # Extract the argument names and their values from args and kwargs 
             arg_values = {**dict(zip(all_args, args)), **kwargs}
             format_dict = {param: str(arg_values[param]) for param in path_params}
@@ -86,21 +84,21 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
                     bucket.save_df_as_parquet(data, path)                                   # Save the data to S3 as parquet
                     return data
                 else:
-                    return bucket.read_parquet_df(path)                                      # Read cached data from S3
+                    return bucket.read_parquet_df(path, **read_parquet_kwargs)              # Read cached data from S3
             elif on == "local_storage":
-                if force_update or not exists(path):                                         # Check if we need to update the cache or if the cache does not exist
-                    data: pd.DataFrame = data_gen_func(*args, **kwargs)                      # Generate the data using the wrapped function
-                    save_cache_locally_to(data, path)                                        # Save the data locally
+                if force_update or not exists(path):                                        # Check if we need to update the cache or if the cache does not exist
+                    data: pd.DataFrame = data_gen_func(*args, **kwargs)                     # Generate the data using the wrapped function
+                    save_cache_locally_to(data, path)                                       # Save the data locally
                     return data
-                return pd.read_parquet(path, engine="pyarrow")                                                 # Read cached data from local file
+                return pd.read_parquet(path, engine="pyarrow")                              # Read cached data from local file
         return wrapper
     return decorator
 
 def get_bucket_from_func_args(func:Callable, *args, **kwargs) -> tuple[S3_Bucket, bool]:
-    signature = inspect.signature(func)                                         # Get the function's signature
-    bound_args = signature.bind_partial(*args, **kwargs)                        # Map the positional args to the parameter names
-    bound_args.apply_defaults()                                                 # Apply default values to the bound arguments
-    bucket_is_in_func_args = 'bucket' in bound_args.arguments                   # Check if 'bucket' is in the arguments
+    signature = inspect.signature(func)                                                     # Get the function's signature
+    bound_args = signature.bind_partial(*args, **kwargs)                                    # Map the positional args to the parameter names
+    bound_args.apply_defaults()                                                             # Apply default values to the bound arguments
+    bucket_is_in_func_args = 'bucket' in bound_args.arguments                               # Check if 'bucket' is in the arguments
     if not bucket_is_in_func_args:
         logger.debug(NO_BUCKET_ARG_FOUND.format(func_name=func.__name__))
     bucket_value = bound_args.arguments.get('bucket', bucket)
