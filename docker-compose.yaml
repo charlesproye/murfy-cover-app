@@ -1,18 +1,18 @@
 # version: '3.8'
 
 services:
-  # tesla_ingestion_service:
-  #   build:
-  #     context: .
-  #     dockerfile: tesla.Dockerfile
-  #   container_name: tesla-ingestion
-  #   env_file:
-  #     - ./.env
-  #     - ./.python.env
-  #   volumes:
-  #     - .:/app
-  #   depends_on:
-  #     - redis
+  tesla_ingestion_service:
+    build:
+      context: .
+      dockerfile: tesla.Dockerfile
+    container_name: tesla-ingestion
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
 
   # bmw_ingestion_service:
   #   build:
