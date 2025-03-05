@@ -78,10 +78,10 @@ parquet raw time series in S3     single fleet_info dataframe (not cached)
     How: Parses json responses into DataFrames and concatenates them into a single one.  
     Note: We nickname raw time series to raw_tss and not raw_ts because there are multiple time series per DF (one per vehicle).
 - **raw_tss/main.py**:   
-    Goal:
-        Provide a function to:
-        - Update all the raw time series, `update_all_raw_tss`
-        - provide simple access to any raw_tss `get_raw_tss` on S3
+    Provides a function to:  
+    - Update all the raw time series, `update_all_raw_tss`  
+    - provide simple access to any raw_tss `get_raw_tss` on S3  
+    Updates all the raw time series when ran as a script
 - **fleet_info/main.py**:
     Goal: Provide the static data of the vehicles that BIB monitors in a single dataframe, one row per vehicle.
     Input: Multiple tables from the DB(`vehicle`, `vehicle_model`, ...).
@@ -95,7 +95,7 @@ parquet raw time series in S3     single fleet_info dataframe (not cached)
     -   Normalized names:   
             Raw time series columns `diagnostic.odometer` and `car.mileage` will be normalized to `odometer`.   
     -   Nomralized units: Imperial units will be converted to metric.   
-    -   Segmentation columns: `in_charge`, `in_discharge`, ... masks   
+    -   Segmentation columns: `in_charge`, `in_discharge`, ...   
     -   Segment indexing: `in_discahrge_idx`, `in_discharge_idx`, ...   
         Segment indexing columns should have the same name as the segment mask column they are indexing + "_idx"
         These columns are used for Split-Apply-Combine operations.
