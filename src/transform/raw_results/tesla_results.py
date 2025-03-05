@@ -24,7 +24,7 @@ def main():
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw tesla results.")
-    results = (
+    return (
         TeslaProcessedTimeSeries("tesla", columns=TESLA_USE_COLS, filters=[("trimmed_in_charge", "==", True)])
         .groupby(["vin", "trimmed_in_charge_idx"], observed=True)
         .agg(
