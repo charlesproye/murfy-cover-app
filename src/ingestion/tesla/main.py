@@ -141,9 +141,10 @@ async def process_vehicle(account):
     auth_code = account.get('code', None)
     
     if professional_account:
-        vehicle_ids = await fetch_all_vehicle_ids(access_token_key, refresh_token_key, excel_url, auth_code)
+        vehicle_ids = ['LRW3E7EJ0SC355239', 'XP7YGCERXRB505399'] # await(access_token_key, refresh_token_key, excel_url, auth_code)
     else:
-        vehicle_ids = [vehicle_id]
+        print("Stop")
+        #vehicle_ids = [vehicle_id]
 
     # Créer le pool de véhicules avec des véhicules uniques
     vehicle_pool = VehiclePool(size=100)
