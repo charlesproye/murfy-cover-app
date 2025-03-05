@@ -1,3 +1,4 @@
+import argparse
 from logging import getLogger
 
 from scipy.integrate import cumulative_trapezoid
@@ -10,6 +11,7 @@ from core.console_utils import main_decorator
 from transform.processed_tss.config import *
 from transform.raw_tss.main import get_raw_tss
 from transform.fleet_info.main import fleet_info
+
 
 # Here we have implemented the ETL as a class as most raw time series go through the same processing step.
 # To have a processing step specific to a data provider/manufacturer, simply implement a subclass of ProcessedTimeSeries and update update_all_tss.
@@ -43,6 +45,7 @@ class ProcessedTimeSeries(CachedETL):
         # It seems that the reset_index calls doesn't reset the id_col into a category if the groupby's by argument was categorical.
         # So we recall astype on the id_col  in case it is supposed to be categorical.
         tss = tss.astype({self.id_col: COL_DTYPES[self.id_col]})
+        return tss
 
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (
@@ -179,7 +182,6 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             .pipe(self.compute_idx_from_masks, ["in_discharge"])
             .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
             .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
-            # .pipe(self.compute_cum_var, "power", "cum_energy")
         )
 
     def compute_charge_n_discharge_masks(self, tss:DF) -> DF:
@@ -229,9 +231,6 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
 
 @main_decorator
 def main():
-    import argparse
-    import logging
-
     parser = argparse.ArgumentParser(description="Process time series data.")
     parser.add_argument('--log_level', type=str, default='INFO', help='Set the logging level (default: INFO)')
     args = parser.parse_args()
