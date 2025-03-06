@@ -47,8 +47,27 @@ It takes in data time series and static vehicle data and outputs valuable time s
 Static data are data that remain the same throughout the vehicles lifes such as the model, default battery capacity, ect...  
 Time series data... you should know what a time series is :left eye brow raised:.  
 The ETL consists of multiple sub ETLs, each implemented in a single sub package.    
+From a high level point of view, the ETL computes the following steps(each arrow is a step):
+```
+json API responses in S3         static data in DB    
+         |                           |   
+         V                           V   
+parquet raw time series in S3     single fleet_info dataframe (not cached)   
+         |                           |   
+         \                           /   
+          \                         /   
+           \                       /   
+            parquet processed_tss in S3   
+                    |   
+                    V   
+            parquet raw_results in S3   
+                    |   
+                    V   
+    parquet processed_results in vehicle_data   
+```
 
 > Here "XX" is the name of the data provider or a manufacturer.  
+
 - **main.py**:   
     Runs a blocking schedueler to execute all the sub ETLs once every day.  
 -  **raw_tss.XX_raw_time_series.py**:  
@@ -59,10 +78,10 @@ The ETL consists of multiple sub ETLs, each implemented in a single sub package.
     How: Parses json responses into DataFrames and concatenates them into a single one.  
     Note: We nickname raw time series to raw_tss and not raw_ts because there are multiple time series per DF (one per vehicle).
 - **raw_tss/main.py**:   
-    Goal:
-        Provide a function to:
-        - Update all the raw time series, `update_all_raw_tss`
-        - provide simple access to any raw_tss `get_raw_tss` on S3
+    Provides a function to:  
+    - Update all the raw time series, `update_all_raw_tss`  
+    - provide simple access to any raw_tss `get_raw_tss` on S3  
+    Updates all the raw time series when ran as a script
 - **fleet_info/main.py**:
     Goal: Provide the static data of the vehicles that BIB monitors in a single dataframe, one row per vehicle.
     Input: Multiple tables from the DB(`vehicle`, `vehicle_model`, ...).
@@ -76,7 +95,7 @@ The ETL consists of multiple sub ETLs, each implemented in a single sub package.
     -   Normalized names:   
             Raw time series columns `diagnostic.odometer` and `car.mileage` will be normalized to `odometer`.   
     -   Nomralized units: Imperial units will be converted to metric.   
-    -   Segmentation columns: `in_charge`, `in_discharge`, ... masks   
+    -   Segmentation columns: `in_charge`, `in_discharge`, ...   
     -   Segment indexing: `in_discahrge_idx`, `in_discharge_idx`, ...   
         Segment indexing columns should have the same name as the segment mask column they are indexing + "_idx"
         These columns are used for Split-Apply-Combine operations.
