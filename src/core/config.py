@@ -68,3 +68,7 @@ valid_soh_points = pd.DataFrame({
   "bound": ["max", "max", "min", "min"]
 }).set_index(["bound", "point"])
 
+
+# SoH estimation evaluation
+BASE_SLOPE = 0.08 / 1e4 # base soh loss per kilometer (0.8% per 10k km)
+
