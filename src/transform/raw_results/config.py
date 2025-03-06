@@ -8,3 +8,20 @@ MERCEDES_SOH_MODEL_CALCULATIONS:dict[str,str] = {
 }
 
 RAW_RESULTS_CACHE_KEY_TEMPLATE = "raw_results/{make}.parquet"
+
+TESLA_USE_COLS = [
+    "vin",
+    "trimmed_in_charge_idx",
+    "trimmed_in_charge",
+    "charge_energy_added",
+    "soc",
+    "inside_temp",
+    "capacity",
+    "odometer",
+    "model",
+    "date",
+    "tesla_code",
+    "battery_heater",
+    "charging_power",
+    "version",
+]
