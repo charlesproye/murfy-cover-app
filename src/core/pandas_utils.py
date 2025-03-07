@@ -68,7 +68,7 @@ def concat(objects:list|dict|Series, logger:Logger=logger, **kwargs) -> DF:
     if isinstance(objects, list):
         return pd.concat([value for value in objects if not value.empty], **kwargs)
     if isinstance(objects, dict):
-        return pd.concat({key:value for key, value in objects.items()}, **kwargs)
+        return pd.concat({key:value for key, value in objects.items() if not value.empty}, **kwargs)
     
     raise ValueError(f"pandas_utils.concat recieved inappropriate type: {type(objects)}.\n{objects}")
 
