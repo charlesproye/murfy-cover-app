@@ -168,12 +168,21 @@ class S3_Bucket():
     def write_string_into_key(self, content:str, key:str):
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=content)
 
-    def read_json_file(self, key:str) -> Any:
-        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-        object_content = response["Body"].read().decode("utf-8")
-        parsed_object = json.loads(object_content)
+    def read_json_file(self, key: str):
+        """Reads a single JSON file from S3."""
+        try:
+            response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            object_content = response["Body"].read().decode("utf-8")
+            return json.loads(object_content)
+        except Exception as e:
+            self.logger.error(f"Failed to read key {key}: {e}")
+            return None
 
-        return parsed_object
+    def read_multiple_json_files(self, keys: list, max_workers=32):
+        """Reads multiple JSON files concurrently using ThreadPoolExecutor."""
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(self.read_json_file, keys))
+        return results
     
     def get_last_modified(self, key:str) -> datetime:
         response = self._s3_client.head_object(Bucket=self.bucket_name, Key=key)
