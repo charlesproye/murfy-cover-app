@@ -1,21 +1,21 @@
-from typing import Any
-from io import BytesIO, StringIO
 import os
-from dotenv import load_dotenv
 import json
 import logging
+from typing import Any
 from datetime import datetime
-import pyarrow.parquet as pq
+from io import BytesIO, StringIO
+from concurrent.futures import ThreadPoolExecutor
+
 import boto3
 import pandas as pd
-from pandas import DataFrame as DF
 from pandas import Series
+import pyarrow.parquet as pq
+from pandas import DataFrame as DF
 
 from core.config import *
 from core.env_utils import get_env_var
 from core.pandas_utils import str_split_and_retain_src
 
-load_dotenv()
 
 class S3_Bucket():
     def __init__(self, creds: dict[str, str]=None):
@@ -105,33 +105,32 @@ class S3_Bucket():
 
         return keys
 
-    def list_keys(self, key_prefix:str="") -> Series:
+    def list_keys(self, key_prefix: str = "", max_workers: int = 32) -> Series:
         """
-        ### Description:
         Returns a pandas Series of the keys present in the bucket.
-        ### Parameters:
-        key_prefix: A string representing the prefix to filter the keys. If None, all keys will be listed.
-        ### Returns:
-        A pandas Series of keys present in the bucket.
+        Uses multithreading to speed up listing.
         """
-
-        # Ensure that the key ends with a /
         if not key_prefix.endswith("/"):
             key_prefix += "/"
 
-        paginator = self._s3_client.get_paginator('list_objects_v2')
+        paginator = self._s3_client.get_paginator("list_objects_v2")
         page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=key_prefix)
 
         keys = []
-        for page in page_iterator:
-            if 'Contents' in page:
-                for obj in page['Contents']:
-                    if obj["Key"] != key_prefix:
-                        keys.append(obj['Key'])
+        
+        # Use multithreading to process pages concurrently
+        def process_page(page):
+            if "Contents" in page:
+                return [obj["Key"] for obj in page["Contents"] if obj["Key"] != key_prefix]
+            return []
 
-        keys_as_series = Series(keys, dtype="string")
-
-        return keys_as_series
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(process_page, page_iterator))
+        
+        # Flatten the list
+        keys = [key for sublist in results for key in sublist]
+        
+        return Series(keys, dtype="string") if keys else Series(dtype="string")
 
     def read_parquet_df(self, key:str, **kwargs) -> DF:
 
