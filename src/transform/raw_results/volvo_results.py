@@ -34,7 +34,7 @@ def get_results() -> DF:
         ProcessedTimeSeries("volvo-cars")
         .eval("odometer = odometer.ffill().bfill()")
         .eval("soh = estimated_range / soc / range / 0.87")
-        .query("soc > 0.7")
+        # .query("soc > 0.7")
     )
     logger.debug("Sanity check of the results:")
     logger.debug(sanity_check(results))
