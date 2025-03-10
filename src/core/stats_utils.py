@@ -42,7 +42,7 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         if nb_rows_removed == results.shape[0]:
             logger.warning(f"While filtering, all SoH results were set to NaN, check the valid SOH points.")
         else:
-            logger.debug(f"Filtered SoH results, {nb_rows_removed}({rows_removed_pct:.2f}%) set to NaN.")
+            logger.debug(f"Filtered SoH results out of bounds defined in processed_results.config, {nb_rows_removed}({rows_removed_pct:.2f}%) set to NaN.")
     else: 
         logger.warning("No SoH results to filter.")
     return results
