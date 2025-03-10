@@ -41,7 +41,7 @@ def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
         .agg(last_parsed_date=pd.NamedAgg("readable_date", "max"))
     )
     return (
-        pd.read_parquet("tesla_response_keys.parquet") #bucket.list_responses_keys_of_brand("tesla")
+        bucket.list_responses_keys_of_brand("tesla")
         .assign(date=lambda df: df["file"].str[:-5].astype("datetime64[ns]"))
         .merge(last_parsed_date, "outer", "vin")
         .query("last_parsed_date.isna() | date > last_parsed_date") 
