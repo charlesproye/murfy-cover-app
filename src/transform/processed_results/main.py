@@ -48,7 +48,7 @@ def get_all_processed_results() -> DF:
             raise
         except:
             logger.error(f"Could not get processed results of {brand}.", exc_info=True)
-    return pd.concat(processed_results)
+    return concat(processed_results)
 
 def get_processed_results(brand:str) -> DF:
     logger.info(f"{'Processing ' + brand + ' results.':=^{50}}")
