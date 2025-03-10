@@ -7,7 +7,7 @@ MERCEDES_SOH_MODEL_CALCULATIONS:dict[str,str] = {
     'default': "estimated_range / soc / range",
 }
 
-RAW_RESULTS_CACHE_KEY_TEMPLATE = "raw_results/test_{make}.parquet"
+RAW_RESULTS_CACHE_KEY_TEMPLATE = "raw_results/{make}.parquet"
 
 TESLA_USE_COLS = [
     "vin",
