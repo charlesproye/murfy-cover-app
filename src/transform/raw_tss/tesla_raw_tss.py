@@ -59,7 +59,7 @@ def get_raw_tss_from_keys(keys:DF, bucket:S3_Bucket) -> DF:
         with ThreadPoolExecutor(max_workers=64) as executor:
             week_raw_tss = list(executor.map(DF.from_records, responses))
         logger.debug(f"Parsed the responses:")
-        week_raw_tss = concat(filter(lambda df: not df.empty, week_raw_tss))
+        week_raw_tss = concat(week_raw_tss)
         logger.debug(f"Concatenated the responses into a single DF.")
         base, ext = splitext(TESLA_RAW_TSS_KEY)
         bucket.save_df_as_parquet(week_raw_tss, f"{base}_{week_date}{ext}")
