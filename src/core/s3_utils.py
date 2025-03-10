@@ -82,7 +82,7 @@ class S3_Bucket():
             self.logger.info(EMTPY_S3_KEYS_WARNING_MSG.format(keys_prefix=brand))
             return DF(None, columns=KEY_LIST_COLUMN_NAMES)
         # Only retain .json responses
-        # Reponses are organized as follow response/brand_name/vin/date-of-response.json
+        # Reponses are organized as follow: response/brand_name/vin/date-of-response.json
         keys = str_split_and_retain_src(keys, "/")
         self.logger.debug(f"Keys ending in .json:\n{keys}")
         # Remove files in temp directory
@@ -102,6 +102,7 @@ class S3_Bucket():
         keys["is_valid_file"] &= keys["vin"].str.len() != 0
         self.logger.debug(f"set is_valid_file column:\n{keys}")
         keys = keys.query(f"is_valid_file")
+        keys["date"] = keys["file"].str[:-5]
 
         return keys
 
