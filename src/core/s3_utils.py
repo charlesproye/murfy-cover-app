@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import boto3
 import pandas as pd
+import pyarrow as pa
 from pandas import Series
 import pyarrow.parquet as pq
 from pandas import DataFrame as DF
@@ -134,40 +135,31 @@ class S3_Bucket():
         return Series(keys, dtype="string") if keys else Series(dtype="string")
 
     def read_parquet_df(self, key:str, **kwargs) -> DF:
-
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-
-        parquet_bytes = response["Body"].read()
-        # Convert bytes to a file-like buffer
-        parquet_buffer = BytesIO(parquet_bytes)
-        
-        # Use pyarrow to read the buffer
-        table = pq.read_table(parquet_buffer, **kwargs)
-        
-        # Convert the table to a pandas DataFrame
-        df = table.to_pandas()
-
-        return df
+        parquet_bytes = response["Body"].read()                     # Convert bytes to a file-like buffer
+        parquet_buffer = BytesIO(parquet_bytes)                     # Use pyarrow to read the buffer
+        table = pq.read_table(parquet_buffer, **kwargs)             # Convert the table to a pandas DataFrame
+        return table.to_pandas()
     
     def read_csv_df(self, key:str, **kwargs) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-
         status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
-
         if status == 200:
             return pd.read_csv(response.get("Body"), **kwargs)
         else:
             raise Exception(f"Unsuccessful S3 get_object response. Status - {status}")
 
-    
     def read_key_as_text(self, key:str) -> str:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
         object_content = response["Body"].read().decode("utf-8")
 
         return object_content
-    
-    def write_string_into_key(self, content:str, key:str):
-        self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=content)
+
+    def read_multiple_json_files(self, keys: list, max_workers=32) -> list:
+        """Reads multiple JSON files concurrently using ThreadPoolExecutor."""
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(self.read_json_file, keys))
+        return results
 
     def read_json_file(self, key: str):
         """Reads a single JSON file from S3."""
@@ -178,12 +170,6 @@ class S3_Bucket():
         except Exception as e:
             self.logger.error(f"Failed to read key {key}: {e}")
             return None
-
-    def read_multiple_json_files(self, keys: list, max_workers=32):
-        """Reads multiple JSON files concurrently using ThreadPoolExecutor."""
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = list(executor.map(self.read_json_file, keys))
-        return results
     
     def get_last_modified(self, key:str) -> datetime:
         response = self._s3_client.head_object(Bucket=self.bucket_name, Key=key)
@@ -297,3 +283,4 @@ class S3_Bucket():
                 'Quiet': True
             }
         )
+
