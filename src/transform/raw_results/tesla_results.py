@@ -26,7 +26,7 @@ def get_results() -> DF:
     logger.info("Processing raw tesla results.")
     return (
         TeslaProcessedTimeSeries("tesla", columns=TESLA_USE_COLS, filters=[("trimmed_in_charge", "==", True)])
-        .groupby(["vin", "trimmed_in_charge_idx"], observed=True)
+        .groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False)
         .agg(
             energy_added_min=pd.NamedAgg("charge_energy_added", "min"),
             energy_added_end=pd.NamedAgg("charge_energy_added", "last"),
