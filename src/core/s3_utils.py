@@ -229,3 +229,62 @@ class S3_Bucket():
         )
         
         return response
+
+    def delete_folder(self, prefix: str, batch_size: int = 1000) -> None:
+        """
+        Recursively deletes a folder and all its contents from the S3 bucket.
+        
+        Args:
+            prefix: The folder path to delete (e.g., 'my/folder/')
+            batch_size: Number of objects to delete in each batch
+        """
+        # Ensure the prefix ends with a '/'
+        if not prefix.endswith('/'):
+            prefix += '/'
+        
+        self.logger.info(f"Starting deletion of folder: {prefix}")
+        
+        # List all objects in the folder
+        paginator = self._s3_client.get_paginator('list_objects_v2')
+        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+        
+        # Process objects in batches
+        current_batch = []
+        deleted_count = 0
+        
+        for page in page_iterator:
+            if 'Contents' not in page:
+                continue
+            
+            for obj in page['Contents']:
+                current_batch.append({'Key': obj['Key']})
+            
+                # If we've reached the batch size, delete the batch
+                if len(current_batch) >= batch_size:
+                    self._delete_batch(current_batch)
+                    deleted_count += len(current_batch)
+                    self.logger.info(f"Deleted {deleted_count} objects from {prefix}")
+                    current_batch = []
+        
+        # Delete any remaining objects
+        if current_batch:
+            self._delete_batch(current_batch)
+            deleted_count += len(current_batch)
+            self.logger.info(f"Deleted {deleted_count} objects from {prefix}")
+        
+        self.logger.info(f"Successfully deleted folder {prefix} and all its contents")
+
+    def _delete_batch(self, objects: list[dict[str, str]]) -> None:
+        """
+        Deletes a batch of objects from the S3 bucket.
+        
+        Args:
+            objects: List of objects to delete, each in the format {'Key': 'path/to/object'}
+        """
+        self._s3_client.delete_objects(
+            Bucket=self.bucket_name,
+            Delete={
+                'Objects': objects,
+                'Quiet': True
+            }
+        )

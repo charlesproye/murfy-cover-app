@@ -10,7 +10,6 @@ from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
 from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT
-from transform.fleet_info.main import fleet_info
 
 logger = getLogger("transform.raw_tss.mobilisight_raw_tss")
 
