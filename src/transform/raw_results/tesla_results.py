@@ -43,7 +43,7 @@ def get_results() -> DF:
         )
         .eval("energy_added = energy_added_end - energy_added_min")
         .eval("soh = energy_added / (soc_diff / 100.0 * capacity)")
-        .query("soc_diff > 40 & soh.between(0.75, 1.05)")
+        # .query("soc_diff > 40 & soh.between(0.75, 1.05)")
         .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER)) / 100")
         .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER) / 100")
