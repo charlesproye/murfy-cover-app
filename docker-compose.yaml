@@ -1,24 +1,11 @@
 # version: '3.8'
 
 services:
-  # tesla_ingestion_service:
-  #   build:
-  #     context: .
-  #     dockerfile: tesla.Dockerfile
-  #   container_name: tesla-ingestion
-  #   env_file:
-  #     - ./.env
-  #     - ./.python.env
-  #   volumes:
-  #     - .:/app
-  #   depends_on:
-  #     - redis
-
-  bmw_ingestion_service:
+  tesla_ingestion_service:
     build:
       context: .
-      dockerfile: bmw.Dockerfile
-    container_name: bmw-ingestion
+      dockerfile: tesla.Dockerfile
+    container_name: tesla-ingestion
     env_file:
       - ./.env
       - ./.python.env
@@ -26,6 +13,19 @@ services:
       - .:/app
     depends_on:
       - redis
+
+  # bmw_ingestion_service:
+  #   build:
+  #     context: .
+  #     dockerfile: bmw.Dockerfile
+  #   container_name: bmw-ingestion
+  #   env_file:
+  #     - ./.env
+  #     - ./.python.env
+  #   volumes:
+  #     - .:/app
+  #   depends_on:
+  #     - redis
 
   # hm_ingestion_service:
   #   build:
@@ -53,18 +53,18 @@ services:
     depends_on:
       - redis
 
-  transform_service:
-    build:
-      context: .
-      dockerfile: transform.Dockerfile
-    container_name: transform
-    env_file:
-      - ./.env
-      - ./.python.env
-    volumes:
-      - .:/app
-    depends_on:
-      - redis
+  # transform_service:
+  #   build:
+  #     context: .
+  #     dockerfile: transform.Dockerfile
+  #   container_name: transform
+  #   env_file:
+  #     - ./.env
+  #     - ./.python.env
+  #   volumes:
+  #     - .:/app
+  #   depends_on:
+  #     - redis
 
   redis:
     image: redis:alpine

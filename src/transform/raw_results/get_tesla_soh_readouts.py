@@ -25,5 +25,7 @@ def get_aviloo_soh_readouts() -> DF:
         .eval("soh_readout = soh_readout / 100.0")
     )
 
+aviloo_readouts = get_aviloo_soh_readouts()
+
 if __name__ == "__main__":
-    print(get_aviloo_soh_readouts())
+    print(aviloo_readouts)

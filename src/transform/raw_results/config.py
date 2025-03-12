@@ -1,3 +1,8 @@
+MAKES_WITHOUT_SOH = [
+  'bmw',
+  'kia',
+]
+
 LEVEL_1_MAX_POWER = 8 #this is to approximate the power of the charger that can go up to 7 kW
 LEVEL_2_MAX_POWER = 45 #this is to approximate the power of the charger that can go up to 44 kW
 
@@ -8,3 +13,20 @@ MERCEDES_SOH_MODEL_CALCULATIONS:dict[str,str] = {
 }
 
 RAW_RESULTS_CACHE_KEY_TEMPLATE = "raw_results/{make}.parquet"
+
+TESLA_USE_COLS = [
+    "vin",
+    "trimmed_in_charge_idx",
+    "trimmed_in_charge",
+    "charge_energy_added",
+    "soc",
+    "inside_temp",
+    "capacity",
+    "odometer",
+    "model",
+    "date",
+    "tesla_code",
+    "battery_heater",
+    "charging_power",
+    "version",
+]

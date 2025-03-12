@@ -134,7 +134,8 @@ COLS_TO_FILL = [
 MAX_TIME_DIFF_TO_FILL = pd.Timedelta(minutes=45)
 
 IN_CHARGE_CHARGING_STATUS_VALS = [
-    'charging',
+    'charging', # Tesla
+    # 'nopower', # Tesla
     'chargingactive',
     'slow_charging',
     'fast_charging',
@@ -147,7 +148,7 @@ IN_DISCHARGE_CHARGING_STATUS_VALS = [
     'nocharging',
     'chargingerror',
     'cable_unplugged',
-    'disconnected'
+    'disconnected', # Tesla
 ]
 
 CHARGING_STATUS_VAL_TO_MASK = {
@@ -173,12 +174,12 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
+    "tesla",
     "bmw",
     "mercedes-benz",
     "ford",
     "volvo-cars",
     "stellantis",
-    "tesla",
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
@@ -202,3 +203,8 @@ COLS_TO_STR_LOWER = [
     "charging_method",
     "fast_charger_type",
 ]
+
+# Tesla specific vars:
+MIN_POWER_LOSS = -0.0005
+MAX_CHARGE_TD = TD(days=1)
+

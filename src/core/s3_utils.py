@@ -1,20 +1,22 @@
-from typing import Any
-from io import BytesIO, StringIO
 import os
-from dotenv import load_dotenv
 import json
 import logging
+from typing import Any
 from datetime import datetime
-import pyarrow.parquet as pq
+from io import BytesIO, StringIO
+from concurrent.futures import ThreadPoolExecutor
+
 import boto3
 import pandas as pd
-from pandas import DataFrame as DF
+import pyarrow as pa
 from pandas import Series
+import pyarrow.parquet as pq
+from pandas import DataFrame as DF
 
 from core.config import *
+from core.env_utils import get_env_var
 from core.pandas_utils import str_split_and_retain_src
 
-load_dotenv()
 
 class S3_Bucket():
     def __init__(self, creds: dict[str, str]=None):
@@ -27,7 +29,7 @@ class S3_Bucket():
         self._s3_client = boto3.client(
             "s3",
             region_name="fr-par",
-            endpoint_url=os.getenv("S3_ENDPOINT"),
+            endpoint_url=get_env_var("S3_ENDPOINT"),
             aws_access_key_id=creds["aws_access_key_id"],
             aws_secret_access_key=creds["aws_secret_access_key"],
         )
@@ -36,15 +38,11 @@ class S3_Bucket():
 
     @classmethod
     def get_creds_from_dot_env(cls) -> dict[str, str]:
-        assert "S3_SECRET" in os.environ, "S3_SECRET variable is not in the environement."
-        assert "S3_BUCKET" in os.environ, "S3_BUCKET variable is not in the environement."
-        assert "S3_KEY" in os.environ, "S3_KEY variable is not in the environement."
-
         return {
-            "endpoint_url": os.getenv("S3_ENDPOINT"),
-            "aws_access_key_id": os.getenv("S3_KEY"),
-            "aws_secret_access_key": os.getenv("S3_SECRET"),
-            "bucket_name": os.getenv("S3_BUCKET"),
+            "endpoint_url": get_env_var("S3_ENDPOINT"),
+            "aws_access_key_id": get_env_var("S3_KEY"),
+            "aws_secret_access_key": get_env_var("S3_SECRET"),
+            "bucket_name": get_env_var("S3_BUCKET"),
         }
 
     def save_df_as_parquet(self, df:DF, key:str):
@@ -85,7 +83,7 @@ class S3_Bucket():
             self.logger.info(EMTPY_S3_KEYS_WARNING_MSG.format(keys_prefix=brand))
             return DF(None, columns=KEY_LIST_COLUMN_NAMES)
         # Only retain .json responses
-        # Reponses are organized as follow response/brand_name/vin/date-of-response.json
+        # Reponses are organized as follow: response/brand_name/vin/date-of-response.json
         keys = str_split_and_retain_src(keys, "/")
         self.logger.debug(f"Keys ending in .json:\n{keys}")
         # Remove files in temp directory
@@ -105,79 +103,73 @@ class S3_Bucket():
         keys["is_valid_file"] &= keys["vin"].str.len() != 0
         self.logger.debug(f"set is_valid_file column:\n{keys}")
         keys = keys.query(f"is_valid_file")
+        keys["date"] = keys["file"].str[:-5]
 
         return keys
 
-    def list_keys(self, key_prefix:str="") -> Series:
+    def list_keys(self, key_prefix: str = "", max_workers: int = 32) -> Series:
         """
-        ### Description:
         Returns a pandas Series of the keys present in the bucket.
-        ### Parameters:
-        key_prefix: A string representing the prefix to filter the keys. If None, all keys will be listed.
-        ### Returns:
-        A pandas Series of keys present in the bucket.
+        Uses multithreading to speed up listing.
         """
-
-        # Ensure that the key ends with a /
         if not key_prefix.endswith("/"):
             key_prefix += "/"
 
-        paginator = self._s3_client.get_paginator('list_objects_v2')
+        paginator = self._s3_client.get_paginator("list_objects_v2")
         page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=key_prefix)
 
         keys = []
-        for page in page_iterator:
-            if 'Contents' in page:
-                for obj in page['Contents']:
-                    if obj["Key"] != key_prefix:
-                        keys.append(obj['Key'])
+        
+        # Use multithreading to process pages concurrently
+        def process_page(page):
+            if "Contents" in page:
+                return [obj["Key"] for obj in page["Contents"] if obj["Key"] != key_prefix]
+            return []
 
-        keys_as_series = Series(keys, dtype="string")
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(process_page, page_iterator))
+        
+        # Flatten the list
+        keys = [key for sublist in results for key in sublist]
+        
+        return Series(keys, dtype="string") if keys else Series(dtype="string")
 
-        return keys_as_series
-
-    def read_parquet_df(self, key:str, use_cols:list[str]=None) -> DF:
-
+    def read_parquet_df(self, key:str, **kwargs) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-
-        parquet_bytes = response["Body"].read()
-        # Convert bytes to a file-like buffer
-        parquet_buffer = BytesIO(parquet_bytes)
-        
-        # Use pyarrow to read the buffer
-        table = pq.read_table(parquet_buffer, columns=use_cols)
-        
-        # Convert the table to a pandas DataFrame
-        df = table.to_pandas()
-
-        return df
+        parquet_bytes = response["Body"].read()                     # Convert bytes to a file-like buffer
+        parquet_buffer = BytesIO(parquet_bytes)                     # Use pyarrow to read the buffer
+        table = pq.read_table(parquet_buffer, **kwargs)             # Convert the table to a pandas DataFrame
+        return table.to_pandas()
     
     def read_csv_df(self, key:str, **kwargs) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-
         status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
-
         if status == 200:
             return pd.read_csv(response.get("Body"), **kwargs)
         else:
             raise Exception(f"Unsuccessful S3 get_object response. Status - {status}")
 
-    
     def read_key_as_text(self, key:str) -> str:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
         object_content = response["Body"].read().decode("utf-8")
 
         return object_content
-    
-    def write_string_into_key(self, content:str, key:str):
-        self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=content)
 
-    def read_json_file(self, key:str) -> Any:
-        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-        object_content = response["Body"].read().decode("utf-8")
-        parsed_object = json.loads(object_content)
+    def read_multiple_json_files(self, keys: list, max_workers=32) -> list:
+        """Reads multiple JSON files concurrently using ThreadPoolExecutor."""
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(self.read_json_file, keys))
+        return results
 
-        return parsed_object
+    def read_json_file(self, key: str):
+        """Reads a single JSON file from S3."""
+        try:
+            response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            object_content = response["Body"].read().decode("utf-8")
+            return json.loads(object_content)
+        except Exception as e:
+            self.logger.error(f"Failed to read key {key}: {e}")
+            return None
     
     def get_last_modified(self, key:str) -> datetime:
         response = self._s3_client.head_object(Bucket=self.bucket_name, Key=key)
@@ -217,7 +209,7 @@ class S3_Bucket():
     
     def generate_folder_presigned_url(self, folder_name):
         # s3 = S3_Bucket()
-        # bucket_name = os.getenv("S3_BUCKET")
+        # bucket_name = get_env_var("S3_BUCKET")
         # folder_name = 'response/ituran/'
         
         response = self.generate_presigned_post(
@@ -232,3 +224,63 @@ class S3_Bucket():
         )
         
         return response
+
+    def delete_folder(self, prefix: str, batch_size: int = 1000) -> None:
+        """
+        Recursively deletes a folder and all its contents from the S3 bucket.
+        
+        Args:
+            prefix: The folder path to delete (e.g., 'my/folder/')
+            batch_size: Number of objects to delete in each batch
+        """
+        # Ensure the prefix ends with a '/'
+        if not prefix.endswith('/'):
+            prefix += '/'
+        
+        self.logger.info(f"Starting deletion of folder: {prefix}")
+        
+        # List all objects in the folder
+        paginator = self._s3_client.get_paginator('list_objects_v2')
+        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+        
+        # Process objects in batches
+        current_batch = []
+        deleted_count = 0
+        
+        for page in page_iterator:
+            if 'Contents' not in page:
+                continue
+            
+            for obj in page['Contents']:
+                current_batch.append({'Key': obj['Key']})
+            
+                # If we've reached the batch size, delete the batch
+                if len(current_batch) >= batch_size:
+                    self._delete_batch(current_batch)
+                    deleted_count += len(current_batch)
+                    self.logger.info(f"Deleted {deleted_count} objects from {prefix}")
+                    current_batch = []
+        
+        # Delete any remaining objects
+        if current_batch:
+            self._delete_batch(current_batch)
+            deleted_count += len(current_batch)
+            self.logger.info(f"Deleted {deleted_count} objects from {prefix}")
+        
+        self.logger.info(f"Successfully deleted folder {prefix} and all its contents")
+
+    def _delete_batch(self, objects: list[dict[str, str]]) -> None:
+        """
+        Deletes a batch of objects from the S3 bucket.
+        
+        Args:
+            objects: List of objects to delete, each in the format {'Key': 'path/to/object'}
+        """
+        self._s3_client.delete_objects(
+            Bucket=self.bucket_name,
+            Delete={
+                'Objects': objects,
+                'Quiet': True
+            }
+        )
+

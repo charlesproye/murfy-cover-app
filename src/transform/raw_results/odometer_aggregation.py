@@ -8,7 +8,6 @@ from core.pandas_utils import *
 from core.console_utils import main_decorator
 from core.caching_utils import cache_result
 from transform.raw_results.config import *
-from transform.processed_results.config import *
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries as TSS
 
 @main_decorator
@@ -21,6 +20,7 @@ def main():
 
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE, "s3", ["make"])
 def agg_last_odometer(make:str) -> DF:
+    from transform.processed_results.config import UPDATE_FREQUENCY
     logger.info(f"Processing odometer aggregation of {make}.")
     tss = TSS(make)
     return (
