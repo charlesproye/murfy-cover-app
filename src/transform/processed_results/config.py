@@ -45,5 +45,10 @@ SOH_FILTER_EVAL_STRINGS: dict[callable] = {
     "tesla": "soh = soh.where(soc_diff > 40 & soh.between(0.75, 1.05))",
     "volvo": "soh = soh.where(soc > 0.7)",
     "renault": "soh = soh.where(soc > 0.5)",
+    "ford": "soh = soh",
+    "mercedes-benz": "soh = soh",
+    "bmw": "soh = soh",
+    "kia": "soh = soh",
+    "stellantis": "soh = soh",
 }
 
