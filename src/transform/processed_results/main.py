@@ -102,6 +102,7 @@ def make_soh_presentable_per_vehicle(df:DF) -> DF:
         df = df[outliser_mask].copy()
     if df["soh"].count() >= 2:
         df["soh"] = force_monotonic_decrease(df["soh"]).values
+        df["soh"] = apply_soh_decay(df[["soh", 'odometer']])
     return df
 
 if __name__ == "__main__":
