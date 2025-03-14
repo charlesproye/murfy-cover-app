@@ -124,21 +124,31 @@ def evaluate_single_soh_estimation(results:DF, soh_col:DF) -> DF:
         "MAE_to_1_intercept": lr_params["intercept"].sub(1).abs().mean(),
     })
 
-def force_decay(df:pd.DataFrame) -> pd.Series:
-    """Force une décroissance strictement monotone pour le SoH
+def force_decay(df:pd.Series) -> dict:
+    """Force une décroissance strictement monotone pour le SoH 
+       entre la première valeur et la dernière de la série
 
     Args:
-        df (pd.DataFrame):  DataFrame contenant une colonne "soh"
+        df (pd.Series): Series contenant les SoH
 
     Returns:
-        pd.Series: Nouvelles valeurs de "soh"
+        dict: Nouvelles valeurs de "soh"
     """
-    # compute rooling mean
-    rolling_mean = df["soh"].rolling(window=3, min_periods=1).mean()
+    
+    indices = df.index
+    values = df.dropna().values
+    interpolated_values = np.linspace(values[0], values[-1], num=len(df))
+    return dict(zip(indices, interpolated_values))
 
-    # force la décroissance
-    rolling_decreasing = rolling_mean.cummin()
-    # force la  décroissante stricte par rapport au km le coef est arbitraire
-    soh_decreasing = rolling_decreasing - (df["odometer"] - df["odometer"].min()) * 1e-8
-    return soh_decreasing
+def rolling_window(df: pd.DataFrame) -> pd.Series:
+    """Calcul un 
+
+    Args:
+        df (pd.DataFrame): DataFrame contenant une colonne "soh"
+
+    Returns:
+        pd.Series: Serie avec la windows fonction calculé
+    """
+    rolling_mean = df["soh"].rolling(window=3, min_periods=2).mean()
+    return rolling_mean
 
