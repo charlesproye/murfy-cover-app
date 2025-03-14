@@ -134,11 +134,13 @@ def force_decay(df:pd.Series) -> dict:
     Returns:
         dict: Nouvelles valeurs de "soh"
     """
-    
     indices = df.index
     values = df.dropna().values
-    interpolated_values = np.linspace(values[0], values[-1], num=len(df))
+    greater_than_first_value = np.argmax(values > values[0])
+    first_greater_value = values[greater_than_first_value] if greater_than_first_value > 0 else values[-1]
+    interpolated_values = np.linspace(first_greater_value, values[-1], num=len(df))
     return dict(zip(indices, interpolated_values))
+
 
 def rolling_window(df: pd.DataFrame) -> pd.Series:
     """Calcul un 
