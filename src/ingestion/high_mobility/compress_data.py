@@ -33,8 +33,8 @@ class HMCompresser:
 
     def __init__(
         self, 
-        s3, 
-        bucket, 
+        # s3, 
+        # bucket, 
         threaded: bool = True,
         max_workers: Optional[int] = None,
         batch_size: int = 50
