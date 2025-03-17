@@ -6,7 +6,7 @@ from scipy.optimize import minimize
 from scipy.stats import linregress as lr
 
 from core.pandas_utils import * 
-from transform.raw_results.get_tesla_soh_readouts import aviloo_readouts
+# from transform.raw_results.get_tesla_soh_readouts import aviloo_readouts
 
 
 logger = getLogger("core.stats_utils")
