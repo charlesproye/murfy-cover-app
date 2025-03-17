@@ -134,23 +134,11 @@ def force_decay(df:pd.Series) -> dict:
     Returns:
         dict: Nouvelles valeurs de "soh"
     """
+    rolling_mean = df["soh"].rolling(window=3, min_periods=2).mean()
     indices = df.index
-    values = df.dropna().values
+    values = rolling_mean.dropna().values
     greater_than_first_value = np.argmax(values > values[0])
     first_greater_value = values[greater_than_first_value] if greater_than_first_value > 0 else values[-1]
     interpolated_values = np.linspace(first_greater_value, values[-1], num=len(df))
     return dict(zip(indices, interpolated_values))
-
-
-def rolling_window(df: pd.DataFrame) -> pd.Series:
-    """Calcul un 
-
-    Args:
-        df (pd.DataFrame): DataFrame contenant une colonne "soh"
-
-    Returns:
-        pd.Series: Serie avec la windows fonction calculé
-    """
-    rolling_mean = df["soh"].rolling(window=3, min_periods=2).mean()
-    return rolling_mean
 
