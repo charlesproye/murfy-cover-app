@@ -15,7 +15,7 @@ from ingestion.high_mobility.schema import all_brands
 import multiprocessing as mp
 
 
-class HighMobilityCompresser:
+class HMCompresser:
     __logger: logging.Logger
     __s3: boto3.client
     __s3_dev: boto3.client
