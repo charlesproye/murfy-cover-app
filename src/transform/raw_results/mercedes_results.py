@@ -62,7 +62,6 @@ def get_results() -> DF:
         .pipe(hot_fix_in_charge_idx)
         .pipe(compute_charging_power)
         .pipe(charge_levels)
-        .eval('cycles = round(odometer / (range * soh))')
     )
     results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
     logger.debug("Sanity check of the results:")
