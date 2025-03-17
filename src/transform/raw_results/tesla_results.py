@@ -25,7 +25,7 @@ def main():
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw tesla results.")
-    results =  (
+    return (
         TeslaProcessedTimeSeries("tesla", columns=TESLA_USE_COLS, filters=[("trimmed_in_charge", "==", True)])
         .groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False)
         .agg(
@@ -52,10 +52,9 @@ def get_results() -> DF:
         .eval("fixed_soh_min_end = soh.mask(tesla_code == 'MTY13', soh / 0.96)")
         .eval("fixed_soh_min_end = fixed_soh_min_end.mask(bottom_soh & tesla_code == 'MTY13', fixed_soh_min_end + 0.08)")
         .eval("soh = fixed_soh_min_end")
+        .eval('cycles = round(odometer / (range * soh))')
         .sort_values(["tesla_code", "vin", "date"])
     )
-    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
-    return results
 
 if __name__ == "__main__":
     main()

@@ -14,10 +14,11 @@ logger = getLogger("transform.raw_results.renault_results")
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="renault"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw renault results.")
-    results = (
+    return (
         ProcessedTimeSeries("renault", filters=[("in_charge", "==", True)])
         .eval("expected_battery_energy = capacity * soc")
         .eval("soh = battery_energy / expected_battery_energy") 
+        .eval('cycles = round(odometer / (range * soh))')
         # .query("soc > 0.5")
         # .groupby("vin")
         # # Ensure that there are at least 3 discharge period
@@ -26,8 +27,6 @@ def get_results() -> DF:
         # .filter(lambda ts: ts["trimmed_in_discharge_idx"].max() >= 6)
         .pipe(charge_levels)
     )
-    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
-    return results
 
 def charge_levels(tss:DF) -> DF:
     tss_grp = tss.groupby("vin")

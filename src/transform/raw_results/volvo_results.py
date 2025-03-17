@@ -35,11 +35,11 @@ def get_results() -> DF:
         ProcessedTimeSeries("volvo-cars")
         .eval("odometer = odometer.ffill().bfill()")
         .eval("soh = estimated_range / soc / range / 0.87")
+        .eval('cycles = round(odometer / (range * soh))')
         # .query("soc > 0.7")
     )
     logger.debug("Sanity check of the results:")
     logger.debug(sanity_check(results))
-    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
 
     return results
 

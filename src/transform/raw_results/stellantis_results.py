@@ -25,15 +25,14 @@ def main():
 
 def get_results() -> DF:
     logger.info("Getting Stellantis results")
-    results= (
+    return (
         ProcessedTimeSeries("stellantis")
         .eval("odometer = odometer.ffill().bfill()")
         .assign(soh=np.nan)
+        .eval('cycles = round(odometer / (range * soh))')
         # .eval("soh = soc.ffill().bfill()")
         # .query("soc > 0.7")
     )
-    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
-    return results
 
 if __name__ == "__main__":
     main()
