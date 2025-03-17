@@ -2,6 +2,7 @@ from logging import getLogger
 
 import plotly.express as px
 
+from core.stats_utils import estimate_cycles
 from core.pandas_utils import *
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
@@ -24,7 +25,7 @@ def main():
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw tesla results.")
-    return (
+    results =  (
         TeslaProcessedTimeSeries("tesla", columns=TESLA_USE_COLS, filters=[("trimmed_in_charge", "==", True)])
         .groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False)
         .agg(
@@ -53,6 +54,8 @@ def get_results() -> DF:
         .eval("soh = fixed_soh_min_end")
         .sort_values(["tesla_code", "vin", "date"])
     )
+    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
+    return results
 
 if __name__ == "__main__":
     main()
