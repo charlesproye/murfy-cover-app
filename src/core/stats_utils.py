@@ -123,23 +123,4 @@ def evaluate_single_soh_estimation(results:DF, soh_col:DF) -> DF:
         "MAE_to_base_trendline": lr_params.eval("slope - @BASE_SLOPE").abs().mean(),
         "MAE_to_1_intercept": lr_params["intercept"].sub(1).abs().mean(),
     })
-    
-    
-def estimate_cycles(total_range:float, initial_range:float, soh:float=1.0):
-    """Calcule le nombre estimé de cycles
-
-    Args:
-        total_range (float): nombre de km parcouru
-        initial_range (float): autonomie initiale du véhicule
-        soh (float, optional): SoH du véhicule 
-
-    Returns:
-        float: le nombre de cycles de la batterie
-    """
-    try:
-        autonomie_effective = initial_range * soh
-        nombre_de_cycles = total_range / autonomie_effective
-        return round(nombre_de_cycles)
-    except:
-        return np.nan
 
