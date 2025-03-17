@@ -33,8 +33,8 @@ def get_results() -> DF:
             logger
         )
         .eval("soh = battery_energy / max_battery_energy")
+        .eval('cycles = round(odometer / (range * soh))')
     )
-    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
     logger.debug("Sanity check of the results:")
     logger.debug(sanity_check(results))
     return results
