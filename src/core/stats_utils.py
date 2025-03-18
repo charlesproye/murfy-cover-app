@@ -136,6 +136,8 @@ def estimate_cycles(total_range:float, initial_range:float, soh:float=1.0):
     Returns:
         float: le nombre de cycles de la batterie
     """
+    if soh is np.nan:
+        soh=1
     try:
         autonomie_effective = initial_range * soh
         nombre_de_cycles = total_range / autonomie_effective
