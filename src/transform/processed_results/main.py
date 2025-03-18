@@ -3,29 +3,12 @@ from logging import getLogger
 from core.sql_utils import *
 from core.stats_utils import *
 from core.pandas_utils import *
+from transform.processed_results.config import *
 from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
-from transform.processed_results.config import *
-from transform.raw_results.ford_results import get_results as get_ford_results
-from transform.raw_results.tesla_results import get_results as get_tesla_results
-from transform.raw_results.renault_results import get_results as get_renault_results
-from transform.raw_results.mercedes_results import get_results as get_mercedes_results
-from transform.raw_results.volvo_results import get_results as get_volvo_results
-from transform.raw_results.stellantis_results import get_results as get_stellantis_results
-from transform.raw_results.odometer_aggregation import agg_last_odometer
+
 
 logger = getLogger("transform.results.main")
-GET_RESULTS_FUNCS = {
-    "tesla": get_tesla_results,
-    "mercedes-benz": get_mercedes_results,
-    "bmw": lambda: agg_last_odometer("bmw"),
-    "kia": lambda: agg_last_odometer("kia"),
-    "renault": get_renault_results,
-    "volvo": get_volvo_results,
-    "stellantis": get_stellantis_results,
-    "ford": get_ford_results,
-}
-
 def update_vehicle_data_table():
     logger.info("Updating 'vehicle_data' table.")
     return (
@@ -48,12 +31,13 @@ def get_all_processed_results() -> DF:
             raise
         except:
             logger.error(f"Could not get processed results of {brand}.", exc_info=True)
-    return pd.concat(processed_results)
+    return concat(processed_results)
 
 def get_processed_results(brand:str) -> DF:
     logger.info(f"{'Processing ' + brand + ' results.':=^{50}}")
     results =  (
         GET_RESULTS_FUNCS[brand]()
+        .eval(SOH_FILTER_EVAL_STRINGS[brand])
         # Some raw estimations may have inf values, this will make mask_out_outliers_by_interquartile_range and force_monotonic_decrease fail
         # So we replace them by NaNs.
         .assign(soh=lambda df: df["soh"].replace([np.inf, -np.inf], np.nan))

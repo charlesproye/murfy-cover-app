@@ -12,7 +12,7 @@ from core.sql_utils import get_connection
 
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
-from core.sql_utils import con, right_inner_merge
+from core.sql_utils import con
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

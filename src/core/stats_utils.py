@@ -1,3 +1,4 @@
+import warnings
 from logging import Logger, getLogger
 
 import numpy as np
@@ -5,6 +6,7 @@ from scipy.optimize import minimize
 from scipy.stats import linregress as lr
 
 from core.pandas_utils import * 
+# from transform.raw_results.get_tesla_soh_readouts import aviloo_readouts
 
 
 logger = getLogger("core.stats_utils")
@@ -40,7 +42,7 @@ def filter_results_by_lines_bounds(results: DF, valid_soh_points: DF, logger: Lo
         if nb_rows_removed == results.shape[0]:
             logger.warning(f"While filtering, all SoH results were set to NaN, check the valid SOH points.")
         else:
-            logger.debug(f"Filtered SoH results, {nb_rows_removed}({rows_removed_pct:.2f}%) set to NaN.")
+            logger.debug(f"Filtered SoH results out of bounds defined in processed_results.config, {nb_rows_removed}({rows_removed_pct:.2f}%) set to NaN.")
     else: 
         logger.warning("No SoH results to filter.")
     return results
@@ -98,3 +100,26 @@ def force_monotonic_decrease(values:Series) -> Series:
     else:
         raise ValueError("Optimisation failed:\n", results.message)
 
+
+def evaluate_soh_estimations(results:DF, soh_cols:list[str]) -> DF:
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
+        # This is an ugly pd.concat call but it's the first working I found :-)
+        return pd.concat(
+            {soh_col: evaluate_single_soh_estimation(results, soh_col) for soh_col in soh_cols},
+            axis="columns"
+        ).T
+
+def evaluate_single_soh_estimation(results:DF, soh_col:DF) -> DF:
+    from core.config import BASE_SLOPE
+    lr_params:DF = (
+        results
+        .groupby("vin", observed=True, as_index=False)
+        .apply(lr_params_as_series, "odometer", soh_col, include_groups=False)
+    )
+    return pd.Series({
+        "std_soh_diff_to_lr": results.merge(lr_params, "left", "vin").eval(f"intercept + odometer * slope - {soh_col}").std(),
+        "MAE_to_aviloo_soh_readouts": results.groupby("vin", observed=True).agg({soh_col:"median"}).merge(aviloo_readouts, "left", "vin").eval(f"soh_readout - {soh_col}").abs().mean(),
+        "MAE_to_base_trendline": lr_params.eval("slope - @BASE_SLOPE").abs().mean(),
+        "MAE_to_1_intercept": lr_params["intercept"].sub(1).abs().mean(),
+    })

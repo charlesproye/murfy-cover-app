@@ -1,11 +1,12 @@
-from logging import Logger, getLogger
+from logging import getLogger
 
 import plotly.express as px
 
 from core.pandas_utils import *
+from transform.raw_results.config import *
 from core.caching_utils import cache_result
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
-from transform.raw_results.config import *
+
 
 logger = getLogger("transform.raw_results.renault_results")
 
@@ -13,15 +14,15 @@ logger = getLogger("transform.raw_results.renault_results")
 def get_results() -> DF:
     logger.info("Processing raw renault results.")
     return (
-        ProcessedTimeSeries("renault")
+        ProcessedTimeSeries("renault", filters=[("in_charge", "==", True)])
         .eval("expected_battery_energy = capacity * soc")
         .eval("soh = battery_energy / expected_battery_energy") 
-        .query("~in_discharge & soc > 0.5")
-        .groupby("vin")
-        # Ensure that there are at least 3 discharge period
-        # Since discharge_perf_idx is declared as discharge_perf_mask.diff().cumsum(), it increases per discharge AND charge, i.e 2 per discharge
-        # So we check that the max is superiror or equal to 3 * 2
-        .filter(lambda ts: ts["trimmed_in_discharge_idx"].max() >= 6)
+        # .query("soc > 0.5")
+        # .groupby("vin")
+        # # Ensure that there are at least 3 discharge period
+        # # Since discharge_perf_idx is declared as discharge_perf_mask.diff().cumsum(), it increases per discharge AND charge, i.e 2 per discharge
+        # # So we check that the max is superiror or equal to 3 * 2
+        # .filter(lambda ts: ts["trimmed_in_discharge_idx"].max() >= 6)
         .pipe(charge_levels)
     )
 

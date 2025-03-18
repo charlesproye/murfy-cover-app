@@ -174,12 +174,12 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
+    "tesla",
     "bmw",
     "mercedes-benz",
     "ford",
     "volvo-cars",
     "stellantis",
-    "tesla",
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
@@ -203,3 +203,8 @@ COLS_TO_STR_LOWER = [
     "charging_method",
     "fast_charger_type",
 ]
+
+# Tesla specific vars:
+MIN_POWER_LOSS = -0.0005
+MAX_CHARGE_TD = TD(days=1)
+

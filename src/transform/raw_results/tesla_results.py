@@ -16,6 +16,7 @@ logger = getLogger("transform.raw_results.tesla_results")
 def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform.raw_results")
     results = get_results(force_update=True)
+    print(sanity_check(results))
     if not results.empty:
         fig = px.scatter(results, x="odometer", y="soh", color="tesla_code", opacity=0.2)
         fig.show()
@@ -23,9 +24,9 @@ def main():
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw tesla results.")
-    results = (
-        TeslaProcessedTimeSeries("tesla", columns=USE_COLS, filters=[("trimmed_in_charge", "==", True)])
-        .groupby(["vin", "trimmed_in_charge_idx"], observed=True)
+    return (
+        TeslaProcessedTimeSeries("tesla", columns=TESLA_USE_COLS, filters=[("trimmed_in_charge", "==", True)])
+        .groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False)
         .agg(
             energy_added_min=pd.NamedAgg("charge_energy_added", "min"),
             energy_added_end=pd.NamedAgg("charge_energy_added", "last"),
@@ -40,10 +41,9 @@ def get_results() -> DF:
             charging_power=pd.NamedAgg("charging_power", "median"),
             tesla_code=pd.NamedAgg("tesla_code", "first"),
         )
-        .reset_index(drop=False)
         .eval("energy_added = energy_added_end - energy_added_min")
         .eval("soh = energy_added / (soc_diff / 100.0 * capacity)")
-        .query("soc_diff > 40 & soh.between(0.75, 1.05)")
+        # .query("soc_diff > 40 & soh.between(0.75, 1.05)")
         .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER)) / 100")
         .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER) / 100")
