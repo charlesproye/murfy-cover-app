@@ -13,7 +13,7 @@ from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from core.config import *
 from ingestion.vehicle_info.config.credentials import SPREADSHEET_ID 
-from ingestion.vehicle_info.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES
+from ingestion.vehicle_info.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
 from ingestion.vehicle_info.config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
 from ingestion.vehicle_info.utils.google_sheets_utils import get_google_client
 # from config import COL_DTYPES
@@ -70,6 +70,8 @@ def safe_astype(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
         if col in df.columns:
             try:
                 if dtype == bool:
+                    # Replace empty strings with False before conversion
+                    df[col] = df[col].replace('', False)
                     df[col] = df[col].fillna(False)
                     df[col] = df[col].map({'TRUE': True, 'True': True, True: True,
                                          'FALSE': False, 'False': False, False: False})
@@ -121,6 +123,52 @@ def format_licence_plate(df, licence_plate_col='licence_plate'):
         DataFrame with formatted licence plate strings
     """
     return df.assign(**{licence_plate_col: lambda df: df[licence_plate_col].apply(lambda plate: re.sub(r"([a-zA-Z]+)(\d{3})([a-zA-Z]+)", r"\1-\2-\3", plate) if pd.notna(plate) else plate)})
+
+def standardize_model_type(df: pd.DataFrame, oem_col='oem', model_col='model', type_col='type') -> pd.DataFrame:
+    """Standardize model and type strings based on predefined mappings.
+    
+    Args:
+        df: DataFrame containing model and type columns
+        oem_col: Name of the column containing OEM/make information
+        model_col: Name of the column containing model information
+        type_col: Name of the column containing type/version information
+        
+    Returns:
+        DataFrame with standardized model and type strings
+    """
+    df = df.copy()
+    
+    def _standardize_row(row):
+        make = str(row[oem_col]).lower() if pd.notna(row[oem_col]) else ''
+        model = str(row[model_col]).lower() if pd.notna(row[model_col]) else ''
+        type_val = str(row[type_col]).lower() if pd.notna(row[type_col]) else ''
+        
+        if not type_val or type_val == 'x' or type_val == 'unknown':
+            return pd.Series({model_col: model, type_col: None})
+            
+        # Remove common suffixes
+        for suffix in suffixes_to_remove:
+            type_val = type_val.replace(f" {suffix}", "")
+            
+        if make in mappings and model in mappings[make]:
+            model_info = mappings[make][model]
+            
+            # Apply model cleaning if specified
+            if 'model_clean' in model_info:
+                model = model_info['model_clean'](model)
+                
+            # Apply type patterns
+            for pattern, replacement in model_info['patterns']:
+                if re.search(pattern, type_val):
+                    return pd.Series({model_col: model, type_col: str(replacement).lower()})
+                    
+        return pd.Series({model_col: model, type_col: type_val.strip()})
+    
+    result = df.apply(_standardize_row, axis=1)
+    df[model_col] = result[model_col]
+    df[type_col] = result[type_col]
+    
+    return df
 
 async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     """Read fleet information from Google Sheets."""
@@ -185,14 +233,15 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
                 logger.warning(f"Missing column {col}, adding empty column")
                 df[col] = None
                 
+        # Add this before safe_astype
+        print(f"EValue unique values before conversion: {df['EValue'].unique()}")
         df = df.pipe(safe_astype, COL_DTYPES)
+        print(f"EValue unique values after conversion: {df['EValue'].unique()}")
+        
         df = df.pipe(clean_version, model_col='model', version_col='type')
         df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
-        
+        df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
         logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
-        
-        
-        #df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
         
         return df
         
@@ -201,6 +250,6 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         raise
 
 if __name__ == "__main__":
-    df = asyncio.run(read_fleet_info())
-    print(df)
+    df = asyncio.run(read_fleet_info(owner_filter=''))
+    print(df[['vin','oem', 'make','model','type','country','start_date','end_of_contract','activation','EValue']])
     
