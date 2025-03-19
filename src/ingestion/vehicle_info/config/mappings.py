@@ -41,16 +41,16 @@ OEM_MAPPING = {
 }
 
 COUNTRY_MAPPING = {
-    'NL': 'Netherlands',
-    'FR': 'France',
-    'BE': 'Belgium',
-    'DE': 'Germany',
-    'LU': 'Luxembourg',
-    'ES': 'Spain',
-    'IT': 'Italy',
-    'PT': 'Portugal',
-    'GB': 'United Kingdom',
-    'UK': 'United Kingdom'
+    'nl': 'Netherlands',
+    'fr': 'France',
+    'be': 'Belgium',
+    'de': 'Germany',
+    'lu': 'Luxembourg',
+    'es': 'Spain',
+    'it': 'Italy',
+    'pt': 'Portugal',
+    'gb': 'United Kingdom',
+    'uk': 'United Kingdom'
 } 
 
 COL_DTYPES = {

@@ -167,18 +167,17 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         if 'oem' in df.columns:
             df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
         
-        for col in ['make', 'model', 'type']:
-            if col in df.columns:
-                df[col] = df[col].str.lower()
+        df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].apply(lambda x: x.str.lower())
         
         # Convert dates with explicit format handling
         date_columns = ['start_date', 'end_of_contract']
         for col in date_columns:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col], format='%d-%m-%Y', dayfirst=True, errors='coerce')
+                df[col] = pd.to_datetime(df[col], yearfirst=True, errors='coerce').dt.strftime('%Y-%m-%d')
         
         # Remove duplicates and convert types
         df = df.drop_duplicates(subset="vin")
+        df = df.replace({pd.NaT: None})
         
         # Ensure all required columns exist before type conversion
         for col in COL_DTYPES:
@@ -187,10 +186,14 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
                 df[col] = None
                 
         df = df.pipe(safe_astype, COL_DTYPES)
-        df = df.pipe(clean_version)
-        df = df.pipe(format_licence_plate)
+        df = df.pipe(clean_version, model_col='model', version_col='type')
+        df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
         
         logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
+        
+        
+        #df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
+        
         return df
         
     except Exception as e:
