@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List
 import time
 from gspread.exceptions import APIError
 from gspread import Cell
+import re
 
 from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
@@ -94,6 +95,33 @@ def map_col_to_dict(df: pd.DataFrame, col: str, mapping: Dict[str, str]) -> pd.D
         df[col] = df[col].str.lower().map(lambda x: mapping.get(x, x) if pd.notna(x) else x)
     return df
 
+def clean_version(df, model_col='model', version_col='type'):
+    """Clean version strings by removing model name if it appears in the version.
+    
+    Args:
+        df: DataFrame containing model and version columns
+        model_col: Name of the column containing model information
+        version_col: Name of the column containing version information
+        
+    Returns:
+        DataFrame with cleaned version strings
+    """
+    return df.assign(**{version_col: lambda df: df.apply(lambda row: row[version_col].replace(row[model_col], '') 
+                                                         if pd.notna(row[model_col]) and pd.notna(row[version_col]) and row[model_col] in row[version_col] 
+                                                         else row[version_col], axis=1)})
+
+def format_licence_plate(df, licence_plate_col='licence_plate'):
+    """Format licence plate strings by adding dashes between letters and numbers.
+    
+    Args:
+        df: DataFrame containing licence plate column
+        licence_plate_col: Name of the column containing licence plate information
+        
+    Returns:
+        DataFrame with formatted licence plate strings
+    """
+    return df.assign(**{licence_plate_col: lambda df: df[licence_plate_col].apply(lambda plate: re.sub(r"([a-zA-Z]+)(\d{3})([a-zA-Z]+)", r"\1-\2-\3", plate) if pd.notna(plate) else plate)})
+
 async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     """Read fleet information from Google Sheets."""
     try:
@@ -139,6 +167,10 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         if 'oem' in df.columns:
             df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
         
+        for col in ['make', 'model', 'type']:
+            if col in df.columns:
+                df[col] = df[col].str.lower()
+        
         # Convert dates with explicit format handling
         date_columns = ['start_date', 'end_of_contract']
         for col in date_columns:
@@ -155,6 +187,8 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
                 df[col] = None
                 
         df = df.pipe(safe_astype, COL_DTYPES)
+        df = df.pipe(clean_version)
+        df = df.pipe(format_licence_plate)
         
         logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
         return df
