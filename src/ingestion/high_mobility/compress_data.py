@@ -12,58 +12,108 @@ from botocore.credentials import threading
 from botocore.client import Config
 from ingestion.high_mobility.multithreading import MergedInfoWrapper
 from ingestion.high_mobility.schema import all_brands
+import multiprocessing as mp
 
 
 class HMCompresser:
     __logger: logging.Logger
     __s3: boto3.client
+    __s3_dev: boto3.client
     __bucket: str
+    __dev_bucket: str
     __s3_keys_by_vin: dict[str, dict[str, set[str]]] = {}
     __shutdown_requested: threading.Event
     __s3_config: Dict[str, str]
+    __s3_dev_config: Dict[str, str]
+    __config: Config
+    __session: aioboto3.Session
+    __batch_size: int
+    __max_workers: int
+    __upload_semaphore: asyncio.Semaphore
 
-    def __init__(self, threaded: bool = True, max_workers: int = 8):
-        """Initialize the compressor with S3 credentials and configuration"""
+    def __init__(
+        self, 
+        # s3, 
+        # bucket, 
+        threaded: bool = True,
+        max_workers: Optional[int] = None,
+        batch_size: int = 50
+    ) -> None:
         self.__logger = logging.getLogger("COMPRESSER")
-        self.__shutdown_requested = threading.Event()  # Initialize as Event
+        self.__upload_semaphore = asyncio.Semaphore(3)  # Limite à 3 uploads simultanés
         
-        # Load environment variables
+        # Load environment variables for both prod and dev
         dotenv.load_dotenv()
-        self.__s3_config = self.__load_s3_config()
-        if not self.__s3_config:
+        self.__s3_config = self.__load_s3_config("S3")
+        self.__s3_dev_config = self.__load_s3_config("S3_DEV")
+        if not self.__s3_config or not self.__s3_dev_config:
             raise ValueError("Missing required S3 configuration")
 
-        # Initialize S3 client with config
-        S3_ENDPOINT = os.getenv("S3_ENDPOINT")
-        S3_REGION = os.getenv("S3_REGION")
-        S3_KEY = os.getenv("S3_KEY")
-        S3_SECRET = os.getenv("S3_SECRET")
+        # Initialize main S3 client with optimized config
         self.__s3 = boto3.client(
             "s3",
-            region_name=S3_REGION,
-            endpoint_url=S3_ENDPOINT,
-            aws_access_key_id=S3_KEY,
-            aws_secret_access_key=S3_SECRET,
+            region_name=self.__s3_config['region'],
+            endpoint_url=self.__s3_config['endpoint'],
+            aws_access_key_id=self.__s3_config['key'],
+            aws_secret_access_key=self.__s3_config['secret'],
             config=Config(
                 signature_version='s3v4',
                 s3={'addressing_style': 'path'},
-                retries={'max_attempts': 3}
+                retries={'max_attempts': 2},  # Reduced retries
+                max_pool_connections=25  # Increased connection pool
             )
         )
-        self.__bucket = self.__s3_config['bucket']
         
+        # Initialize dev S3 client with optimized config
+        self.__s3_dev = boto3.client(
+            "s3",
+            region_name=self.__s3_dev_config['region'],
+            endpoint_url=self.__s3_dev_config['endpoint'],
+            aws_access_key_id=self.__s3_dev_config['key'],
+            aws_secret_access_key=self.__s3_dev_config['secret'],
+            config=Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+                retries={'max_attempts': 2},  # Reduced retries
+                max_pool_connections=25  # Increased connection pool
+            )
+        )
+        
+        self.__bucket = self.__s3_config['bucket']
+        self.__dev_bucket = self.__s3_dev_config['bucket']
         self.threaded = threaded
-        self.max_workers = max_workers
+        self.__batch_size = batch_size
+        self.__max_workers = max_workers or mp.cpu_count()
+        
+        # Configure boto3 to use signature version 4 with optimized settings
+        self.__config = Config(
+            signature_version='s3v4',
+            s3={'addressing_style': 'path'},
+            retries={'max_attempts': 2},  # Reduced retries
+            max_pool_connections=25  # Increased connection pool
+        )
+        self.__session = aioboto3.Session()
+        self.__s3_keys_by_vin = {}
+        self.__shutdown_requested = threading.Event()
 
-    def __load_s3_config(self) -> Optional[Dict[str, str]]:
-        """Load S3 configuration from environment variables"""
-        required_vars = {
-            'endpoint': 'S3_ENDPOINT',
-            'region': 'S3_REGION',
-            'bucket': 'S3_BUCKET',
-            'key': 'S3_KEY',
-            'secret': 'S3_SECRET'
-        }
+    def __load_s3_config(self, prefix: str) -> Optional[Dict[str, str]]:
+        """Load S3 configuration from environment variables with given prefix"""
+        if prefix == "S3_DEV":
+            required_vars = {
+                'endpoint': 'S3_ENDPOINT',
+                'region': 'S3_REGION',
+                'bucket': 'S3_BUCKET_DEV',
+                'key': 'S3_KEY_DEV',
+                'secret': 'S3_SECRET_DEV'
+            }
+        else:
+            required_vars = {
+                'endpoint': 'S3_ENDPOINT',
+                'region': 'S3_REGION',
+                'bucket': 'S3_BUCKET',
+                'key': 'S3_KEY',
+                'secret': 'S3_SECRET'
+            }
         
         config = {}
         for key, env_var in required_vars.items():
@@ -195,7 +245,7 @@ class HMCompresser:
             yesterday = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
             
             # Process in parallel batches
-            batch_size = 1000
+            batch_size = self.__batch_size
             temp_data_list = list(temp_data)
             batches = [temp_data_list[i:i + batch_size] 
                       for i in range(0, len(temp_data_list), batch_size)]
@@ -235,6 +285,32 @@ class HMCompresser:
 
         self.__logger.info(f"Completed process_all for brand {brand}")
 
+    async def __upload_to_dev_bucket(self, s3_dev, compressed_key: str, encoded: bytes, vin: str):
+        """Upload to dev bucket with retry logic and semaphore control"""
+        async with self.__upload_semaphore:  # Utiliser le sémaphore pour contrôler la concurrence
+            max_retries = 3
+            base_delay = 0.5
+            
+            for attempt in range(max_retries):
+                try:
+                    if attempt > 0:  # Add delay before retries
+                        await asyncio.sleep(base_delay * (2 ** attempt))  # Exponential backoff
+                        
+                    await s3_dev.put_object(
+                        Bucket=self.__dev_bucket,
+                        Key=compressed_key,
+                        Body=encoded
+                    )
+                    self.__logger.info(f"Successfully uploaded to dev bucket: {compressed_key}")
+                    return True
+                except Exception as e:
+                    if "OperationAborted" in str(e) and attempt < max_retries - 1:
+                        self.__logger.warning(f"Retry {attempt + 1}/{max_retries} for dev bucket upload: {compressed_key}")
+                        continue
+                    else:
+                        self.__logger.error(f"Failed to upload to dev bucket: {compressed_key}, error: {e}")
+                        return False
+
     async def __save_compressed_data(self, successful_processes, merged, vin, brand, yesterday):
         session = aioboto3.Session()
         async with session.client(
@@ -248,20 +324,30 @@ class HMCompresser:
                 encoded = msgspec.json.encode(merged.info)
                 compressed_key = f"response/{brand}/{vin}/{yesterday}.json"
                 
+                # Upload to main bucket first
                 await s3.put_object(
                     Bucket=self.__bucket,
                     Key=compressed_key,
                     Body=encoded
                 )
 
-                delete_tasks = []
-                for temp_key in successful_processes:
-                    task = asyncio.create_task(
-                        s3.delete_object(Bucket=self.__bucket, Key=temp_key)
-                    )
-                    delete_tasks.append(task)
+                # Upload to dev bucket with retry and semaphore control
+                success = await self.__upload_to_dev_bucket(self.__s3_dev, compressed_key, encoded, vin)
                 
-                await asyncio.gather(*delete_tasks)
+                if success:
+                    # Delete temp files from main bucket only
+                    try:
+                        delete_tasks = []
+                        for temp_key in successful_processes:
+                            task = asyncio.create_task(
+                                s3.delete_object(Bucket=self.__bucket, Key=temp_key)
+                            )
+                            delete_tasks.append(task)
+                        
+                        await asyncio.gather(*delete_tasks)
+                        self.__logger.info(f"Successfully deleted {len(successful_processes)} temp files from main bucket for VIN {vin}")
+                    except Exception as e:
+                        self.__logger.error(f"Error deleting temp files for VIN {vin}: {e}")
                 
             except Exception as e:
                 self.__logger.error(f"Error saving compressed data for VIN {vin}: {e}")
