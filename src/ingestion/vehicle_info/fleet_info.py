@@ -11,10 +11,10 @@ from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from core.config import *
-from .config.credentials import SPREADSHEET_ID 
-from .config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES
-from .config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
-from .utils.google_sheets_utils import get_google_client
+from ingestion.vehicle_info.config.credentials import SPREADSHEET_ID 
+from ingestion.vehicle_info.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES
+from ingestion.vehicle_info.config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
+from ingestion.vehicle_info.utils.google_sheets_utils import get_google_client
 # from config import COL_DTYPES
 
 logger = getLogger("ingestion.vehicle_info")
