@@ -234,10 +234,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
                 df[col] = None
                 
         # Add this before safe_astype
-        print(f"EValue unique values before conversion: {df['EValue'].unique()}")
         df = df.pipe(safe_astype, COL_DTYPES)
-        print(f"EValue unique values after conversion: {df['EValue'].unique()}")
-        
         df = df.pipe(clean_version, model_col='model', version_col='type')
         df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
         df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
