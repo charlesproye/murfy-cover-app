@@ -55,7 +55,13 @@ class BMWApi:
 
     def check_vehicle_status(self, vin: str) -> Tuple[int, Any]:
         """Check vehicle status in BMW API."""
-        return self.get_clearance(vin)
+        status_code, _ = self.get_clearance(vin)
+        if status_code == 200:
+            return True
+        elif status_code == 404:
+            return False
+        else:
+            return False
 
     def get_clearance(self, vin: str) -> Tuple[int, Any]:
         """Get vehicle clearance status."""

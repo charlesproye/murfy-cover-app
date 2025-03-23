@@ -28,8 +28,9 @@ class HMApi:
         """Check if the current token is expired."""
         if not self._access_token:
             return True
+        # Add a 5-minute buffer to prevent unnecessary renewals
         timestamp = (datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
-        return timestamp >= (self.__token_exp - 300)
+        return timestamp >= (self.__token_exp - 60)  # Only renew when within 1 minute of expiration
 
     def _get_auth_token(self) -> str:
         """Get authentication token from High Mobility API."""
@@ -59,7 +60,8 @@ class HMApi:
 
     def _get_headers(self) -> Dict[str, str]:
         """Get headers for API requests."""
-        if self._is_token_expired():
+        # Only check token expiration if we don't have a token or if it's expired
+        if not self._access_token or self._is_token_expired():
             self._get_auth_token()
         return {
             "Authorization": f"Bearer {self._access_token}",
@@ -102,20 +104,19 @@ class HMApi:
                     if result is None:
                         retry_count += 1
                         continue
-                    return result
                 
                 if response.ok:
                     data = response.json()
                     status = data.get('status', '').lower()
-                    return response.status_code, {
-                        'has_clearance': self.STATUS_MAPPING.get(status, False),
-                        'status': status
-                    }
-                
-                return response.status_code, response.text
+                    if status == 'approved':
+                        return True
+                    else:
+                        return False
+                    
+                else:
+                    return False
             except Exception as e:
-                logging.error(f"Failed to get HM vehicle status: {str(e)}")
-                return 500, str(e)
+                return False
 
     def get_clearance(self, vin: str) -> Tuple[int, Any]:
         """Get vehicle clearance status."""

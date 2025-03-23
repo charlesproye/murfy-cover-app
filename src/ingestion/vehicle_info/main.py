@@ -3,8 +3,9 @@ import logging
 import pandas as pd
 import signal
 import sys
-from typing import Optional
+from typing import Optional, List
 from functools import partial
+from dataclasses import dataclass
 
 from ingestion.vehicle_info.config.settings import LOGGING_CONFIG
 from ingestion.vehicle_info.config.credentials import *
@@ -19,6 +20,109 @@ from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
+
+@dataclass
+class BrandOperations:
+    """Data class to hold brand-specific operations."""
+    name: str
+    activation_task: callable
+class VehicleProcessingManager:
+    """Manages the vehicle processing operations for different brands."""
+    
+    def __init__(self, owner_filter: Optional[str] = None):
+        self.owner_filter = owner_filter
+        self.apis = self._initialize_apis()
+        self.df = None
+        self.activation_service = None
+        self.vehicle_processor = None
+    def _initialize_apis(self) -> dict:
+        """Initialize all API clients."""
+        return {
+            'bmw': BMWApi(
+                auth_url=BMW_AUTH_URL,
+                base_url=BMW_BASE_URL,
+                client_id=BMW_CLIENT_ID,
+                fleet_id=BMW_FLEET_ID,
+                client_username=BMW_CLIENT_USERNAME,
+                client_password=BMW_CLIENT_PASSWORD
+            ),
+            'hm': HMApi(
+                base_url=HM_BASE_URL,
+                client_id=HM_CLIENT_ID,
+                client_secret=HM_CLIENT_SECRET
+            ),
+            'stellantis': StellantisApi(
+                base_url=STELLANTIS_BASE_URL,
+                email=STELLANTIS_EMAIL,
+                password=STELLANTIS_PASSWORD,
+                fleet_id=STELLANTIS_FLEET_ID,
+                company_id=STELLANTIS_COMPANY_ID
+            ),
+            'tesla': TeslaApi(
+                base_url=TESLA_BASE_URL,
+                slack_token=SLACK_TOKEN,
+                slack_channel_id=SLACK_CHANNEL_ID
+            )
+        }
+    
+    async def initialize(self):
+        """Initialize the processing manager with fleet data."""
+        self.df = await fleet_info(owner_filter=self.owner_filter)
+        logger.info(f"Total vehicles in fleet_info: {len(self.df)}")
+        
+        self.activation_service = VehicleActivationService(
+            self.apis['bmw'], self.apis['hm'], 
+            self.apis['stellantis'], self.apis['tesla'],
+            self.df
+        )
+        #self.df = await fleet_info(owner_filter=self.owner_filter)
+        #logger.info(f"Total vehicles in fleet_info: {len(self.df)}")
+        #self.vehicle_processor = VehicleProcessor(
+        #    self.apis['bmw'], self.apis['hm'], 
+        #    self.apis['stellantis'], self.apis['tesla'],
+        #    self.df
+        #)
+    
+    async def process_brand(self, brand: str, activation_task: callable):
+        """Process a single brand's operations."""
+        try:
+            logger.info(f"Starting {brand} operations...")
+            await activation_task()
+            #await processing_task()
+            logger.info(f"Completed {brand} operations successfully")
+        except Exception as e:
+            logger.error(f"Error processing {brand}: {str(e)}")
+            raise
+    
+    async def process_all_brands(self):
+        """Process all brands in parallel."""
+        brand_operations = [
+            #BrandOperations('tesla', self.activation_service.activation_tesla), #self.vehicle_processor.process_tesla),
+            BrandOperations('bmw', self.activation_service.activation_bmw), #self.vehicle_processor.process_bmw),
+            BrandOperations('hm', self.activation_service.activation_hm), #self.vehicle_processor.process_hm),
+            BrandOperations('stellantis', self.activation_service.activation_stellantis) #self.vehicle_processor.process_stellantis)
+        ]
+        tasks = [
+            self.process_brand(brand.name, brand.activation_task) #brand.processing_task)
+            for brand in brand_operations
+        ]
+        
+        await asyncio.gather(*tasks)
+
+async def main(owner_filter: Optional[str] = None):
+    """Main entry point for vehicle processing."""
+    try:
+        logger.info("Starting vehicle processing...")
+        manager = VehicleProcessingManager(owner_filter)
+        await manager.initialize()
+        await manager.process_all_brands()
+        
+    except asyncio.CancelledError:
+        logger.info("Processing cancelled by user.")
+        raise
+    except Exception as e:
+        logger.error(f"Error in main program: {str(e)}")
+        raise
 
 def handle_sigint(signum, frame, current_task=None):
     """Handle SIGINT (Ctrl+C) gracefully."""
@@ -43,102 +147,6 @@ async def cleanup(task):
             if task is not asyncio.current_task():
                 task.cancel()
         logger.info("All tasks cancelled. Exiting...")
-
-async def get_existing_model_metadata():
-    """Retrieve existing model metadata from the database."""
-    from core.sql_utils import get_connection
-    
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT 
-                m.make_name,
-                vm.model_name,
-                vm.type,
-                vm.url_image,
-                vm.warranty_km,
-                vm.warranty_date,
-                vm.capacity
-            FROM vehicle_model vm
-            JOIN make m ON vm.make_id = m.id
-            WHERE vm.url_image IS NOT NULL 
-               OR vm.warranty_km IS NOT NULL 
-               OR vm.warranty_date IS NOT NULL 
-               OR vm.capacity IS NOT NULL
-            ORDER BY m.make_name, vm.model_name, vm.type
-        """)
-        
-        results = cursor.fetchall()
-        
-        if results:
-            print("\nExisting model metadata:")
-            print("--------------------------------------------------------------------------------")
-            print("Make | Model | Type | URL | Warranty km | Warranty years | Capacity")
-            print("--------------------------------------------------------------------------------")
-            for row in results:
-                make, model, type_value, url, warranty_km, warranty_date, capacity = row
-                print(f"{make} | {model} | {type_value or 'N/A'} | {url or 'N/A'} | {warranty_km or 'N/A'} | {warranty_date or 'N/A'} | {capacity or 'N/A'}")
-            print("--------------------------------------------------------------------------------")
-        else:
-            print("No metadata found in database")
-            
-        return results
-
-async def main(owner_filter: Optional[str] = None):
-    """Main entry point for vehicle processing."""
-    try:
-        logger.info("Starting vehicle processing...")
-        
-        bmw_api = BMWApi(
-            auth_url=BMW_AUTH_URL,
-            base_url=BMW_BASE_URL,
-            client_id=BMW_CLIENT_ID,
-            fleet_id=BMW_FLEET_ID,
-            client_username=BMW_CLIENT_USERNAME,
-            client_password=BMW_CLIENT_PASSWORD
-        )
-
-        hm_api = HMApi(
-            base_url=HM_BASE_URL,
-            client_id=HM_CLIENT_ID,
-            client_secret=HM_CLIENT_SECRET
-        )
-
-        stellantis_api = StellantisApi(
-            base_url=STELLANTIS_BASE_URL,
-            email=STELLANTIS_EMAIL,
-            password=STELLANTIS_PASSWORD,
-            fleet_id=STELLANTIS_FLEET_ID,
-            company_id=STELLANTIS_COMPANY_ID
-        )
-        
-        # Initialize Tesla API with required parameters
-        tesla_api = TeslaApi(
-            base_url="https://fleet-api.prd.eu.vn.cloud.tesla.com",
-            slack_token=SLACK_TOKEN,
-            slack_channel_id="C0816LXFCNL"  # Channel ID from tesla.py
-        )
-        
-        df = await fleet_info(owner_filter=owner_filter)
-        logger.info(f"Total vehicles in fleet_info: {len(df)}")
-                
-        activation_service = VehicleActivationService(bmw_api, hm_api, stellantis_api, tesla_api)
-        activation_service.set_fleet_info(df)
-        
-        vehicle_processor = VehicleProcessor(activation_service)
-        
-        await vehicle_processor.process_vehicles(df)
-        
-        # Optionally get model metadata
-        # await get_existing_model_metadata()
-        
-    except asyncio.CancelledError:
-        logger.info("Processing cancelled by user.")
-        raise
-    except Exception as e:
-        logger.error(f"Error in main program: {str(e)}")
-        raise
 
 if __name__ == "__main__":
     try:
