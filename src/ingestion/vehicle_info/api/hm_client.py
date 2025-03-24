@@ -1,5 +1,5 @@
 import logging
-import requests
+import aiohttp
 from datetime import datetime, timezone
 from typing import Tuple, Any, List, Dict
 
@@ -32,10 +32,10 @@ class HMApi:
         timestamp = (datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
         return timestamp >= (self.__token_exp - 60)  # Only renew when within 1 minute of expiration
 
-    def _get_auth_token(self) -> str:
+    async def _get_auth_token(self, session: aiohttp.ClientSession) -> str:
         """Get authentication token from High Mobility API."""
         try:
-            response = requests.post(
+            response = await session.post(
                 f"{self.base_url}/v1/access_tokens",
                 data={
                     "grant_type": "client_credentials",
@@ -45,7 +45,7 @@ class HMApi:
                 timeout=10
             )
             response.raise_for_status()
-            response_data = response.json()
+            response_data = await response.json()
             self._access_token = response_data.get("access_token")
             timestamp = (
                 datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -58,17 +58,17 @@ class HMApi:
             logging.error(f"Failed to get HM auth token: {str(e)}")
             raise
 
-    def _get_headers(self) -> Dict[str, str]:
+    async def _get_headers(self, session: aiohttp.ClientSession) -> Dict[str, str]:
         """Get headers for API requests."""
         # Only check token expiration if we don't have a token or if it's expired
         if not self._access_token or self._is_token_expired():
-            self._get_auth_token()
+            self._access_token = await self._get_auth_token(session)
         return {
             "Authorization": f"Bearer {self._access_token}",
             "Content-Type": "application/json"
         }
 
-    def _handle_auth_error(self, response: requests.Response, retry_count: int = 0) -> Tuple[int, Any]:
+    async def _handle_auth_error(self, response: aiohttp.ClientResponse, retry_count: int = 0) -> Tuple[int, Any]:
         """Handle authentication errors by refreshing token and retrying.
         
         Args:
@@ -82,9 +82,9 @@ class HMApi:
             logging.info("Received 401, attempting to refresh token and retry")
             self._access_token = None
             return None
-        return response.status_code, response.json() if response.ok else response.text
+        return response.status_code, await response.json() if response.ok else await response.text()
 
-    def get_status(self, vin: str) -> Tuple[int, Any]:
+    async def get_status(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Get vehicle status.
         
         Returns:
@@ -97,7 +97,8 @@ class HMApi:
         while retry_count < 2:
             try:
                 url = f"{self.base_url}/v1/fleets/vehicles/{vin}"
-                response = requests.get(url, headers=self._get_headers())
+                headers = await self._get_headers(session)
+                response = await session.get(url, headers=headers)
                 
                 if response.status_code == 401:
                     result = self._handle_auth_error(response, retry_count)
@@ -106,7 +107,7 @@ class HMApi:
                         continue
                 
                 if response.ok:
-                    data = response.json()
+                    data = await response.json()
                     status = data.get('status', '').lower()
                     if status == 'approved':
                         return True
@@ -118,13 +119,14 @@ class HMApi:
             except Exception as e:
                 return False
 
-    def get_clearance(self, vin: str) -> Tuple[int, Any]:
+    async def get_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Get vehicle clearance status."""
         retry_count = 0
         while retry_count < 2:
             try:
                 url = f"{self.base_url}/vehicles/{vin}/clearance"
-                response = requests.get(url, headers=self._get_headers())
+                headers = await self._get_headers(session)
+                response = await session.get(url, headers=headers)
                 
                 if response.status_code == 401:
                     result = self._handle_auth_error(response, retry_count)
@@ -138,7 +140,7 @@ class HMApi:
                 logging.error(f"Failed to get HM clearance: {str(e)}")
                 return 500, str(e)
 
-    def create_clearance(self, vehicles: List[Dict[str, str]]) -> Tuple[int, Dict[str, Any]]:
+    async def create_clearance(self, vehicles: List[Dict[str, str]], session: aiohttp.ClientSession) -> Tuple[int, Dict[str, Any]]:
         """Create clearance for vehicles and check their real activation status.
         
         Args:
@@ -161,9 +163,10 @@ class HMApi:
                         "brand": self.BRAND_MAPPING.get(brand, brand),
                     })
                 
-                response = requests.post(
+                headers = await self._get_headers(session)
+                response = await session.post(
                     url,
-                    headers=self._get_headers(),
+                    headers=headers,
                     json={"vehicles": formatted_vehicles}
                 )
                 
@@ -178,7 +181,7 @@ class HMApi:
                 if response.ok:
                     for vehicle in formatted_vehicles:
                         vin = vehicle["vin"]
-                        status_code, status_data = self.get_status(vin)
+                        status_code, status_data = await self.get_status(vin,session)
                         activation_status[vin] = status_data if status_code == 200 else {'has_clearance': False, 'status': 'error'}
 
                     return response.status_code, {
@@ -191,13 +194,14 @@ class HMApi:
                 logging.error(f"Failed to create HM clearance: {str(e)}")
                 return 500, str(e)
 
-    def delete_clearance(self, vin: str) -> Tuple[int, Any]:
+    async def delete_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Delete vehicle clearance."""
         retry_count = 0
         while retry_count < 2:
             try:
                 url = f"{self.base_url}/v1/fleets/vehicles/{vin}"
-                response = requests.delete(url, headers=self._get_headers())
+                headers = await self._get_headers(session)
+                response = await session.delete(url, headers=headers)
                 
                 if response.status_code == 401:
                     result = self._handle_auth_error(response, retry_count)
@@ -206,7 +210,7 @@ class HMApi:
                         continue
                     return result
                 
-                return response.status_code, response.json() if response.ok else response.text
+                return response.status_code, await response.json() if response.ok else await response.text()
             except Exception as e:
                 logging.error(f"Failed to delete HM clearance: {str(e)}")
                 return 500, str(e) 

@@ -1,6 +1,7 @@
 import logging
 import requests
 import json
+import aiohttp
 from typing import Tuple, Any, List, Dict
 
 class BMWApi:
@@ -16,10 +17,10 @@ class BMWApi:
         self.client_password = client_password
         self._access_token = None
 
-    def _get_auth_token(self) -> str:
+    async def _get_auth_token(self, session: aiohttp.ClientSession) -> str:
         """Get authentication token from BMW API."""
         try:
-            response = requests.post(
+            response = await session.post(
                 self.auth_url,
                 headers={
                     "Content-Type": "application/x-amz-json-1.1",
@@ -35,7 +36,9 @@ class BMWApi:
                 }
             )
             response.raise_for_status()
-            auth_result = response.json().get("AuthenticationResult", {})
+            # Handle the response text directly since it's not standard JSON MIME type
+            response_text = await response.text()
+            auth_result = json.loads(response_text).get("AuthenticationResult", {})
             self._access_token = auth_result.get("IdToken")
             if not self._access_token:
                 raise ValueError("No IdToken found in authentication response")
@@ -44,36 +47,37 @@ class BMWApi:
             logging.error(f"Failed to get BMW auth token: {str(e)}")
             raise
 
-    def _get_headers(self) -> Dict[str, str]:
+    async def _get_headers(self, session: aiohttp.ClientSession) -> Dict[str, str]:
         """Get headers for API requests."""
         if not self._access_token:
-            self._get_auth_token()
+            await self._get_auth_token(session)
         return {
             "Authorization": f"Bearer {self._access_token}",
             "Content-Type": "application/json"
         }
 
-    def check_vehicle_status(self, vin: str) -> Tuple[int, Any]:
+    async def check_vehicle_status(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Check vehicle status in BMW API."""
-        status_code, _ = self.get_clearance(vin)
-        if status_code == 200:
+        status, _ = await self.get_clearance(vin, session)
+        if status == 200:
             return True
-        elif status_code == 404:
+        elif status == 404:
             return False
         else:
             return False
 
-    def get_clearance(self, vin: str) -> Tuple[int, Any]:
+    async def get_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Get vehicle clearance status."""
         try:
             url = f"{self.base_url}/vehicle/{vin}"
-            response = requests.get(url, headers=self._get_headers())
-            return response.status_code, response.json() if response.ok else response.text
+            headers = await self._get_headers(session)
+            response = await session.get(url, headers=headers)
+            return response.status, await response.json() if response.ok else await response.text()
         except Exception as e:
             logging.error(f"Failed to get BMW clearance: {str(e)}")
             return 500, str(e)
 
-    def create_clearance(self, vehicle_data: Dict[str, Any]) -> Tuple[int, Any]:
+    async def create_clearance(self, vehicle_data: Dict[str, Any], session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Create clearance for a vehicle.
         
         Args:
@@ -82,42 +86,42 @@ class BMWApi:
         try:
             url = f"{self.base_url}/vehicle"
             vehicle_data['contract']['end_date'] = ""
-            
+            headers = await self._get_headers(session)
             payload = json.dumps(vehicle_data)
-            headers = self._get_headers()
                         
-            response = requests.request(
-                "POST",
+            response = await session.post(
                 url,
                 headers=headers,
                 data=payload
             )
-            return response.status_code, response.json() if response.ok else response.text
+            return response.status, await response.json() if response.ok else await response.text()
         except Exception as e:
             logging.error(f"Failed to create BMW clearance: {str(e)}")
             return 500, str(e)
 
-    def delete_clearance(self, vin: str) -> Tuple[int, Any]:
+    async def delete_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Delete vehicle clearance."""
         try:
             url = f"{self.base_url}/vehicle/{vin}"
-            response = requests.delete(url, headers=self._get_headers())
-            return response.status_code, response.text if response.text else ""
+            headers = await self._get_headers(session)
+            response = await session.delete(url, headers=headers)
+            return response.status, await response.text() if response.text else ""
         except Exception as e:
             logging.error(f"Failed to delete BMW clearance: {str(e)}")
             return 500, str(e)
 
-    def get_fleets(self) -> Tuple[int, Any]:
+    async def get_fleets(self, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Get list of available fleets."""
         try:
             url = f"{self.base_url}/fleet"
-            response = requests.get(url, headers=self._get_headers())
-            return response.status_code, response.json() if response.ok else response.text
+            headers = await self._get_headers(session)
+            response = await session.get(url, headers=headers)
+            return response.status, await response.json() if response.ok else await response.text()
         except Exception as e:
             logging.error(f"Failed to get BMW fleets: {str(e)}")
             return 500, str(e)
 
-    def add_vehicle_to_fleet(self, fleet_id: str, vin: str) -> Tuple[int, Any]:
+    async def add_vehicle_to_fleet(self, fleet_id: str, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Add a vehicle to a fleet.
         
         Args:
@@ -126,9 +130,9 @@ class BMWApi:
         """
         try:
             url = f"{self.base_url}/fleet/{fleet_id}/vehicle/{vin}"
-            logging.info(f"Adding vehicle to fleet - URL: {url}")
-            response = requests.post(url, headers=self._get_headers())
-            return response.status_code, response.text if response.text else ""
+            headers = await self._get_headers(session)
+            response = await session.post(url, headers=headers)
+            return response.status, await response.text() if response.text else ""
         except Exception as e:
             logging.error(f"Failed to add vehicle to BMW fleet: {str(e)}")
             return 500, str(e) 

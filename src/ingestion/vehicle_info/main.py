@@ -97,7 +97,7 @@ class VehicleProcessingManager:
     async def process_all_brands(self):
         """Process all brands in parallel."""
         brand_operations = [
-            #BrandOperations('tesla', self.activation_service.activation_tesla), #self.vehicle_processor.process_tesla),
+            BrandOperations('tesla', self.activation_service.activation_tesla), #self.vehicle_processor.process_tesla),
             BrandOperations('bmw', self.activation_service.activation_bmw), #self.vehicle_processor.process_bmw),
             BrandOperations('hm', self.activation_service.activation_hm), #self.vehicle_processor.process_hm),
             BrandOperations('stellantis', self.activation_service.activation_stellantis) #self.vehicle_processor.process_stellantis)
@@ -146,7 +146,7 @@ async def cleanup(task):
         for task in asyncio.all_tasks():
             if task is not asyncio.current_task():
                 task.cancel()
-        logger.info("All tasks cancelled. Exiting...")
+        logger.info("All tasks completed. Exiting...")
 
 if __name__ == "__main__":
     try:
