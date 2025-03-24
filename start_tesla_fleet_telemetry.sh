@@ -63,9 +63,9 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
 fi
 
 # Vérifier que l'environnement conda est activé
-if [[ -z "${CONDA_DEFAULT_ENV}" || "${CONDA_DEFAULT_ENV}" != "data_ev_transform" ]]; then
-    echo "Erreur: L'environnement conda 'data_ev_transform' n'est pas activé"
-    echo "Utilisez: conda activate data_ev_transform"
+if [[ -z "${CONDA_DEFAULT_ENV}" ]]; then
+    echo "Erreur: Aucun environnement conda n'est activé"
+    echo "Utilisez: conda activate <votre_environnement>"
     exit 1
 fi
 

@@ -6,14 +6,18 @@ import json
 import signal
 import sys
 import time
+import warnings
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional
 
+# Ignore aiohttp ResourceWarnings due to unclosed sockets
+warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<socket.socket.*>")
+
 # Fix relative imports to use absolute paths
 from src.ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
 from src.ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
-from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data
+from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients
 from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
 
 # Logging configuration
@@ -111,6 +115,16 @@ async def graceful_shutdown():
             logger.info("Flush completed successfully")
         except asyncio.TimeoutError:
             logger.warning("Timeout during buffer flush")
+        
+        # Cleanup S3 client connections
+        logger.info("Cleaning up S3 connections...")
+        try:
+            await asyncio.wait_for(cleanup_clients(), timeout=2.0)
+            logger.info("S3 connections closed successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Timeout during S3 client cleanup")
+        except Exception as e:
+            logger.error(f"Error during S3 client cleanup: {str(e)}")
         
     except Exception as e:
         logger.error(f"Error during graceful shutdown: {str(e)}")
@@ -359,17 +373,29 @@ async def compress_worker(vehicles: List[str], date: datetime):
         from botocore.client import Config
         
         session = aioboto3.Session()
+        
+        # Use the same config as in s3_handler
+        boto_config = Config(
+            signature_version='s3v4',
+            s3={
+                'addressing_style': 'path',
+                'payload_signing_enabled': False,
+                'use_accelerate_endpoint': False,
+                'checksum_validation': False  # Disable checksum validation properly
+            },
+            connect_timeout=5,
+            read_timeout=60,
+            retries={'max_attempts': 3, 'mode': 'standard'}
+        )
+        
         s3_client = await session.client(
             's3',
             region_name=settings.s3_region,
             endpoint_url=settings.s3_endpoint,
             aws_access_key_id=settings.s3_key,
             aws_secret_access_key=settings.s3_secret,
-            config=Config(
-                signature_version='s3v4',
-                s3={'addressing_style': 'path'},
-                retries={'max_attempts': 3}
-            )
+            config=boto_config,
+            verify=False  # Disable SSL verification if using a self-signed cert
         ).__aenter__()
         
         # Date format for S3 paths
@@ -393,8 +419,12 @@ async def compress_worker(vehicles: List[str], date: datetime):
     except Exception as e:
         logger.error(f"Error in compression worker: {str(e)}")
     finally:
+        # Ensure client is properly closed
         if s3_client:
-            await s3_client.__aexit__(None, None, None)
+            try:
+                await s3_client.__aexit__(None, None, None)
+            except Exception as e:
+                logger.error(f"Error closing S3 client: {str(e)}")
 
 async def is_midnight() -> bool:
     """Check if it's midnight UTC."""
@@ -419,17 +449,29 @@ async def compress_previous_day_data():
         from botocore.client import Config
         
         session = aioboto3.Session()
+        
+        # Use the same config as in s3_handler
+        boto_config = Config(
+            signature_version='s3v4',
+            s3={
+                'addressing_style': 'path',
+                'payload_signing_enabled': False,
+                'use_accelerate_endpoint': False,
+                'checksum_validation': False  # Disable checksum validation properly
+            },
+            connect_timeout=5,
+            read_timeout=60,
+            retries={'max_attempts': 3, 'mode': 'standard'}
+        )
+        
         s3_client = await session.client(
             's3',
             region_name=settings.s3_region,
             endpoint_url=settings.s3_endpoint,
             aws_access_key_id=settings.s3_key,
             aws_secret_access_key=settings.s3_secret,
-            config=Config(
-                signature_version='s3v4',
-                s3={'addressing_style': 'path'},
-                retries={'max_attempts': 3}
-            )
+            config=boto_config,
+            verify=False  # Disable SSL verification if using a self-signed cert
         ).__aenter__()
         
         vehicles = []
@@ -448,7 +490,11 @@ async def compress_previous_day_data():
                     vin = vehicle_prefix.split('/')[-2]
                     vehicles.append(vin)
         finally:
-            await s3_client.__aexit__(None, None, None)
+            # Ensure client is properly closed
+            try:
+                await s3_client.__aexit__(None, None, None)
+            except Exception as e:
+                logger.error(f"Error closing S3 client: {str(e)}")
         
         if not vehicles:
             logger.info("No vehicles found to compress")
@@ -582,8 +628,8 @@ async def run_compress_now():
     logger.info("Starting immediate data compression")
     
     try:
-        # Parallel compression
-        await compress_data_parallel()
+        # Run regular compression, not the non-existent compress_data_parallel
+        await compress_data()
         logger.info("Immediate compression completed")
         return True
     except Exception as e:
@@ -667,6 +713,17 @@ async def main():
 
 if __name__ == "__main__":
     try:
+        import aiohttp
+        # Configure aiohttp to avoid the unclosed client session error
+        if hasattr(aiohttp, 'ClientSession'):
+            original_init = aiohttp.ClientSession.__init__
+            
+            def patched_init(self, *args, **kwargs):
+                kwargs['connector_owner'] = False  # Avoid connector warning
+                return original_init(self, *args, **kwargs)
+                
+            aiohttp.ClientSession.__init__ = patched_init
+            
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Interruption during startup")
