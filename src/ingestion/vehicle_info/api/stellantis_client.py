@@ -107,7 +107,7 @@ class StellantisApi:
             logging.error(f"Failed to get vehicle status for VIN {vin}: {str(e)}")
             return False, None
 
-    async def create_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
+    async def activate(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Create clearance for vehicles."""
         try:
 
@@ -125,9 +125,8 @@ class StellantisApi:
                 "to": datetime.now(timezone.utc).replace(year=datetime.now().year + 1).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
                 "pack": "pack-1"
             }
-            
             response = await session.post(url,headers=await self._get_headers(session),json=data)
-            return response.status, await response.json() if response.ok else await response.text()
+            return int(response.status), await response.json() if response.ok else await response.text()
         except Exception as e:
             logging.error(f"Failed to create Stellantis clearance: {str(e)}")
             return 500, str(e)

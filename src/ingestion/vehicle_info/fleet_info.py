@@ -31,6 +31,7 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
             sheet = client.open_by_key(SPREADSHEET_ID).sheet1
             data = sheet.get_all_records()
             logger.info(f"Successfully fetched {len(data)} rows from Google Sheets")
+            print(data)
             return data
             
         except APIError as e:
@@ -152,9 +153,9 @@ def standardize_model_type(df: pd.DataFrame, oem_col='oem', model_col='model', t
         if make in mappings and model in mappings[make]:
             model_info = mappings[make][model]
             
-            # Apply model cleaning if specified
-            if 'model_clean' in model_info:
-                model = model_info['model_clean'](model)
+            # # Apply model cleaning if specified
+            # if 'model_clean' in model_info:
+            #     model = model_info['model_clean'](model)
                 
             # Apply type patterns
             for pattern, replacement in model_info['patterns']:
@@ -176,7 +177,8 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         # Get data with retries
         data = get_google_sheet_data()
         df = pd.DataFrame(data)
-        
+        print(df)      
+
         if df.empty:
             raise ValueError("No data retrieved from Google Sheets")
             
@@ -184,7 +186,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         
         # Clean column names
         df.columns = [col if col == "EValue" else col.lower().strip().replace(' ', '_') for col in df.columns]
-                
+   
         # Handle potential variations of the owner column name
         owner_column_variants = ['owner', 'ownership', 'ownership_', 'fleet_owner', 'fleet']
         owner_col = None
@@ -196,7 +198,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
                 
         if owner_col is None:
             raise ValueError(f"Could not find owner column. Available columns: {df.columns.tolist()}")
-            
+
         # Rename the owner column to 'owner' for consistency
         df = df.rename(columns={owner_col: 'owner'})
         
@@ -206,9 +208,10 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
             initial_count = len(df)
             df = df[df['owner'].str.lower() == owner_filter.lower()]
             logger.info(f"Found {len(df)} vehicles for owner {owner_filter} (filtered from {initial_count})")
-            
+        
+
         # Clean and standardize data
-        df = df.pipe(map_col_to_dict, "country", COUNTRY_MAPPING)
+        # df = df.pipe(map_col_to_dict, "country", COUNTRY_MAPPING)
         
         # Map OEM names
         if 'oem' in df.columns:
@@ -231,7 +234,6 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
             if col not in df.columns:
                 logger.warning(f"Missing column {col}, adding empty column")
                 df[col] = None
-                
         # Add this before safe_astype
         df = df.pipe(safe_astype, COL_DTYPES)
         df = df.pipe(clean_version, model_col='model', version_col='type')

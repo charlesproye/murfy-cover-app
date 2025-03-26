@@ -212,9 +212,12 @@ class VehicleActivationService:
         df_stellantis = self.fleet_info_df[self.fleet_info_df['oem'] == 'stellantis']
         status_data = []
         async with aiohttp.ClientSession() as session:
+            print(df_stellantis)
             for _, row in df_stellantis.iterrows():
                 vin = row['vin']
                 desired_state = row['activation']
+                # if desired_state is False:
+                #     continue
                 is_eligible = await self.stellantis_api.is_eligible(vin,session)
                 
                 if not is_eligible:
@@ -229,7 +232,7 @@ class VehicleActivationService:
                     continue
             
                 current_state, contract_id = await self.stellantis_api.get_status(vin,session)
-            
+                print(vin, desired_state, current_state, contract_id, is_eligible)
                 if current_state == desired_state:
                     logging.info(f"Stellantis vehicle {vin} is already in desired state: {desired_state}")
                     vehicle_data = {
@@ -241,7 +244,7 @@ class VehicleActivationService:
                     status_data.append(vehicle_data)
                     continue
                     
-                if not desired_state:
+                elif not desired_state:
                     logging.info(f"Stellantis vehicle {vin} is activated but deactivation is requested")
                     if contract_id:
                         status_code = await self.stellantis_api.delete_clearance(contract_id,session)
@@ -274,8 +277,8 @@ class VehicleActivationService:
                         status_data.append(vehicle_data)
                         continue
 
-                if desired_state:
-                    status_code, result = await self.stellantis_api.create_clearance(vin, session)
+                elif desired_state:
+                    status_code, result = await self.stellantis_api.activate(vin, session)
                     if status_code in [200, 201, 204]:
                         vehicle_data = {
                             'vin': vin,
