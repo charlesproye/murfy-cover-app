@@ -2,9 +2,9 @@ import logging
 import aiohttp
 import uuid
 from datetime import datetime, timezone
-from typing import Tuple, Any, List, Dict
+from typing import Tuple, Any, List, Dict, Optional
 import json
-
+import asyncio
 class StellantisApi:
     """Stellantis API client for vehicle management."""
     
@@ -48,7 +48,15 @@ class StellantisApi:
         }
     
     async def is_eligible(self, vin: str, session: aiohttp.ClientSession) -> bool:
-        """Check if a vehicle is eligible for activation."""
+        """Check if a vehicle is eligible for activation.
+        
+        Args:
+            vin: Vehicle Identification Number
+            session: aiohttp ClientSession for making HTTP requests
+            
+        Returns:
+            bool: True if the vehicle is eligible, False otherwise
+        """
         try:
             url = f"{self.base_url}/connected-fleet/api/vehicles/eligibilities"
             response = await session.post(
@@ -56,65 +64,53 @@ class StellantisApi:
                 headers=await self._get_headers(session), 
                 json={"vins": [vin], "resultByEmail": False}
             )
-            if response.status == 200:
-                response_data = await response.json()
-                if response_data and isinstance(response_data, list) and len(response_data) > 0:
-                    vehicle_data = response_data[0]
-                    is_eligible = vehicle_data.get("eligible", False)
-                    return is_eligible
-                else:
-                    logging.error("Unexpected response structure: not a list or empty list")
-                    return False
-            else:
-                logging.error(f"Failed to check Stellantis eligibility vin: {vin}")
+            if response.status == 502:
+                await asyncio.sleep(2)
+                response = await session.post(url, headers=await self._get_headers(session), json={"vins": [vin], "resultByEmail": False})
+            response.raise_for_status()
+            
+            response_data = await response.json()
+            if not response_data or not isinstance(response_data, list) or not response_data:
                 return False
+                
+            vehicle_data = response_data[0]
+            return vehicle_data.get("eligible") is True
+
         except Exception as e:
-            logging.error(f"Failed to check Stellantis eligibility vin: {vin}")
+            logging.error(f"Failed to check eligibility for VIN {vin}: {str(e)}")
             return False
 
-    async def get_status(self, vin: str, session: aiohttp.ClientSession, skip: int = 0, limit: int = 100) -> Tuple[int, Any]:
-        """Get vehicle contracts."""
+    async def get_status(self, vin: str, session: aiohttp.ClientSession, skip: int = 0, limit: int = 100) -> Tuple[bool, Optional[str]]:
+        """Get vehicle activation status and contract ID."""
         try:
             url = f"{self.base_url}/connected-fleet/api/contracts"
-            
-            conditions = json.dumps({"car.vin": vin})
-            
             params = {
                 "skip": skip,
                 "limit": limit,
-                "conditions": conditions
+                "conditions": json.dumps({"car.vin": vin})
             }
             
-            response = await session.get(
-                url, 
-                headers=await self._get_headers(session),
-                params=params
-            )
-
-            if response.ok:
-                data = await response.json()
-                if data and isinstance(data, list) and len(data) > 0:
-                    return response.status, data[0]
-                return 404, None
-            return response.status, await response.text()
+            response = await session.get(url, headers=await self._get_headers(session), params=params)
+            if response.status == 502:
+                await asyncio.sleep(2)
+                response = await session.get(url, headers=await self._get_headers(session), params=params)
+            response.raise_for_status()
+            
+            data = await response.json()
+            if not data or not isinstance(data, list):
+                return False, None
+                
+            contract = data[0]
+            return contract.get("status") == "activated", contract.get("_id",None)
+            
         except Exception as e:
-            logging.error(f"Failed to get Stellantis vehicle contracts: {str(e)}")
-            return 500, str(e)
+            logging.error(f"Failed to get vehicle status for VIN {vin}: {str(e)}")
+            return False, None
 
-    async def create_clearance(self, vehicles: List[Dict[str, str]], session: aiohttp.ClientSession) -> Tuple[int, Any]:
+    async def create_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Create clearance for vehicles."""
         try:
-            if not vehicles:
-                return 400, "No vehicles provided"
-                
-            vehicle = vehicles[0]
-            vin = vehicle["vin"]
-            
-            if not await self.is_eligible(vin, session):
-                error_msg = f"Vehicle {vin} is not eligible for activation"
-                logging.error(error_msg)
-                return 400, error_msg
-            
+
             url = f"{self.base_url}/connected-fleet/api/contracts"
             
             data = {
@@ -130,11 +126,7 @@ class StellantisApi:
                 "pack": "pack-1"
             }
             
-            response = await session.post(
-                url,
-                headers=await self._get_headers(session),
-                json=data
-            )
+            response = await session.post(url,headers=await self._get_headers(session),json=data)
             return response.status, await response.json() if response.ok else await response.text()
         except Exception as e:
             logging.error(f"Failed to create Stellantis clearance: {str(e)}")
@@ -169,22 +161,3 @@ class StellantisApi:
             error_msg = str(e)
             logging.error(f"Failed to delete Stellantis clearance: {error_msg}")
             return 500, {"message": error_msg}
-
-    async def add_to_fleet(self, fleet_id: str, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
-        """Add a vehicle to a fleet."""
-        try:
-            url = f"{self.base_url}/connected-fleet/api/fleets/{fleet_id}/vehicles"
-            
-            data = {
-                "vins": [vin]
-            }
-            
-            response = await session.put(
-                url,
-                headers=await self._get_headers(session),
-                json=data
-            )
-            return response.status, await response.json() if response.ok else await response.text()
-        except Exception as e:
-            logging.error(f"Failed to add vehicle to fleet: {str(e)}")
-            return 500, str(e) 

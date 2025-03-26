@@ -109,15 +109,11 @@ class HMApi:
                 if response.ok:
                     data = await response.json()
                     status = data.get('status', '').lower()
-                    if status == 'approved':
-                        return True
-                    else:
-                        return False
-                    
+                    return response.status_code, status == 'approved'
                 else:
-                    return False
+                    return response.status_code, False
             except Exception as e:
-                return False
+                return 500, False
 
     async def get_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Get vehicle clearance status."""
@@ -169,27 +165,25 @@ class HMApi:
                     headers=headers,
                     json={"vehicles": formatted_vehicles}
                 )
-                
-                if response.status_code == 401:
+                if response.status == 401:
                     result = self._handle_auth_error(response, retry_count)
                     if result is None:
                         retry_count += 1
                         continue
-                    return result
 
                 activation_status = {}
                 if response.ok:
                     for vehicle in formatted_vehicles:
                         vin = vehicle["vin"]
                         status_code, status_data = await self.get_status(vin,session)
-                        activation_status[vin] = status_data if status_code == 200 else {'has_clearance': False, 'status': 'error'}
+                        activation_status[vin] = status_data if status_code == 200 else False
 
-                    return response.status_code, {
-                        'creation_response': response.json(),
+                    return response.status, {
+                        'creation_response': await response.json(),
                         'activation_status': activation_status
                     }
                 
-                return response.status_code, response.text
+                return response.status, await response.text()
             except Exception as e:
                 logging.error(f"Failed to create HM clearance: {str(e)}")
                 return 500, str(e)

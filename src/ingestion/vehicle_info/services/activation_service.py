@@ -166,7 +166,7 @@ class VehicleActivationService:
             make: Vehicle make/brand
         """
         try:
-            status_code = await self.hm_api.create_clearance([{"vin": vin, "brand": make}])
+            status_code = await self.hm_api.create_clearance([{"vin": vin, "brand": make}],session)
 
             if status_code in [200, 201, 204]:
                 return True, None
@@ -183,7 +183,7 @@ class VehicleActivationService:
         """Deactivate a High Mobility vehicle."""
         try:
             status_code, result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.hm_api.get_status(vin)
+                None, lambda: self.hm_api.get_status(vin,session)
             )
             
             if status_code == 404:
@@ -207,19 +207,15 @@ class VehicleActivationService:
             logging.error(f"Error deactivating High Mobility vehicle {vin}: {str(e)}")
             return False
 
-    async def activation_stellantis(self) -> pd.DataFrame:
+    async def activation_stellantis(self):
         """Process Stellantis vehicle activation/deactivation."""
         df_stellantis = self.fleet_info_df[self.fleet_info_df['oem'] == 'stellantis']
         status_data = []
         async with aiohttp.ClientSession() as session:
-            for index, row in df_stellantis.iterrows():
+            for _, row in df_stellantis.iterrows():
                 vin = row['vin']
                 desired_state = row['activation']
-                try:
-                    is_eligible = await self.stellantis_api.is_eligible(vin,session)
-                except Exception as e:
-                    logging.error(f"Error checking Stellantis eligibility for vehicle {vin}: {str(e)}")
-                    is_eligible = False
+                is_eligible = await self.stellantis_api.is_eligible(vin,session)
                 
                 if not is_eligible:
                     logging.info(f"Stellantis vehicle {vin} is not eligible for activation")
@@ -232,17 +228,8 @@ class VehicleActivationService:
                     status_data.append(vehicle_data)
                     continue
             
-                status_code, result = await self.stellantis_api.get_status(vin,session)
+                current_state, contract_id = await self.stellantis_api.get_status(vin,session)
             
-                contract_id = None
-                if status_code == 200 and result and isinstance(result, dict):
-                    contract_id = result.get("_id")
-                    status = result.get("status", "")
-                    current_state = status == "activated"
-                else:
-                    current_state = False
-                    status = "unknown"
-                
                 if current_state == desired_state:
                     logging.info(f"Stellantis vehicle {vin} is already in desired state: {desired_state}")
                     vehicle_data = {
@@ -253,7 +240,6 @@ class VehicleActivationService:
                     }
                     status_data.append(vehicle_data)
                     continue
-                    
                     
                 if not desired_state:
                     logging.info(f"Stellantis vehicle {vin} is activated but deactivation is requested")
@@ -274,7 +260,7 @@ class VehicleActivationService:
                                 'vin': vin,
                                 'Eligibility': True,
                                 'Real_Activation': False,
-                                'Activation_Error': error_msg
+                                'Activation_Error': "Failed to deactivate"
                             }
                             status_data.append(vehicle_data)
                             continue
@@ -289,7 +275,7 @@ class VehicleActivationService:
                         continue
 
                 if desired_state:
-                    status_code = await self.stellantis_api.create_clearance([{"vin": vin}],session)
+                    status_code, result = await self.stellantis_api.create_clearance(vin, session)
                     if status_code in [200, 201, 204]:
                         vehicle_data = {
                             'vin': vin,
@@ -297,8 +283,10 @@ class VehicleActivationService:
                             'Real_Activation': True,
                             'Activation_Error': None
                         }
+                        status_data.append(vehicle_data)
+                        continue
                     elif status_code == 409:
-                        error_msg = "Stellantis vehicle {vin} already has an active contract or activation in progress"
+                        error_msg = f"Stellantis vehicle {vin} already has an active contract or activation in progress"
                         vehicle_data = {
                             'vin': vin,
                             'Eligibility': True,
@@ -321,7 +309,7 @@ class VehicleActivationService:
         status_df = pd.DataFrame(status_data)
         await update_vehicle_activation_data(status_df)
 
-    async def activation_tesla(self) -> pd.DataFrame:
+    async def activation_tesla(self):
         """Process Tesla vehicle activation/deactivation.
         
         Returns:
@@ -367,7 +355,7 @@ class VehicleActivationService:
             status_df = pd.concat([api_vehicles, missing_vehicles], ignore_index=True)
             await update_vehicle_activation_data(status_df)
         
-    async def activation_bmw(self) -> pd.DataFrame:
+    async def activation_bmw(self):
         """Process BMW vehicle activation/deactivation."""
         df_bmw = self.fleet_info_df[self.fleet_info_df['oem'] == 'bmw']
         status_data = []
@@ -464,7 +452,7 @@ class VehicleActivationService:
             status_df = pd.DataFrame(status_data)
             await update_vehicle_activation_data(status_df)
 
-    async def activation_hm(self) -> pd.DataFrame:
+    async def activation_hm(self):
         """Process High Mobility vehicle activation/deactivation."""
         df_hm = self.fleet_info_df[self.fleet_info_df['oem'].isin(['ford', 'mercedes', 'kia','renault'])]
         status_data = []
@@ -476,7 +464,7 @@ class VehicleActivationService:
                 desired_state = row['activation']
                 
                 try:
-                    current_state = await self.hm_api.get_status(vin,session)
+                    status_code, current_state = await self.hm_api.get_status(vin,session)
                         
                     if current_state == desired_state:
                         logging.info(f"High Mobility vehicle {vin} already in desired state: {desired_state}")
