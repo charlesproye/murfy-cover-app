@@ -209,15 +209,13 @@ class VehicleActivationService:
 
     async def activation_stellantis(self):
         """Process Stellantis vehicle activation/deactivation."""
-        df_stellantis = self.fleet_info_df[self.fleet_info_df['oem'] == 'stellantis']
+        df_stellantis = self.fleet_info_df[(self.fleet_info_df['oem'] == 'stellantis') & (self.fleet_info_df['activation'] == True)]
         status_data = []
         async with aiohttp.ClientSession() as session:
-            print(df_stellantis)
+            print(df_stellantis[['vin','oem','activation','EValue','eligibility','real_activation','activation_error']])
             for _, row in df_stellantis.iterrows():
                 vin = row['vin']
                 desired_state = row['activation']
-                # if desired_state is False:
-                #     continue
                 is_eligible = await self.stellantis_api.is_eligible(vin,session)
                 
                 if not is_eligible:
@@ -232,7 +230,6 @@ class VehicleActivationService:
                     continue
             
                 current_state, contract_id = await self.stellantis_api.get_status(vin,session)
-                print(vin, desired_state, current_state, contract_id, is_eligible)
                 if current_state == desired_state:
                     logging.info(f"Stellantis vehicle {vin} is already in desired state: {desired_state}")
                     vehicle_data = {
@@ -249,6 +246,7 @@ class VehicleActivationService:
                     if contract_id:
                         status_code = await self.stellantis_api.delete_clearance(contract_id,session)
                         if status_code in [200, 204]:
+                            logging.info(f"Stellantis vehicle {vin} deactivated successfully")
                             vehicle_data = {
                                 'vin': vin,
                                 'Eligibility': False,
@@ -258,7 +256,7 @@ class VehicleActivationService:
                             status_data.append(vehicle_data)
                             continue
                         else:
-                            error_msg = f"Failed to deactivate Stellantis vehicle: HTTP {status_code}"
+                            logging.info(f"Failed to deactivate Stellantis vehicle {vin}: HTTP {status_code}")
                             vehicle_data = {
                                 'vin': vin,
                                 'Eligibility': True,
@@ -268,6 +266,7 @@ class VehicleActivationService:
                             status_data.append(vehicle_data)
                             continue
                     else :
+                        logging.info(f"Failed to deactivate Stellantis vehicle {vin} has no contract ID")
                         vehicle_data = {
                             'vin': vin,
                             'Eligibility': True,
@@ -280,6 +279,7 @@ class VehicleActivationService:
                 elif desired_state:
                     status_code, result = await self.stellantis_api.activate(vin, session)
                     if status_code in [200, 201, 204]:
+                        logging.info(f"Stellantis vehicle {vin} activated successfully")
                         vehicle_data = {
                             'vin': vin,
                             'Eligibility': True,
@@ -289,12 +289,12 @@ class VehicleActivationService:
                         status_data.append(vehicle_data)
                         continue
                     elif status_code == 409:
-                        error_msg = f"Stellantis vehicle {vin} already has an active contract or activation in progress"
+                        logging.info(f"Stellantis vehicle {vin} already has an active contract or activation in progress")
                         vehicle_data = {
                             'vin': vin,
                             'Eligibility': True,
                             'Real_Activation': True,
-                            'Activation_Error': error_msg
+                            'Activation_Error': 'Already has an active contract or activation in progress'
                         }
                         status_data.append(vehicle_data)
                         continue

@@ -30,29 +30,13 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
     for attempt in range(max_retries):
         try:
             sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-            # First get all records to determine the total length
-            data1 = sheet.get_all_records()
-            df1 = pd.DataFrame(data1)
-            total_rows = len(df1)
+            # Get all values including headers
+            data = sheet.get_all_records()
             
-            # Get headers from first row
-            headers = sheet.row_values(1)  # First row contains headers
+            # Get headers from first row and use them as column names
+            df = pd.DataFrame(data)
+
             
-            # Split into 4 chunks
-            chunk_size = total_rows // 4
-            chunks = []
-            
-            # Calculate ranges for each chunk
-            for i in range(4):
-                start_row = i * chunk_size + 2  # Adding 2 because Google Sheets is 1-indexed and we skip header row
-                end_row = (i + 1) * chunk_size + 1 if i < 3 else total_rows + 1
-                range_str = f'A{start_row}:P{end_row}'
-                chunk_data = sheet.get_values(range_str)
-                chunk_df = pd.DataFrame(chunk_data, columns=headers)
-                chunks.append(chunk_df)
-            
-            # Combine all chunks
-            df = pd.concat(chunks, ignore_index=True)
             logger.info(f"Successfully fetched {len(df)} rows from Google Sheets")
             return df
             
@@ -92,11 +76,11 @@ def safe_astype(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
         if col in df.columns:
             try:
                 if dtype == bool:
-                    # Replace empty strings with False before conversion
-                    df[col] = df[col].replace('', False)
+                    # First replace all empty values with False
                     df[col] = df[col].fillna(False)
+                    # Then map the remaining values
                     df[col] = df[col].map({'TRUE': True, 'True': True, True: True,
-                                         'FALSE': False, 'False': False, False: False})
+                                         'FALSE': False, 'False': False, False: False, '': False})
                 else:
                     df[col] = df[col].astype(dtype)
             except Exception as e:
@@ -269,4 +253,3 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
 
 if __name__ == "__main__":
     df = asyncio.run(read_fleet_info(owner_filter=''))
-    print(df)
