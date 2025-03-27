@@ -21,44 +21,18 @@ class VehicleActivationService:
         self.stellantis_api = stellantis_api
         self.tesla_api = tesla_api
         self.fleet_info_df = fleet_info_df
-
-    async def _get_vehicle_ownership(self, vin: str) -> str:
-        """Get the ownership of a vehicle from fleet info.
         
-        Args:
-            vin: Vehicle VIN
-            
-        Returns:
-            The ownership of the vehicle, or 'bib' as default if not found
-        """
-        try:
-            if self.fleet_info_df is None:
-                logging.warning("Fleet info DataFrame not set, defaulting to 'bib'")
-                return 'bib'
-            
-            vehicle_info = self.fleet_info_df[self.fleet_info_df['vin'] == vin]
-            if not vehicle_info.empty:
-                return vehicle_info['owner'].iloc[0]
-            
-            logging.warning(f"Vehicle {vin} not found in fleet info, defaulting to 'bib'")
-            return 'bib'
-            
-        except Exception as e:
-            logging.error(f"Error getting vehicle ownership: {str(e)}")
-            return 'bib'
-        
-    async def _add_to_fleet(self, vin: str) -> Tuple[bool, Optional[str]]:
+    async def _add_to_fleet(self, vin: str, session: aiohttp.ClientSession) -> Tuple[bool, Optional[str]]:
         """Add a vehicle to the appropriate fleet based on ownership.
         
         Args:
             vin: Vehicle VIN
         """
         try:
-            target_fleet_name = await self._get_vehicle_ownership(vin)
+            vehicle_info = self.fleet_info_df[self.fleet_info_df['vin'] == vin]
+            target_fleet_name = str(vehicle_info['owner'].iloc[0]) if 'owner' in vehicle_info.columns else 'bib'
             
-            status_code, result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.bmw_api.get_fleets()
-            )
+            status_code, result = await self.bmw_api.get_fleets(session)
             
             if status_code != 200:
                 error_msg = f"Failed to get fleets: HTTP {status_code}"
@@ -76,9 +50,7 @@ class VehicleActivationService:
                 logging.error(error_msg)
                 return False, error_msg
             
-            status_code, result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.bmw_api.add_vehicle_to_fleet(target_fleet_id, vin)
-            )
+            status_code, result = await self.bmw_api.add_vehicle_to_fleet(target_fleet_id, vin,session)
             
             if status_code in [200, 201, 204]:
                 logging.info(f"Successfully added vehicle {vin} to {target_fleet_name} fleet")
@@ -123,14 +95,12 @@ class VehicleActivationService:
                 }
             }
             
-            status_code, result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.bmw_api.create_clearance(payload)
-            )
+            status_code, result = await self.bmw_api.create_clearance(payload,session)
             
-            logging.info(f"Create clearance response - Status: {status_code}, Result: {result}")
+            logging.info(f"Create clearance response")
             
             if status_code in [200, 201, 204]:
-                fleet_success, fleet_error = await self._add_to_fleet(vin)
+                fleet_success, fleet_error = await self._add_to_fleet(vin,session)
                 if not fleet_success:
                     return False, fleet_error
                 return True, None
@@ -143,70 +113,6 @@ class VehicleActivationService:
             logging.error(error_msg)
             return False, error_msg
         
-    async def _deactivate_bmw(self, session: aiohttp.ClientSession, vin: str) -> bool:
-        """Deactivate a BMW vehicle."""
-        try:            
-            status_code = await self.bmw_api.delete_clearance(vin)
-            
-            success = status_code in [200, 204]
-            if not success:
-                logging.error(f"Failed to deactivate BMW vehicle {vin}: HTTP {status_code}")
-            return success
-            
-        except Exception as e:
-            logging.error(f"Error deactivating BMW vehicle {vin}: {str(e)}")
-            return False
-
-    async def _activate_high_mobility(self, session: aiohttp.ClientSession, vin: str, make: str) -> Tuple[bool, Optional[str]]:
-        """Activate a vehicle using High Mobility's API.
-        
-        Args:
-            session: aiohttp client session
-            vin: Vehicle VIN
-            make: Vehicle make/brand
-        """
-        try:
-            status_code = await self.hm_api.create_clearance([{"vin": vin, "brand": make}],session)
-
-            if status_code in [200, 201, 204]:
-                return True, None
-            else:
-                error_msg = f"Failed to activate High Mobility vehicle: HTTP {status_code}"
-                return False, error_msg
-                
-        except Exception as e:
-            error_msg = f"Error activating High Mobility vehicle: {str(e)}"
-            logging.error(error_msg)
-            return False, error_msg
-        
-    async def _deactivate_high_mobility(self, session: aiohttp.ClientSession, vin: str) -> bool:
-        """Deactivate a High Mobility vehicle."""
-        try:
-            status_code, result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.hm_api.get_status(vin,session)
-            )
-            
-            if status_code == 404:
-                logging.info(f"High Mobility vehicle {vin} not found (already deactivated)")
-                return True
-                
-            if status_code != 200:
-                logging.error(f"Failed to check High Mobility vehicle status: HTTP {status_code}")
-                return False
-                
-            current_status = result.get('status', '').lower()
-            if current_status in ['revoked', 'rejected']:
-                logging.info(f"High Mobility vehicle {vin} already deactivated (status: {current_status})")
-                return True
-                
-            status_code = await self.hm_api.delete_clearance(vin)
-            success = status_code in [200, 204]
-            return success
-            
-        except Exception as e:
-            logging.error(f"Error deactivating High Mobility vehicle {vin}: {str(e)}")
-            return False
-
     async def activation_stellantis(self):
         """Process Stellantis vehicle activation/deactivation."""
         df_stellantis = self.fleet_info_df[(self.fleet_info_df['oem'] == 'stellantis')]
@@ -365,8 +271,9 @@ class VehicleActivationService:
         async with aiohttp.ClientSession() as session:
             for _, row in df_bmw.iterrows():
                 vin = row['vin']
-                desired_state = row['activation'] == 'True'
+                desired_state = row['activation']
                 current_state = await self.bmw_api.check_vehicle_status(vin,session)
+
                 if desired_state == current_state:
                     logging.info(f"BMW vehicle {vin} already in desired state: {desired_state}")
                     vehicle_data = {
@@ -376,13 +283,10 @@ class VehicleActivationService:
                         'Activation_Error': None
                     }
                     status_data.append(vehicle_data)
-                
+                    continue
+
                 elif desired_state:
-                    logging.info(f"Attempting to activate BMW vehicle - VIN: {vin}")
-                    success, _ = await asyncio.wait_for(
-                        self._activate_bmw(session, vin),
-                        timeout=ACTIVATION_TIMEOUT
-                    )
+                    success, _ = await self._activate_bmw(session, vin)
                     if success:
                         logging.info(f"BMW vehicle {vin} activated successfully")
                         vehicle_data = {
@@ -392,23 +296,21 @@ class VehicleActivationService:
                         'Activation_Error': None
                         }
                         status_data.append(vehicle_data)
+                        continue
                     else:
                         logging.info(f"BMW vehicle {vin} activation failed")
                         vehicle_data = {
                         'vin': vin,
-                        'Eligibility': False,
-                        'Real_Activation': False,
-                        'Activation_Error': 'Activation failed'
+                            'Eligibility': False,
+                            'Real_Activation': False,
+                            'Activation_Error': 'Activation failed'
                         }
                         status_data.append(vehicle_data)
+                        continue
 
                 else:
-                    logging.info(f"Attempting to deactivate BMW vehicle - VIN: {vin}")
                     try:
-                        deactivation_success = await asyncio.wait_for(
-                            self._deactivate_bmw(session, vin),
-                            timeout=ACTIVATION_TIMEOUT
-                        )
+                        deactivation_success = await self.bmw_api.deactivate(vin,session)
                         
                         if deactivation_success:
                             current_state = await self.bmw_api.check_vehicle_status(vin,session)
@@ -422,8 +324,9 @@ class VehicleActivationService:
                                     'Activation_Error': None
                                 }
                                 status_data.append(vehicle_data)
+                                continue
                             else:
-                                error_msg = f"Deactivation seemed successful but vehicle is still active"
+                                logging.info(f"BMW vehicle {vin} deactivation seemed successful but vehicle is still active")
                                 vehicle_data = {
                                     'vin': vin,
                                     'Eligibility': True,
@@ -431,8 +334,9 @@ class VehicleActivationService:
                                     'Activation_Error': 'Deactivation seemed successful but vehicle is still active'
                                 }
                                 status_data.append(vehicle_data)
+                                continue
                         else:
-                            error_msg = "Failed to deactivate BMW vehicle - API returned failure"
+                            logging.info(f"BMW vehicle {vin} deactivation failed - API returned failure")
                             vehicle_data = {
                                 'vin': vin,
                                 'Eligibility': True,
@@ -440,17 +344,17 @@ class VehicleActivationService:
                                 'Activation_Error': 'Failed to deactivate BMW vehicle - API returned failure'
                             }
                             status_data.append(vehicle_data)
-
+                            continue
                     except Exception as e:
-                        error_msg = f"Failed to deactivate BMW vehicle - Error: {str(e)}"
-                        logging.error(error_msg)
+                        logging.info(f"BMW vehicle {vin} deactivation failed - Error: {str(e)}")
                         vehicle_data = {
                             'vin': vin,
                             'Eligibility': True,
                             'Real_Activation': False,
-                            'Activation_Error': 'Failed to deactivate BMW vehicle - Error'
+                            'Activation_Error': 'Failed to deactivate BMW vehicle'
                         }
                         status_data.append(vehicle_data)
+                        continue
                     
             status_df = pd.DataFrame(status_data)
             await update_vehicle_activation_data(status_df)
@@ -464,11 +368,11 @@ class VehicleActivationService:
                 vin = row['vin']
                 make = row['make']
                 make_lower = make.lower()
+
                 desired_state = row['activation']
                 
                 try:
-                    status_code, current_state = await self.hm_api.get_status(vin,session)
-                        
+                    current_state = await self.hm_api.get_status(vin,session)
                     if current_state == desired_state:
                         logging.info(f"High Mobility vehicle {vin} already in desired state: {desired_state}")
                         vehicle_data = {
@@ -478,15 +382,13 @@ class VehicleActivationService:
                             'Activation_Error': None
                         }
                         status_data.append(vehicle_data)
+                        continue
                         
                     elif desired_state:
-                        logging.info(f"Attempting to activate High Mobility vehicle - VIN: {vin}")
                         try:
-                            success, error_msg = await asyncio.wait_for(
-                                self._activate_high_mobility(session, vin, make_lower),
-                                timeout=ACTIVATION_TIMEOUT
-                            )
-                            if success:
+                            activation_success = await self.hm_api.create_clearance(vin,make,session)
+
+                            if activation_success:
                                 logging.info(f"High Mobility vehicle {vin} activated successfully")
                                 vehicle_data = {
                                     'vin': vin,
@@ -495,41 +397,40 @@ class VehicleActivationService:
                                     'Activation_Error': None
                                 }
                                 status_data.append(vehicle_data)
+                                continue
                             else:
                                 logging.info(f"High Mobility vehicle {vin} activation failed")
                                 vehicle_data = {
                                     'vin': vin,
                                     'Eligibility': False,
                                     'Real_Activation': False,
-                                    'Activation_Error': error_msg
+                                    'Activation_Error': 'Failed to activate or pending approval'
                                 }
                                 status_data.append(vehicle_data)
+                                continue
                         except Exception as e:
-                            error_msg = f"Error activating High Mobility vehicle: {str(e)}"
-                            logging.error(error_msg)
+                            logging.error(f"Error activating High Mobility vehicle: {str(e)}")
                             vehicle_data = {
                                 'vin': vin,
                                 'Eligibility': True,
                                 'Real_Activation': False,
-                                'Activation_Error': error_msg
+                                'Activation_Error': 'Failed to activate or pending approval'
                             }
                             status_data.append(vehicle_data)
+                            continue
                     else:
-                        logging.info(f"Attempting to deactivate High Mobility vehicle - VIN: {vin}")
                         try:
-                            success = await asyncio.wait_for(
-                                self._deactivate_high_mobility(session, vin),
-                                timeout=ACTIVATION_TIMEOUT
-                            )
-                            if not success:
-                                error_msg = "Failed to deactivate High Mobility vehicle"
+                            deactivation_success = await self.hm_api.delete_clearance(vin,session)
+                            if not deactivation_success:
+                                logging.error(f"Failed to deactivate High Mobility vehicle")
                                 vehicle_data = {
                                     'vin': vin,
                                     'Eligibility': True,
                                     'Real_Activation': False,
-                                    'Activation_Error': error_msg
+                                    'Activation_Error': 'Failed to deactivate or pending approval'
                                 }
                                 status_data.append(vehicle_data)
+                                continue
                             else:
                                 logging.info(f"High Mobility vehicle {vin} deactivated successfully")
                                 vehicle_data = {
@@ -539,29 +440,28 @@ class VehicleActivationService:
                                     'Activation_Error': None
                                 }
                                 status_data.append(vehicle_data)
-
+                                continue
                         except Exception as e:
-                            error_msg = f"Error deactivating High Mobility vehicle: {str(e)}"
-                            logging.error(error_msg)
+                            logging.error(f"Error deactivating High Mobility vehicle: {str(e)}")
                             vehicle_data = {
                                 'vin': vin,
                                 'Eligibility': True,
                                 'Real_Activation': False,
-                                'Activation_Error': error_msg
+                                'Activation_Error': 'Failed to deactivate or pending approval'
                             }
                             status_data.append(vehicle_data)
+                            continue
                             
                 except Exception as e:
-                    error_msg = f"Error processing High Mobility vehicle: {str(e)}"
-                    logging.error(error_msg)
+                    logging.error(f"Error processing High Mobility vehicle: {str(e)}")
                     vehicle_data = {
                         'vin': vin,
                         'Eligibility': True,
                         'Real_Activation': False,
-                        'Activation_Error': error_msg
+                        'Activation_Error': 'Failed to process High Mobility vehicle'
                     }
                     status_data.append(vehicle_data)
-
+                    continue
         status_df = pd.DataFrame(status_data)
         await update_vehicle_activation_data(status_df)
     

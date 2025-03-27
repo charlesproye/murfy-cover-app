@@ -57,22 +57,17 @@ class BMWApi:
         }
 
     async def check_vehicle_status(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
-        """Check vehicle status in BMW API."""
-        status, _ = await self.get_clearance(vin, session)
-        if status == 200:
-            return True
-        elif status == 404:
-            return False
-        else:
-            return False
-
-    async def get_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Get vehicle clearance status."""
         try:
             url = f"{self.base_url}/vehicle/{vin}"
             headers = await self._get_headers(session)
             response = await session.get(url, headers=headers)
-            return response.status, await response.json() if response.ok else await response.text()
+            if response.status == 200:
+                return True
+            elif response.status == 404:
+                return False
+            else:
+                return False
         except Exception as e:
             logging.error(f"Failed to get BMW clearance: {str(e)}")
             return 500, str(e)
@@ -99,16 +94,18 @@ class BMWApi:
             logging.error(f"Failed to create BMW clearance: {str(e)}")
             return 500, str(e)
 
-    async def delete_clearance(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
+    async def deactivate(self, vin: str, session: aiohttp.ClientSession) -> bool:
         """Delete vehicle clearance."""
         try:
             url = f"{self.base_url}/vehicle/{vin}"
             headers = await self._get_headers(session)
             response = await session.delete(url, headers=headers)
-            return response.status, await response.text() if response.text else ""
+            if response.status in [200, 204]:
+                return True
+            else:
+                return False
         except Exception as e:
-            logging.error(f"Failed to delete BMW clearance: {str(e)}")
-            return 500, str(e)
+            return False
 
     async def get_fleets(self, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Get list of available fleets."""
