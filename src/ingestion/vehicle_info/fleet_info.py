@@ -8,6 +8,7 @@ from gspread.exceptions import APIError
 from gspread import Cell
 import re
 
+
 from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
@@ -29,10 +30,31 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
     for attempt in range(max_retries):
         try:
             sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-            data = sheet.get_all_records()
-            logger.info(f"Successfully fetched {len(data)} rows from Google Sheets")
-            print(data)
-            return data
+            # First get all records to determine the total length
+            data1 = sheet.get_all_records()
+            df1 = pd.DataFrame(data1)
+            total_rows = len(df1)
+            
+            # Get headers from first row
+            headers = sheet.row_values(1)  # First row contains headers
+            
+            # Split into 4 chunks
+            chunk_size = total_rows // 4
+            chunks = []
+            
+            # Calculate ranges for each chunk
+            for i in range(4):
+                start_row = i * chunk_size + 2  # Adding 2 because Google Sheets is 1-indexed and we skip header row
+                end_row = (i + 1) * chunk_size + 1 if i < 3 else total_rows + 1
+                range_str = f'A{start_row}:P{end_row}'
+                chunk_data = sheet.get_values(range_str)
+                chunk_df = pd.DataFrame(chunk_data, columns=headers)
+                chunks.append(chunk_df)
+            
+            # Combine all chunks
+            df = pd.concat(chunks, ignore_index=True)
+            logger.info(f"Successfully fetched {len(df)} rows from Google Sheets")
+            return df
             
         except APIError as e:
             last_error = e
@@ -175,9 +197,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     try:
         logger.info("Starting to read fleet information...")
         # Get data with retries
-        data = get_google_sheet_data()
-        df = pd.DataFrame(data)
-        print(df)      
+        df = get_google_sheet_data()
 
         if df.empty:
             raise ValueError("No data retrieved from Google Sheets")
@@ -249,5 +269,4 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
 
 if __name__ == "__main__":
     df = asyncio.run(read_fleet_info(owner_filter=''))
-    print(df[['vin','oem', 'make','model','type','country','start_date','end_of_contract','activation','EValue']])
-    
+    print(df)

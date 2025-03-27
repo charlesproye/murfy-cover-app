@@ -130,11 +130,11 @@ mappings = {
             },
         },
         'peugeot': {
-            # '208': {
-            #     'patterns': [(r'.*50kwh 136.*', 'ev 50kwh 136')],
-            #     'model_clean': lambda m: '208'  # Unifie e-208 et 208
+            '208': {
+                'patterns': [(r'.*50kwh 136.*', 'ev 50kwh 136')],
+                'model_clean': lambda m: '208'  # Unifie e-2008 et 2008
 
-            # },
+            },
             '2008': {
                 'patterns': [(r'.*50kwh 136.*', 'ev 50kwh 136')],
                 'model_clean': lambda m: '2008'  # Unifie e-2008 et 2008
