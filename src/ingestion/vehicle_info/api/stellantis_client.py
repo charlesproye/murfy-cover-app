@@ -126,12 +126,12 @@ class StellantisApi:
                 "pack": "pack-1"
             }
             response = await session.post(url,headers=await self._get_headers(session),json=data)
-            return int(response.status), await response.json() if response.ok else await response.text()
+            return response.status, await response.json() if response.ok else await response.text()
         except Exception as e:
             logging.error(f"Failed to create Stellantis clearance: {str(e)}")
             return 500, str(e)
 
-    async def delete_clearance(self, contract_id: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
+    async def deactivate(self, contract_id: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Delete vehicle clearance."""
         try:
             url = f"{self.base_url}/connected-fleet/api/contracts/{contract_id}"
@@ -157,6 +157,5 @@ class StellantisApi:
             return response.status, error_data
             
         except Exception as e:
-            error_msg = str(e)
-            logging.error(f"Failed to delete Stellantis clearance: {error_msg}")
-            return 500, {"message": error_msg}
+            logging.error(f"Failed to delete Stellantis clearance: {str(e)}")
+            return 500, str(e)

@@ -209,10 +209,9 @@ class VehicleActivationService:
 
     async def activation_stellantis(self):
         """Process Stellantis vehicle activation/deactivation."""
-        df_stellantis = self.fleet_info_df[(self.fleet_info_df['oem'] == 'stellantis') & (self.fleet_info_df['activation'] == True)]
+        df_stellantis = self.fleet_info_df[(self.fleet_info_df['oem'] == 'stellantis')]
         status_data = []
         async with aiohttp.ClientSession() as session:
-            print(df_stellantis[['vin','oem','activation','EValue','eligibility','real_activation','activation_error']])
             for _, row in df_stellantis.iterrows():
                 vin = row['vin']
                 desired_state = row['activation']
@@ -224,12 +223,13 @@ class VehicleActivationService:
                         'vin': vin,
                         'Eligibility': False,
                         'Real_Activation': False,
-                        'Activation_Error': 'Vehicle not eligible'
+                        'Activation_Error': 'Not eligible'
                     }
                     status_data.append(vehicle_data)
                     continue
             
                 current_state, contract_id = await self.stellantis_api.get_status(vin,session)
+
                 if current_state == desired_state:
                     logging.info(f"Stellantis vehicle {vin} is already in desired state: {desired_state}")
                     vehicle_data = {
@@ -242,9 +242,8 @@ class VehicleActivationService:
                     continue
                     
                 elif not desired_state:
-                    logging.info(f"Stellantis vehicle {vin} is activated but deactivation is requested")
                     if contract_id:
-                        status_code = await self.stellantis_api.delete_clearance(contract_id,session)
+                        status_code, error_msg = await self.stellantis_api.deactivate(contract_id,session)
                         if status_code in [200, 204]:
                             logging.info(f"Stellantis vehicle {vin} deactivated successfully")
                             vehicle_data = {
@@ -256,7 +255,7 @@ class VehicleActivationService:
                             status_data.append(vehicle_data)
                             continue
                         else:
-                            logging.info(f"Failed to deactivate Stellantis vehicle {vin}: HTTP {status_code}")
+                            logging.info(f"Failed to deactivate Stellantis vehicle {vin}: HTTP {status_code} - {error_msg}")
                             vehicle_data = {
                                 'vin': vin,
                                 'Eligibility': True,
@@ -299,7 +298,8 @@ class VehicleActivationService:
                         status_data.append(vehicle_data)
                         continue
                     else:
-                        error_msg = f"Failed to activate Stellantis vehicle {vin}: HTTP {status_code}"
+                        error_msg = f"Failed to activate Stellantis vehicle {vin}: HTTP {status_code} - {result}"
+                        logging.error(error_msg)
                         vehicle_data = {
                             'vin': vin,
                             'Eligibility': False,
