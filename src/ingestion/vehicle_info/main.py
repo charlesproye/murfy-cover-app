@@ -72,7 +72,8 @@ class VehicleProcessingManager:
         
         self.activation_service = VehicleActivationService(
             self.apis['bmw'], self.apis['hm'], 
-            self.apis['stellantis'], self.apis['tesla'],
+            self.apis['stellantis'],
+            self.apis['tesla'],
             self.df
         )
         #self.df = await fleet_info(owner_filter=self.owner_filter)
