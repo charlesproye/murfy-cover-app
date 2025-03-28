@@ -47,7 +47,7 @@ def main():
     parser.add_argument(
         "--max_workers",
         type=int,
-        default=8,
+        default=4,
         help="maximum number of threads to fetch the vehicles info (mostly limited by S3)",
     )
     parser.add_argument(
@@ -56,11 +56,16 @@ def main():
         default=12,
         help="interval (in hours) at which to compress S3 data",
     )
-
     parser.add_argument(
         "--compress_threaded",
         action=argparse.BooleanOptionalAction,
         help="run the compresser in threaded mode",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=25,
+        help="number of files to process in a single batch (reduces memory usage with smaller values)",
     )
     args = parser.parse_args()
 
@@ -68,6 +73,8 @@ def main():
         refresh_interval=args.refresh_interval,
         max_workers=args.max_workers,
         compress_interval=args.compress_interval,
+        compress_threaded=args.compress_threaded,
+        batch_size=args.batch_size,
     )
 
     ingester.run()

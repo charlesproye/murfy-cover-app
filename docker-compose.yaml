@@ -39,6 +39,32 @@ services:
       - .:/app
     depends_on:
       - redis
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.5"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 120s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      memlock:
+        soft: -1
+        hard: -1
+    environment:
+      - PYTHONMALLOC=debug
+      - PYTHONFAULTHANDLER=1
+      - PYTHONOPTIMIZE=2
+      - PYTHONIOENCODING=utf-8
+      - BATCH_SIZE=15
+      - MAX_WORKERS=3
 
   ms_ingestion_service:
     build:
