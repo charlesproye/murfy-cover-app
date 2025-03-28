@@ -62,13 +62,6 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     exit 0
 fi
 
-# Vérifier que l'environnement conda est activé
-if [[ -z "${CONDA_DEFAULT_ENV}" ]]; then
-    echo "Erreur: Aucun environnement conda n'est activé"
-    echo "Utilisez: conda activate <votre_environnement>"
-    exit 1
-fi
-
 # Charger les variables d'environnement depuis .env si disponible
 if [ -f .env ]; then
     echo "Chargement des variables d'environnement depuis .env"
