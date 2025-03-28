@@ -40,34 +40,37 @@ class MobilisightsCompresser:
         if not self.__s3_config or not self.__s3_dev_config:
             raise ValueError("Missing required S3 configuration")
 
-        # Initialize main S3 client with optimized config
+        # Improved S3 client configuration
+        s3_config = Config(
+            signature_version='s3v4',
+            s3={'addressing_style': 'path'},
+            retries={
+                'max_attempts': 3,
+                'mode': 'standard'
+            },
+            connect_timeout=5,
+            read_timeout=10,
+            max_pool_connections=25
+        )
+
+        # Initialize main S3 client with improved config
         self.__s3 = boto3.client(
             "s3",
             region_name=self.__s3_config['region'],
             endpoint_url=self.__s3_config['endpoint'],
             aws_access_key_id=self.__s3_config['key'],
             aws_secret_access_key=self.__s3_config['secret'],
-            config=Config(
-                signature_version='s3v4',
-                s3={'addressing_style': 'path'},
-                retries={'max_attempts': 2},  # Reduced retries
-                max_pool_connections=25  # Increased connection pool
-            )
+            config=s3_config
         )
         
-        # Initialize dev S3 client with optimized config
+        # Initialize dev S3 client with improved config
         self.__s3_dev = boto3.client(
             "s3",
             region_name=self.__s3_dev_config['region'],
             endpoint_url=self.__s3_dev_config['endpoint'],
             aws_access_key_id=self.__s3_dev_config['key'],
             aws_secret_access_key=self.__s3_dev_config['secret'],
-            config=Config(
-                signature_version='s3v4',
-                s3={'addressing_style': 'path'},
-                retries={'max_attempts': 2},  # Reduced retries
-                max_pool_connections=25  # Increased connection pool
-            )
+            config=s3_config
         )
         
         self.__bucket = self.__s3_config['bucket']
@@ -205,18 +208,33 @@ class MobilisightsCompresser:
         """Process a batch of files asynchronously"""
         session = aioboto3.Session()
         
+        # Improved client configuration with better retry and timeout settings
+        s3_config = Config(
+            signature_version='s3v4',
+            s3={'addressing_style': 'path'},
+            retries={
+                'max_attempts': 3,
+                'mode': 'standard'
+            },
+            connect_timeout=5,
+            read_timeout=10,
+            max_pool_connections=25
+        )
+        
         async with session.client(
             "s3",
             region_name=self.__s3_config['region'],
             endpoint_url=self.__s3_config['endpoint'],
             aws_access_key_id=self.__s3_config['key'],
-            aws_secret_access_key=self.__s3_config['secret']
+            aws_secret_access_key=self.__s3_config['secret'],
+            config=s3_config
         ) as s3, session.client(
             "s3",
             region_name=self.__s3_dev_config['region'],
             endpoint_url=self.__s3_dev_config['endpoint'],
             aws_access_key_id=self.__s3_dev_config['key'],
-            aws_secret_access_key=self.__s3_dev_config['secret']
+            aws_secret_access_key=self.__s3_dev_config['secret'],
+            config=s3_config
         ) as s3_dev:
             car_states = []
             successful_processes = []
@@ -280,16 +298,28 @@ class MobilisightsCompresser:
 
     async def __process_one_async(self, s3, s3_key: str):
         """Process a single file asynchronously"""
-        try:
-            response = await s3.get_object(Bucket=self.__bucket, Key=s3_key)
-            async with response['Body'] as stream:
-                content = await stream.read()
-            
-            return msgspec.json.decode(content, type=CarState)
+        max_retries = 3
+        base_delay = 0.5
+        
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:  # Add delay before retries
+                    await asyncio.sleep(base_delay * (2 ** attempt))  # Exponential backoff
+                    self.__logger.info(f"Retry {attempt}/{max_retries} for processing {s3_key}")
                 
-        except Exception as e:
-            self.__logger.error(f"Error processing {s3_key}: {e}")
-            return None
+                response = await s3.get_object(Bucket=self.__bucket, Key=s3_key)
+                async with response['Body'] as stream:
+                    content = await stream.read()
+                
+                return msgspec.json.decode(content, type=CarState)
+                    
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    self.__logger.warning(f"Error processing {s3_key} (attempt {attempt+1}/{max_retries}): {e}")
+                    continue
+                else:
+                    self.__logger.error(f"Error processing {s3_key} after {max_retries} attempts: {e}")
+                    return None
 
     def _get_date_from_filename(self, filename: str) -> str:
         """Extract date from timestamp filename"""
