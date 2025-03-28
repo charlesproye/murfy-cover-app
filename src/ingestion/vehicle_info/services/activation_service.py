@@ -150,11 +150,12 @@ class VehicleActivationService:
                 elif not desired_state:
                     if contract_id:
                         status_code, error_msg = await self.stellantis_api.deactivate(contract_id,session)
+                        real_state = await self.stellantis_api.get_status(vin,session)
                         if status_code in [200, 204]:
                             logging.info(f"Stellantis vehicle {vin} deactivated successfully")
                             vehicle_data = {
                                 'vin': vin,
-                                'Eligibility': False,
+                                'Eligibility': real_state,
                                 'Real_Activation': False,
                                 'Activation_Error': None
                             }
@@ -164,7 +165,7 @@ class VehicleActivationService:
                             logging.info(f"Failed to deactivate Stellantis vehicle {vin}: HTTP {status_code} - {error_msg}")
                             vehicle_data = {
                                 'vin': vin,
-                                'Eligibility': True,
+                                'Eligibility': real_state,
                                 'Real_Activation': False,
                                 'Activation_Error': "Failed to deactivate"
                             }
@@ -174,7 +175,7 @@ class VehicleActivationService:
                         logging.info(f"Failed to deactivate Stellantis vehicle {vin} has no contract ID")
                         vehicle_data = {
                             'vin': vin,
-                            'Eligibility': True,
+                            'Eligibility': real_state,
                             'Real_Activation': False,
                             'Activation_Error': "No contract ID found"
                         }
@@ -183,12 +184,13 @@ class VehicleActivationService:
 
                 elif desired_state:
                     status_code, result = await self.stellantis_api.activate(vin, session)
+                    real_state = await self.stellantis_api.get_status(vin,session)
                     if status_code in [200, 201, 204]:
                         logging.info(f"Stellantis vehicle {vin} activated successfully")
                         vehicle_data = {
                             'vin': vin,
-                            'Eligibility': True,
-                            'Real_Activation': True,
+                            'Eligibility': real_state,
+                            'Real_Activation': real_state,
                             'Activation_Error': None
                         }
                         status_data.append(vehicle_data)
@@ -197,8 +199,8 @@ class VehicleActivationService:
                         logging.info(f"Stellantis vehicle {vin} already has an active contract or activation in progress")
                         vehicle_data = {
                             'vin': vin,
-                            'Eligibility': True,
-                            'Real_Activation': True,
+                            'Eligibility': real_state,
+                            'Real_Activation': real_state,
                             'Activation_Error': 'Already has an active contract or activation in progress'
                         }
                         status_data.append(vehicle_data)
@@ -208,8 +210,8 @@ class VehicleActivationService:
                         logging.error(error_msg)
                         vehicle_data = {
                             'vin': vin,
-                            'Eligibility': False,
-                            'Real_Activation': False,
+                            'Eligibility': real_state,
+                            'Real_Activation': real_state,
                             'Activation_Error': error_msg
                         }
                         status_data.append(vehicle_data)
