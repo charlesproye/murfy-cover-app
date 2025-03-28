@@ -124,21 +124,39 @@ def evaluate_single_soh_estimation(results:DF, soh_col:DF) -> DF:
         "MAE_to_1_intercept": lr_params["intercept"].sub(1).abs().mean(),
     })
 
-def force_decay(df:pd.Series) -> dict:
-    """Force une décroissance strictement monotone pour le SoH 
-       entre la première valeur et la dernière de la série
-
-    Args:
-        df (pd.Series): Series contenant les SoH
-
-    Returns:
-        dict: Nouvelles valeurs de "soh"
+def force_decay(df, window_size=3, max_drop=0.003):
     """
-    rolling_mean = df["soh"].rolling(window=3, min_periods=2).mean()
-    indices = df.index
-    values = rolling_mean.dropna().values
-    greater_than_first_value = np.argmax(values > values[0])
-    first_greater_value = values[greater_than_first_value] if greater_than_first_value > 0 else values[-1]
-    interpolated_values = np.linspace(first_greater_value, values[-1], num=len(df))
-    return dict(zip(indices, interpolated_values))
+    Génère une série strictement décroissante à partir d'une liste de valeurs en :
+      - Calcule d'abord une moyenne mobile,
+      - En choisissant un point de départ proche du maximum (pour refléter les meilleures valeurs),
+      - Puis en s'assurant qu'entre deux points consécutifs, la diminution ne dépasse pas max_drop,
+        et que la série ne stagne pas sur plus de 2 points.
+    """
+    # Calcul de la moyenne mobile
+    smoothed = df['soh'].rolling(window=window_size, min_periods=2).mean().values
+    # récupère l'odomètre pour la dcroissance forcé.
+    odometer = df['odometer'].ffill().copy().values
+    n = len(smoothed)
+    
+    # Pour le démarrage, on part du maximum de la série lissée / pas forcéement optimal
+    output = [max(smoothed[1:])]
+    for i in range(1, n):
+        candidate = smoothed[i]
+        prev = output[-1]
+        
+        # Si  candidate >= à la précédente, on la force à être légèrement plus basse en se basant sur l'odomètre
+        if candidate >= prev:
+            epsilon = (odometer[i] - odometer[i-1]) * 1e-7
+            candidate = prev - epsilon
+
+        
+        # Vérifier que le drop n'est pas trop important
+        drop = prev - candidate
+        if drop > max_drop:
+            candidate = prev - max_drop
+        output.append(candidate)
+        
+    return output
+
+
 
