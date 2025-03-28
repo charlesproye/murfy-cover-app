@@ -101,7 +101,7 @@ def make_soh_presentable_per_vehicle(df:DF) -> DF:
         assert outliser_mask.any(), f"There seems to be only outliers???:\n{df['soh']}."
         df = df[outliser_mask].copy()
     if df["soh"].count() >= 2:
-        df["soh"] = force_monotonic_decrease(df[["soh"]])
+        df["soh"] = force_monotonic_decrease(df["soh"]).values
     return df
 
 if __name__ == "__main__":
