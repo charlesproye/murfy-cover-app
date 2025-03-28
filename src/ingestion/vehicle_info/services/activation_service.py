@@ -199,8 +199,8 @@ class VehicleActivationService:
                         logging.info(f"Stellantis vehicle {vin} already has an active contract or activation in progress")
                         vehicle_data = {
                             'vin': vin,
-                            'Eligibility': real_state,
-                            'Real_Activation': real_state,
+                            'Eligibility': False,
+                            'Real_Activation': False,
                             'Activation_Error': 'Already has an active contract or activation in progress'
                         }
                         status_data.append(vehicle_data)
@@ -238,7 +238,7 @@ class VehicleActivationService:
         # Get Tesla API data
         async with aiohttp.ClientSession() as session:
             api_tesla = await self.tesla_api._build_vin_mapping(session)
-            
+            print(f"len(api_tesla): {len(api_tesla)}")
             # Create DataFrame for vehicles in API
             api_vehicles = pd.DataFrame([
                 {
@@ -249,6 +249,7 @@ class VehicleActivationService:
                 }
                 for vin in api_tesla
             ])
+            print(f"len(api_vehicles): {len(api_vehicles)}")
             
             # Create DataFrame for vehicles not in API
             missing_vehicles = pd.DataFrame([
@@ -261,9 +262,10 @@ class VehicleActivationService:
                 for vin in ggsheet_tesla['vin']
                 if vin not in api_tesla
             ])
-            
+            print(f"len(missing_vehicles): {len(missing_vehicles)}")
             # Combine both DataFrames
             status_df = pd.concat([api_vehicles, missing_vehicles], ignore_index=True)
+            print(f"len(status_df): {len(status_df)}")
             await update_vehicle_activation_data(status_df)
         
     async def activation_bmw(self):
