@@ -29,4 +29,5 @@ RUN chmod +x ./start_hm.sh
 SHELL ["/bin/bash", "-c"]
 
 # Démarrer l'application avec des limites de mémoire pour Python
-CMD ["./start_hm.sh", "--max_workers", "4", "--compress_threaded"]
+CMD ["./start_hm.sh"] 
+#, "--max_workers", "4", "--compress_threaded"]

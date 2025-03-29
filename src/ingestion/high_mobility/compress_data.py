@@ -29,7 +29,7 @@ class HMCompresser:
     __config: Config
     __session: aioboto3.Session
     __batch_size: int
-    max_workers: int
+    # max_workers: int
     __upload_semaphore: asyncio.Semaphore
 
     def __init__(
@@ -477,7 +477,7 @@ class HMCompresser:
         # Set a reasonable timeout for the entire operation
         async def run_with_timeout():
             try:
-                await asyncio.wait_for(process_all_brands(), timeout=3600)  # 1 hour timeout
+                await asyncio.wait_for(process_all_brands(), timeout=7200)  # 1 hour timeout
             except asyncio.TimeoutError:
                 self.__logger.error("Compression process timed out after 1 hour, forcing termination")
             except Exception as e:

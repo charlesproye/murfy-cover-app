@@ -64,7 +64,7 @@ services:
       - PYTHONOPTIMIZE=2
       - PYTHONIOENCODING=utf-8
       - BATCH_SIZE=15
-      - max_workers=3
+      #- max_workers=3
 
   ms_ingestion_service:
     build:
