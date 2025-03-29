@@ -17,7 +17,7 @@ def get_results() -> DF:
         ProcessedTimeSeries("renault", filters=[("in_charge", "==", True)])
         .eval("expected_battery_energy = capacity * soc")
         .eval("soh = battery_energy / expected_battery_energy") 
-        # .query("soc > 0.5")
+        #.query("soc > 0.5")
         # .groupby("vin")
         # # Ensure that there are at least 3 discharge period
         # # Since discharge_perf_idx is declared as discharge_perf_mask.diff().cumsum(), it increases per discharge AND charge, i.e 2 per discharge
