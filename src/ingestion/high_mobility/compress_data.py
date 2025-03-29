@@ -29,7 +29,7 @@ class HMCompresser:
     __config: Config
     __session: aioboto3.Session
     __batch_size: int
-    __max_workers: int
+    max_workers: int
     __upload_semaphore: asyncio.Semaphore
 
     def __init__(
@@ -84,7 +84,7 @@ class HMCompresser:
         self.__dev_bucket = self.__s3_dev_config['bucket']
         self.threaded = threaded
         self.__batch_size = batch_size
-        self.__max_workers = max_workers or mp.cpu_count()
+        self.max_workers = max_workers or mp.cpu_count()
         
         # Configure boto3 to use signature version 4 with optimized settings
         self.__config = Config(
