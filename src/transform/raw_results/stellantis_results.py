@@ -21,7 +21,6 @@ def main():
         })
         .reset_index()
     )
-    print(df)
 
 def get_results() -> DF:
     logger.info("Getting Stellantis results")
