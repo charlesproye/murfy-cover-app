@@ -229,6 +229,7 @@ class VehicleActivationService:
                 - Eligibility: Whether the vehicle is eligible for activation
                 - Real_Activation: Current activation status
                 - Activation_Error: Any error messages
+                - account_owner: Tesla account owner name
         """
         logging.info("Checking eligibility of Tesla vehicles")
         
@@ -239,15 +240,17 @@ class VehicleActivationService:
         async with aiohttp.ClientSession() as session:
             api_tesla = await self.tesla_api._build_vin_mapping(session)
             print(f"len(api_tesla): {len(api_tesla)}")
+            
             # Create DataFrame for vehicles in API
             api_vehicles = pd.DataFrame([
                 {
                     'vin': vin,
                     'Eligibility': True,
                     'Real_Activation': ggsheet_tesla[ggsheet_tesla['vin'] == vin]['activation'].iloc[0] == 'True' if not ggsheet_tesla[ggsheet_tesla['vin'] == vin].empty else False,
-                    'Activation_Error': None
+                    'Activation_Error': None,
+                    'account_owner': account_name
                 }
-                for vin in api_tesla
+                for vin, account_name in api_tesla
             ])
             print(f"len(api_vehicles): {len(api_vehicles)}")
             
@@ -257,12 +260,14 @@ class VehicleActivationService:
                     'vin': vin,
                     'Eligibility': False,
                     'Real_Activation': False,
-                    'Activation_Error': 'Vehicle not found in Tesla accounts'
+                    'Activation_Error': 'Vehicle not found in Tesla accounts',
+                    'account_owner': None
                 }
                 for vin in ggsheet_tesla['vin']
-                if vin not in api_tesla
+                if vin not in [v[0] for v in api_tesla]  # Extract VINs from tuples for comparison
             ])
             print(f"len(missing_vehicles): {len(missing_vehicles)}")
+            
             # Combine both DataFrames
             status_df = pd.concat([api_vehicles, missing_vehicles], ignore_index=True)
             print(f"len(status_df): {len(status_df)}")

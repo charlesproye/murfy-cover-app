@@ -198,21 +198,26 @@ class TeslaApi:
         
         return all_vins
 
-    async def _build_vin_mapping(self, session) -> List[str]:
-        """Construit le mapping VIN -> compte Tesla en interrogeant tous les comptes."""
+    async def _build_vin_mapping(self, session) -> List[Tuple[str, str]]:
+        """Construit le mapping VIN -> compte Tesla en interrogeant tous les comptes.
+        
+        Returns:
+            List of tuples, where each tuple contains (vin, account_name)
+        """
         self._vin_to_account = {}
         self._cache_timestamp = datetime.now(timezone.utc).timestamp()
-        all_vins = []
+        vin_account_pairs = []
+        
         for account_name in self.ACCOUNT_TOKEN_KEYS:
             try:
                 vins = await self._fetch_account_vehicles(session, account_name)
-                all_vins.extend(vins)
                 for vin in vins:
                     self._vin_to_account[vin] = account_name
+                    vin_account_pairs.append((vin, account_name))
                 logging.info(f"Mapped {len(vins)} VINs to account {account_name}")
             except Exception as e:
                 logging.error(f"Failed to fetch VINs for account {account_name}: {str(e)}")
-        return all_vins
+        return vin_account_pairs
     
     async def get_account_for_vin(self, session, vin: str) -> Optional[str]:
         """Trouve le compte Tesla associé à un VIN donné.

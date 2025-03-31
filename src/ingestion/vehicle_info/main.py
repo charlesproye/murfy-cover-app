@@ -35,6 +35,7 @@ class VehicleProcessingManager:
         self.df = None
         self.activation_service = None
         self.vehicle_processor = None
+        
     def _initialize_apis(self) -> dict:
         """Initialize all API clients."""
         return {
