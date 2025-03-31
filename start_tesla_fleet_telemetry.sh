@@ -99,4 +99,4 @@ python -m src.ingestion.tesla_fleet_telemetry.main \
     --bootstrap-servers "$KAFKA_BOOTSTRAP_SERVERS" \
     --topic "$KAFKA_TOPIC" \
     --group-id "$KAFKA_GROUP_ID" \
-    "$@" 
+    "$@"    

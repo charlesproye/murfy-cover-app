@@ -10,15 +10,20 @@ import warnings
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional
+import aiohttp
+import aioboto3
+from botocore.client import Config
+        
 
 # Ignore aiohttp ResourceWarnings due to unclosed sockets
 warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<socket.socket.*>")
 
 # Fix relative imports to use absolute paths
-from src.ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
-from src.ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
-from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients
-from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
+from ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
+from ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
+from ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients
+from ingestion.tesla_fleet_telemetry.config.settings import get_settings
+
 
 # Logging configuration
 logging.basicConfig(
@@ -179,7 +184,6 @@ async def process_message(message) -> Optional[Dict[str, Any]]:
         try:
             # If we have an ISO createdAt, convert it to timestamp
             if created_at and not timestamp:
-                from datetime import datetime
                 try:
                     # Convert ISO format "2025-03-19T15:43:06.516737697Z" to timestamp
                     dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
@@ -368,10 +372,7 @@ async def compress_worker(vehicles: List[str], date: datetime):
     settings = get_settings()
     s3_client = None
     
-    try:
-        import aioboto3
-        from botocore.client import Config
-        
+    try:        
         session = aioboto3.Session()
         
         # Use the same config as in s3_handler
@@ -410,7 +411,6 @@ async def compress_worker(vehicles: List[str], date: datetime):
                 compressed_path = f"{settings.base_s3_path}/compressed/{date_path}/{vin}.parquet"
                 
                 # Compress vehicle data for the specified date
-                from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_vehicle_data_for_date
                 await compress_vehicle_data_for_date(s3_client, settings.s3_bucket, vin, date, compressed_path)
                 
             except Exception as e:
@@ -444,9 +444,7 @@ async def compress_previous_day_data():
         
         # Get list of vehicles with temporary data
         settings = get_settings()
-        
-        import aioboto3
-        from botocore.client import Config
+
         
         session = aioboto3.Session()
         
@@ -713,7 +711,6 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        import aiohttp
         # Configure aiohttp to avoid the unclosed client session error
         if hasattr(aiohttp, 'ClientSession'):
             original_init = aiohttp.ClientSession.__init__
