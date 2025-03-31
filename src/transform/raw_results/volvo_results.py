@@ -37,8 +37,8 @@ def get_results() -> DF:
         .eval("soh = estimated_range / soc / range / 0.87")
         # .query("soc > 0.7")
     )
-    logger.debug("Sanity check of the results:")
-    logger.debug(sanity_check(results))
+    # logger.debug("Sanity check of the results:")
+    # logger.debug(sanity_check(results))
     results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
 
     return results
