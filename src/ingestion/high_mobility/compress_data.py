@@ -477,9 +477,9 @@ class HMCompresser:
         # Set a reasonable timeout for the entire operation
         async def run_with_timeout():
             try:
-                await asyncio.wait_for(process_all_brands(), timeout=7200)  # 1 hour timeout
+                await asyncio.wait_for(process_all_brands(), timeout=10800)  # 3 hours timeout
             except asyncio.TimeoutError:
-                self.__logger.error("Compression process timed out after 1 hour, forcing termination")
+                self.__logger.error("Compression process timed out after 3 hours, forcing termination")
             except Exception as e:
                 self.__logger.error(f"Error in compression process: {e}")
             finally:
