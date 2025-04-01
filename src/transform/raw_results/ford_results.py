@@ -20,7 +20,6 @@ def get_results() -> DF:
         .agg(max_battery_energy=pd.NamedAgg("battery_energy", lambda x: x.quantile(0.9)))
         .reset_index(drop=False)
     )
-    print(max_energy)
     results = (
         tss
         .pipe(
@@ -33,8 +32,8 @@ def get_results() -> DF:
         )
         .eval("soh = battery_energy / max_battery_energy")
     )
-    logger.debug("Sanity check of the results:")
-    logger.debug(sanity_check(results))
+    # logger.debug("Sanity check of the results:")
+    # logger.debug(sanity_check(results))
     return results
 
 if __name__ == "__main__":

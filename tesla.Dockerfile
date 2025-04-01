@@ -14,11 +14,11 @@ WORKDIR /app
 
 # Installer les dépendances
 RUN conda update -n base -c defaults conda
-RUN conda env update --prune -n base -f ingestion.conda-env.yaml
-RUN chmod +x ./start_tesla.sh
+RUN conda env update --prune -n base -f conda-env.yaml
+RUN chmod +x ./start_tesla_fleet_telemetry.sh
 
 # Définir le shell par défaut pour utiliser conda
 SHELL ["/bin/bash", "-c"]
 
 # Démarrer l'application
-CMD ["./start_tesla.sh"]
+CMD ["./start_tesla_fleet_telemetry.sh", "--auto-offset-reset=latest"]
