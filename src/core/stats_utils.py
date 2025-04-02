@@ -159,8 +159,6 @@ def force_decay(df, window_size=3, max_drop=0.003):
     return output
 
 
-
-
 def estimate_cycles(total_range:float=0, initial_range:float=1, soh:float=1.0):
     """Calcule le nombre estimé de cycles
 
