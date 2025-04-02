@@ -29,7 +29,7 @@ class HMCompresser:
     __config: Config
     __session: aioboto3.Session
     __batch_size: int
-    __max_workers: int
+    # max_workers: int
     __upload_semaphore: asyncio.Semaphore
 
     def __init__(
@@ -84,7 +84,7 @@ class HMCompresser:
         self.__dev_bucket = self.__s3_dev_config['bucket']
         self.threaded = threaded
         self.__batch_size = batch_size
-        self.__max_workers = max_workers or mp.cpu_count()
+        self.max_workers = max_workers or mp.cpu_count()
         
         # Configure boto3 to use signature version 4 with optimized settings
         self.__config = Config(
@@ -477,9 +477,9 @@ class HMCompresser:
         # Set a reasonable timeout for the entire operation
         async def run_with_timeout():
             try:
-                await asyncio.wait_for(process_all_brands(), timeout=3600)  # 1 hour timeout
+                await asyncio.wait_for(process_all_brands(), timeout=10800)  # 3 hours timeout
             except asyncio.TimeoutError:
-                self.__logger.error("Compression process timed out after 1 hour, forcing termination")
+                self.__logger.error("Compression process timed out after 3 hours, forcing termination")
             except Exception as e:
                 self.__logger.error(f"Error in compression process: {e}")
             finally:

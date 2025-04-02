@@ -3,6 +3,7 @@ from logging import getLogger
 import plotly.express as px
 
 from core.pandas_utils import *
+from core.stats_utils import estimate_cycles
 from core.constants import KWH_TO_KJ
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
@@ -62,6 +63,7 @@ def get_results() -> DF:
         .pipe(compute_charging_power)
         .pipe(charge_levels)
     )
+    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
     logger.debug("Sanity check of the results:")
     logger.debug(sanity_check(results))
     return results
