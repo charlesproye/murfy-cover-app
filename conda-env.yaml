@@ -33,3 +33,4 @@ dependencies:
     - git+https://bib-batteries-admin@bitbucket.org/bib-batteries/bib-models.git@main#subdirectory=src
     - -e .
     - apscheduler==3.10.4
+    - aiokafka==0.10.0

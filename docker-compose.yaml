@@ -14,31 +14,57 @@ services:
     depends_on:
       - redis
 
-  # bmw_ingestion_service:
-  #   build:
-  #     context: .
-  #     dockerfile: bmw.Dockerfile
-  #   container_name: bmw-ingestion
-  #   env_file:
-  #     - ./.env
-  #     - ./.python.env
-  #   volumes:
-  #     - .:/app
-  #   depends_on:
-  #     - redis
+  bmw_ingestion_service:
+    build:
+      context: .
+      dockerfile: bmw.Dockerfile
+    container_name: bmw-ingestion
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
 
-  # hm_ingestion_service:
-  #   build:
-  #     context: .
-  #     dockerfile: hm.Dockerfile
-  #   container_name: hm-ingestion
-  #   env_file:
-  #     - ./.env
-  #     - ./.python.env
-  #   volumes:
-  #     - .:/app
-  #   depends_on:
-  #     - redis
+  hm_ingestion_service:
+    build:
+      context: .
+      dockerfile: hm.Dockerfile
+    container_name: hm-ingestion
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.5"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 120s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      memlock:
+        soft: -1
+        hard: -1
+    environment:
+      - PYTHONMALLOC=debug
+      - PYTHONFAULTHANDLER=1
+      - PYTHONOPTIMIZE=2
+      - PYTHONIOENCODING=utf-8
+      - BATCH_SIZE=15
+      #- max_workers=3
 
   ms_ingestion_service:
     build:
@@ -53,18 +79,18 @@ services:
     depends_on:
       - redis
 
-  # transform_service:
-  #   build:
-  #     context: .
-  #     dockerfile: transform.Dockerfile
-  #   container_name: transform
-  #   env_file:
-  #     - ./.env
-  #     - ./.python.env
-  #   volumes:
-  #     - .:/app
-  #   depends_on:
-  #     - redis
+  transform_service:
+    build:
+      context: .
+      dockerfile: transform.Dockerfile
+    container_name: transform
+    env_file:
+      - ./.env
+      - ./.python.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
 
   redis:
     image: redis:alpine

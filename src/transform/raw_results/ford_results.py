@@ -1,6 +1,7 @@
 from logging import getLogger
 
 from core.pandas_utils import *
+from core.stats_utils import estimate_cycles
 from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.caching_utils import cache_result
@@ -20,7 +21,6 @@ def get_results() -> DF:
         .agg(max_battery_energy=pd.NamedAgg("battery_energy", lambda x: x.quantile(0.9)))
         .reset_index(drop=False)
     )
-    print(max_energy)
     results = (
         tss
         .pipe(
@@ -33,8 +33,9 @@ def get_results() -> DF:
         )
         .eval("soh = battery_energy / max_battery_energy")
     )
-    logger.debug("Sanity check of the results:")
-    logger.debug(sanity_check(results))
+    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
+    # # logger.debug("Sanity check of the results:")
+    # # logger.debug(sanity_check(results))
     return results
 
 if __name__ == "__main__":

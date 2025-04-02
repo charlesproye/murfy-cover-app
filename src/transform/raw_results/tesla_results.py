@@ -2,6 +2,7 @@ from logging import getLogger
 
 import plotly.express as px
 
+from core.stats_utils import estimate_cycles
 from core.pandas_utils import *
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
@@ -24,7 +25,7 @@ def main():
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw tesla results.")
-    return (
+    results =  (
         TeslaProcessedTimeSeries("tesla", columns=TESLA_USE_COLS, filters=[("trimmed_in_charge", "==", True)])
         .groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False)
         .agg(
@@ -43,16 +44,18 @@ def get_results() -> DF:
         )
         .eval("energy_added = energy_added_end - energy_added_min")
         .eval("soh = energy_added / (soc_diff / 100.0 * capacity)")
-        # .query("soc_diff > 40 & soh.between(0.75, 1.05)")
+        #.query("soc_diff > 40 & soh.between(0.75, 1.05)")
         .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER)) / 100")
         .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER) / 100")
-	    .eval("bottom_soh = soh.between(0.75, 0.9)")
+	    #.eval("bottom_soh = soh.between(0.75, 0.9)")
         .eval("fixed_soh_min_end = soh.mask(tesla_code == 'MTY13', soh / 0.96)")
         .eval("fixed_soh_min_end = fixed_soh_min_end.mask(bottom_soh & tesla_code == 'MTY13', fixed_soh_min_end + 0.08)")
         .eval("soh = fixed_soh_min_end")
         .sort_values(["tesla_code", "vin", "date"])
     )
+    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
+    return results
 
 if __name__ == "__main__":
     main()

@@ -6,7 +6,7 @@ from scipy.optimize import minimize
 from scipy.stats import linregress as lr
 
 from core.pandas_utils import * 
-from transform.raw_results.get_tesla_soh_readouts import aviloo_readouts
+# from transform.raw_results.get_tesla_soh_readouts import aviloo_readouts
 
 
 logger = getLogger("core.stats_utils")
@@ -158,5 +158,26 @@ def force_decay(df, window_size=3, max_drop=0.003):
         
     return output
 
+
+
+
+def estimate_cycles(total_range:float=0, initial_range:float=1, soh:float=1.0):
+    """Calcule le nombre estimé de cycles
+
+    Args:
+        total_range (float): nombre de km parcouru
+        initial_range (float): autonomie initiale du véhicule
+        soh (float, optional): SoH du véhicule 
+
+    Returns:
+        float: le nombre de cycle de la batterie
+    """
+    if soh is np.nan:
+        soh=1
+    try:
+        total_cycle = total_range / (initial_range * (soh + 1) / 2)
+        return round(total_cycle)
+    except:
+        return np.nan
 
 

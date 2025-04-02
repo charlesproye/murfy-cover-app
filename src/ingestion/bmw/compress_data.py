@@ -9,12 +9,13 @@ import time
 import logging
 import os
 from botocore.client import Config
-from typing import Optional
+from typing import Optional, Dict
 import boto3
 import msgspec
 from .schema import BMWInfo, BMWMergedInfo
 from multithreading import MergedInfoWrapper
 import botocore.config
+import dotenv
 
 class BMWCompresser:
     def __init__(
@@ -26,36 +27,90 @@ class BMWCompresser:
         batch_size: int = 50
     ) -> None:
         self.__logger = logging.getLogger("COMPRESSER")
-        S3_ENDPOINT = os.getenv("S3_ENDPOINT")
-        S3_REGION = os.getenv("S3_REGION")
-        S3_KEY = os.getenv("S3_KEY")
-        S3_SECRET = os.getenv("S3_SECRET")
+        self.__upload_semaphore = asyncio.Semaphore(3)  # Limite à 3 uploads simultanés
+        
+        # Load environment variables for both prod and dev
+        dotenv.load_dotenv()
+        self.__s3_config = self.__load_s3_config("S3")
+        self.__s3_dev_config = self.__load_s3_config("S3_DEV")
+        if not self.__s3_config or not self.__s3_dev_config:
+            raise ValueError("Missing required S3 configuration")
+
+        # Initialize main S3 client with optimized config
         self.__s3 = boto3.client(
             "s3",
-            region_name=S3_REGION,
-            endpoint_url=S3_ENDPOINT,
-            aws_access_key_id=S3_KEY,
-            aws_secret_access_key=S3_SECRET,
+            region_name=self.__s3_config['region'],
+            endpoint_url=self.__s3_config['endpoint'],
+            aws_access_key_id=self.__s3_config['key'],
+            aws_secret_access_key=self.__s3_config['secret'],
             config=Config(
                 signature_version='s3v4',
                 s3={'addressing_style': 'path'},
-                retries={'max_attempts': 3}
+                retries={'max_attempts': 2},  # Reduced retries
+                max_pool_connections=25  # Increased connection pool
             )
         )
-        self.__bucket = bucket
+        
+        # Initialize dev S3 client with optimized config
+        self.__s3_dev = boto3.client(
+            "s3",
+            region_name=self.__s3_dev_config['region'],
+            endpoint_url=self.__s3_dev_config['endpoint'],
+            aws_access_key_id=self.__s3_dev_config['key'],
+            aws_secret_access_key=self.__s3_dev_config['secret'],
+            config=Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+                retries={'max_attempts': 2},  # Reduced retries
+                max_pool_connections=25  # Increased connection pool
+            )
+        )
+        
+        self.__bucket = self.__s3_config['bucket']
+        self.__dev_bucket = self.__s3_dev_config['bucket']
         self.threaded = threaded
         self.batch_size = batch_size
         self.max_workers = max_workers or mp.cpu_count()
         
-        # Configure boto3 to use signature version 4
+        # Configure boto3 to use signature version 4 with optimized settings
         self.__config = Config(
-                signature_version='s3v4',
-                s3={'addressing_style': 'path'},
-                retries={'max_attempts': 3}
-            )
+            signature_version='s3v4',
+            s3={'addressing_style': 'path'},
+            retries={'max_attempts': 2},  # Reduced retries
+            max_pool_connections=25  # Increased connection pool
+        )
         self.__session = aioboto3.Session()
         self.__s3_keys_by_vin = {}
         self.__shutdown_requested = asyncio.Event()
+
+    def __load_s3_config(self, prefix: str) -> Optional[Dict[str, str]]:
+        """Load S3 configuration from environment variables with given prefix"""
+        if prefix == "S3_DEV":
+            required_vars = {
+                'endpoint': 'S3_ENDPOINT',
+                'region': 'S3_REGION',
+                'bucket': 'S3_BUCKET_DEV',
+                'key': 'S3_KEY_DEV',
+                'secret': 'S3_SECRET_DEV'
+            }
+        else:
+            required_vars = {
+                'endpoint': 'S3_ENDPOINT',
+                'region': 'S3_REGION',
+                'bucket': 'S3_BUCKET',
+                'key': 'S3_KEY',
+                'secret': 'S3_SECRET'
+            }
+        
+        config = {}
+        for key, env_var in required_vars.items():
+            value = os.getenv(env_var)
+            if value is None:
+                self.__logger.error(f"{env_var} environment variable not found")
+                return None
+            config[key] = value
+        
+        return config
 
     def _get_date_from_filename(self, filename: str) -> str:
         """Extract date from timestamp filename"""
@@ -127,15 +182,48 @@ class BMWCompresser:
             self.__logger.error(f"Error listing objects: {str(e)}", exc_info=True)
             raise
 
+    async def __upload_to_dev_bucket(self, s3_dev, compressed_key: str, encoded: bytes, vin: str):
+        """Upload to dev bucket with retry logic and semaphore control"""
+        async with self.__upload_semaphore:  # Utiliser le sémaphore pour contrôler la concurrence
+            max_retries = 3
+            base_delay = 0.5
+            
+            for attempt in range(max_retries):
+                try:
+                    if attempt > 0:  # Add delay before retries
+                        await asyncio.sleep(base_delay * (2 ** attempt))  # Exponential backoff
+                        
+                    await s3_dev.put_object(
+                        Bucket=self.__dev_bucket,
+                        Key=compressed_key,
+                        Body=encoded,
+                    )
+                    self.__logger.info(f"Successfully uploaded to dev bucket: {compressed_key}")
+                    return True
+                except Exception as e:
+                    if "OperationAborted" in str(e) and attempt < max_retries - 1:
+                        self.__logger.warning(f"Retry {attempt + 1}/{max_retries} for dev bucket upload: {compressed_key}")
+                        continue
+                    else:
+                        self.__logger.error(f"Failed to upload to dev bucket: {compressed_key}, error: {e}")
+                        return False
+
     async def __process_batch(self, vin: str, batch: list[str], date: str):
         async with self.__session.client(
             "s3",
-            region_name=self.__s3.meta.region_name,
-            aws_access_key_id=self.__s3._request_signer._credentials.access_key,
-            aws_secret_access_key=self.__s3._request_signer._credentials.secret_key,
-            endpoint_url=self.__s3.meta.endpoint_url if hasattr(self.__s3.meta, 'endpoint_url') else None,
+            region_name=self.__s3_config['region'],
+            endpoint_url=self.__s3_config['endpoint'],
+            aws_access_key_id=self.__s3_config['key'],
+            aws_secret_access_key=self.__s3_config['secret'],
             config=self.__config
-        ) as s3:
+        ) as s3, self.__session.client(
+            "s3",
+            region_name=self.__s3_dev_config['region'],
+            endpoint_url=self.__s3_dev_config['endpoint'],
+            aws_access_key_id=self.__s3_dev_config['key'],
+            aws_secret_access_key=self.__s3_dev_config['secret'],
+            config=self.__config
+        ) as s3_dev:
             merged = MergedInfoWrapper[BMWInfo, BMWMergedInfo](BMWMergedInfo)
             
             # Fetch all objects in batch concurrently
@@ -149,19 +237,28 @@ class BMWCompresser:
             if merged.info is not None:
                 bmw_info = merged.info.to_bmw_info()
                 encoded = msgspec.json.encode(bmw_info)
+                compressed_key = f"response/bmw/{vin}/{date}.json"
                 
-                # Upload to date-specific file
+                # Upload to main bucket first
                 await s3.put_object(
                     Bucket=self.__bucket,
-                    Key=f"response/bmw/{vin}/{date}.json",
+                    Key=compressed_key,
                     Body=encoded,
                 )
                 
-                # Delete processed files in batch
-                delete_objects = {'Objects': [{'Key': key} for key in batch]}
-                await s3.delete_objects(Bucket=self.__bucket, Delete=delete_objects)
+                # Upload to dev bucket with retry and semaphore control
+                success = await self.__upload_to_dev_bucket(s3_dev, compressed_key, encoded, vin)
                 
-                self.__logger.info(f"Processed and merged {len(batch)} files for VIN {vin} on date {date}")
+                if success:
+                    # Delete processed files in batch from main bucket only
+                    try:
+                        delete_objects = {'Objects': [{'Key': key} for key in batch]}
+                        await s3.delete_objects(Bucket=self.__bucket, Delete=delete_objects)
+                        self.__logger.info(f"Successfully deleted {len(batch)} temp files from main bucket for VIN {vin}")
+                    except Exception as e:
+                        self.__logger.error(f"Error deleting temp files for VIN {vin}: {e}")
+                    
+                    self.__logger.info(f"Processed and merged {len(batch)} files for VIN {vin} on date {date}")
 
     async def __fetch_and_process(self, s3, s3_key: str, merged: MergedInfoWrapper):
         try:
