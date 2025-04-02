@@ -45,13 +45,15 @@ class HMIngester:
     compress_interval: int = 12
     max_workers: int = 8
     compress_threaded: bool = True
+    batch_size: int = 25
 
     def __init__(
         self,
         refresh_interval: Optional[int] = 2 * 60,
-        max_workers: Optional[int] = 8,
+        max_workers: Optional[int] = 4,
         compress_interval: Optional[int] = 12,
         compress_threaded: Optional[bool] = True,
+        batch_size: Optional[int] = 25,
     ):
         """
         Parameters
@@ -61,10 +63,16 @@ class HMIngester:
             default: 120
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
-            default: 8
+            default: 4
         compress_interval: int, optional
             The interval at which to compress the S3 data (in hours)
             default: 12
+        compress_threaded: bool, optional
+            Whether to run the compresser in threaded mode
+            default: True
+        batch_size: int, optional
+            Number of files to process in a single batch
+            default: 25
         """
         dotenv.load_dotenv()
         HM_BASE_URL = os.getenv("HM_BASE_URL")
@@ -101,6 +109,10 @@ class HMIngester:
         if S3_SECRET is None:
             self.__ingester_logger.error("S3_SECRET environment variable not found")
             return
+
+        self.__ingester_logger = logging.getLogger("INGESTER")
+        self.__scheduler_logger = logging.getLogger("SCHEDULER")
+        
         self.__api = HMApi(HM_BASE_URL, HM_CLIENT_ID, HM_CLIENT_SECRET)
         self.__is_compressing = False
         self.__s3 = boto3.client(
@@ -116,16 +128,19 @@ class HMIngester:
         )
         self.__bucket = S3_BUCKET
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
-        self.__compresser = HMCompresser(threaded=compress_threaded)
+        self.__compresser = HMCompresser(
+            threaded=compress_threaded, 
+            max_workers=max_workers,
+            batch_size=batch_size
+        )
 
         self.__job_queue = Queue()
         self.refresh_interval = refresh_interval or self.refresh_interval
         self.compress_interval = compress_interval or self.compress_interval
         self.max_workers = max_workers or self.max_workers
         self.compress_threaded = compress_threaded or self.compress_threaded
+        self.batch_size = batch_size
 
-        self.__ingester_logger = logging.getLogger("INGESTER")
-        self.__scheduler_logger = logging.getLogger("SCHEDULER")
         signal.signal(signal.SIGTERM, self.__handle_shutdown_signal)
         signal.signal(signal.SIGINT, self.__handle_shutdown_signal)
 
