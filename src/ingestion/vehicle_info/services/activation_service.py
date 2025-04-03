@@ -124,13 +124,16 @@ class VehicleActivationService:
                 is_eligible = await self.stellantis_api.is_eligible(vin,session)
                 
                 if not is_eligible:
-                    logging.info(f"Stellantis vehicle {vin} is not eligible for activation")
                     vehicle_data = {
                         'vin': vin,
                         'Eligibility': False,
                         'Real_Activation': False,
                         'Activation_Error': 'Not eligible'
                     }
+                    if desired_state:
+                        logging.info(f"Stellantis vehicle {vin} should be activated but is not eligible")
+                    else:
+                        logging.info(f"Stellantis vehicle {vin} is already in desired state: {desired_state}")
                     status_data.append(vehicle_data)
                     continue
             
@@ -150,7 +153,7 @@ class VehicleActivationService:
                 elif not desired_state:
                     if contract_id:
                         status_code, error_msg = await self.stellantis_api.deactivate(contract_id,session)
-                        real_state = await self.stellantis_api.get_status(vin,session)
+                        real_state, contract_id = await self.stellantis_api.get_status(vin,session)
                         if status_code in [200, 204]:
                             logging.info(f"Stellantis vehicle {vin} deactivated successfully")
                             vehicle_data = {
@@ -184,7 +187,7 @@ class VehicleActivationService:
 
                 elif desired_state:
                     status_code, result = await self.stellantis_api.activate(vin, session)
-                    real_state = await self.stellantis_api.get_status(vin,session)
+                    real_state,contract_id = await self.stellantis_api.get_status(vin,session)
                     if status_code in [200, 201, 204]:
                         logging.info(f"Stellantis vehicle {vin} activated successfully")
                         vehicle_data = {

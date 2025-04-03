@@ -80,7 +80,7 @@ class StellantisApi:
             logging.error(f"Failed to check eligibility for VIN {vin}: {str(e)}")
             return False
 
-    async def get_status(self, vin: str, session: aiohttp.ClientSession, skip: int = 0, limit: int = 100) -> Tuple[bool, Optional[str]]:
+    async def get_status(self, vin: str, session: aiohttp.ClientSession, skip: int = 0, limit: int = 100) -> Tuple[bool,str]:
         """Get vehicle activation status and contract ID."""
         try:
             url = f"{self.base_url}/connected-fleet/api/contracts"
