@@ -91,12 +91,13 @@ echo "Kafka Bootstrap Servers: $KAFKA_BOOTSTRAP_SERVERS"
 echo "Kafka Topic: $KAFKA_TOPIC"
 echo "Kafka Group ID: $KAFKA_GROUP_ID"
 echo "Auto Offset Reset: ${AUTO_OFFSET_RESET:-latest}"
-echo "Buffer Size: ${BUFFER_SIZE:-1000}"
+echo "Buffer Size: ${BUFFER_SIZE:-3000}"
 echo "Buffer Flush Interval: ${BUFFER_FLUSH_INTERVAL:-30}"
 
 echo "Démarrage du module tesla-fleet-telemetry..."
 python -m src.ingestion.tesla_fleet_telemetry.main \
     --bootstrap-servers "$KAFKA_BOOTSTRAP_SERVERS" \
     --topic "$KAFKA_TOPIC" \
+    --compress-now \
     --group-id "$KAFKA_GROUP_ID" \
     "$@"    
