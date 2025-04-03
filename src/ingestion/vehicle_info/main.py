@@ -99,10 +99,10 @@ class VehicleProcessingManager:
     async def process_all_brands(self):
         """Process all brands in parallel."""
         brand_operations = [
-            BrandOperations('tesla', self.activation_service.activation_tesla), #self.vehicle_processor.process_tesla),
+            #BrandOperations('tesla', self.activation_service.activation_tesla), #self.vehicle_processor.process_tesla),
             #BrandOperations('bmw', self.activation_service.activation_bmw), #self.vehicle_processor.process_bmw),
             #BrandOperations('hm', self.activation_service.activation_hm), #self.vehicle_processor.process_hm),
-            #BrandOperations('stellantis', self.activation_service.activation_stellantis) #self.vehicle_processor.process_stellantis)
+            BrandOperations('stellantis', self.activation_service.activation_stellantis) #self.vehicle_processor.process_stellantis)
         ]
         tasks = [
             self.process_brand(brand.name, brand.activation_task) #brand.processing_task)

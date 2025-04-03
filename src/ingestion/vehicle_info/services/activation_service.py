@@ -196,12 +196,12 @@ class VehicleActivationService:
                         status_data.append(vehicle_data)
                         continue
                     elif status_code == 409:
-                        logging.info(f"Stellantis vehicle {vin} already has an active contract or activation in progress")
+                        logging.info(f"Stellantis vehicle {vin} activation in progress")
                         vehicle_data = {
                             'vin': vin,
-                            'Eligibility': False,
-                            'Real_Activation': False,
-                            'Activation_Error': 'Already has an active contract or activation in progress'
+                            'Eligibility': real_state,
+                            'Real_Activation': real_state,
+                            'Activation_Error': 'Activation in progress'
                         }
                         status_data.append(vehicle_data)
                         continue
