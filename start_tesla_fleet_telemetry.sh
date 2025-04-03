@@ -20,7 +20,7 @@ Options:
 --help                          Affiche cette aide
 --verbose                       Active les logs détaillés
 --auto-offset-reset=<value>     Position de départ dans Kafka ('latest' ou 'earliest')
---buffer-size=<value>           Taille du buffer par véhicule (défaut: 1000)
+--buffer-size=<value>           Taille du buffer par véhicule (défaut: 3000)
 --buffer-flush-interval=<value> Intervalle de flush en secondes (défaut: 30)
 --compress-now                  Compresse immédiatement les données et quitte
 
