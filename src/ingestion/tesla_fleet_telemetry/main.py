@@ -429,7 +429,6 @@ async def compress_worker(vehicles: List[str], date: datetime):
 async def is_midnight() -> bool:
     """Check if it's midnight UTC."""
     now = datetime.now()
-    print("test", now.hour, now.minute)
     return now.hour ==0 and now.minute == 0
 
 async def compress_previous_day_data():
@@ -555,7 +554,6 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
             while not shutdown_event.is_set():
                 try:
                     await check_buffer_timeouts()
-                    print("check_timeouts")
                     # Check if it's midnight
                     now = datetime.now()
                     if now.date() > last_midnight_check.date():

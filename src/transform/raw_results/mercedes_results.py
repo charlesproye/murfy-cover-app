@@ -22,7 +22,7 @@ def main():
         results
         .dropna(subset=["odometer", "soh"])
         .eval("date = date.dt.date")
-        .groupby(["vin", "date"])
+        .groupby(["vin", "date"], observed=True)
         .agg({
             "soh": "median",
             "odometer": "last",
@@ -52,8 +52,8 @@ def get_results() -> DF:
     results = (
         ProcessedTimeSeries("mercedes-benz")
         .pipe(fill_vars, cols=["soc", "estimated_range", "range"])
-        .assign(discharge_size = lambda df: df.groupby(["vin", "in_discharge_idx"]).transform("size"))
-        .groupby('model')
+        .assign(discharge_size = lambda df: df.groupby(["vin", "in_discharge_idx"], observed=True).transform("size"))
+        .groupby('model', observed=True)
         .apply(apply_soh_model_calculation, include_groups=False)
         .reset_index()
         # Set to NaN the SoH if the SOC is not between 0.7 and 0.98 or the discharge size is less than 10
@@ -100,7 +100,7 @@ def compute_charging_power(tss:DF) -> DF:
         .eval("charging_power = capacity * @KWH_TO_KJ * soc_diff / sec_time_diff")
         .eval("charging_power = charging_power.mask(sec_time_diff > 3600, 0)")
     )
-    tss["charging_power"] = tss.groupby(["vin", "in_charge_idx"])["charging_power"].transform("median")
+    tss["charging_power"] = tss.groupby(["vin", "in_charge_idx"], observed=True)["charging_power"].transform("median")
     tss[["charging_power", "soc_diff"]] = tss[["charging_power", "soc_diff"]].where(tss["trimmed_in_charge"])
     return tss
 
@@ -108,8 +108,8 @@ def hot_fix_in_charge_idx(tss:DF) -> DF:
     # There are some issues with the in_charge_idx column, this is a hot fix to get the correct values
     # Eventaully we will either fix ProcessedTimeSeries or create a new MercedesProcessedTimeSeries class to get the correct values
     tss = tss.dropna(subset=["soc", "date"])
-    tss["in_new_charge"] = tss.groupby("vin")["in_charge"].shift(1, fill_value=False).ne(tss["in_charge"])
-    tss["in_charge_idx"] = tss.groupby("vin")["in_new_charge"].cumsum()
+    tss["in_new_charge"] = tss.groupby("vin", observed=True)["in_charge"].shift(1, fill_value=False).ne(tss["in_charge"])
+    tss["in_charge_idx"] = tss.groupby("vin", observed=True)["in_new_charge"].cumsum()
     return tss
 
 

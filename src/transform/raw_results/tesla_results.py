@@ -34,6 +34,7 @@ def get_results() -> DF:
             soc_diff=pd.NamedAgg("soc", series_start_end_diff),
             inside_temp=pd.NamedAgg("inside_temp", "mean"),
             capacity=pd.NamedAgg("capacity", "first"),
+            range=pd.NamedAgg("range", "first"),
             odometer=pd.NamedAgg("odometer", "first"),
             version=pd.NamedAgg("version", "first"),
             size=pd.NamedAgg("soc", "size"),
@@ -48,12 +49,13 @@ def get_results() -> DF:
         .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER)) / 100")
         .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER) / 100")
-	    #.eval("bottom_soh = soh.between(0.75, 0.9)")
+	    .eval("bottom_soh = soh.between(0.75, 0.9)")
         .eval("fixed_soh_min_end = soh.mask(tesla_code == 'MTY13', soh / 0.96)")
         .eval("fixed_soh_min_end = fixed_soh_min_end.mask(bottom_soh & tesla_code == 'MTY13', fixed_soh_min_end + 0.08)")
         .eval("soh = fixed_soh_min_end")
         .sort_values(["tesla_code", "vin", "date"])
     )
+    print(results.columns)
     results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
     return results
 

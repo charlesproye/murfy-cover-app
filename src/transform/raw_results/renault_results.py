@@ -30,7 +30,7 @@ def get_results() -> DF:
     return results
 
 def charge_levels(tss:DF) -> DF:
-    tss_grp = tss.groupby("vin")
+    tss_grp = tss.groupby("vin",observed=True)
     return (
         tss
         .assign(soc_diff=tss_grp["soc"].diff())

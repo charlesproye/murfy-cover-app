@@ -22,6 +22,7 @@ TESLA_USE_COLS = [
     "soc",
     "inside_temp",
     "capacity",
+    "range",
     "odometer",
     "model",
     "date",
