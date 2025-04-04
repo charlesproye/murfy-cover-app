@@ -17,7 +17,7 @@ def get_results() -> DF:
     tss = ProcessedTimeSeries("ford")
     max_energy = (
         tss
-        .groupby(["capacity", "soc"])
+        .groupby(["capacity", "soc"], observed=True)
         .agg(max_battery_energy=pd.NamedAgg("battery_energy", lambda x: x.quantile(0.9)))
         .reset_index(drop=False)
     )

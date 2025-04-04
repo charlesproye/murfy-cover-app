@@ -64,8 +64,8 @@ def get_results() -> DF:
         .pipe(charge_levels)
     )
     results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
-    logger.debug("Sanity check of the results:")
-    logger.debug(sanity_check(results))
+    # logger.debug("Sanity check of the results:")
+    # logger.debug(sanity_check(results))
     return results
 
 def apply_soh_model_calculation(group:DF) -> DF:
@@ -83,14 +83,14 @@ def charge_levels(tss:DF) -> DF:
     )
 
 def fill_vars(tss:DF, cols:list[str]) -> DF:
-    tss_grouped = tss.groupby("vin")
+    tss_grouped = tss.groupby("vin", observed=True)
     for col in cols:
         tss[col] = tss_grouped[col].ffill()
         tss[col] = tss_grouped[col].bfill()
     return tss
 
 def compute_charging_power(tss:DF) -> DF:
-    tss_grp = tss.groupby("vin")
+    tss_grp = tss.groupby("vin", observed=True)
     tss = (
         tss
         .assign(

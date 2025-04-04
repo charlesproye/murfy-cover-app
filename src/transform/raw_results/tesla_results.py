@@ -17,10 +17,10 @@ logger = getLogger("transform.raw_results.tesla_results")
 def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform.raw_results")
     results = get_results(force_update=True)
-    print(sanity_check(results))
-    if not results.empty:
-        fig = px.scatter(results, x="odometer", y="soh", color="tesla_code", opacity=0.2)
-        fig.show()
+    # print(sanity_check(results))
+    # if not results.empty:
+    #     fig = px.scatter(results, x="odometer", y="soh", color="tesla_code", opacity=0.2)
+    #     fig.show()
 
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla"), "s3")
 def get_results() -> DF:
@@ -55,7 +55,6 @@ def get_results() -> DF:
         .eval("soh = fixed_soh_min_end")
         .sort_values(["tesla_code", "vin", "date"])
     )
-    print(results.columns)
     results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
     return results
 
