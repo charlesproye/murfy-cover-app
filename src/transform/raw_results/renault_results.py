@@ -16,7 +16,7 @@ def get_results() -> DF:
     logger.info("Processing raw renault results.")
     results = (
         ProcessedTimeSeries("renault", filters=[("in_charge", "==", True)])
-        .eval("expected_battery_energy = capacity * soc")
+        .eval("expected_battery_energy = net_capacity * soc")
         .eval("soh = battery_energy / expected_battery_energy") 
         #.query("soc > 0.5")
         # .groupby("vin")

@@ -33,7 +33,7 @@ def get_results() -> DF:
             energy_added_end=pd.NamedAgg("charge_energy_added", "last"),
             soc_diff=pd.NamedAgg("soc", series_start_end_diff),
             inside_temp=pd.NamedAgg("inside_temp", "mean"),
-            capacity=pd.NamedAgg("capacity", "first"),
+            net_capacity=pd.NamedAgg("net_capacity", "first"),
             range=pd.NamedAgg("range", "first"),
             odometer=pd.NamedAgg("odometer", "first"),
             version=pd.NamedAgg("version", "first"),
@@ -44,15 +44,15 @@ def get_results() -> DF:
             tesla_code=pd.NamedAgg("tesla_code", "first"),
         )
         .eval("energy_added = energy_added_end - energy_added_min")
-        .eval("soh = energy_added / (soc_diff / 100.0 * capacity)")
+        .eval("soh = energy_added / (soc_diff / 100.0 * net_capacity)")
         #.query("soc_diff > 40 & soh.between(0.75, 1.05)")
         .eval("level_1 = soc_diff * (charging_power < @LEVEL_1_MAX_POWER) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(@LEVEL_1_MAX_POWER, @LEVEL_2_MAX_POWER)) / 100")
         .eval("level_3 = soc_diff * (charging_power > @LEVEL_2_MAX_POWER) / 100")
-	    .eval("bottom_soh = soh.between(0.75, 0.9)")
-        .eval("fixed_soh_min_end = soh.mask(tesla_code == 'MTY13', soh / 0.96)")
-        .eval("fixed_soh_min_end = fixed_soh_min_end.mask(bottom_soh & tesla_code == 'MTY13', fixed_soh_min_end + 0.08)")
-        .eval("soh = fixed_soh_min_end")
+	    # .eval("bottom_soh = soh.between(0.75, 0.9)")
+        # .eval("fixed_soh_min_end = soh.mask(tesla_code == 'MTY13', soh / 0.96)")
+        # .eval("fixed_soh_min_end = fixed_soh_min_end.mask(bottom_soh & tesla_code == 'MTY13', fixed_soh_min_end + 0.08)")
+        # .eval("soh = fixed_soh_min_end")
         .sort_values(["tesla_code", "vin", "date"])
     )
     results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
