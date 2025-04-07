@@ -26,7 +26,7 @@ def agg_last_odometer(make:str) -> DF:
     return (
         tss
         .eval("floored_date = date.dt.floor(@UPDATE_FREQUENCY)")
-        .groupby([tss.id_col, "floored_date"])
+        .groupby([tss.id_col, "floored_date"], observed=True)
         .agg({
             "odometer": "last", 
             "make": "first",
