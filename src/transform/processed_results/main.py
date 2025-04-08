@@ -37,13 +37,13 @@ def get_processed_results(brand:str) -> DF:
     logger.info(f"{'Processing ' + brand + ' results.':=^{50}}")
     results =  (
         GET_RESULTS_FUNCS[brand]()
-        .eval(SOH_FILTER_EVAL_STRINGS[brand])
         # Some raw estimations may have inf values, this will make mask_out_outliers_by_interquartile_range and force_monotonic_decrease fail
         # So we replace them by NaNs.
         .assign(soh=lambda df: df["soh"].replace([np.inf, -np.inf], np.nan))
         .sort_values(["vin", "date"])
-        .pipe(agg_results_by_update_frequency)
         .pipe(make_charge_levels_presentable)
+        .eval(SOH_FILTER_EVAL_STRINGS[brand])
+        .pipe(agg_results_by_update_frequency)
         .groupby('vin', observed=True)
         .apply(make_soh_presentable_per_vehicle, include_groups=False)
         .reset_index(level=0)
@@ -82,6 +82,7 @@ def agg_results_by_update_frequency(results:DF) -> DF:
             level_1=pd.NamedAgg("level_1", "sum"),
             level_2=pd.NamedAgg("level_2", "sum"),
             level_3=pd.NamedAgg("level_3", "sum"),
+            
         )
     )
 
