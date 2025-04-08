@@ -4,7 +4,8 @@ import json
 import asyncio
 import os
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 from typing import Tuple, Any, List, Dict, Optional
 
 class TeslaApi:
@@ -57,6 +58,12 @@ class TeslaApi:
     
     RATE_LIMIT_DELAY = 0.5
     MAX_RETRIES = 3
+    
+    MODEL_CODE_MAPPING = {
+        "1": "s",
+        "7": "s",
+        "9": "s"
+    }
     
     def __init__(self, base_url: str, slack_token: str, slack_channel_id: str):
         self.base_url = base_url
@@ -237,76 +244,53 @@ class TeslaApi:
             logging.warning(f"No Tesla account found for VIN: {vin}")
         return account
 
-    async def get_all_vehicles(self, session, vin: str) -> List[str]:
-        """Vérifie si un VIN est présent dans un compte Tesla.
-        
-        Args:
-            session: Session aiohttp
-            vin: VIN à vérifier
-            
-        Returns:
-            Liste contenant le VIN si trouvé, liste vide sinon
-        """
-        account = await self.get_account_for_vin(session, vin)
-        if not account:
-            return []
-        return [vin]
-
-    async def get_vehicle_options(self, session, vin: str) -> Dict:
+    async def get_vehicle_options(self, session, vin: str) -> Tuple[str, str, str]:
         """Récupère les options d'un véhicule."""
         account = await self.get_account_for_vin(session, vin)
-        if not account:
-            return {'vin': vin, 'model_name': 'unknown', 'version': 'unknown', 'type': 'unknown'}
-            
         url = f"{self.base_url}/api/1/dx/vehicles/options?vin={vin}"
+        retries = self.MAX_RETRIES
+        while retries > 0:
+            try:
+                headers = await self._get_headers(session, account)
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        model_info = next((item for item in data.get('codes', []) if item['code'].startswith('$MT')),None)
+                        
+                        if model_info:
+                            version = model_info['code'][1:]
+                            model_code = version[2]
+                            
+                            model_code = self.MODEL_CODE_MAPPING.get(model_code, model_code)
+                            model_name = f"model {model_code}".lower()
+                            
+                            display_name = model_info['displayName'].lower()
+                            vehicle_type = "unknown"
+                            
+                            if model_name in self.TESLA_PATTERNS:
+                                vehicle_type = next(
+                                    (type_name for pattern, type_name in self.TESLA_PATTERNS[model_name]['patterns']
+                                     if re.match(pattern, display_name, re.IGNORECASE)),"unknown")
+                            return {
+                                'model_name': model_name,
+                                'version': version,
+                                'type': vehicle_type
+                            }
+                        else:
+                            logging.info(f"Error fetching options for VIN {vin}: HTTP {response.status}")
+                            return {'model_name': 'model u', 'version': 'unknown', 'type': 'MTU'}
+                
+            except Exception as e:
+                logging.error(f"Error fetching options for VIN {vin}: {str(e)}")
+                retries -= 1
+                await asyncio.sleep(self.RATE_LIMIT_DELAY)
         
-        try:
-            headers = await self._get_headers(session, account)
-            async with session.get(url, headers=headers) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    model_info = next(
-                        (item for item in data.get('codes', []) if item['code'].startswith('$MT')),
-                        None
-                    )
-                    
-                    if model_info:
-                        version = model_info['code'][1:]
-                        model_code = version[2]
-                        
-                        if model_code in ["1", "7"]:
-                            model_code = "s"
-                        model_name = f"model {model_code}".lower()
-                        
-                        display_name = model_info['displayName'].lower()
-                        vehicle_type = "unknown"
-                        
-                        if model_name in self.TESLA_PATTERNS:
-                            for pattern, type_name in self.TESLA_PATTERNS[model_name]['patterns']:
-                                if re.match(pattern, display_name, re.IGNORECASE):
-                                    vehicle_type = type_name
-                                    break
-                        
-                        return {
-                            'vin': vin,
-                            'model_name': model_name,
-                            'version': version,
-                            'type': vehicle_type
-                        }
-                
-                logging.error(f"Error fetching options for VIN {vin}: HTTP {response.status}")
-                return {'vin': vin, 'model_name': 'unknown', 'version': 'unknown', 'type': 'unknown'}
-                
-        except Exception as e:
-            logging.error(f"Error fetching options for VIN {vin}: {str(e)}")
-            return {'vin': vin, 'model_name': 'unknown', 'version': 'unknown', 'type': 'unknown'}
+        logging.error(f"Failed to fetch options for VIN {vin} after {self.MAX_RETRIES} retries")
+        return {'model_name': 'model u', 'version': 'unknown', 'type': 'MTU'}
 
-    async def get_warranty_info(self, session, vin: str) -> Optional[str]:
+    async def get_warranty_info(self, session, vin: str) -> Tuple[Optional[int], Optional[int], Optional[str]]:
         """Récupère la date de début basée sur les informations de garantie."""
         account = await self.get_account_for_vin(session, vin)
-        if not account:
-            return None
-            
         url = f"{self.base_url}/api/1/dx/warranty/details?vin={vin}"
         retries = self.MAX_RETRIES
         
@@ -319,17 +303,19 @@ class TeslaApi:
                         active_warranty = data.get("activeWarranty", [])
                         
                         if active_warranty:
-                            warranty = active_warranty[0]
+                            warranty = active_warranty[1]
                             expiration_date = warranty.get("expirationDate")
-                            coverage_years = warranty.get("coverageAgeInYears")
+                            warranty_date = warranty.get("coverageAgeInYears")
+                            warranty_km = int(warranty.get("expirationOdometer"))
+                            warranty_km = 240000 if warranty_km == 9999999 else warranty_km
                             
-                            if expiration_date and coverage_years is not None:
-                                expiration_date_obj = datetime.fromisoformat(expiration_date.replace("Z", "+00:00"))
-                                start_date_obj = expiration_date_obj - timedelta(days=int(coverage_years * 365.25))
-                                return start_date_obj.strftime('%Y-%m-%d')
-                        
-                        logging.warning(f"No valid warranty data for VIN {vin}")
-                        return None
+                            expiration_date_obj = datetime.fromisoformat(expiration_date.replace("Z", "+00:00"))
+                            start_date_obj = expiration_date_obj - relativedelta(years=int(warranty_date))
+                            start_date = start_date_obj.strftime('%Y-%m-%d')
+                            return warranty_km,warranty_date,start_date
+                        else:
+                            logging.warning(f"No valid warranty data for VIN {vin}")
+                            return None, None, None
                     elif response.status == 401:
                         self._tokens.pop(self.ACCOUNT_TOKEN_KEYS[account], None)
                     
@@ -343,4 +329,4 @@ class TeslaApi:
                 await asyncio.sleep(self.RATE_LIMIT_DELAY)
         
         logging.error(f"Failed to fetch warranty info for VIN {vin} after {self.MAX_RETRIES} retries")
-        return None 
+        return None, None, None
