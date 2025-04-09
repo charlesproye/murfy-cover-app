@@ -123,3 +123,59 @@ def evaluate_single_soh_estimation(results:DF, soh_col:DF) -> DF:
         "MAE_to_base_trendline": lr_params.eval("slope - @BASE_SLOPE").abs().mean(),
         "MAE_to_1_intercept": lr_params["intercept"].sub(1).abs().mean(),
     })
+
+def force_decay(df, window_size=3, max_drop=0.003):
+    """
+    Génère une série strictement décroissante à partir d'une liste de valeurs en :
+      - Calcule d'abord une moyenne mobile,
+      - En choisissant un point de départ proche du maximum (pour refléter les meilleures valeurs),
+      - Puis en s'assurant qu'entre deux points consécutifs, la diminution ne dépasse pas max_drop,
+        et que la série ne stagne pas sur plus de 2 points.
+    """
+    # Calcul de la moyenne mobile
+    smoothed = df['soh'].rolling(window=window_size, min_periods=2).mean().values
+    # récupère l'odomètre pour la dcroissance forcé.
+    odometer = df['odometer'].ffill().copy().values
+    n = len(smoothed)
+    
+    # Pour le démarrage, on part du maximum de la série lissée / pas forcéement optimal
+    output = [max(smoothed[1:])]
+    for i in range(1, n):
+        candidate = smoothed[i]
+        prev = output[-1]
+        
+        # Si  candidate >= à la précédente, on la force à être légèrement plus basse en se basant sur l'odomètre
+        if candidate >= prev:
+            epsilon = (odometer[i] - odometer[i-1]) * 1e-7
+            candidate = prev - epsilon
+
+        
+        # Vérifier que le drop n'est pas trop important
+        drop = prev - candidate
+        if drop > max_drop:
+            candidate = prev - max_drop
+        output.append(candidate)
+        
+    return output
+
+
+def estimate_cycles(total_range:float=0, initial_range:float=1, soh:float=1.0):
+    """Calcule le nombre estimé de cycles
+
+    Args:
+        total_range (float): nombre de km parcouru
+        initial_range (float): autonomie initiale du véhicule
+        soh (float, optional): SoH du véhicule 
+
+    Returns:
+        float: le nombre de cycle de la batterie
+    """
+    if soh is np.nan:
+        soh=1
+    try:
+        total_cycle = total_range / (initial_range * (soh + 1) / 2)
+        return round(total_cycle)
+    except:
+        return np.nan
+
+

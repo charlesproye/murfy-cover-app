@@ -20,7 +20,7 @@ Options:
 --help                          Affiche cette aide
 --verbose                       Active les logs détaillés
 --auto-offset-reset=<value>     Position de départ dans Kafka ('latest' ou 'earliest')
---buffer-size=<value>           Taille du buffer par véhicule (défaut: 1000)
+--buffer-size=<value>           Taille du buffer par véhicule (défaut: 3000)
 --buffer-flush-interval=<value> Intervalle de flush en secondes (défaut: 30)
 --compress-now                  Compresse immédiatement les données et quitte
 
@@ -91,12 +91,13 @@ echo "Kafka Bootstrap Servers: $KAFKA_BOOTSTRAP_SERVERS"
 echo "Kafka Topic: $KAFKA_TOPIC"
 echo "Kafka Group ID: $KAFKA_GROUP_ID"
 echo "Auto Offset Reset: ${AUTO_OFFSET_RESET:-latest}"
-echo "Buffer Size: ${BUFFER_SIZE:-1000}"
+echo "Buffer Size: ${BUFFER_SIZE:-3000}"
 echo "Buffer Flush Interval: ${BUFFER_FLUSH_INTERVAL:-30}"
 
 echo "Démarrage du module tesla-fleet-telemetry..."
 python -m src.ingestion.tesla_fleet_telemetry.main \
     --bootstrap-servers "$KAFKA_BOOTSTRAP_SERVERS" \
     --topic "$KAFKA_TOPIC" \
+    --compress-now \
     --group-id "$KAFKA_GROUP_ID" \
-    "$@" 
+    "$@"    
