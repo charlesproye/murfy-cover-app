@@ -44,7 +44,7 @@ messages_processed = 0
 running = True
 
 # Maximum buffer size before flush (number of messages)
-MAX_BUFFER_SIZE = 1000
+MAX_BUFFER_SIZE = 3000
 # Flush interval in seconds
 FLUSH_INTERVAL_SECONDS = 30
 # Max number of vehicles processed per worker in the pool
@@ -428,8 +428,8 @@ async def compress_worker(vehicles: List[str], date: datetime):
 
 async def is_midnight() -> bool:
     """Check if it's midnight UTC."""
-    now = datetime.utcnow()
-    return now.hour == 0 and now.minute == 0
+    now = datetime.now()
+    return now.hour ==0 and now.minute == 0
 
 async def compress_previous_day_data():
     """
@@ -439,13 +439,13 @@ async def compress_previous_day_data():
     
     try:
         # Calculate yesterday's date
-        yesterday = datetime.utcnow() - timedelta(days=1)
+        yesterday = datetime.now() - timedelta(days=1)
         yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         
         # Get list of vehicles with temporary data
         settings = get_settings()
 
-        
+        print("yesterday", yesterday)
         session = aioboto3.Session()
         
         # Use the same config as in s3_handler
@@ -518,7 +518,7 @@ async def compress_previous_day_data():
 
 async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str, 
                             auto_offset_reset: str = "latest", buffer_flush_interval: int = 30,
-                            buffer_size: int = 1000):
+                            buffer_size: int = 3000):
     """
     Consume Kafka data with midnight daily compression.
     """
@@ -545,7 +545,7 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
     logger.info(f"Starting Kafka consumer: {topic}, {group_id}, {bootstrap_servers}")
     logger.info(f"Configuration: buffer={MAX_BUFFER_SIZE}, flush_interval={FLUSH_INTERVAL_SECONDS}s")
     
-    last_midnight_check = datetime.utcnow()
+    last_midnight_check = datetime.now() - timedelta(days=1)
     timeout_task = None
     
     try:
@@ -554,13 +554,13 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
             while not shutdown_event.is_set():
                 try:
                     await check_buffer_timeouts()
-                    
                     # Check if it's midnight
-                    now = datetime.utcnow()
+                    now = datetime.now()
                     if now.date() > last_midnight_check.date():
                         if await is_midnight():
+                            print("is_midnight ok")
                             logger.info("Midnight UTC detected, starting daily compression")
-                            await compress_previous_day_data()
+                            await compress_data() ######ompress_previous_day_data()
                             last_midnight_check = now
                             
                 except Exception as e:
@@ -568,7 +568,7 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
                 
                 try:
                     # Use wait_for with timeout to periodically check shutdown_event
-                    await asyncio.wait_for(shutdown_event.wait(), timeout=1.0)
+                    await asyncio.wait_for(shutdown_event.wait(), timeout=1.0) # check fait toutes les 30 secondes
                     break
                 except asyncio.TimeoutError:
                     continue
@@ -654,7 +654,7 @@ async def main():
         parser.add_argument('--auto-offset-reset', type=str, choices=['earliest', 'latest'], 
                            default='latest', 
                            help='Starting position (earliest or latest)')
-        parser.add_argument('--buffer-size', type=int, default=1000, 
+        parser.add_argument('--buffer-size', type=int, default=3000, 
                            help='Maximum buffer size before automatic flush')
         parser.add_argument('--buffer-flush-interval', type=int, default=30, 
                            help='Buffer flush interval in seconds')
@@ -662,6 +662,13 @@ async def main():
                            help='Disable periodic compression')
         parser.add_argument('--compression-interval', type=int, default=300, 
                            help='Compression interval in seconds')
+        parser.add_argument(
+        "--compress_time",
+        type=str,
+        default="00:00",
+        help="time of day at which to compress S3 data",
+        )
+
         
         args = parser.parse_args()
         
@@ -678,9 +685,9 @@ async def main():
         auto_offset_reset = args.auto_offset_reset
         buffer_size = args.buffer_size
         buffer_flush_interval = args.buffer_flush_interval
-        
+        compress_time = args.compress_time
         # Immediate compression if requested
-        if args.compress_now:
+        if args.compress_now or os.getenv("COMPRESS_ONLY_TESLA") == "1":
             logger.info("Immediate compression mode")
             await run_compress_now()
             return
@@ -692,7 +699,7 @@ async def main():
             bootstrap_servers=bootstrap_servers,
             auto_offset_reset=auto_offset_reset,
             buffer_size=buffer_size,
-            buffer_flush_interval=buffer_flush_interval
+            buffer_flush_interval=buffer_flush_interval,
         )
     
     except KeyboardInterrupt:
