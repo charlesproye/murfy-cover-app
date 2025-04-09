@@ -81,12 +81,16 @@ def agg_results_by_update_frequency(results:DF) -> DF:
             version=pd.NamedAgg("version", "first"),
             level_1=pd.NamedAgg("level_1", "sum"),
             level_2=pd.NamedAgg("level_2", "sum"),
-            level_3=pd.NamedAgg("level_3", "sum"),
-            
+            level_3=pd.NamedAgg("level_3", "sum"),            
         )
     )
 
 def make_charge_levels_presentable(results:DF) -> DF:
+    # If none of the level columns exist, return the results as is
+    level_columns = ["level_1", "level_2", "level_3"]
+    existing_level_columns = [col for col in level_columns if col in results.columns]
+    if not existing_level_columns:
+        return results
     negative_charge_levels = results[["level_1", "level_2", "level_3"]].lt(0)
     nb_negative_levels = negative_charge_levels.sum().sum()
     if nb_negative_levels > 0:

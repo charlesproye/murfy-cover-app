@@ -62,6 +62,10 @@ def get_results() -> DF:
         .pipe(hot_fix_in_charge_idx)
         .pipe(compute_charging_power)
         .pipe(charge_levels)
+        # No methode define at the 
+        .eval("level_1 = 0")
+        .eval("level_2 = 0")
+        .eval("level_3 = 0")
     )
     results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
     # logger.debug("Sanity check of the results:")
