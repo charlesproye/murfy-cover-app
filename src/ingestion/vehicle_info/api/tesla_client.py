@@ -271,14 +271,10 @@ class TeslaApi:
                                 vehicle_type = next(
                                     (type_name for pattern, type_name in self.TESLA_PATTERNS[model_name]['patterns']
                                      if re.match(pattern, display_name, re.IGNORECASE)),"unknown")
-                            return {
-                                'model_name': model_name,
-                                'version': version,
-                                'type': vehicle_type
-                            }
+                            return model_name,version,vehicle_type
                         else:
                             logging.info(f"Error fetching options for VIN {vin}: HTTP {response.status}")
-                            return {'model_name': 'model u', 'version': 'unknown', 'type': 'MTU'}
+                            return 'model u','unknown','MTU'
                 
             except Exception as e:
                 logging.error(f"Error fetching options for VIN {vin}: {str(e)}")
@@ -286,7 +282,7 @@ class TeslaApi:
                 await asyncio.sleep(self.RATE_LIMIT_DELAY)
         
         logging.error(f"Failed to fetch options for VIN {vin} after {self.MAX_RETRIES} retries")
-        return {'model_name': 'model u', 'version': 'unknown', 'type': 'MTU'}
+        return 'model u','unknown','MTU'
 
     async def get_warranty_info(self, session, vin: str) -> Tuple[Optional[int], Optional[int], Optional[str]]:
         """Récupère la date de début basée sur les informations de garantie."""

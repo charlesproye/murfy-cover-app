@@ -23,9 +23,10 @@ logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 brand_mapping = {
     'citroën': 'citroen',
-    'dsautomobiles': 'ds',
+    'DS': 'ds',
     'volvo': 'volvo-cars',
-    'mercedes': 'mercedes-benz'
+    'mercedes': 'mercedes-benz',
+    'b.m.w.': 'bmw',
 }
 async def check_eligibility():
     # Lire le fichier CSV
@@ -45,7 +46,7 @@ async def check_eligibility():
             vin = row['codif_vin']
             brand = row['marque'].strip().lower()
             brand = brand_mapping.get(brand, brand)
-            if brand not in ['alfaromeo', 'bmw', 'citroen', 'dsautomobiles', 'ford', 'fiat', 'mercedes', 'mercedesbenzfleets', 'mini', 'opel', 'volvocars','renault','peugeot']:
+            if brand not in ['bmw']:
                 continue
             try:
                 is_eligible = await hm_client.get_eligibility(vin, brand, session)
@@ -63,7 +64,7 @@ async def check_eligibility():
                 df.at[index, 'Comment'] = str(e)
     
     # Sauvegarder le résultat
-    output_file = 'src/ingestion/vehicle_info/vin_autoviza_updated.csv'
+    output_file = 'src/ingestion/vehicle_info/vin_autoviza_updated_2.csv'
     df.to_csv(output_file, index=False)
     logger.info(f"Results saved to {output_file}")
 

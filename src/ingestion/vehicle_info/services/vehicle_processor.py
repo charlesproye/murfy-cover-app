@@ -83,67 +83,15 @@ class VehicleProcessor:
             )
             return cursor.fetchone()[0]
         return result[0]
-
-    async def _update_or_create_vehicle(self, cursor, vin: str, fleet_id: str, region_id: str, 
-                                      vehicle_model_id: str, vehicle_data: pd.Series) -> None:
-        """Update or create Vehicle record."""
-        end_of_contract = convert_date_format(vehicle_data['end_of_contract'])
-        start_date = convert_date_format(vehicle_data['start_date'])
-        
-        cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
-        vehicle_exists = cursor.fetchone()
-        
-        if vehicle_exists:
-            cursor.execute("""
-                UPDATE vehicle 
-                SET fleet_id = %s,
-                    region_id = %s,
-                    vehicle_model_id = %s,
-                    licence_plate = %s,
-                    end_of_contract_date = %s,
-                    start_date = %s,
-                    activation_status = %s,
-                    is_displayed = %s
-                WHERE vin = %s
-            """, (
-                fleet_id,
-                region_id,
-                vehicle_model_id,
-                vehicle_data['licence_plate'],
-                end_of_contract,
-                start_date,
-                vehicle_data.get('activation_status'),
-                vehicle_data.get('is_displayed'),
-                vin
-            ))
-        else:
-            vehicle_id = str(uuid.uuid4())
-            cursor.execute("""
-                INSERT INTO vehicle (
-                    id, vin, fleet_id, region_id, vehicle_model_id,
-                    licence_plate, end_of_contract_date, start_date, activation_status
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                vehicle_id,
-                vin,
-                fleet_id,
-                region_id,
-                vehicle_model_id,
-                vehicle_data['licence_plate'],
-                end_of_contract,
-                start_date,
-                vehicle_data.get('activation_status'),
-                vehicle_data.get('is_displayed')
-            ))
-            logging.info(f"New vehicle inserted in DB VIN: {vin}") 
     
-    async def _update_or_create_tesla_models(self, cursor, model_name: str, type: str, version: str, make_id: str, oem_id: str, warranty_km: int, warranty_date: str) -> str:
+    async def _update_or_create_tesla_models(self, cursor, model_name: str, type: str, version: str, make: str, oem: str, warranty_km: int, warranty_date: str) -> str:
         """Get a Tesla model if it exists then update it, or create it if it doesn't exist."""
         cursor.execute(
             "SELECT id FROM vehicle_model WHERE LOWER(version) = %s",
             (version.lower(),))
         result = cursor.fetchone()
-        
+        oem_id = await self._get_or_create_oem(cursor, oem)
+        make_id = await self._get_or_create_make(cursor, make, oem_id)
         if result:
             model_id = result[0]
             cursor.execute("""
@@ -169,62 +117,190 @@ class VehicleProcessor:
             
         return model_id
 
-    async def _update_or_create_other_models(self, cursor, model_name: str, type: str, version: str, make_id: str, oem_id: str) -> str:
+    async def _update_or_create_other_models(self, cursor, model_name: str, type: str, make: str, oem: str) -> str:
         """Get a model if it exists then update it, or create it if it doesn't exist."""
+        if not model_name or model_name.strip() == '':
+            model_name = 'unknown'
+        if not type or type.strip() == '':
+            type = 'unknown'
         cursor.execute("SELECT id FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s", (model_name.lower(), type.lower()))
         result = cursor.fetchone()
+        oem_id = await self._get_or_create_oem(cursor, oem)
+        make_id = await self._get_or_create_make(cursor, make, oem_id)
         if result:
             model_id = result[0]
             cursor.execute("""
                 UPDATE vehicle_model 
                 SET model_name = %s, 
-                    type = %s, 
-                    version = %s, 
+                    type = %s,  
                     make_id = %s, 
                     oem_id = %s
                 WHERE id = %s
-            """, (model_name, type, version, make_id, oem_id, model_id))
-            logging.info(f"Updated existing model with version {version}")
+            """, (model_name, type, make_id, oem_id, model_id))
+            logging.info(f"Updated existing model with name {model_name} and type {type}")
         else:
             model_id = str(uuid.uuid4())
             cursor.execute("""
                 INSERT INTO vehicle_model (
-                    id, model_name, type, version, make_id, oem_id
-                ) VALUES (%s, %s, %s, %s, %s, %s)
-            """, (model_id, model_name, type, version, make_id, oem_id))
-            logging.info(f"Created new model with version {version}")
+                    id, model_name, type, make_id, oem_id
+                ) VALUES (%s, %s, %s, %s, %s)
+            """, (model_id, model_name, type, make_id, oem_id))
+            logging.info(f"Created new model with name {model_name} and type {type}")
             
         return model_id
     
-    async def process_tesla_vehicles(self, session: aiohttp.ClientSession) -> None:
+    async def process_tesla(self) -> None:
         """Process Tesla vehicles."""
         try:
-            tesla_df = self.df[self.df['brand'] == 'tesla'] and self.df['real_activation'] == True
-            for _, vehicle in tesla_df.iterrows():
-                model_name,version,type = await self.tesla_api.get_vehicle_options(session, tesla_df['vin'])
-                warranty_km,warranty_date,start_date = await self.tesla_api.get_warranty_info(session, tesla_df['vin'])
-                fleet_id = await self._get_fleet_id(cursor, tesla_df['owner'])
-                oem_id = await self._get_or_create_oem(cursor, tesla_df['oem'])
-                make_id = await self._get_or_create_make(cursor, tesla_df['make'], oem_id)
-                region_id = await self._get_or_create_region(cursor, tesla_df['country'])
-                model_id = await self._get_or_create_model(cursor, model_name, type, make_id, oem_id)
+            # Debug prints to inspect DataFrame
+            tesla_df = self.df[self.df['oem'] == 'tesla'] & (self.df['real_activation'] == True)
+                
+            async with aiohttp.ClientSession() as session:
+                with get_connection() as con:
+                    cursor = con.cursor()
+                    for _, vehicle in tesla_df.iterrows():
+                        try:
+                            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
+                            vehicle_exists = cursor.fetchone()
+                            model_name, version, type = await self.tesla_api.get_vehicle_options(session, vehicle['vin'])
+                            warranty_km, warranty_date, start_date = await self.tesla_api.get_warranty_info(session, vehicle['vin'])
+                            fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+                            region_id = await self._get_or_create_region(cursor, vehicle['country'])
+                            
+                            model_id = await self._update_or_create_tesla_models(
+                                cursor, model_name, type, version, vehicle['make'], 
+                                vehicle['oem'], warranty_km, warranty_date
+                            )
+                            print(f'Vehicle Details - VIN: {vehicle["vin"]} | {model_name} | {version} | {type} | Warranty KM: {warranty_km} | Warranty Date: {warranty_date} | {start_date} -> {vehicle["end_of_contract"]}')
 
+                            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
+                            vehicle_exists = cursor.fetchone()
+                            
+                            if not vehicle_exists:
+                                vehicle_id = str(uuid.uuid4())
+                                insert_query = """
+                                    INSERT INTO vehicle (
+                                        id, vin, fleet_id, region_id, vehicle_model_id,
+                                        licence_plate, end_of_contract_date, start_date, activation_status, is_displayed
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """
+                                cursor.execute(
+                                    insert_query,
+                                    (
+                                        vehicle_id, vehicle['vin'], fleet_id, region_id, model_id,
+                                        vehicle['licence_plate'], vehicle['end_of_contract'], start_date,
+                                        vehicle['real_activation'], vehicle['EValue']
+                                    )
+                                )
+                                logging.info(f"New Tesla vehicle inserted in DB VIN: {vehicle['vin']}")
+                            else:
+                                cursor.execute(
+                                    "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s WHERE vin = %s",
+                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['vin'])
+                                )
+                                logging.info(f"Updated Tesla vehicle in DB VIN: {vehicle['vin']}")
+                                
+                            con.commit()
+                        except Exception as e:
+                            logging.error(f"Error processing Tesla vehicle {vehicle['vin']}: {str(e)}")
+                            con.rollback()
+                            continue
+        except Exception as e:
+            logging.error(f"Error in Tesla processing: {str(e)}")
+            raise
+
+    async def process_other_vehicles(self) -> None:
+        """Process other vehicles."""
+        try:
+            other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['real_activation'] == True)]
+            print(other_df)
             with get_connection() as con:
                 cursor = con.cursor()
-                for index, vehicle in tesla_df.iterrows():
-
-                    cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
-                    vehicle_exists = cursor.fetchone()
-                    if not vehicle_exists:
-                        cursor.execute("UPDATE vehicle SET activation_status = %s WHERE vin = %s", (vehicle['real_activation'], vehicle['vin']))
-                        
+                for _, vehicle in other_df.iterrows():
+                    try:
+                        cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
+                        vehicle_exists = cursor.fetchone()
+                        fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+                        region_id = await self._get_or_create_region(cursor, vehicle['country'])
+                        model_id = await self._update_or_create_other_models(cursor, vehicle['model'],vehicle['type'], vehicle['make'], vehicle['oem'])
+                        if not vehicle_exists:
+                            vehicle_id = str(uuid.uuid4())
+                            insert_query = """
+                                INSERT INTO vehicle (
+                                    id, vin, fleet_id, region_id, vehicle_model_id,
+                                    licence_plate, end_of_contract_date, start_date, activation_status, is_displayed
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """
+                            cursor.execute(
+                                insert_query,
+                                (
+                                    vehicle_id, vehicle['vin'], fleet_id, region_id, model_id,
+                                    vehicle['licence_plate'], vehicle['end_of_contract'],
+                                    vehicle['start_date'], vehicle['real_activation'], vehicle['EValue']
+                                )
+                            )
+                            logging.info(f"New vehicle inserted in DB VIN: {vehicle['vin']}")
+                        else:
+                            cursor.execute(
+                                "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s WHERE vin = %s",
+                                (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['vin'])
+                            )
+                            logging.info(f"Updated vehicle in DB VIN: {vehicle['vin']}")
+                            
+                        con.commit()
+                    except Exception as e:
+                        logging.error(f"Error processing vehicle {vehicle['vin']}: {str(e)}")
+                        con.rollback()
+                        continue
         except Exception as e:
-            logging.error(f"Error processing Tesla vehicle: {str(e)}")
+            logging.error(f"Error in other vehicles processing: {str(e)}")
             raise
-    
 
-        
-        
+    async def process_deactivated_vehicles(self) -> None:
+        """Process deactivated vehicles."""
+        deactivated_df = self.df[self.df['real_activation'] == False]
+        if deactivated_df.empty:
+            logging.info("No deactivated vehicles to process")
+            return
+
+        try:
+            with get_connection() as con:
+                cursor = con.cursor()
+                
+                # Create a temporary table for bulk operations
+                cursor.execute("""
+                    CREATE TEMPORARY TABLE temp_deactivated_vehicles (
+                        vin VARCHAR(17) PRIMARY KEY
+                    ) ON COMMIT DROP
+                """)
+                
+                # Bulk insert VINs into temporary table
+                vins_to_update = deactivated_df['vin'].tolist()
+                cursor.executemany(
+                    "INSERT INTO temp_deactivated_vehicles (vin) VALUES (%s)",
+                    [(vin,) for vin in vins_to_update]
+                )
+                
+                # Perform the update using a join with the temporary table
+                cursor.execute("""
+                    UPDATE vehicle v
+                    SET activation_status = false,
+                        is_displayed = false,
+                        updated_at = CURRENT_TIMESTAMP
+                    FROM temp_deactivated_vehicles t
+                    WHERE v.vin = t.vin
+                """)
+                
+                affected_rows = cursor.rowcount
+                logging.info(f"Bulk updated {affected_rows} deactivated vehicles in DB")
+                con.commit()
+                
+        except Exception as e:
+            logging.error(f"Error in deactivated vehicles processing: {str(e)}")
+            if 'con' in locals():
+                con.rollback()
+            raise
+            
         
 
         

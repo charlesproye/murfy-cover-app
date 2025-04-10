@@ -59,15 +59,15 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
                 # Update existing row
                 updates.append({
                     'range': f'R{row_idx}C{real_activation_col}',
-                    'values': [[str(row['Real_Activation']).upper()]]
+                    'values': [[(row['Real_Activation'])]]
                 })
                 updates.append({
                     'range': f'R{row_idx}C{eligibility_col}',
-                    'values': [[str(row['Eligibility']).upper()]]
+                    'values': [[row['Eligibility']]]
                 })
                 updates.append({
                     'range': f'R{row_idx}C{error_col}',
-                    'values': [[row['Activation_Error'] or ""]]
+                    'values': [[row['Activation_Error']]]
                 })
                 updates.append({
                     'range': f'R{row_idx}C{account_owner_col}',
@@ -76,11 +76,11 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
             else:
                 new_row = [""] * len(headers)  # Create empty row with same length as headers
                 new_row[vin_col - 1] = vin
-                new_row[activation_col - 1] = 'FALSE'
-                new_row[evalue_col - 1] = 'FALSE'
-                new_row[real_activation_col - 1] = 'FALSE'
-                new_row[eligibility_col - 1] = 'TRUE'
-                new_row[error_col - 1] = row['Activation_Error'] or ""
+                new_row[activation_col - 1] = False
+                new_row[evalue_col - 1] = False
+                new_row[real_activation_col - 1] = False
+                new_row[eligibility_col - 1] = True
+                new_row[error_col - 1] = row['Activation_Error']
                 new_row[oem_col - 1] = 'TESLA'
                 new_row[make_col - 1] = 'TESLA'
                 new_row[ownership_col - 1] = "Bib"
