@@ -261,9 +261,9 @@ def flatten_metrics(metrics_list):
 
 def explode_data(df: pd.DataFrame) -> pd.DataFrame:
     df_merge = pd.DataFrame(index=df.index)
-    if "metrics" in df.columns:
-        metrics=pd.json_normalize(df['metrics'])
-        df_merge = pd.merge(df.drop(columns='metrics'), metrics, left_index=True, right_index=True)
+    # if "metrics" in df.columns:
+    #     metrics=pd.json_normalize(df['metrics'])
+    #     df_merge = pd.merge(df.drop(columns='metrics'), metrics, left_index=True, right_index=True)
     if "data" in df.columns:
         data_df = df['data'].apply(flatten_metrics).apply(pd.Series)
         df_merge = pd.merge(df_merge, data_df,  left_index=True, right_index=True)
