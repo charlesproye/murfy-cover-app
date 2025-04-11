@@ -13,11 +13,12 @@ from ..services.activation_service import VehicleActivationService
 from core.sql_utils import get_connection
 
 class VehicleProcessor:
-    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, df: pd.DataFrame):
+    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, renault_api: callable, df: pd.DataFrame):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
         self.tesla_api = tesla_api
+        self.renault_api = renault_api
         self.df = df
     
     async def _get_or_create_oem(self, cursor, oem_raw: str) -> str:
@@ -209,10 +210,58 @@ class VehicleProcessor:
             logging.error(f"Error in Tesla processing: {str(e)}")
             raise
 
+    async def process_renault(self) -> None:
+        """Process Renault vehicles."""
+        try:
+            renault_df = self.df[(self.df['oem'] == 'renault') & (self.df['real_activation'] == True)]
+            async with aiohttp.ClientSession() as session:
+                with get_connection() as con:
+                    cursor = con.cursor()
+                    for _, vehicle in renault_df.iterrows():
+                        try:
+                            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
+                            vehicle_exists = cursor.fetchone()
+                            fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+                            region_id = await self._get_or_create_region(cursor, vehicle['country'])
+                            model_name, type, start_date = await self.renault_api.get_vehicle_info(session, vehicle['vin'])
+                            model_id = await self._update_or_create_other_models(cursor, model_name, type, vehicle['make'], vehicle['oem'])
+                            if not vehicle_exists:
+                                vehicle_id = str(uuid.uuid4())
+                                insert_query = """
+                                    INSERT INTO vehicle (
+                                        id, vin, fleet_id, region_id, vehicle_model_id,
+                                        licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """
+                                cursor.execute(
+                                    insert_query,
+                                    (
+                                        vehicle_id, vehicle['vin'], fleet_id, region_id, model_id,
+                                        vehicle['licence_plate'], vehicle['end_of_contract'], start_date,
+                                        vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility']
+                                    )
+                                )
+                                logging.info(f"New Renault vehicle inserted in DB VIN: {vehicle['vin']}")
+                            else:
+                                cursor.execute(
+                                    "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vehicle['vin'])
+                                )
+                                logging.info(f"Updated Renault vehicle in DB VIN: {vehicle['vin']}")
+                                
+                            con.commit()
+                        except Exception as e:
+                            logging.error(f"Error processing Renault vehicle {vehicle['vin']}: {str(e)}")
+                            con.rollback()
+                            continue
+        except Exception as e:
+            logging.error(f"Error in Renault processing: {str(e)}")
+            raise
+
     async def process_other_vehicles(self) -> None:
         """Process other vehicles."""
         try:
-            other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['real_activation'] == True)]
+            other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['oem'] != 'renault') & (self.df['real_activation'] == True)]
             print(other_df)
             with get_connection() as con:
                 cursor = con.cursor()
