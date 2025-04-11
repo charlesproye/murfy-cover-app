@@ -181,22 +181,22 @@ class VehicleProcessor:
                                 insert_query = """
                                     INSERT INTO vehicle (
                                         id, vin, fleet_id, region_id, vehicle_model_id,
-                                        licence_plate, end_of_contract_date, start_date, activation_status, is_displayed
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                        licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 """
                                 cursor.execute(
                                     insert_query,
                                     (
                                         vehicle_id, vehicle['vin'], fleet_id, region_id, model_id,
                                         vehicle['licence_plate'], vehicle['end_of_contract'], start_date,
-                                        vehicle['real_activation'], vehicle['EValue']
+                                        vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility']
                                     )
                                 )
                                 logging.info(f"New Tesla vehicle inserted in DB VIN: {vehicle['vin']}")
                             else:
                                 cursor.execute(
-                                    "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s WHERE vin = %s",
-                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['vin'])
+                                    "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vehicle['vin'])
                                 )
                                 logging.info(f"Updated Tesla vehicle in DB VIN: {vehicle['vin']}")
                                 
@@ -228,22 +228,22 @@ class VehicleProcessor:
                             insert_query = """
                                 INSERT INTO vehicle (
                                     id, vin, fleet_id, region_id, vehicle_model_id,
-                                    licence_plate, end_of_contract_date, start_date, activation_status, is_displayed
-                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """
                             cursor.execute(
                                 insert_query,
                                 (
                                     vehicle_id, vehicle['vin'], fleet_id, region_id, model_id,
                                     vehicle['licence_plate'], vehicle['end_of_contract'],
-                                    vehicle['start_date'], vehicle['real_activation'], vehicle['EValue']
+                                    vehicle['start_date'], vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility']
                                 )
                             )
                             logging.info(f"New vehicle inserted in DB VIN: {vehicle['vin']}")
                         else:
                             cursor.execute(
-                                "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s WHERE vin = %s",
-                                (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['vin'])
+                                "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'],vehicle['vin'])
                             )
                             logging.info(f"Updated vehicle in DB VIN: {vehicle['vin']}")
                             
@@ -270,15 +270,16 @@ class VehicleProcessor:
                 # Create a temporary table for bulk operations
                 cursor.execute("""
                     CREATE TEMPORARY TABLE temp_deactivated_vehicles (
-                        vin VARCHAR(17) PRIMARY KEY
+                        vin VARCHAR(17) PRIMARY KEY,
+                        eligibility BOOLEAN
                     ) ON COMMIT DROP
                 """)
                 
-                # Bulk insert VINs into temporary table
-                vins_to_update = deactivated_df['vin'].tolist()
+                # Bulk insert VINs and eligibility into temporary table
+                vins_to_update = list(zip(deactivated_df['vin'], deactivated_df['eligibility']))
                 cursor.executemany(
-                    "INSERT INTO temp_deactivated_vehicles (vin) VALUES (%s)",
-                    [(vin,) for vin in vins_to_update]
+                    "INSERT INTO temp_deactivated_vehicles (vin, eligibility) VALUES (%s, %s)",
+                    vins_to_update
                 )
                 
                 # Perform the update using a join with the temporary table
@@ -286,6 +287,7 @@ class VehicleProcessor:
                     UPDATE vehicle v
                     SET activation_status = false,
                         is_displayed = false,
+                        is_eligible = t.eligibility,
                         updated_at = CURRENT_TIMESTAMP
                     FROM temp_deactivated_vehicles t
                     WHERE v.vin = t.vin
