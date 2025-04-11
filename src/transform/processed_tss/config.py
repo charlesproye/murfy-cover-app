@@ -75,7 +75,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     'SentryMode_stringValue': 'sentry_mode',
     'BrickVoltageMin_stringValue': 'brick_voltage_min',
     'Odometer_stringValue': 'odometer',
-    'RatedRange_stringValue': 'rated_range',
+    'RatedRange_stringValue': 'rated_range', # True battery range lower than battery range line 98
     'HvacAutoMode_hvacAutoModeValue': 'hvac_auto_mode',
     'ChargeCurrentRequest_stringValue': 'charge_current_request',
     'PackCurrent_stringValue': 'pack_current',
@@ -90,12 +90,12 @@ RENAME_COLS_DICT:dict[str, str] = {
     'ChargeCurrentRequestMax_stringValue': 'charge_current_request_max',
     'DCChargingPower_stringValue': 'dc_charging_power',
     'PackVoltage_stringValue': 'pack_voltage',
-    'VehicleSpeed_stringValue': 'vehicle_speed',
+    'VehicleSpeed_stringValue': 'speed',
     'ChargeLimitSoc_stringValue': 'charge_limit_soc',
     'HvacFanSpeed_intValue': 'hvac_fan_speed',
     'BMSState_stringValue': 'bms_state',
     'DCDCEnable_stringValue': 'dc_dc_enable',
-    'IdealBatteryRange_stringValue': 'ideal_battery_range',
+    'IdealBatteryRange_stringValue': 'battery_range', # Battery range classic
     'RearDefrostEnabled_booleanValue': 'rear_defrost_enabled',
     'ChargePort_stringValue': 'charge_port',
     'EuropeVehicle_booleanValue': 'europe_vehicle',
@@ -119,7 +119,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     'EstimatedHoursToChargeTermination_doubleValue': 'estimated_hours_to_charge_termination',
     'FastChargerType_fastChargerValue': 'fast_charger_type',
     'ChargerPhases_stringValue': 'charger_phases',
-    'BatteryHeaterOn_stringValue': 'battery_heater_on'
+    'BatteryHeaterOn_stringValue': 'battery_heater'
     }
 
 # The keys will be used to determine what columns to keep.
