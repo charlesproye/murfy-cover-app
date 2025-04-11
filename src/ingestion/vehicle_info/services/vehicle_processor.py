@@ -153,7 +153,7 @@ class VehicleProcessor:
         """Process Tesla vehicles."""
         try:
             # Debug prints to inspect DataFrame
-            tesla_df = self.df[self.df['oem'] == 'tesla'] & (self.df['real_activation'] == True)
+            tesla_df = self.df[(self.df['oem'] == 'tesla') & (self.df['real_activation'] == True)]
                 
             async with aiohttp.ClientSession() as session:
                 with get_connection() as con:
