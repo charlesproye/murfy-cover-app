@@ -247,3 +247,27 @@ def set_json_parsed_col_name(col:str, path:list[str], no_prefix_path:list[str], 
 
     return col
 
+# Fonction d'aplatissement
+def flatten_metrics(metrics_list):
+    if not isinstance(metrics_list, list):
+        return {}
+    flat = {}
+    for item in metrics_list:
+        key = item.get('key')
+        value_dict = item.get('value', {})
+        for subkey, subval in value_dict.items():
+            flat[f"{key}_{subkey}"] = subval
+    return flat
+
+def explode_data(df: pd.DataFrame) -> pd.DataFrame:
+    df_merge = pd.DataFrame(index=df.index)
+    if "metrics" in df.columns:
+        metrics=pd.json_normalize(df['metrics'])
+        df_merge = pd.merge(df.drop(columns='metrics'), metrics, left_index=True, right_index=True)
+    if "data" in df.columns:
+        data_df = df['data'].apply(flatten_metrics).apply(pd.Series)
+        df_merge = pd.merge(df_merge, data_df,  left_index=True, right_index=True)
+    
+    else:
+        return df
+    return df_merge
