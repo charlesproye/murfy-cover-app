@@ -18,12 +18,11 @@ def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform.raw_results")
     results = get_results(force_update=True)
 
-#@cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla-fleet-telemetry"), "s3")
+@cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla-fleet-telemetry"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw tesla results.")
-    results = (ProcessedTimeSeries('tesla-fleet-telemetry').groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False))
-    print(results.columns)
-    results= (results.agg(
+    results = (ProcessedTimeSeries('tesla-fleet-telemetry').groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False)
+        .agg(
             ac_energy_added_min=pd.NamedAgg("ac_charge_energy_added", "min"),
             dc_energy_added_min=pd.NamedAgg("dc_charge_energy_added", "min"),
             ac_energy_added_end=pd.NamedAgg("ac_charge_energy_added", "last"),
