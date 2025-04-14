@@ -6,6 +6,7 @@ S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss.par
 
 ODOMETER_MILES_TO_KM = {
     "tesla": 1.60934,
+    "tesla-fleet-telemetry": 1.60934,
 }
 
 COLS_TO_CPY_FROM_FLEET_INFO = [
@@ -173,14 +174,12 @@ COL_DTYPES = {
     "charging_rate": "float32",
     "engine_speed": "float32",
     "soh_oem": "float32",
-    # Fleet
+    # Fleet-telemetry
     "charging_state": "category",
     "ac_charge_energy_added":'float32',
     "dc_charge_energy_added": 'float32',
     "ac_charging_power": 'float32',
     "dc_charging_power": 'float32',
-    
-    
 }
 
 DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
@@ -201,7 +200,7 @@ IN_CHARGE_CHARGING_STATUS_VALS = [
     'fast_charging',
     'initialization',
     "in-progress",
-    # fleet
+    # fleet-telemetry
     'DetailedChargeStateNoPower',
     'DetailedChargeStateComplete', 
     'DetailedChargeStateCharging', 
@@ -214,7 +213,7 @@ IN_DISCHARGE_CHARGING_STATUS_VALS = [
     'chargingerror',
     'cable_unplugged',
     'disconnected', # Tesla
-    "DetailedChargeStateDisconnected"
+    "DetailedChargeStateDisconnected" # fleet-telemetry
 ]
 
 CHARGING_STATUS_VAL_TO_MASK = {
@@ -248,6 +247,7 @@ CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
     "ford",
     "volvo-cars",
     "stellantis",
+    "tesla-fleet-telemetry"
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [

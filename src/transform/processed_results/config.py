@@ -6,6 +6,7 @@ from transform.raw_results.volvo_results import get_results as get_volvo_results
 from transform.raw_results.renault_results import get_results as get_renault_results
 from transform.raw_results.mercedes_results import get_results as get_mercedes_results
 from transform.raw_results.stellantis_results import get_results as get_stellantis_results
+from transform.raw_results.tesla_fleet_telemetry import get_results as get_tesla_fleet_telemetry
 
 
 UPDATE_FREQUENCY = pd.Timedelta(days=7)
@@ -37,6 +38,7 @@ GET_RESULTS_FUNCS = {
     "volvo": get_volvo_results,
     "stellantis": get_stellantis_results,
     "ford": get_ford_results,
+    "tesla-fleet-telemetry": get_tesla_fleet_telemetry
 }
 
 # Eval strings to filter raw results SoH per brand 
@@ -50,5 +52,6 @@ SOH_FILTER_EVAL_STRINGS: dict[callable] = {
     "bmw": "soh = soh",
     "kia": "soh = soh",
     "stellantis": "soh = soh",
+    "tesla-fleet-telemetry": "soh = soh.where(soc_diff > 40 & soh.between(0.75, 1.05))",
 }
 
