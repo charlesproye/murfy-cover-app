@@ -10,6 +10,10 @@ import warnings
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional
+import aiohttp
+import aioboto3
+from botocore.client import Config
+        
 
 # Ignore aiohttp ResourceWarnings due to unclosed sockets
 warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<socket.socket.*>")
@@ -40,7 +44,7 @@ messages_processed = 0
 running = True
 
 # Maximum buffer size before flush (number of messages)
-MAX_BUFFER_SIZE = 1000
+MAX_BUFFER_SIZE = 3000
 # Flush interval in seconds
 FLUSH_INTERVAL_SECONDS = 30
 # Max number of vehicles processed per worker in the pool
@@ -180,7 +184,6 @@ async def process_message(message) -> Optional[Dict[str, Any]]:
         try:
             # If we have an ISO createdAt, convert it to timestamp
             if created_at and not timestamp:
-                from datetime import datetime
                 try:
                     # Convert ISO format "2025-03-19T15:43:06.516737697Z" to timestamp
                     dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
@@ -369,10 +372,7 @@ async def compress_worker(vehicles: List[str], date: datetime):
     settings = get_settings()
     s3_client = None
     
-    try:
-        import aioboto3
-        from botocore.client import Config
-        
+    try:        
         session = aioboto3.Session()
         
         # Use the same config as in s3_handler
@@ -414,7 +414,6 @@ async def compress_worker(vehicles: List[str], date: datetime):
                 compressed_path = f"{settings.base_s3_path}/compressed/{date_path}/{vin}.parquet"
                 
                 # Compress vehicle data for the specified date
-                from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_vehicle_data_for_date
                 await compress_vehicle_data_for_date(s3_client, settings.s3_bucket, vin, date, compressed_path)
                 
             except Exception as e:
@@ -432,8 +431,8 @@ async def compress_worker(vehicles: List[str], date: datetime):
 
 async def is_midnight() -> bool:
     """Check if it's midnight UTC."""
-    now = datetime.utcnow()
-    return now.hour == 0 and now.minute == 0
+    now = datetime.now()
+    return now.hour ==0 and now.minute == 0
 
 async def compress_previous_day_data(blocking=False, batch_size: int = 10):
     """
@@ -450,15 +449,13 @@ async def compress_previous_day_data(blocking=False, batch_size: int = 10):
     
     try:
         # Calculate yesterday's date
-        yesterday = datetime.utcnow() - timedelta(days=1)
+        yesterday = datetime.now() - timedelta(days=1)
         yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         
         # Get list of vehicles with temporary data
         settings = get_settings()
-        
-        import aioboto3
-        from botocore.client import Config
-        
+
+        print("yesterday", yesterday)
         session = aioboto3.Session()
         
         # Use the same config as in s3_handler
@@ -587,7 +584,7 @@ async def compress_previous_day_data(blocking=False, batch_size: int = 10):
 
 async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str, 
                             auto_offset_reset: str = "latest", buffer_flush_interval: int = 30,
-                            buffer_size: int = 1000):
+                            buffer_size: int = 3000):
     """
     Consume Kafka data with midnight daily compression.
     """
@@ -615,7 +612,7 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
     logger.info(f"Starting Kafka consumer: {topic}, {group_id}, {bootstrap_servers}")
     logger.info(f"Configuration: buffer={MAX_BUFFER_SIZE}, flush_interval={FLUSH_INTERVAL_SECONDS}s, message_retention=48h")
     
-    last_midnight_check = datetime.utcnow()
+    last_midnight_check = datetime.now() - timedelta(days=1)
     timeout_task = None
     
     try:
@@ -624,11 +621,11 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
             while not shutdown_event.is_set():
                 try:
                     await check_buffer_timeouts()
-                    
                     # Check if it's midnight
-                    now = datetime.utcnow()
+                    now = datetime.now()
                     if now.date() > last_midnight_check.date():
                         if await is_midnight():
+                            print("is_midnight ok")
                             logger.info("Midnight UTC detected, starting daily compression")
                             # Use non-blocking compression for daily tasks with a reasonable batch size
                             await compress_previous_day_data(blocking=False, batch_size=10)
@@ -640,7 +637,7 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
                 
                 try:
                     # Use wait_for with timeout to periodically check shutdown_event
-                    await asyncio.wait_for(shutdown_event.wait(), timeout=1.0)
+                    await asyncio.wait_for(shutdown_event.wait(), timeout=1.0) # check fait toutes les 30 secondes
                     break
                 except asyncio.TimeoutError:
                     continue
@@ -745,7 +742,7 @@ async def main():
         parser.add_argument('--auto-offset-reset', type=str, choices=['earliest', 'latest'], 
                            default='latest', 
                            help='Starting position (earliest or latest)')
-        parser.add_argument('--buffer-size', type=int, default=1000, 
+        parser.add_argument('--buffer-size', type=int, default=3000, 
                            help='Maximum buffer size before automatic flush')
         parser.add_argument('--buffer-flush-interval', type=int, default=30, 
                            help='Buffer flush interval in seconds')
@@ -802,7 +799,7 @@ async def main():
         auto_offset_reset = args.auto_offset_reset
         buffer_size = args.buffer_size
         buffer_flush_interval = args.buffer_flush_interval
-        
+        compress_time = args.compress_time
         # Immediate compression if requested
         if args.compress_now or args.compress_vin:
             if args.compress_vin:
@@ -820,7 +817,7 @@ async def main():
             bootstrap_servers=bootstrap_servers,
             auto_offset_reset=auto_offset_reset,
             buffer_size=buffer_size,
-            buffer_flush_interval=buffer_flush_interval
+            buffer_flush_interval=buffer_flush_interval,
         )
     
     except KeyboardInterrupt:
@@ -839,7 +836,6 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        import aiohttp
         # Configure aiohttp to avoid the unclosed client session error
         if hasattr(aiohttp, 'ClientSession'):
             original_init = aiohttp.ClientSession.__init__
