@@ -30,7 +30,7 @@ GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3_Bucket], DF]] = {
     # Volvo
     "volvo-cars":       hm_get_raw_tss,
     # fleet-telemetry
-    "fleet-telemetry":  fleet_telemetry_raw_tss,
+    "tesla-fleet-telemetry":  fleet_telemetry_raw_tss,
     
 }
 
