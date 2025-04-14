@@ -2,11 +2,14 @@ import os
 import json
 import logging
 import asyncio
+import functools
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Set
 import random
+import time
 from botocore.client import Config
 from botocore.exceptions import ClientError
+from functools import wraps
 
 import aioboto3
 import boto3
@@ -45,11 +48,14 @@ async def get_s3_async_client():
             'addressing_style': 'path',
             'payload_signing_enabled': False,
             'use_accelerate_endpoint': False,
-            'checksum_validation': False  # Disable checksum validation properly
+            'checksum_validation': False,  # Disable checksum validation properly
+            'use_dualstack_endpoint': False
         },
         connect_timeout=5,
         read_timeout=60,
-        retries={'max_attempts': 3, 'mode': 'standard'}
+        retries={'max_attempts': 3, 'mode': 'standard'},
+        # Add parameter to force clock to use AWS server time
+        parameter_validation=True
     )
     
     # Enable boto3 debug logging for troubleshooting if needed
@@ -86,11 +92,14 @@ def get_s3_sync_client():
             'addressing_style': 'path',
             'payload_signing_enabled': False,
             'use_accelerate_endpoint': False,
-            'checksum_validation': False  # Disable checksum validation properly
+            'checksum_validation': False,  # Disable checksum validation properly
+            'use_dualstack_endpoint': False
         },
         connect_timeout=5,
         read_timeout=60,
-        retries={'max_attempts': 3, 'mode': 'standard'}
+        retries={'max_attempts': 3, 'mode': 'standard'},
+        # Add parameter to force clock to use AWS server time
+        parameter_validation=True
     )
     
     _s3_sync_client = boto3.client(
@@ -215,8 +224,14 @@ async def save_object_to_s3(s3_client, bucket_name: str, key: str, data: Any) ->
     Returns:
         bool: True if save was successful, False otherwise
     """
+    # Use retry decorator for put_object operation
+    @retry_on_time_skewed(max_retries=3)
+    async def put_object_with_retry(client, **kwargs):
+        return await client.put_object(**kwargs)
+        
     try:
-        await s3_client.put_object(
+        await put_object_with_retry(
+            s3_client,
             Bucket=bucket_name,
             Key=key,
             Body=json.dumps(data),
@@ -229,16 +244,20 @@ async def save_object_to_s3(s3_client, bucket_name: str, key: str, data: Any) ->
         return False
 
 
-async def compress_data() -> bool:
+async def compress_data(specific_vin: str = None, batch_size: int = 10) -> bool:
     """
     Compresses temporary data from all vehicles to optimize storage.
     Temp files are grouped by date and saved in a single file,
     then temporary files are deleted.
     
+    Args:
+        specific_vin (str, optional): If provided, only compress data for this specific VIN.
+        batch_size (int): Number of vehicles to process in parallel (default: 10)
+    
     Returns:
         bool: True if compression was successful, False otherwise
     """
-    logger.info("Starting data compression")
+    logger.info(f"Starting data compression{f' for vehicle {specific_vin}' if specific_vin else ''}")
     
     settings = get_settings()
     s3_client = await get_s3_async_client()
@@ -246,8 +265,14 @@ async def compress_data() -> bool:
     base_path = settings.base_s3_path
     
     try:
-        # Get list of vehicle prefixes
-        response = await s3_client.list_objects_v2(
+        # Define list_objects_v2 with retry
+        @retry_on_time_skewed(max_retries=3)
+        async def list_objects_v2_with_retry(client, **kwargs):
+            return await client.list_objects_v2(**kwargs)
+            
+        # Get list of vehicle prefixes with retry
+        response = await list_objects_v2_with_retry(
+            s3_client,
             Bucket=bucket_name,
             Prefix=f"{base_path}/",
             Delimiter="/"
@@ -257,53 +282,195 @@ async def compress_data() -> bool:
             logger.info("No vehicles found to compress")
             return True
             
-        # Create compression tasks for each vehicle
-        compression_tasks = []
+        # Create list of vehicles to compress
+        vehicles_to_compress = []
         for prefix in response.get('CommonPrefixes', []):
             vehicle_prefix = prefix.get('Prefix', '')
             if vehicle_prefix:
                 vin = vehicle_prefix.split('/')[-2]
-                task = asyncio.create_task(compress_vehicle_data(s3_client, bucket_name, vin))
-                compression_tasks.append(task)
+                
+                # If specific_vin is provided, only include that VIN
+                if specific_vin is None or vin == specific_vin:
+                    vehicles_to_compress.append(vin)
         
-        if not compression_tasks:
-            logger.info("No compression tasks created")
+        if not vehicles_to_compress:
+            logger.info(f"No vehicles found to compress{f' with VIN {specific_vin}' if specific_vin else ''}")
             return True
             
-        # Use semaphore to limit concurrency
-        semaphore = asyncio.Semaphore(50)  # Max 50 parallel tasks
+        logger.info(f"Found {len(vehicles_to_compress)} vehicles to compress")
         
-        async def compress_with_semaphore(task):
-            async with semaphore:
-                return await task
-                
-        # Execute compression tasks
-        results = await asyncio.gather(
-            *[compress_with_semaphore(task) for task in compression_tasks],
-            return_exceptions=True
-        )
+        # Process vehicles in smaller batches to avoid time skew issues
+        # This prevents preparing too many requests at once
+        total_success = True
         
-        # Check for errors
-        success_count = sum(1 for r in results if r is True)
-        error_count = sum(1 for r in results if isinstance(r, Exception))
-        
-        logger.info(f"Compression completed: {success_count} vehicles processed successfully, {error_count} errors")
-        
-        if error_count > 0:
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    logger.error(f"Error compressing vehicle {i}: {str(result)}")
+        # Split vehicles into chunks of batch_size
+        for i in range(0, len(vehicles_to_compress), batch_size):
+            batch = vehicles_to_compress[i:i+batch_size]
+            logger.info(f"Processing batch {i//batch_size + 1}/{(len(vehicles_to_compress) + batch_size - 1)//batch_size}: {len(batch)} vehicles")
+            
+            # Create compression tasks for this batch
+            compression_tasks = []
+            for vin in batch:
+                task = asyncio.create_task(compress_vehicle_data(s3_client, bucket_name, vin))
+                compression_tasks.append(task)
+            
+            # Use semaphore to limit concurrency within each batch
+            semaphore = asyncio.Semaphore(batch_size)  # Limit concurrency
+            
+            async def compress_with_semaphore(task):
+                async with semaphore:
+                    return await task
+            
+            # Wait for all tasks in this batch to complete before moving to the next batch
+            results = await asyncio.gather(
+                *[compress_with_semaphore(task) for task in compression_tasks],
+                return_exceptions=True
+            )
+            
+            # Check for errors
+            success_count = sum(1 for r in results if r is True)
+            error_count = sum(1 for r in results if isinstance(r, Exception))
+            
+            logger.info(f"Batch completed: {success_count} vehicles processed successfully, {error_count} errors")
+            
+            if error_count > 0:
+                total_success = False
+                for j, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        logger.error(f"Error compressing vehicle {batch[j]}: {str(result)}")
+            
+            # Brief pause between batches to help with time skew
+            await asyncio.sleep(1)
         
         # Clean compressed files cache once a day
-        if datetime.now().hour == 4:  # At 4am
+        if datetime.now().hour == 4 and not specific_vin:  # At 4am and not processing specific VIN
             _compressed_files_cache.clear()
             logger.info("Compressed files cache cleared")
         
-        return error_count == 0
+        return total_success
         
     except Exception as e:
         logger.error(f"Error during data compression: {str(e)}")
         return False
+
+
+def retry_on_time_skewed(max_retries=3):
+    """
+    Decorator to retry AWS S3 operations when RequestTimeTooSkewed errors occur.
+    Works with both boto3 and aioboto3 clients.
+    
+    Args:
+        max_retries (int): Maximum number of times to retry the operation
+    
+    Returns:
+        Function decorator
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            retry_count = 0
+            last_exception = None
+            
+            while retry_count <= max_retries:
+                try:
+                    # Apply the helper function to clean kwargs
+                    clean_kwargs = _clean_s3_kwargs(kwargs)
+                    # Call the original function with cleaned kwargs
+                    return await func(*args, **clean_kwargs)
+                except ClientError as e:
+                    error_code = e.response.get('Error', {}).get('Code', '')
+                    
+                    if error_code == 'RequestTimeTooSkewed' and retry_count < max_retries:
+                        retry_count += 1
+                        logger.warning(f"RequestTimeTooSkewed error, retry {retry_count}/{max_retries}")
+                        
+                        # Get time offset from NTP
+                        time_offset = await force_time_sync()
+                        
+                        if time_offset is None:
+                            logger.error("Failed to sync time, retrying without time adjustment")
+                        else:
+                            # Calculate the correct timestamp for AWS requests
+                            logger.info(f"Adjusting time by {time_offset} seconds")
+                            
+                            # Create a timestamp function that adds the offset
+                            def corrected_timestamp():
+                                # Get current time and add offset to match NTP time
+                                return datetime.utcnow() + timedelta(seconds=time_offset)
+                            
+                            # Add the corrected timestamp to the kwargs - ensure we don't pass config directly
+                            # Instead we store the function for later use, but it will be removed by _clean_s3_kwargs
+                            kwargs['timestamp_func'] = corrected_timestamp
+                        
+                        # Wait a moment before retrying
+                        await asyncio.sleep(1)
+                    else:
+                        # Re-raise if it's not a time skew error or we've exceeded retries
+                        raise e
+                    
+                    last_exception = e
+            
+            # If we've exhausted retries
+            if last_exception:
+                raise last_exception
+        
+        @functools.wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            retry_count = 0
+            last_exception = None
+            
+            while retry_count <= max_retries:
+                try:
+                    # Apply the helper function to clean kwargs
+                    clean_kwargs = _clean_s3_kwargs(kwargs)
+                    # Call the original function with cleaned kwargs
+                    return func(*args, **clean_kwargs)
+                except ClientError as e:
+                    error_code = e.response.get('Error', {}).get('Code', '')
+                    
+                    if error_code == 'RequestTimeTooSkewed' and retry_count < max_retries:
+                        retry_count += 1
+                        logger.warning(f"RequestTimeTooSkewed error, retry {retry_count}/{max_retries}")
+                        
+                        # For synchronous calls, we need to run force_time_sync in a separate thread
+                        loop = asyncio.new_event_loop()
+                        time_offset = loop.run_until_complete(force_time_sync())
+                        loop.close()
+                        
+                        if time_offset is None:
+                            logger.error("Failed to sync time, retrying without time adjustment")
+                        else:
+                            # Calculate the correct timestamp for AWS requests
+                            logger.info(f"Adjusting time by {time_offset} seconds")
+                            
+                            # Create a timestamp function that adds the offset
+                            def corrected_timestamp():
+                                # Get current time and add offset to match NTP time
+                                return datetime.utcnow() + timedelta(seconds=time_offset)
+                            
+                            # Add the corrected timestamp to the kwargs but don't pass config directly
+                            # It will be cleaned by _clean_s3_kwargs
+                            kwargs['timestamp_func'] = corrected_timestamp
+                        
+                        # Wait a moment before retrying
+                        time.sleep(1)
+                    else:
+                        # Re-raise if it's not a time skew error or we've exceeded retries
+                        raise e
+                    
+                    last_exception = e
+            
+            # If we've exhausted retries
+            if last_exception:
+                raise last_exception
+        
+        # Detect if the wrapped function is a coroutine function
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
+    
+    return decorator
 
 
 async def compress_vehicle_data(s3_client, bucket_name: str, vin: str) -> bool:
@@ -324,8 +491,14 @@ async def compress_vehicle_data(s3_client, bucket_name: str, vin: str) -> bool:
     temp_folder = f"{settings.base_s3_path}/{vin}/temp/"
     
     try:
-        # List temporary files
-        response = await s3_client.list_objects_v2(
+        # Use retry decorator for list_objects_v2 operation
+        @retry_on_time_skewed(max_retries=3)
+        async def list_with_retry(client, **kwargs):
+            return await client.list_objects_v2(**kwargs)
+            
+        # List temporary files with retry
+        response = await list_with_retry(
+            s3_client,
             Bucket=bucket_name,
             Prefix=temp_folder
         )
@@ -355,10 +528,20 @@ async def compress_vehicle_data(s3_client, bucket_name: str, vin: str) -> bool:
         data_by_date = {}
         files_to_delete = []
         
+        # Define get_object with retry
+        @retry_on_time_skewed(max_retries=3)
+        async def get_object_with_retry(client, **kwargs):
+            return await client.get_object(**kwargs)
+        
         for obj in new_files:
             try:
                 file_key = obj['Key']
-                file_response = await s3_client.get_object(Bucket=bucket_name, Key=file_key)
+                # Use retry for get_object operation
+                file_response = await get_object_with_retry(
+                    s3_client, 
+                    Bucket=bucket_name, 
+                    Key=file_key
+                )
                 file_content = await file_response['Body'].read()
                 
                 try:
@@ -427,7 +610,11 @@ async def compress_vehicle_data(s3_client, bucket_name: str, vin: str) -> bool:
                 try:
                     # Check if file already exists
                     try:
-                        existing_response = await s3_client.get_object(Bucket=bucket_name, Key=target_key)
+                        existing_response = await get_object_with_retry(
+                            s3_client, 
+                            Bucket=bucket_name, 
+                            Key=target_key
+                        )
                         existing_content = await existing_response['Body'].read()
                         existing_data = json.loads(existing_content)
                         
@@ -475,16 +662,32 @@ async def save_with_retry(s3_client, bucket_name: str, key: str, data: Any, max_
     Returns:
         bool: True if save was successful, False otherwise
     """
+    # Define put_object with time skew retry
+    @retry_on_time_skewed(max_retries=3)
+    async def put_object_with_retry(client, **kwargs):
+        return await client.put_object(**kwargs)
+    
     for attempt in range(max_retries):
         try:
-            await s3_client.put_object(
+            await put_object_with_retry(
+                s3_client,
                 Bucket=bucket_name,
                 Key=key,
                 Body=json.dumps(data),
                 ContentType='application/json'
             )
             return True
+        except ClientError as e:
+            # If this is a RequestTimeTooSkewed error, let the decorator handle it
+            if e.response.get('Error', {}).get('Code') == 'RequestTimeTooSkewed':
+                raise
+            # For other ClientErrors, handle as before
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to save to S3 after {max_retries} attempts. Key: {key}, Error: {str(e)}")
+                raise
+            await asyncio.sleep(random.uniform(0.1, 0.5) * (attempt + 1))
         except Exception as e:
+            # Handle other exceptions
             if attempt == max_retries - 1:
                 logger.error(f"Failed to save to S3 after {max_retries} attempts. Key: {key}, Error: {str(e)}")
                 raise
@@ -506,11 +709,30 @@ async def delete_with_retry(s3_client, bucket_name: str, key: str, max_retries: 
     Returns:
         bool: True if deletion was successful, False otherwise
     """
+    # Define delete_object with time skew retry
+    @retry_on_time_skewed(max_retries=3)
+    async def delete_object_with_retry(client, **kwargs):
+        return await client.delete_object(**kwargs)
+    
     for attempt in range(max_retries):
         try:
-            await s3_client.delete_object(Bucket=bucket_name, Key=key)
+            await delete_object_with_retry(
+                s3_client,
+                Bucket=bucket_name,
+                Key=key
+            )
             return True
+        except ClientError as e:
+            # If this is a RequestTimeTooSkewed error, let the decorator handle it
+            if e.response.get('Error', {}).get('Code') == 'RequestTimeTooSkewed':
+                raise
+            # For other ClientErrors, handle as before
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to delete from S3 after {max_retries} attempts. Key: {key}, Error: {str(e)}")
+                raise
+            await asyncio.sleep(random.uniform(0.1, 0.5) * (attempt + 1))
         except Exception as e:
+            # Handle other exceptions
             if attempt == max_retries - 1:
                 logger.error(f"Failed to delete from S3 after {max_retries} attempts. Key: {key}, Error: {str(e)}")
                 raise
@@ -537,8 +759,14 @@ async def cleanup_old_data(retention_days: int = 30) -> bool:
     cutoff_date = datetime.now() - timedelta(days=retention_days)
     
     try:
-        # List all vehicle prefixes
-        response = await s3_client.list_objects_v2(
+        # Define list_objects_v2 with retry
+        @retry_on_time_skewed(max_retries=3)
+        async def list_objects_v2_with_retry(client, **kwargs):
+            return await client.list_objects_v2(**kwargs)
+            
+        # List all vehicle prefixes with retry
+        response = await list_objects_v2_with_retry(
+            s3_client,
             Bucket=bucket_name,
             Prefix=f"{settings.base_s3_path}/",
             Delimiter="/"
@@ -594,8 +822,14 @@ async def cleanup_vehicle_data(s3_client, bucket_name: str, vin: str, cutoff_dat
     vehicle_prefix = f"{settings.base_s3_path}/{vin}/"
     
     try:
-        # List all files for the vehicle (excluding temp)
-        response = await s3_client.list_objects_v2(
+        # Define list_objects_v2 with retry
+        @retry_on_time_skewed(max_retries=3)
+        async def list_objects_v2_with_retry(client, **kwargs):
+            return await client.list_objects_v2(**kwargs)
+            
+        # List all files for the vehicle (excluding temp) with retry
+        response = await list_objects_v2_with_retry(
+            s3_client,
             Bucket=bucket_name,
             Prefix=vehicle_prefix
         )
@@ -644,4 +878,360 @@ async def cleanup_vehicle_data(s3_client, bucket_name: str, vin: str, cutoff_dat
         
     except Exception as e:
         logger.error(f"Error cleaning up data for vehicle {vin}: {str(e)}")
-        return False 
+        return False
+
+
+async def compress_vehicle_data_for_date(s3_client, bucket_name: str, vin: str, 
+                                        date: datetime, target_key: str) -> bool:
+    """
+    Compresses vehicle data for a specific date into parquet format.
+    
+    Args:
+        s3_client: aioboto3 S3 client
+        bucket_name: S3 bucket name
+        vin: Vehicle VIN
+        date: Date to compress (datetime object)
+        target_key: S3 key where to store the compressed file
+        
+    Returns:
+        bool: True if compression was successful, False otherwise
+    """
+    settings = get_settings()
+    date_str = date.strftime("%Y-%m-%d")
+    source_key = f"{settings.base_s3_path}/{vin}/{date_str}.json"
+    
+    try:
+        # Define decorated functions for S3 operations
+        @retry_on_time_skewed(max_retries=3)
+        async def get_object_with_retry(client, **kwargs):
+            return await client.get_object(**kwargs)
+            
+        @retry_on_time_skewed(max_retries=3)
+        async def put_object_with_retry(client, **kwargs):
+            return await client.put_object(**kwargs)
+        
+        # Check if source file exists
+        try:
+            # Get source data
+            logger.debug(f"Getting source data from {source_key}")
+            response = await get_object_with_retry(
+                s3_client,
+                Bucket=bucket_name,
+                Key=source_key
+            )
+            content = await response['Body'].read()
+            
+            # Parse JSON data
+            try:
+                data = json.loads(content)
+                if not isinstance(data, list):
+                    data = [data]  # Ensure it's a list
+                
+                if not data:
+                    logger.warning(f"No data to compress for {vin} on {date_str}")
+                    return True
+                
+                # Import needed libraries for parquet conversion
+                try:
+                    import pandas as pd
+                    import pyarrow as pa
+                    import pyarrow.parquet as pq
+                    from io import BytesIO
+                except ImportError:
+                    logger.error("pandas, pyarrow, and/or BytesIO not installed. Cannot compress to parquet.")
+                    # Fall back to JSON if parquet libraries aren't available
+                    compressed_data = json.dumps(data)
+                    content_type = 'application/json'
+                    target_key = target_key.replace('.parquet', '.json')
+                else:
+                    # Convert to pandas DataFrame
+                    df = pd.DataFrame(data)
+                    
+                    # Convert to parquet
+                    buffer = BytesIO()
+                    table = pa.Table.from_pandas(df)
+                    pq.write_table(table, buffer)
+                    buffer.seek(0)
+                    compressed_data = buffer.getvalue()
+                    content_type = 'application/x-parquet'
+                
+                # Save compressed data
+                logger.debug(f"Saving compressed data to {target_key}")
+                await put_object_with_retry(
+                    s3_client,
+                    Bucket=bucket_name,
+                    Key=target_key,
+                    Body=compressed_data,
+                    ContentType=content_type
+                )
+                
+                logger.info(f"Successfully compressed {len(data)} records for {vin} on {date_str}")
+                return True
+                
+            except json.JSONDecodeError:
+                logger.error(f"Invalid JSON in {source_key}")
+                return False
+                
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchKey':
+                logger.debug(f"No data file found for {vin} on {date_str}")
+                return True
+            else:
+                raise
+                
+    except Exception as e:
+        logger.error(f"Error compressing vehicle data for {vin} on {date_str}: {str(e)}")
+        return False
+
+
+async def sync_time_with_aws() -> Optional[float]:
+    """
+    Attempts to synchronize time with AWS S3 server by making a request and 
+    checking for time skew errors. Returns the detected time offset if found.
+    
+    Returns:
+        Optional[float]: Time offset in seconds, or None if couldn't determine
+    """
+    logger.info("Checking time synchronization with AWS S3...")
+    
+    # First try using NTP (fastest and most reliable)
+    try:
+        ntp_offset = await force_time_sync()
+        if ntp_offset is not None:
+            logger.info(f"Time synchronized with NTP: offset {ntp_offset:.2f} seconds")
+            return ntp_offset
+    except Exception as e:
+        logger.warning(f"Could not sync with NTP: {str(e)}")
+    
+    # Fallback to AWS S3 check
+    settings = get_settings()
+    s3_client = await get_s3_async_client()
+    bucket_name = settings.s3_bucket
+    
+    try:
+        # Make a simple LIST request that should return quickly
+        try:
+            # Define a simple retry function for this operation
+            @retry_on_time_skewed(max_retries=3)
+            async def list_objects_v2_simple(client, **kwargs):
+                return await client.list_objects_v2(**kwargs)
+                
+            # Try a simple list operation first to check connectivity
+            await list_objects_v2_simple(
+                s3_client,
+                Bucket=bucket_name,
+                MaxKeys=1
+            )
+            logger.info("Time appears to be in sync with AWS S3")
+            return None
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            
+            if error_code == 'RequestTimeTooSkewed':
+                # Our retry mechanism should have detected the time offset
+                # Extract it from the decorator's global state
+                for obj in globals().values():
+                    if callable(obj) and obj.__name__ == 'retry_on_time_skewed':
+                        # Find instances of our decorator
+                        for attr_name in dir(obj):
+                            if attr_name.startswith('global_time_offset'):
+                                time_offset = getattr(obj, attr_name)[0]
+                                if time_offset != 0:
+                                    logger.warning(f"Detected time offset with AWS: {time_offset:.2f} seconds")
+                                    return time_offset
+                
+                # Fall back to error message parsing as before
+                error_message = e.response.get('Error', {}).get('Message', '')
+                logger.warning(f"Time skew detected: {error_message}")
+                
+                import re
+                match = re.search(r'server time is approx ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)', error_message)
+                if match:
+                    aws_time_str = match.group(1)
+                    try:
+                        aws_time = datetime.strptime(aws_time_str, '%Y-%m-%dT%H:%M:%SZ')
+                        local_time = datetime.utcnow()
+                        time_offset = (aws_time - local_time).total_seconds()
+                        
+                        logger.warning(f"System time is {abs(time_offset):.2f} seconds {'behind' if time_offset > 0 else 'ahead of'} AWS time")
+                        logger.warning(f"AWS time: {aws_time.isoformat()}")
+                        logger.warning(f"Local time: {local_time.isoformat()}")
+                        
+                        # Recommend NTP synchronization if skew is significant
+                        if abs(time_offset) > 60:  # More than a minute
+                            logger.warning("IMPORTANT: System clock is significantly skewed. Consider synchronizing "
+                                           "your system time using NTP: 'sudo ntpdate pool.ntp.org'")
+                        
+                        return time_offset
+                    except Exception as parse_err:
+                        logger.error(f"Error parsing AWS time: {str(parse_err)}")
+                
+                # If we still don't have an offset, use NTP as last resort
+                return await force_time_sync()
+            else:
+                # Different error
+                logger.error(f"Unexpected error checking time sync: {str(e)}")
+                return None
+    except Exception as e:
+        logger.error(f"Error checking time synchronization: {str(e)}")
+        return None
+
+
+# Add the function to __all__ export
+__all__ = [
+    "save_data_to_s3",
+    "compress_data",
+    "compress_data_non_blocking",
+    "compress_specific_vehicle",
+    "cleanup_old_data",
+    "get_s3_async_client",
+    "get_s3_sync_client",
+    "sync_time_with_aws",
+    "force_time_sync",
+    "compress_vehicle_data_for_date"
+]
+
+# Helper function to manually sync time
+async def force_time_sync():
+    """
+    Force time synchronization with network time protocol.
+    
+    Returns:
+        float or None: Time offset in seconds between local and NTP time
+                      or None if synchronization failed
+    """
+    try:
+        import socket, struct, time
+        
+        # NTP query packet (mode=3, version=3)
+        NTP_PACKET = b'\x1b' + 47 * b'\0'
+        
+        # Try multiple NTP servers in case one fails
+        NTP_SERVERS = ["pool.ntp.org", "time.google.com", "time.apple.com", "time.windows.com"]
+        
+        # Track any errors for logging
+        errors = []
+        
+        for server in NTP_SERVERS:
+            try:
+                # Create UDP socket
+                client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                client.settimeout(3)  # 3-second timeout
+                
+                # Send request
+                try:
+                    client.sendto(NTP_PACKET, (server, 123))
+                    msg, _ = client.recvfrom(1024)
+                    
+                    # Extract timestamp
+                    t = struct.unpack("!12I", msg)[10] - 2208988800  # Convert to UNIX epoch
+                    
+                    # Get NTP and local time
+                    ntp_time = datetime.fromtimestamp(t)
+                    local_time = datetime.now()
+                    
+                    # Calculate offset (NTP - local)
+                    time_offset = (ntp_time - local_time).total_seconds()
+                    
+                    logger.info(f"Successfully synced with NTP server {server}")
+                    
+                    # Don't accept extremely large offsets as they're likely errors
+                    if abs(time_offset) > 31536000:  # 1 year in seconds
+                        logger.warning(f"Unrealistic time offset from {server}: {time_offset} seconds, ignoring")
+                        continue
+                        
+                    return time_offset
+                    
+                except Exception as e:
+                    errors.append(f"Error with {server}: {str(e)}")
+                    continue
+                finally:
+                    client.close()
+                    
+            except Exception as e:
+                errors.append(f"Socket error with {server}: {str(e)}")
+                continue
+        
+        # If we get here, all servers failed
+        if errors:
+            logger.warning(f"All NTP servers failed: {'; '.join(errors)}")
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error in NTP synchronization: {str(e)}")
+        return None
+
+
+async def compress_data_non_blocking(specific_vin: str = None, batch_size: int = 10):
+    """
+    Starts the compression process in a separate task without blocking the main process.
+    This creates a background task and immediately returns.
+    
+    Args:
+        specific_vin (str, optional): If provided, only compress data for this specific VIN.
+        batch_size (int): Number of vehicles to process in parallel (default: 10)
+    
+    Returns:
+        asyncio.Task: The compression task that can be awaited if needed
+    """
+    logger.info(f"Starting non-blocking data compression{f' for vehicle {specific_vin}' if specific_vin else ''}")
+    
+    # Create the task
+    compression_task = asyncio.create_task(compress_data(specific_vin=specific_vin, batch_size=batch_size))
+    
+    # Set up a callback to log the result
+    def log_completion(future):
+        try:
+            result = future.result()
+            logger.info(f"Background compression completed successfully: {result}")
+        except Exception as e:
+            logger.error(f"Background compression failed: {str(e)}")
+    
+    compression_task.add_done_callback(log_completion)
+    
+    return compression_task
+
+
+def _clean_s3_kwargs(kwargs):
+    """
+    Clean S3 kwargs by removing problematic parameters.
+    
+    Args:
+        kwargs (dict): The keyword arguments to clean
+        
+    Returns:
+        dict: The cleaned kwargs
+    """
+    # Make a copy to avoid modifying the original
+    clean_kwargs = kwargs.copy()
+    
+    # Remove config parameter which causes issues
+    if 'config' in clean_kwargs:
+        del clean_kwargs['config']
+        
+    # Remove timestamp_func which is used internally by retry_on_time_skewed
+    if 'timestamp_func' in clean_kwargs:
+        del clean_kwargs['timestamp_func']
+        
+    return clean_kwargs
+
+
+async def compress_specific_vehicle(vin: str, blocking: bool = True, batch_size: int = 10):
+    """
+    Compress data for a specific vehicle.
+    
+    Args:
+        vin (str): The VIN of the vehicle to compress
+        blocking (bool): If True, wait for compression to complete. If False, run in background.
+        batch_size (int): Number of parallel operations to perform (default: 10)
+        
+    Returns:
+        bool or asyncio.Task: If blocking, returns True if successful. If non-blocking, returns the Task.
+    """
+    logger.info(f"Starting compression for specific vehicle: {vin}")
+    
+    if blocking:
+        return await compress_data(specific_vin=vin, batch_size=batch_size)
+    else:
+        return await compress_data_non_blocking(specific_vin=vin, batch_size=batch_size) 
