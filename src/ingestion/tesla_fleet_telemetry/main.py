@@ -19,11 +19,11 @@ from botocore.client import Config
 warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<socket.socket.*>")
 
 # Fix relative imports to use absolute paths
-from ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
-from ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
-from ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients
-from ingestion.tesla_fleet_telemetry.config.settings import get_settings
-
+from src.ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
+from src.ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
+from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients, sync_time_with_aws, force_time_sync
+from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
+from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data_non_blocking, compress_specific_vehicle
 
 # Logging configuration
 logging.basicConfig(
@@ -382,11 +382,14 @@ async def compress_worker(vehicles: List[str], date: datetime):
                 'addressing_style': 'path',
                 'payload_signing_enabled': False,
                 'use_accelerate_endpoint': False,
-                'checksum_validation': False  # Disable checksum validation properly
+                'checksum_validation': False,  # Disable checksum validation properly
+                'use_dualstack_endpoint': False
             },
             connect_timeout=5,
             read_timeout=60,
-            retries={'max_attempts': 3, 'mode': 'standard'}
+            retries={'max_attempts': 3, 'mode': 'standard'},
+            # Add parameter to force clock to use AWS server time
+            parameter_validation=True
         )
         
         s3_client = await session.client(
@@ -431,9 +434,16 @@ async def is_midnight() -> bool:
     now = datetime.now()
     return now.hour ==0 and now.minute == 0
 
-async def compress_previous_day_data():
+async def compress_previous_day_data(blocking=False, batch_size: int = 10):
     """
     Compress previous day's data and organize by date.
+    
+    Args:
+        blocking (bool): If True, wait for compression to complete. If False, run in background.
+        batch_size (int): Number of vehicles to process in parallel during compression
+    
+    Returns:
+        bool or Task: If blocking, returns True if successful. If non-blocking, returns the Task.
     """
     logger.info("Starting compression of previous day's data")
     
@@ -455,11 +465,13 @@ async def compress_previous_day_data():
                 'addressing_style': 'path',
                 'payload_signing_enabled': False,
                 'use_accelerate_endpoint': False,
-                'checksum_validation': False  # Disable checksum validation properly
+                'checksum_validation': False,  # Disable checksum validation properly
+                'use_dualstack_endpoint': False
             },
             connect_timeout=5,
             read_timeout=60,
-            retries={'max_attempts': 3, 'mode': 'standard'}
+            retries={'max_attempts': 3, 'mode': 'standard'},
+            parameter_validation=True
         )
         
         s3_client = await session.client(
@@ -496,25 +508,79 @@ async def compress_previous_day_data():
         
         if not vehicles:
             logger.info("No vehicles found to compress")
-            return
+            return True if blocking else None
             
         # Create vehicle pools
         vehicle_pools = await create_vehicle_worker_pools(vehicles)
         
-        # Launch compression workers with yesterday's date
-        worker_tasks = [asyncio.create_task(compress_worker(pool, yesterday)) 
-                       for pool in vehicle_pools]
+        # Define the compression function
+        async def do_compression():
+            try:
+                # Split vehicle pools into smaller batches to avoid time skew issues
+                all_worker_tasks = []
+                
+                for pool in vehicle_pools:
+                    # Process pools in smaller sub-batches
+                    for i in range(0, len(pool), batch_size):
+                        sub_batch = pool[i:i+batch_size]
+                        if sub_batch:
+                            task = asyncio.create_task(compress_worker(sub_batch, yesterday))
+                            all_worker_tasks.append(task)
+                            
+                            # Brief pause between creating tasks to prevent initial time skew
+                            await asyncio.sleep(0.1)
+                
+                # Create a semaphore to limit concurrent task execution
+                semaphore = asyncio.Semaphore(batch_size)
+                
+                async def process_with_semaphore(task):
+                    async with semaphore:
+                        return await task
+                
+                # Wait for all workers to complete, but limit concurrency
+                results = await asyncio.gather(
+                    *[process_with_semaphore(task) for task in all_worker_tasks],
+                    return_exceptions=True
+                )
+                
+                # Check for errors
+                error_count = sum(1 for r in results if isinstance(r, Exception))
+                if error_count > 0:
+                    logger.warning(f"Daily compression completed with {error_count} errors")
+                    for i, result in enumerate(results):
+                        if isinstance(result, Exception):
+                            logger.error(f"Worker error: {str(result)}")
+                
+                logger.info(f"Compression of data for {yesterday.date()} completed")
+                
+                # Clean up yesterday's temporary files
+                await cleanup_old_data(yesterday)
+                
+                return error_count == 0
+            except Exception as e:
+                logger.error(f"Error in compression task: {str(e)}")
+                return False
         
-        # Wait for all workers to complete
-        await asyncio.gather(*worker_tasks)
-        
-        logger.info(f"Compression of data for {yesterday.date()} completed")
-        
-        # Clean up yesterday's temporary files
-        await cleanup_old_data(yesterday)
+        if blocking:
+            # Execute compression synchronously
+            return await do_compression()
+        else:
+            # Execute compression as a background task
+            task = asyncio.create_task(do_compression())
+            
+            def log_completion(future):
+                try:
+                    result = future.result()
+                    logger.info(f"Background daily compression completed: {result}")
+                except Exception as e:
+                    logger.error(f"Background daily compression failed: {str(e)}")
+            
+            task.add_done_callback(log_completion)
+            return task
         
     except Exception as e:
         logger.error(f"Error during daily compression: {str(e)}")
+        return False if blocking else None
 
 async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str, 
                             auto_offset_reset: str = "latest", buffer_flush_interval: int = 30,
@@ -539,11 +605,12 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
         auto_commit_interval_ms=5000,
         max_poll_interval_ms=300000,
         session_timeout_ms=60000,
-        request_timeout_ms=30000
+        request_timeout_ms=30000,
+        message_retention_hours=48  # Configurer explicitement la rétention à 48 heures
     )
     
     logger.info(f"Starting Kafka consumer: {topic}, {group_id}, {bootstrap_servers}")
-    logger.info(f"Configuration: buffer={MAX_BUFFER_SIZE}, flush_interval={FLUSH_INTERVAL_SECONDS}s")
+    logger.info(f"Configuration: buffer={MAX_BUFFER_SIZE}, flush_interval={FLUSH_INTERVAL_SECONDS}s, message_retention=48h")
     
     last_midnight_check = datetime.now() - timedelta(days=1)
     timeout_task = None
@@ -560,7 +627,9 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
                         if await is_midnight():
                             print("is_midnight ok")
                             logger.info("Midnight UTC detected, starting daily compression")
-                            await compress_data() ######ompress_previous_day_data()
+                            # Use non-blocking compression for daily tasks with a reasonable batch size
+                            await compress_previous_day_data(blocking=False, batch_size=10)
+                            logger.info("Daily compression task started in background")
                             last_midnight_check = now
                             
                 except Exception as e:
@@ -619,17 +688,32 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
         
         logger.info("Cleanup completed")
 
-async def run_compress_now():
+async def run_compress_now(specific_vin: str = None, batch_size: int = 10):
     """
-    Execute immediate compression of all data.
+    Execute immediate compression of all data or for a specific VIN.
+    
+    Args:
+        specific_vin (str, optional): If provided, only compress this specific VIN.
+        batch_size (int): Number of vehicles to process in parallel (default: 10)
+    
+    Returns:
+        bool: True if compression was successful, False otherwise
     """
-    logger.info("Starting immediate data compression")
+    if specific_vin:
+        logger.info(f"Starting immediate data compression for vehicle {specific_vin}")
+    else:
+        logger.info("Starting immediate data compression for all vehicles")
     
     try:
-        # Run regular compression, not the non-existent compress_data_parallel
-        await compress_data()
+        # For immediate compression, we still want to wait for completion
+        # because we're exiting after, so use the regular blocking version
+        if specific_vin:
+            result = await compress_specific_vehicle(specific_vin, blocking=True, batch_size=batch_size)
+        else:
+            result = await compress_data(batch_size=batch_size)
+            
         logger.info("Immediate compression completed")
-        return True
+        return result
     except Exception as e:
         logger.error(f"Error during immediate compression: {str(e)}")
         return False
@@ -643,6 +727,10 @@ async def main():
         parser = argparse.ArgumentParser(description='Tesla Fleet Telemetry - Data Ingestion')
         parser.add_argument('--compress-now', action='store_true', 
                            help='Compress data immediately and exit')
+        parser.add_argument('--compress-vin', type=str, 
+                           help='Compress data for a specific VIN and exit')
+        parser.add_argument('--batch-size', type=int, default=10,
+                           help='Number of vehicles to process in parallel during compression')
         parser.add_argument('--verbose', action='store_true', 
                            help='Enable verbose logging (debug)')
         parser.add_argument('--topic', type=str, 
@@ -662,18 +750,44 @@ async def main():
                            help='Disable periodic compression')
         parser.add_argument('--compression-interval', type=int, default=300, 
                            help='Compression interval in seconds')
-        parser.add_argument(
-        "--compress_time",
-        type=str,
-        default="00:00",
-        help="time of day at which to compress S3 data",
-        )
-
+        parser.add_argument('--skip-time-sync', action='store_true',
+                           help='Skip time synchronization check with AWS')
+        parser.add_argument('--force-ntp-sync', action='store_true',
+                           help='Force time synchronization with NTP server')
         
         args = parser.parse_args()
         
         # Logging configuration
         await setup_logging(verbose=args.verbose)
+        
+        # Check time synchronization
+        time_offset = None
+        if args.force_ntp_sync:
+            logger.info("Forcing NTP time synchronization...")
+            time_offset = await force_time_sync()
+            if time_offset is not None:
+                logger.info(f"Time synchronized with NTP: offset {time_offset:.2f} seconds")
+            else:
+                logger.warning("NTP time sync failed")
+        elif not args.skip_time_sync:
+            logger.info("Checking time synchronization with AWS...")
+            time_offset = await sync_time_with_aws()
+            
+        # Show time offset warning if significant
+        if time_offset is not None and abs(time_offset) > 30:
+            logger.warning("⚠️ TIME SYNCHRONIZATION ISSUE DETECTED ⚠️")
+            logger.warning(f"System time is {abs(time_offset):.2f} seconds {'behind' if time_offset > 0 else 'ahead of'} reference time")
+            logger.warning("This may cause RequestTimeTooSkewed errors.")
+            
+            # More serious warning for large offsets
+            if abs(time_offset) > 300:  # 5 minutes
+                logger.warning("⚠️⚠️⚠️ CRITICAL TIME DIFFERENCE! Over 5 minutes offset! ⚠️⚠️⚠️")
+                logger.warning("You should synchronize your system time: sudo ntpdate pool.ntp.org")
+            
+            logger.warning("Processing will continue with automatic retry mechanisms.")
+            logger.warning("------------------------------------------")
+        elif time_offset is not None:
+            logger.info(f"Time offset: {time_offset:.2f} seconds (within acceptable range)")
         
         # Default configuration
         settings = get_settings()
@@ -687,9 +801,13 @@ async def main():
         buffer_flush_interval = args.buffer_flush_interval
         compress_time = args.compress_time
         # Immediate compression if requested
-        if args.compress_now or os.getenv("COMPRESS_ONLY_TESLA") == "1":
-            logger.info("Immediate compression mode")
-            await run_compress_now()
+        if args.compress_now or args.compress_vin:
+            if args.compress_vin:
+                logger.info(f"Immediate compression mode for VIN: {args.compress_vin}")
+                await run_compress_now(specific_vin=args.compress_vin, batch_size=args.batch_size)
+            else:
+                logger.info("Immediate compression mode for all vehicles")
+                await run_compress_now(batch_size=args.batch_size)
             return
         
         # Start Kafka consumption

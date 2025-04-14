@@ -9,6 +9,7 @@ from pathlib import Path
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaError
 from aiokafka.consumer.consumer import ConsumerRecord
+from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 
 logger = logging.getLogger("kafka-consumer")
 
@@ -28,7 +29,8 @@ class KafkaConsumer:
                  session_timeout_ms: int = 60000,        # 1 minute
                  request_timeout_ms: int = 30000,        # 30 secondes
                  enable_auto_commit: bool = True,
-                 auto_commit_interval_ms: int = 5000):   # 5 secondes
+                 auto_commit_interval_ms: int = 5000,   # 5 secondes
+                 message_retention_hours: Optional[int] = 48):   # Rétention de 48 heures par défaut
         """
         Initialise le consumer Kafka avec les meilleures pratiques.
         
@@ -42,6 +44,7 @@ class KafkaConsumer:
             request_timeout_ms: Timeout des requêtes (ms)
             enable_auto_commit: Active le commit automatique des offsets
             auto_commit_interval_ms: Intervalle de commit automatique (ms)
+            message_retention_hours: Durée de rétention des messages en heures (None pour ne pas modifier)
         """
         self.bootstrap_servers = bootstrap_servers
         self.topic = topic
@@ -49,6 +52,7 @@ class KafkaConsumer:
         self.consumer = None
         self.running = False
         self.auto_offset_reset = auto_offset_reset
+        self.message_retention_hours = message_retention_hours
         
         # Configuration Kafka optimisée
         self.config = {
@@ -65,7 +69,56 @@ class KafkaConsumer:
         }
         
         logger.info(f"KafkaConsumer initialisé: bootstrap_servers={bootstrap_servers}, topic={topic}, group_id={group_id}, auto_offset_reset={auto_offset_reset}")
+        if message_retention_hours is not None:
+            logger.info(f"Une politique de rétention de {message_retention_hours} heures sera appliquée au démarrage")
         logger.debug(f"Configuration complète: {self.config}")
+
+    async def set_retention_policy(self, retention_hours: int = 48) -> bool:
+        """
+        Configure la politique de rétention des messages pour le topic.
+        Les messages seront conservés pendant la durée spécifiée, puis supprimés.
+        
+        Args:
+            retention_hours: Durée de rétention en heures (défaut: 48 heures)
+            
+        Returns:
+            bool: True si la configuration a réussi, False sinon
+        """
+        retention_ms = retention_hours * 60 * 60 * 1000  # Conversion en millisecondes
+        
+        logger.info(f"Configuration de la rétention des messages à {retention_hours} heures ({retention_ms} ms) pour le topic {self.topic}")
+        
+        try:
+            # Créer un client Admin Kafka
+            admin_client = AIOKafkaAdminClient(
+                bootstrap_servers=self.bootstrap_servers,
+                client_id=f"{self.group_id}-admin"
+            )
+            
+            await admin_client.start()
+            
+            try:
+                # Configurer la rétention pour le topic
+                config_resource = {
+                    "topic": self.topic,
+                    "configs": {
+                        "retention.ms": str(retention_ms)
+                    }
+                }
+                
+                await admin_client.alter_configs([config_resource])
+                
+                logger.info(f"Politique de rétention configurée avec succès: les messages seront conservés pendant {retention_hours} heures")
+                return True
+                
+            finally:
+                await admin_client.close()
+                
+        except Exception as e:
+            logger.error(f"Erreur lors de la configuration de la politique de rétention: {str(e)}", exc_info=True)
+            logger.warning(f"Pour configurer manuellement la rétention, utilisez la commande Kafka suivante:")
+            logger.warning(f"  kafka-configs.sh --bootstrap-server {self.bootstrap_servers} --entity-type topics --entity-name {self.topic} --alter --add-config retention.ms={retention_ms}")
+            return False
 
     async def _init_consumer(self) -> None:
         """
@@ -82,6 +135,12 @@ class KafkaConsumer:
                 
                 logger.info(f"Démarrage du consumer AIOKafka...")
                 await self.consumer.start()
+                
+                # Si une politique de rétention a été spécifiée, l'appliquer maintenant
+                if self.message_retention_hours is not None:
+                    success = await self.set_retention_policy(self.message_retention_hours)
+                    if not success:
+                        logger.warning(f"Impossible d'appliquer la politique de rétention de {self.message_retention_hours} heures")
                 
                 # Vérifier les partitions assignées
                 partitions = self.consumer.assignment()
