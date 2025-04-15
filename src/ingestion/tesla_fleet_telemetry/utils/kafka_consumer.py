@@ -9,7 +9,7 @@ from pathlib import Path
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaError
 from aiokafka.consumer.consumer import ConsumerRecord
-from aiokafka.admin import AIOKafkaAdminClient, NewTopic
+from aiokafka.admin import AIOKafkaAdminClient, NewTopic, ConfigResource, ResourceType
 
 logger = logging.getLogger("kafka-consumer")
 
@@ -98,13 +98,12 @@ class KafkaConsumer:
             await admin_client.start()
             
             try:
-                # Configurer la rétention pour le topic
-                config_resource = {
-                    "topic": self.topic,
-                    "configs": {
-                        "retention.ms": str(retention_ms)
-                    }
-                }
+                # Utiliser ConfigResource pour configurer la rétention pour le topic
+                config_resource = ConfigResource(
+                    resource_type=ResourceType.TOPIC,
+                    name=self.topic,
+                    configs={"retention.ms": str(retention_ms)}
+                )
                 
                 await admin_client.alter_configs([config_resource])
                 
