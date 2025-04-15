@@ -9,7 +9,7 @@ from pathlib import Path
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaError
 from aiokafka.consumer.consumer import ConsumerRecord
-from aiokafka.admin import AIOKafkaAdminClient, NewTopic, ConfigResource, ResourceType
+from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 
 logger = logging.getLogger("kafka-consumer")
 
@@ -98,14 +98,15 @@ class KafkaConsumer:
             await admin_client.start()
             
             try:
-                # Utiliser ConfigResource pour configurer la rétention pour le topic
-                config_resource = ConfigResource(
-                    resource_type=ResourceType.TOPIC,
-                    name=self.topic,
-                    configs={"retention.ms": str(retention_ms)}
-                )
+                # Dans certaines versions de aiokafka, alter_configs attend un dictionnaire
+                # de configurations par type et nom de ressource
+                configs = {
+                    ('topic', self.topic): {
+                        'retention.ms': str(retention_ms)
+                    }
+                }
                 
-                await admin_client.alter_configs([config_resource])
+                await admin_client.alter_configs(configs)
                 
                 logger.info(f"Politique de rétention configurée avec succès: les messages seront conservés pendant {retention_hours} heures")
                 return True
