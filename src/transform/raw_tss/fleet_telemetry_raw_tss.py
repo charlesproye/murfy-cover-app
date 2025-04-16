@@ -19,7 +19,7 @@ def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform")
     # print(sanity_check(get_raw_tss(force_update=True)))
 
-#@cache_result(FLEET_TELEMETRY_RAW_TSS_KEY, on="s3")
+@cache_result(FLEET_TELEMETRY_RAW_TSS_KEY, on="s3")
 def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
     logger.debug("Getting raw tss from responses provided by tesla.")
     keys = get_response_keys_to_parse(bucket)
