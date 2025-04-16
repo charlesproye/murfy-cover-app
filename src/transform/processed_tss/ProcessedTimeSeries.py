@@ -161,7 +161,7 @@ class ProcessedTimeSeries(CachedETL):
     @classmethod
     def update_all_tss(cls, **kwargs):
         for make in ALL_MAKES:
-            if make == "tesla":
+            if make in ["tesla", "tesla-fleet-telemery"]:
                 cls = TeslaProcessedTimeSeries
             else:
                 cls = ProcessedTimeSeries
@@ -170,9 +170,9 @@ class ProcessedTimeSeries(CachedETL):
 class TeslaProcessedTimeSeries(ProcessedTimeSeries):
 
     def __init__(self, make:str="tesla", id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False, **kwargs):
-        self.logger = getLogger("tesla")
-        set_level_of_loggers_with_prefix(log_level, "tesla")
-        super().__init__("tesla", id_col, log_level, max_td, force_update, **kwargs)
+        self.logger = getLogger(make)
+        set_level_of_loggers_with_prefix(log_level, make)
+        super().__init__(make, id_col, log_level, max_td, force_update, **kwargs)
 
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (
@@ -211,8 +211,16 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         tss["in_discharge"] = tss.eval("nan_charging.notna() & ~nan_charging")
         return tss.drop(columns=["nan_charging", "ffill_charging", "bfill_charging", "ffill_date", "bfill_date"])
 
+    def compute_enenergy_added(self, tss:DF) -> DF:
+        tss['charge_energy_added'] = tss['dc_charge_energy_added'].where(
+            tss['dc_charge_energy_added'].notnull() & 
+            (tss['dc_charge_energy_added'] > 0), 
+            tss['ac_charge_energy_added'])
+        return tss
     def compute_charge_idx(self, tss:DF) -> DF:
         self.logger.debug("Computing tesla specific charge index.")
+        if self.make == 'tesla-fleet-telemetry':
+            tss = tss.pipe(self.compute_enenergy_added)
         tss_grp = tss.groupby("vin", observed=False)
         tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
         energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
