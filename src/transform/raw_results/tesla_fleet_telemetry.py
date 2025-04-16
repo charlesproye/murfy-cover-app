@@ -20,7 +20,7 @@ def main():
 
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla-fleet-telemetry"), "s3")
 def get_results() -> DF:
-    logger.info("Processing raw tesla results.")
+    logger.info("Processing raw tesla fleet telemetry results.")
     results = (TeslaProcessedTimeSeries('tesla-fleet-telemetry',  filters=[("trimmed_in_charge", "==", True)])
                .groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False).agg(
             ac_energy_added_min=pd.NamedAgg("ac_charge_energy_added", "min"),
