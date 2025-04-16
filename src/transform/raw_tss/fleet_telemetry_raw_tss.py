@@ -21,7 +21,7 @@ def main():
 
 @cache_result(FLEET_TELEMETRY_RAW_TSS_KEY, on="s3")
 def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
-    logger.debug("Getting raw tss from responses provided by tesla.")
+    logger.debug("Getting raw tss from responses provided by tesla fleet telemetry.")
     keys = get_response_keys_to_parse(bucket)
     new_raw_tss = get_raw_tss_from_keys(keys, bucket)
     if bucket.check_file_exists(FLEET_TELEMETRY_RAW_TSS_KEY):
@@ -67,4 +67,5 @@ def get_raw_tss_from_keys(keys:DF, bucket:S3_Bucket) -> DF:
 
 if __name__ == "__main__":
     main()
+    get_raw_tss()
 
