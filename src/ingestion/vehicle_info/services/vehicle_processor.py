@@ -92,7 +92,7 @@ class VehicleProcessor:
         result = cursor.fetchone()
         oem_id = await self._get_or_create_oem(cursor, oem)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
-        if result:
+        if result and version != 'MTU':
             model_id = result[0]
             cursor.execute("""
                 UPDATE vehicle_model 
@@ -160,21 +160,19 @@ class VehicleProcessor:
                     cursor = con.cursor()
                     for _, vehicle in tesla_df.iterrows():
                         try:
-                            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
-                            vehicle_exists = cursor.fetchone()
+                            cursor.execute("SELECT id, vehicle_model_id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
+                            vehicle_exists, model_id_db = cursor.fetchone()
+
+                            cursor.execute("SELECT version FROM vehicle_model WHERE id = %s", (model_id_db,))
+                            version_db = cursor.fetchone()[0]
+
                             model_name, version, type = await self.tesla_api.get_vehicle_options(session, vehicle['vin'])
                             warranty_km, warranty_date, start_date = await self.tesla_api.get_warranty_info(session, vehicle['vin'])
+                            model_id = await self._update_or_create_tesla_models(cursor, model_name, type, version, vehicle['make'], vehicle['oem'], warranty_km, warranty_date)
                             fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
                             region_id = await self._get_or_create_region(cursor, vehicle['country'])
                             
-                            model_id = await self._update_or_create_tesla_models(
-                                cursor, model_name, type, version, vehicle['make'], 
-                                vehicle['oem'], warranty_km, warranty_date
-                            )
                             print(f'Vehicle Details - VIN: {vehicle["vin"]} | {model_name} | {version} | {type} | Warranty KM: {warranty_km} | Warranty Date: {warranty_date} | {start_date} -> {vehicle["end_of_contract"]}')
-
-                            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
-                            vehicle_exists = cursor.fetchone()
                             
                             if not vehicle_exists:
                                 vehicle_id = str(uuid.uuid4())
@@ -193,12 +191,20 @@ class VehicleProcessor:
                                     )
                                 )
                                 logging.info(f"New Tesla vehicle inserted in DB VIN: {vehicle['vin']}")
-                            else:
+                            elif vehicle_exists and version_db =='MTU' and version != 'MTU':
                                 cursor.execute(
                                     "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s WHERE vin = %s",
                                     (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['vin'])
                                 )
                                 logging.info(f"Updated Tesla vehicle in DB VIN: {vehicle['vin']}")
+
+                            elif vehicle_exists and version_db !='MTU' and version == 'MTU':
+                                cursor.execute(
+                                    "UPDATE vehicle SET activation_status = %s, is_displayed = %s WHERE vin = %s",
+                                    (vehicle['real_activation'], vehicle['EValue'], vehicle['vin'])
+                                )
+                                logging.info(f"Updated Tesla vehicle in DB VIN: {vehicle['vin']}")
+
                                 
                             con.commit()
                         except Exception as e:
