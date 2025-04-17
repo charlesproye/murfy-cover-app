@@ -24,46 +24,40 @@ class TeslaApi:
     TESLA_PATTERNS = {
         'model 3': {
             'patterns': [
-                (r'.*standard range.*plus.*rear.?wheel.*|.*standard range.*plus.*rwd.*|.*rear.?wheel drive.*', 'RWD'),
-                (r'.*performance.*dual motor.*|.*performance.*', 'Performance'),
-                (r'.*long range.*all.?wheel drive.*', 'Long Range AWD'),
+                (r'.*standard range.*plus.*rear.?wheel.*|.*standard range.*plus.*rwd.*|.*rear.?wheel drive.*', 'rwd'),
+                (r'.*performance.*dual motor.*|.*performance.*', 'performance'),
+                (r'.*long range.*all.?wheel drive.*', 'long range awd'),
             ]
         },
         'model s': {
             'patterns': [
-                (r'.*100d.*', '100D'),
-                (r'.*75d.*', '75D'),
-                (r'.*long range.*plus.*', 'Long Range Plus'),
-                (r'.*long range.*', 'Long Range'),
-                (r'.*plaid.*', 'Plaid'),
-                (r'.*performance.*', 'Performance'),
-                (r'.*standard range.*', 'Standard Range'),
+                (r'.*100d.*', '100d'),
+                (r'.*75d.*', '75d'),
+                (r'.*long range.*plus.*', 'long range plus'),
+                (r'.*long range.*', 'long range'),
+                (r'.*plaid.*', 'plaid'),
+                (r'.*performance.*', 'performance'),
+                (r'.*standard range.*', 'standard range'),
             ]
         },
         'model x': {
             'patterns': [
-                (r'.*long range.*plus.*', 'Long Range Plus'),
-                (r'.*long range.*', 'Long Range'),
+                (r'.*long range.*plus.*', 'long range plus'),
+                (r'.*long range.*', 'long range'),
             ]
         },
         'model y': {
             'patterns': [
-                (r'.*long range.*rwd.*', 'Long Range RWD'),
-                (r'.*long range.*all.?wheel drive.*', 'Long Range AWD'),
-                (r'.*performance.*awd.*', 'Performance'),
-                (r'.*rear.?wheel drive.*', 'RWD'),
+                (r'.*long range.*rwd.*', 'long range rwd'),
+                (r'.*long range.*all.?wheel drive.*', 'long range awd'),
+                (r'.*performance.*awd.*', 'performance'),
+                (r'.*rear.?wheel drive.*', 'rwd'),
             ]
         }
     }
     
     RATE_LIMIT_DELAY = 0.5
     MAX_RETRIES = 3
-    
-    MODEL_CODE_MAPPING = {
-        "1": "s",
-        "7": "s",
-        "9": "s"
-    }
     
     def __init__(self, base_url: str, slack_token: str, slack_channel_id: str):
         self.base_url = base_url
@@ -244,45 +238,65 @@ class TeslaApi:
             logging.warning(f"No Tesla account found for VIN: {vin}")
         return account
 
-    async def get_vehicle_options(self, session, vin: str) -> Tuple[str, str, str]:
-        """Récupère les options d'un véhicule."""
+    async def get_vehicle_options(self, session, vin: str, model_name: str) -> Tuple[str, str]:
+        """Get vehicle options from Tesla API.
+        
+        Args:
+            session: aiohttp client session
+            vin: Vehicle Identification Number
+            model_name: Name of Tesla model (e.g., 'model 3', 'model y')
+            
+        Returns:
+            Tuple[str, str]: (version_code, vehicle_type)
+            where version_code is the Tesla model version (e.g., 'MTY13B')
+            and vehicle_type is the specific variant (e.g., 'Performance', 'Long Range AWD')
+        """
         account = await self.get_account_for_vin(session, vin)
         url = f"{self.base_url}/api/1/dx/vehicles/options?vin={vin}"
-        retries = self.MAX_RETRIES
-        while retries > 0:
+        for _ in range(self.MAX_RETRIES):
             try:
                 headers = await self._get_headers(session, account)
                 async with session.get(url, headers=headers) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        model_info = next((item for item in data.get('codes', []) if item['code'].startswith('$MT')),None)
-                        
-                        if model_info:
-                            version = model_info['code'][1:]
-                            model_code = version[2]
-                            
-                            model_code = self.MODEL_CODE_MAPPING.get(model_code, model_code)
-                            model_name = f"model {model_code}".lower()
-                            
-                            display_name = model_info['displayName'].lower()
-                            vehicle_type = "unknown"
-                            
-                            if model_name in self.TESLA_PATTERNS:
-                                vehicle_type = next(
-                                    (type_name for pattern, type_name in self.TESLA_PATTERNS[model_name]['patterns']
-                                     if re.match(pattern, display_name, re.IGNORECASE)),"unknown")
-                            return model_name,version,vehicle_type
-                        else:
-                            logging.info(f"Error fetching options for VIN {vin}: HTTP {response.status}")
-                            return 'model u','unknown','MTU'
-                
+                    if response.status != 200:
+                        logging.warning(f"Failed to fetch options for VIN {vin}: HTTP {response.status}")
+                        continue
+                    
+                    data = await response.json()
+                    model_info = next(
+                        (item for item in data.get('codes', []) 
+                         if item['code'].startswith('$MT')), 
+                        None
+                    )
+                    
+                    if not model_info:
+                        return 'unknown', 'MTU'
+                    
+                    # Extract version code
+                    version = model_info['code'][1:]
+                    if version == 'MTY13':
+                        version = 'MTY13C' if vin[10] == 'C' else 'MTY13B'
+                    
+                    # Determine vehicle type
+                    display_name = model_info['displayName'].lower()
+                    if model_name not in self.TESLA_PATTERNS:
+                        return version, 'unknown'
+                    
+                    # Match vehicle type using patterns
+                    vehicle_type = next(
+                        (type_name for pattern, type_name 
+                         in self.TESLA_PATTERNS[model_name]['patterns']
+                         if re.match(pattern, display_name, re.IGNORECASE)),
+                        'unknown'
+                    )
+                    
+                    return version, vehicle_type
+                    
             except Exception as e:
                 logging.error(f"Error fetching options for VIN {vin}: {str(e)}")
-                retries -= 1
                 await asyncio.sleep(self.RATE_LIMIT_DELAY)
         
         logging.error(f"Failed to fetch options for VIN {vin} after {self.MAX_RETRIES} retries")
-        return 'model u','unknown','MTU'
+        return 'unknown', 'MTU'
 
     async def get_warranty_info(self, session, vin: str) -> Tuple[Optional[int], Optional[int], Optional[str]]:
         """Récupère la date de début basée sur les informations de garantie."""
