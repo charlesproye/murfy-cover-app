@@ -110,9 +110,9 @@ def make_soh_presentable_per_vehicle(df:DF) -> DF:
     return df
 
 if __name__ == "__main__":
-    # set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
-    # set_level_of_loggers_with_prefix("DEBUG", "transform.results")
-    # single_dataframe_script_main(update_vehicle_data_table)
+    set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
+    set_level_of_loggers_with_prefix("DEBUG", "transform.results")
+    single_dataframe_script_main(update_vehicle_data_table)
 
     ###Ingest demo data
     asyncio.run(ingest_demo())
