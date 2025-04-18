@@ -52,6 +52,6 @@ SOH_FILTER_EVAL_STRINGS: dict[callable] = {
     "bmw": "soh = soh",
     "kia": "soh = soh",
     "stellantis": "soh = soh",
-    "tesla-fleet-telemetry": "soh = soh.where(soc_diff > 40 & soh.between(0.75, 1.05))",
+    "tesla-fleet-telemetry": "soh = soh.where(soc_diff > 30 & soh.between(0.75, 1.05))",
 }
 
