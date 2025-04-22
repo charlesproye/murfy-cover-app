@@ -1,12 +1,12 @@
 from logging import getLogger
-
+import asyncio
 from core.sql_utils import *
 from core.stats_utils import *
 from core.pandas_utils import *
 from transform.processed_results.config import *
 from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
-
+from transform.processed_results.demo_data.ingest_demo import ingest_demo
 
 logger = getLogger("transform.results.main")
 def update_vehicle_data_table():
@@ -113,4 +113,7 @@ if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
     set_level_of_loggers_with_prefix("DEBUG", "transform.results")
     single_dataframe_script_main(update_vehicle_data_table)
+
+    ###Ingest demo data
+    asyncio.run(ingest_demo())
 
