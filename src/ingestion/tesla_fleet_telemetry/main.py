@@ -21,12 +21,13 @@ warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<
 # Fix relative imports to use absolute paths
 from src.ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
 from src.ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
-from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients, sync_time_with_aws, force_time_sync
-from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
 from src.ingestion.tesla_fleet_telemetry.core.s3_handler import (
-    compress_data_non_blocking, compress_specific_vehicle,
-    deep_compress_all_temp_files, deep_compress_temp_files_non_blocking
+    compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients,
+    sync_time_with_aws, force_time_sync, compress_data_non_blocking,
+    compress_specific_vehicle, deep_compress_all_temp_files,
+    deep_compress_temp_files_non_blocking, compress_vehicle_data_for_date
 )
+from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
 
 # Logging configuration
 logging.basicConfig(
@@ -433,9 +434,12 @@ async def compress_worker(vehicles: List[str], date: datetime):
                 logger.error(f"Error closing S3 client: {str(e)}")
 
 async def is_midnight() -> bool:
-    """Check if current time is midnight (00:00)."""
+    """Check if current time is within the first minute of the day (00:00-00:01)."""
     now = datetime.now()
-    return now.hour == 0 and now.minute == 0
+    is_compression_time = now.hour == 14 and now.minute == 31
+    if is_compression_time:
+        logger.info(f"Compression time detected: {now}")
+    return is_compression_time
 
 async def compress_previous_day_data(blocking=False, batch_size: int = 10):
     """
@@ -454,133 +458,18 @@ async def compress_previous_day_data(blocking=False, batch_size: int = 10):
         # Calculate yesterday's date
         yesterday = datetime.now() - timedelta(days=1)
         yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        logger.info(f"Compressing data for {yesterday}")
         
-        # Get list of vehicles with temporary data
-        settings = get_settings()
-
-        print("yesterday", yesterday)
-        session = aioboto3.Session()
-        
-        # Use the same config as in s3_handler
-        boto_config = Config(
-            signature_version='s3v4',
-            s3={
-                'addressing_style': 'path',
-                'payload_signing_enabled': False,
-                'use_accelerate_endpoint': False,
-                'checksum_validation': False,  # Disable checksum validation properly
-                'use_dualstack_endpoint': False
-            },
-            connect_timeout=5,
-            read_timeout=60,
-            retries={'max_attempts': 3, 'mode': 'standard'},
-            parameter_validation=True
-        )
-        
-        s3_client = await session.client(
-            's3',
-            region_name=settings.s3_region,
-            endpoint_url=settings.s3_endpoint,
-            aws_access_key_id=settings.s3_key,
-            aws_secret_access_key=settings.s3_secret,
-            config=boto_config,
-            verify=False  # Disable SSL verification if using a self-signed cert
-        ).__aenter__()
-        
-        vehicles = []
-        
-        try:
-            # Get list of vehicles
-            response = await s3_client.list_objects_v2(
-                Bucket=settings.s3_bucket,
-                Prefix=f"{settings.base_s3_path}/temp/",
-                Delimiter="/"
-            )
-            
-            for prefix in response.get('CommonPrefixes', []):
-                vehicle_prefix = prefix.get('Prefix', '')
-                if vehicle_prefix:
-                    vin = vehicle_prefix.split('/')[-2]
-                    vehicles.append(vin)
-        finally:
-            # Ensure client is properly closed
-            try:
-                await s3_client.__aexit__(None, None, None)
-            except Exception as e:
-                logger.error(f"Error closing S3 client: {str(e)}")
-        
-        if not vehicles:
-            logger.info("No vehicles found to compress")
-            return True if blocking else None
-            
-        # Create vehicle pools
-        vehicle_pools = await create_vehicle_worker_pools(vehicles)
-        
-        # Define the compression function
-        async def do_compression():
-            try:
-                # Split vehicle pools into smaller batches to avoid time skew issues
-                all_worker_tasks = []
-                
-                for pool in vehicle_pools:
-                    # Process pools in smaller sub-batches
-                    for i in range(0, len(pool), batch_size):
-                        sub_batch = pool[i:i+batch_size]
-                        if sub_batch:
-                            task = asyncio.create_task(compress_worker(sub_batch, yesterday))
-                            all_worker_tasks.append(task)
-                            
-                            # Brief pause between creating tasks to prevent initial time skew
-                            await asyncio.sleep(0.1)
-                
-                # Create a semaphore to limit concurrent task execution
-                semaphore = asyncio.Semaphore(batch_size)
-                
-                async def process_with_semaphore(task):
-                    async with semaphore:
-                        return await task
-                
-                # Wait for all workers to complete, but limit concurrency
-                results = await asyncio.gather(
-                    *[process_with_semaphore(task) for task in all_worker_tasks],
-                    return_exceptions=True
-                )
-                
-                # Check for errors
-                error_count = sum(1 for r in results if isinstance(r, Exception))
-                if error_count > 0:
-                    logger.warning(f"Daily compression completed with {error_count} errors")
-                    for i, result in enumerate(results):
-                        if isinstance(result, Exception):
-                            logger.error(f"Worker error: {str(result)}")
-                
-                logger.info(f"Compression of data for {yesterday.date()} completed")
-                
-                # Clean up yesterday's temporary files
-                await cleanup_old_data(yesterday)
-                
-                return error_count == 0
-            except Exception as e:
-                logger.error(f"Error in compression task: {str(e)}")
-                return False
-        
+        # Use deep_compress_all_temp_files directly as it's more reliable
         if blocking:
-            # Execute compression synchronously
-            return await do_compression()
+            return await deep_compress_all_temp_files(batch_size=batch_size)
         else:
-            # Execute compression as a background task
-            task = asyncio.create_task(do_compression())
-            
-            def log_completion(future):
-                try:
-                    result = future.result()
-                    logger.info(f"Background daily compression completed: {result}")
-                except Exception as e:
-                    logger.error(f"Background daily compression failed: {str(e)}")
-            
-            task.add_done_callback(log_completion)
+            task = asyncio.create_task(deep_compress_all_temp_files(batch_size=batch_size))
+            task.add_done_callback(lambda future: logger.info(
+                f"Background daily compression completed: {future.result()}"
+            ))
             return task
-        
+            
     except Exception as e:
         logger.error(f"Error during daily compression: {str(e)}")
         return False if blocking else None
@@ -608,13 +497,33 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
             if await is_midnight():
                 logger.info("Midnight detected - Starting compression")
                 
-                # Flush all buffers before compression
-                await flush_all_buffers()
+                # Pause Kafka consumption
+                logger.info("Pausing Kafka consumption for compression")
+                await consumer.pause()
                 
-                # Run compression
-                await compress_previous_day_data(blocking=True)
-                
-                logger.info("Compression completed - Resuming data collection")
+                try:
+                    # Flush all buffers before compression
+                    logger.info("Flushing all buffers")
+                    await flush_all_buffers()
+                    
+                    # Run compression
+                    logger.info("Starting compression process")
+                    compression_result = await compress_previous_day_data(blocking=True)
+                    
+                    if compression_result:
+                        logger.info("Compression completed successfully")
+                    else:
+                        logger.error("Compression failed")
+                        
+                except Exception as e:
+                    logger.error(f"Error during compression process: {str(e)}")
+                    
+                finally:
+                    # Only resume if we're still running
+                    if running:
+                        logger.info("Resuming Kafka consumption")
+                        await consumer.resume()
+                        logger.info("Kafka consumption resumed")
                 
                 # Sleep for a minute to avoid multiple triggers
                 await asyncio.sleep(60)
@@ -693,7 +602,10 @@ async def run_compress_now(specific_vin: str = None, batch_size: int = 10, deep:
     try:
         if specific_vin:
             logger.info(f"Starting compression for vehicle {specific_vin}")
-            await compress_specific_vehicle(specific_vin, deep=deep)
+            if deep:
+                await deep_compress_all_temp_files(specific_vin=specific_vin, batch_size=batch_size)
+            else:
+                await compress_specific_vehicle(specific_vin)
             logger.info(f"Completed compression for vehicle {specific_vin}")
         else:
             # Since deep compression is now the default behavior, we always do deep compression
