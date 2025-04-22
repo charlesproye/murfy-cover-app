@@ -201,10 +201,9 @@ IN_CHARGE_CHARGING_STATUS_VALS = [
     'initialization',
     "in-progress",
     # fleet-telemetry
-    'DetailedChargeStateNoPower',
-    'DetailedChargeStateComplete', 
-    'DetailedChargeStateCharging', 
-    'DetailedChargeStateStarting'
+    'detailedchargestatecomplete', 
+    'detailedchargestatecharging', 
+    'detailedchargestatestarting'
 ]
 
 IN_DISCHARGE_CHARGING_STATUS_VALS = [
@@ -213,7 +212,9 @@ IN_DISCHARGE_CHARGING_STATUS_VALS = [
     'chargingerror',
     'cable_unplugged',
     'disconnected', # Tesla
-    "DetailedChargeStateDisconnected" # fleet-telemetry
+    "detailedchargestatedisconnected",
+    "detailedchargestatenopower",
+    "detailedchargestatestopped", # fleet-telemetry
 ]
 
 CHARGING_STATUS_VAL_TO_MASK = {
