@@ -224,6 +224,7 @@ class VehicleProcessor:
                             fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
                             region_id = await self._get_or_create_region(cursor, vehicle['country'])
                             model_name, type, start_date = await self.renault_api.get_vehicle_info(session, vehicle['vin'])
+                            print(f"Vehicle Details - VIN: {vehicle['vin']} | {model_name} | {type} | {start_date} -> {vehicle['end_of_contract']}")
                             model_id = await self._update_or_create_other_models(cursor, model_name, type, vehicle['make'], vehicle['oem'])
                             if not vehicle_exists:
                                 vehicle_id = str(uuid.uuid4())
@@ -244,8 +245,8 @@ class VehicleProcessor:
                                 logging.info(f"New Renault vehicle inserted in DB VIN: {vehicle['vin']}")
                             else:
                                 cursor.execute(
-                                    "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
-                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vehicle['vin'])
+                                    "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s, start_date = %s WHERE vin = %s",
+                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], start_date, vehicle['vin'])
                                 )
                                 logging.info(f"Updated Renault vehicle in DB VIN: {vehicle['vin']}")
                                 

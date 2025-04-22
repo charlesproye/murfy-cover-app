@@ -72,7 +72,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
         await asyncio.gather(
             #activation_service.activation_tesla(),
             #activation_service.activation_bmw(),
-            activation_service.activation_hm(),
+            #activation_service.activation_hm(),
             #activation_service.activation_stellantis()
         )
 
