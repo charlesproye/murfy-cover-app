@@ -269,7 +269,7 @@ class TeslaApi:
                     )
                     
                     if not model_info:
-                        return 'unknown', 'MTU'
+                        return 'MTU', 'unknown'
                     
                     # Extract version code
                     version = model_info['code'][1:]
@@ -296,7 +296,7 @@ class TeslaApi:
                 await asyncio.sleep(self.RATE_LIMIT_DELAY)
         
         logging.error(f"Failed to fetch options for VIN {vin} after {self.MAX_RETRIES} retries")
-        return 'unknown', 'MTU'
+        return 'MTU', 'unknown'
 
     async def get_warranty_info(self, session, vin: str) -> Tuple[Optional[int], Optional[int], Optional[str]]:
         """Récupère la date de début basée sur les informations de garantie."""
