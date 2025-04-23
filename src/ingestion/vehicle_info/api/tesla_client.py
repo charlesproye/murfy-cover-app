@@ -16,7 +16,8 @@ class TeslaApi:
         'AYVENS_BLBV': 'ACCESS_TOKEN_AYVENS_BLBV',
         'AYVENS': 'ACCESS_TOKEN_AYVENS',
         'AYVENS_NV': 'ACCESS_TOKEN_AYVENS_NV',
-        'AYVENS_NVA': 'ACCESS_TOKEN_AYVENS_NVA'
+        'AYVENS_NVA': 'ACCESS_TOKEN_AYVENS_NVA',
+        'CAPFM': 'ACCESS_TOKEN_CAPFM'
     }
     
     TESLA_PATTERNS = {
@@ -96,7 +97,7 @@ class TeslaApi:
             logging.info(f"Getting token for {account_key} from Slack...")
             messages = await self._fetch_slack_messages(session)
             
-            for i in range(6):
+            for i in range(7):
                 try:
                     message_text = messages[i]['blocks'][0]['elements'][0]['elements'][3]['text']
                     response_key = messages[i]['blocks'][0]['elements'][0]['elements'][0]['text'].split(':')[0]
@@ -197,20 +198,27 @@ class TeslaApi:
         
         return all_vins
 
-    async def _build_vin_mapping(self, session):
-        """Construit le mapping VIN -> compte Tesla en interrogeant tous les comptes."""
+    async def _build_vin_mapping(self, session) -> List[Tuple[str, str]]:
+        """Construit le mapping VIN -> compte Tesla en interrogeant tous les comptes.
+        
+        Returns:
+            List of tuples, where each tuple contains (vin, account_name)
+        """
         self._vin_to_account = {}
         self._cache_timestamp = datetime.now(timezone.utc).timestamp()
+        vin_account_pairs = []
         
         for account_name in self.ACCOUNT_TOKEN_KEYS:
             try:
                 vins = await self._fetch_account_vehicles(session, account_name)
                 for vin in vins:
                     self._vin_to_account[vin] = account_name
+                    vin_account_pairs.append((vin, account_name))
                 logging.info(f"Mapped {len(vins)} VINs to account {account_name}")
             except Exception as e:
                 logging.error(f"Failed to fetch VINs for account {account_name}: {str(e)}")
-
+        return vin_account_pairs
+    
     async def get_account_for_vin(self, session, vin: str) -> Optional[str]:
         """Trouve le compte Tesla associé à un VIN donné.
         

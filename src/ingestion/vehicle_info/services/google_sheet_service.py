@@ -1,118 +1,103 @@
 import logging
-import time
 from typing import Optional
-from ..config.credentials import SPREADSHEET_ID
-from ..utils.google_sheets_utils import get_google_client
-from gspread.exceptions import APIError
+from ingestion.vehicle_info.config.credentials import SPREADSHEET_ID
+from ingestion.vehicle_info.utils.google_sheets_utils import get_google_client
+import pandas as pd
 
-MAX_RETRIES = 5
-INITIAL_RETRY_DELAY = 1
-MAX_RETRY_DELAY = 32  # Maximum delay between retries in seconds
-REQUESTS_PER_MINUTE = 50  # Conservative limit to avoid quota issues
-MIN_REQUEST_INTERVAL = 60.0 / REQUESTS_PER_MINUTE  # Minimum time between requests
-
-last_request_time = 0
-
-def wait_for_rate_limit():
-    """Wait if necessary to respect rate limits."""
-    global last_request_time
-    current_time = time.time()
-    time_since_last_request = current_time - last_request_time
-    
-    if time_since_last_request < MIN_REQUEST_INTERVAL:
-        sleep_time = MIN_REQUEST_INTERVAL - time_since_last_request
-        logging.debug(f"Rate limiting: waiting {sleep_time:.2f} seconds")
-        time.sleep(sleep_time)
-    
-    last_request_time = time.time()
-
-async def update_google_sheet_status(vin: str, real_activation: Optional[bool], error_message: Optional[str] = None, eligibility: Optional[bool] = None, evalue: Optional[str] = None) -> bool:
-    """Update Real Activation and Activation Error columns in Google Sheet.
+async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
+    """Update or insert vehicle activation data in Google Sheet.
     
     Args:
-        vin (str): Vehicle VIN
-        real_activation (Optional[bool]): Actual activation status, None means don't update
-        error_message (Optional[str]): Error message if any
-        eligibility (Optional[bool]): Eligibility status, None means don't update
-        evalue (Optional[str]): EValue status, None means don't update
-        
+        df (pd.DataFrame): DataFrame containing vehicle data with columns:
+            - vin: Vehicle identification number
+            - Eligibility: Whether the vehicle is eligible for activation
+            - Real_Activation: Current activation status
+            - Activation_Error: Any error messages
+            - Oem: (Optional) Vehicle manufacturer
+            - Make: (Optional) Vehicle make/brand
+            
     Returns:
-        bool: True if update was successful, False otherwise
+        bool: True if all updates were successful, False otherwise
     """
-    delay = INITIAL_RETRY_DELAY
-    last_error = None
-    
-    for attempt in range(MAX_RETRIES):
-        try:
-            wait_for_rate_limit()
+    try:
+        client = get_google_client()
+        sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+        
+        # Get all existing data at once
+        existing_data = sheet.get_all_records()
+        existing_df = pd.DataFrame(existing_data)
+        
+        # Get headers
+        headers = sheet.row_values(1)
+        vin_col = headers.index("vin") + 1
+        activation_col = headers.index("Activation") + 1
+        evalue_col = headers.index("EValue") + 1
+        real_activation_col = headers.index("Real Activation") + 1
+        eligibility_col = headers.index("Eligibility") + 1
+        error_col = headers.index("Activation Error") + 1
+        oem_col = headers.index("Oem") + 1
+        make_col = headers.index("Make") + 1
+        ownership_col = headers.index("Ownership") + 1
+        country_col = headers.index("Country") + 1
+        account_owner_col = headers.index("account_owner") + 1
+        updates = []
+        inserts = []
+        
+        # Create a set of existing VINs for faster lookup
+        existing_vins = set(existing_df['vin'].astype(str))
+        
+        for _, row in df.iterrows():
+            vin = str(row['vin'])
             
-            client = get_google_client()
-            sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+            # Check if account_owner exists in the DataFrame columns
+            account_owner_value = row.get('account_owner', "") if 'account_owner' in df.columns else ""
             
-            cell = sheet.find(vin)
-            if not cell:
-                logging.error(f"VIN {vin} not found in Google Sheet")
-                return False
+            if vin in existing_vins:
+                # Find the row number in the existing data
+                row_idx = existing_df[existing_df['vin'] == vin].index[0] + 2  # +2 because of 0-based index and header row
                 
-            headers = sheet.row_values(1)
-            real_activation_col = headers.index("Real Activation") + 1
-            error_col = headers.index("Activation Error") + 1
-            eligibility_col = headers.index("Eligibility") + 1
-            evalue_col = headers.index("EValue") + 1
-            
-            updates = []
-            
-            # Update Real Activation status only if a value is provided
-            if real_activation is not None:
+                # Update existing row
                 updates.append({
-                    'range': f'R{cell.row}C{real_activation_col}',
-                    'values': [[str(real_activation).upper()]]
+                    'range': f'R{row_idx}C{real_activation_col}',
+                    'values': [[str(row['Real_Activation']).upper()]]
                 })
-            
-            # Update error message
-            updates.append({
-                'range': f'R{cell.row}C{error_col}',
-                'values': [[error_message or ""]]
-            })
-            
-            # Update Eligibility status if provided
-            if eligibility is not None:
                 updates.append({
-                    'range': f'R{cell.row}C{eligibility_col}',
-                    'values': [[str(eligibility).upper()]]
+                    'range': f'R{row_idx}C{eligibility_col}',
+                    'values': [[str(row['Eligibility']).upper()]]
                 })
-                
-            # Update EValue status if provided
-            if evalue is not None:
                 updates.append({
-                    'range': f'R{cell.row}C{evalue_col}',
-                    'values': [[evalue]]
+                    'range': f'R{row_idx}C{error_col}',
+                    'values': [[row['Activation_Error'] or ""]]
                 })
+                updates.append({
+                    'range': f'R{row_idx}C{account_owner_col}',
+                    'values': [[account_owner_value]]
+                })
+            else:
+                new_row = [""] * len(headers)  # Create empty row with same length as headers
+                new_row[vin_col - 1] = vin
+                new_row[activation_col - 1] = 'FALSE'
+                new_row[evalue_col - 1] = 'FALSE'
+                new_row[real_activation_col - 1] = 'FALSE'
+                new_row[eligibility_col - 1] = 'TRUE'
+                new_row[error_col - 1] = row['Activation_Error'] or ""
+                new_row[oem_col - 1] = 'TESLA'
+                new_row[make_col - 1] = 'TESLA'
+                new_row[ownership_col - 1] = "Bib"
+                new_row[country_col - 1] = 'France'
+                new_row[account_owner_col - 1] = account_owner_value
+                inserts.append(new_row)
+        
+        # Execute batch updates
+        if updates:
+            sheet.batch_update(updates)
             
-            # Execute batch update
-            if updates:
-                sheet.batch_update(updates)
+        # Insert new rows
+        if inserts:
+            sheet.append_rows(inserts)
             
-            return True
-            
-        except APIError as e:
-            last_error = e
-            if e.response.status_code == 429:  # Rate limit exceeded
-                sleep_time = min(delay * (2 ** attempt), MAX_RETRY_DELAY)
-                logging.warning(f"Rate limit hit, waiting {sleep_time} seconds before retry {attempt + 1}/{MAX_RETRIES}")
-                time.sleep(sleep_time)
-                continue
-            logging.error(f"API Error updating Google Sheet for VIN {vin}: {str(e)}")
-            return False
-            
-        except Exception as e:
-            last_error = e
-            if attempt < MAX_RETRIES - 1:
-                sleep_time = min(delay * (2 ** attempt), MAX_RETRY_DELAY)
-                logging.warning(f"Error updating Google Sheet, retrying in {sleep_time} seconds: {str(e)}")
-                time.sleep(sleep_time)
-                continue
-            logging.error(f"Failed to update Google Sheet after {MAX_RETRIES} attempts. Last error: {str(last_error)}")
-            return False
-            
-    return False 
+        return True
+        
+    except Exception as e:
+        logging.error(f"Error updating vehicle activation data in Google Sheet: {str(e)}")
+        return False 

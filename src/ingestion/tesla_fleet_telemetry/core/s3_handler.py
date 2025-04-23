@@ -1083,12 +1083,15 @@ __all__ = [
     "compress_data",
     "compress_data_non_blocking",
     "compress_specific_vehicle",
+    "deep_compress_all_temp_files",
+    "deep_compress_temp_files_non_blocking",
     "cleanup_old_data",
     "get_s3_async_client",
     "get_s3_sync_client",
     "sync_time_with_aws",
     "force_time_sync",
-    "compress_vehicle_data_for_date"
+    "compress_vehicle_data_for_date",
+    "compress_all_vehicle_temp_files"
 ]
 
 # Helper function to manually sync time
@@ -1234,4 +1237,229 @@ async def compress_specific_vehicle(vin: str, blocking: bool = True, batch_size:
     if blocking:
         return await compress_data(specific_vin=vin, batch_size=batch_size)
     else:
-        return await compress_data_non_blocking(specific_vin=vin, batch_size=batch_size) 
+        return await compress_data_non_blocking(specific_vin=vin, batch_size=batch_size)
+
+
+async def compress_all_vehicle_temp_files(s3_client, bucket_name: str, vin: str, batch_size: int = 10) -> bool:
+    """
+    Compresses ALL temporary files for a specific vehicle, handling pagination to ensure
+    all files are processed even if there are more than 1000.
+    
+    Args:
+        s3_client: aioboto3 S3 client
+        bucket_name: S3 bucket name
+        vin: Vehicle VIN
+        batch_size: Batch size for parallel processing
+        
+    Returns:
+        bool: True if compression was successful, False otherwise
+    """
+    settings = get_settings()
+    temp_folder = f"{settings.base_s3_path}/{vin}/temp/"
+    
+    try:
+        logger.info(f"Starting deep compression for vehicle {vin} - processing ALL temp files")
+        
+        # Define list_objects_v2 with retry
+        @retry_on_time_skewed(max_retries=3)
+        async def list_with_retry(client, **kwargs):
+            return await client.list_objects_v2(**kwargs)
+        
+        # Process all pages of results to handle more than 1000 files
+        continuation_token = None
+        total_files_processed = 0
+        total_success = True
+        
+        while True:
+            # Prepare pagination parameters
+            list_params = {
+                'Bucket': bucket_name,
+                'Prefix': temp_folder,
+                'MaxKeys': 1000  # AWS S3 maximum
+            }
+            
+            # Add continuation token if we're not on the first page
+            if continuation_token:
+                list_params['ContinuationToken'] = continuation_token
+            
+            # List temporary files with retry
+            response = await list_with_retry(s3_client, **list_params)
+            
+            if 'Contents' not in response or not response['Contents']:
+                if total_files_processed == 0:
+                    logger.debug(f"No temporary files to compress for vehicle {vin}")
+                break
+            
+            # Process this batch of files
+            files_in_batch = len(response.get('Contents', []))
+            logger.info(f"Processing batch of {files_in_batch} temp files for vehicle {vin}")
+            
+            # Call compress_vehicle_data to process this batch
+            result = await compress_vehicle_data(s3_client, bucket_name, vin)
+            if not result:
+                total_success = False
+                logger.error(f"Error compressing batch for vehicle {vin}")
+            
+            total_files_processed += files_in_batch
+            
+            # Check if there are more files to process
+            if not response.get('IsTruncated', False):
+                break
+            
+            # Get continuation token for next batch
+            continuation_token = response.get('NextContinuationToken')
+            if not continuation_token:
+                break
+        
+        logger.info(f"Completed deep compression for vehicle {vin}: {total_files_processed} files processed")
+        return total_success
+        
+    except Exception as e:
+        logger.error(f"Error deep compressing all files for vehicle {vin}: {str(e)}")
+        return False
+
+
+async def deep_compress_all_temp_files(specific_vin: str = None, batch_size: int = 5) -> bool:
+    """
+    Compresses ALL temporary files for all vehicles or a specific vehicle.
+    This is a deep compression that will process all historical temp files,
+    regardless of their date.
+    
+    Args:
+        specific_vin (str, optional): If provided, only compress for this VIN.
+        batch_size (int): Number of vehicles/files to process in parallel (default: 5)
+        
+    Returns:
+        bool: True if compression was successful, False otherwise
+    """
+    logger.info(f"Starting deep compression of ALL temporary files{f' for vehicle {specific_vin}' if specific_vin else ''}")
+    
+    settings = get_settings()
+    s3_client = await get_s3_async_client()
+    bucket_name = settings.s3_bucket
+    base_path = settings.base_s3_path
+    
+    try:
+        # Define list_objects_v2 with retry
+        @retry_on_time_skewed(max_retries=3)
+        async def list_objects_v2_with_retry(client, **kwargs):
+            return await client.list_objects_v2(**kwargs)
+            
+        # Get list of vehicle prefixes with retry
+        response = await list_objects_v2_with_retry(
+            s3_client,
+            Bucket=bucket_name,
+            Prefix=f"{base_path}/",
+            Delimiter="/"
+        )
+        
+        if 'CommonPrefixes' not in response:
+            logger.info("No vehicles found to compress")
+            return True
+            
+        # Create list of vehicles to compress
+        vehicles_to_compress = []
+        for prefix in response.get('CommonPrefixes', []):
+            vehicle_prefix = prefix.get('Prefix', '')
+            if vehicle_prefix:
+                vin = vehicle_prefix.split('/')[-2]
+                
+                # If specific_vin is provided, only include that VIN
+                if specific_vin is None or vin == specific_vin:
+                    # Check if the vehicle has temp files
+                    temp_response = await list_objects_v2_with_retry(
+                        s3_client,
+                        Bucket=bucket_name,
+                        Prefix=f"{base_path}/{vin}/temp/",
+                        MaxKeys=1
+                    )
+                    
+                    if 'Contents' in temp_response and temp_response['Contents']:
+                        vehicles_to_compress.append(vin)
+        
+        if not vehicles_to_compress:
+            logger.info(f"No vehicles found with temp files{f' for VIN {specific_vin}' if specific_vin else ''}")
+            return True
+            
+        logger.info(f"Found {len(vehicles_to_compress)} vehicles with temp files to deep compress")
+        
+        # Process vehicles in smaller batches to avoid time skew issues
+        total_success = True
+        
+        # Split vehicles into chunks of batch_size
+        for i in range(0, len(vehicles_to_compress), batch_size):
+            batch = vehicles_to_compress[i:i+batch_size]
+            logger.info(f"Processing batch {i//batch_size + 1}/{(len(vehicles_to_compress) + batch_size - 1)//batch_size}: {len(batch)} vehicles")
+            
+            # Create compression tasks for this batch
+            compression_tasks = []
+            for vin in batch:
+                task = asyncio.create_task(compress_all_vehicle_temp_files(s3_client, bucket_name, vin, batch_size))
+                compression_tasks.append(task)
+            
+            # Use semaphore to limit concurrency within each batch
+            semaphore = asyncio.Semaphore(batch_size)  # Limit concurrency
+            
+            async def compress_with_semaphore(task):
+                async with semaphore:
+                    return await task
+            
+            # Wait for all tasks in this batch to complete before moving to the next batch
+            results = await asyncio.gather(
+                *[compress_with_semaphore(task) for task in compression_tasks],
+                return_exceptions=True
+            )
+            
+            # Check for errors
+            success_count = sum(1 for r in results if r is True)
+            error_count = sum(1 for r in results if isinstance(r, Exception) or r is False)
+            
+            logger.info(f"Deep compression batch completed: {success_count} vehicles processed successfully, {error_count} errors")
+            
+            if error_count > 0:
+                total_success = False
+                for j, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        logger.error(f"Error deep compressing vehicle {batch[j]}: {str(result)}")
+                    elif result is False:
+                        logger.error(f"Error deep compressing vehicle {batch[j]}")
+            
+            # Brief pause between batches to help with time skew
+            await asyncio.sleep(2)
+        
+        logger.info(f"Deep compression of ALL temp files completed")
+        return total_success
+        
+    except Exception as e:
+        logger.error(f"Error during deep compression: {str(e)}")
+        return False
+
+
+async def deep_compress_temp_files_non_blocking(specific_vin: str = None, batch_size: int = 5):
+    """
+    Starts the deep compression process in a separate task without blocking the main process.
+    This creates a background task and immediately returns.
+    
+    Args:
+        specific_vin (str, optional): If provided, only compress for this VIN.
+        batch_size (int): Number of vehicles/files to process in parallel (default: 5)
+    
+    Returns:
+        asyncio.Task: The compression task that can be awaited if needed
+    """
+    logger.info(f"Starting non-blocking deep compression{f' for vehicle {specific_vin}' if specific_vin else ''}")
+    
+    # Create the task
+    compression_task = asyncio.create_task(deep_compress_all_temp_files(specific_vin=specific_vin, batch_size=batch_size))
+    
+    # Set up a callback to log the result
+    def log_completion(future):
+        try:
+            result = future.result()
+            logger.info(f"Background deep compression completed successfully: {result}")
+        except Exception as e:
+            logger.error(f"Background deep compression failed: {str(e)}")
+    
+    compression_task.add_done_callback(log_completion)
+    
+    return compression_task 

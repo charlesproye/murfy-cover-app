@@ -13,8 +13,13 @@ from ..services.activation_service import VehicleActivationService
 from core.sql_utils import get_connection
 
 class VehicleProcessor:
-    def __init__(self, activation_service: VehicleActivationService):
-        self.activation_service = activation_service
+    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, df: pd.DataFrame):
+        self.bmw_api = bmw_api
+        self.hm_api = hm_api
+        self.stellantis_api = stellantis_api
+        self.tesla_api = tesla_api
+        self.df = df
+    
 
     async def process_vehicles(self, df: pd.DataFrame) -> None:
         """Process vehicles from DataFrame and insert into database.
