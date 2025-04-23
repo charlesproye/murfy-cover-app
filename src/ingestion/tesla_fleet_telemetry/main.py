@@ -23,7 +23,10 @@ from src.ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsum
 from src.ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
 from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients, sync_time_with_aws, force_time_sync
 from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
-from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data_non_blocking, compress_specific_vehicle
+from src.ingestion.tesla_fleet_telemetry.core.s3_handler import (
+    compress_data_non_blocking, compress_specific_vehicle,
+    deep_compress_all_temp_files, deep_compress_temp_files_non_blocking
+)
 
 # Logging configuration
 logging.basicConfig(
@@ -688,35 +691,61 @@ async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str,
         
         logger.info("Cleanup completed")
 
-async def run_compress_now(specific_vin: str = None, batch_size: int = 10):
+async def run_deep_compress(specific_vin: str = None, batch_size: int = 5):
     """
-    Execute immediate compression of all data or for a specific VIN.
+    Execute deep compression of ALL temporary files for all vehicles or a specific VIN.
+    This will compress all historical temp files, regardless of their date.
     
     Args:
         specific_vin (str, optional): If provided, only compress this specific VIN.
-        batch_size (int): Number of vehicles to process in parallel (default: 10)
+        batch_size (int): Number of vehicles to process in parallel (default: 5)
     
     Returns:
         bool: True if compression was successful, False otherwise
     """
     if specific_vin:
-        logger.info(f"Starting immediate data compression for vehicle {specific_vin}")
+        logger.info(f"Starting deep compression for vehicle {specific_vin}")
     else:
-        logger.info("Starting immediate data compression for all vehicles")
+        logger.info("Starting deep compression for all vehicles")
     
     try:
-        # For immediate compression, we still want to wait for completion
-        # because we're exiting after, so use the regular blocking version
-        if specific_vin:
-            result = await compress_specific_vehicle(specific_vin, blocking=True, batch_size=batch_size)
-        else:
-            result = await compress_data(batch_size=batch_size)
-            
-        logger.info("Immediate compression completed")
+        # For deep compression, we still want to wait for completion
+        # because we're exiting after, so use the blocking version
+        result = await deep_compress_all_temp_files(specific_vin=specific_vin, batch_size=batch_size)
+        logger.info("Deep compression completed")
         return result
     except Exception as e:
-        logger.error(f"Error during immediate compression: {str(e)}")
+        logger.error(f"Error during deep compression: {str(e)}")
         return False
+
+async def run_compress_now(specific_vin: str = None, batch_size: int = 10, deep: bool = True):
+    """
+    Run the compression process immediately for all vehicles or a specific VIN.
+    
+    Args:
+        specific_vin: Optional VIN to compress
+        batch_size: Number of vehicles to process in parallel
+        deep: Whether to perform deep compression (default is True)
+    """
+    try:
+        if specific_vin:
+            logger.info(f"Starting compression for vehicle {specific_vin}")
+            await compress_specific_vehicle(specific_vin, deep=deep)
+            logger.info(f"Completed compression for vehicle {specific_vin}")
+        else:
+            # Since deep compression is now the default behavior, we always do deep compression
+            # unless explicitly turned off
+            if deep:
+                logger.info("Starting deep compression of all temp files")
+                await deep_compress_all_temp_files(batch_size=batch_size)
+                logger.info("Completed deep compression of all temp files")
+            else:
+                logger.info(f"Starting regular compression for all vehicles (batch size: {batch_size})")
+                await compress_data_non_blocking(batch_size=batch_size)
+                logger.info("Completed regular compression for all vehicles")
+    except Exception as e:
+        logger.error(f"Error during compression: {str(e)}")
+        raise
 
 async def main():
     """
@@ -729,6 +758,8 @@ async def main():
                            help='Compress data immediately and exit')
         parser.add_argument('--compress-vin', type=str, 
                            help='Compress data for a specific VIN and exit')
+        parser.add_argument('--deep-compress', action='store_true',
+                           help='Perform a deep compression of ALL temp files (can be combined with --compress-vin)')
         parser.add_argument('--batch-size', type=int, default=10,
                            help='Number of vehicles to process in parallel during compression')
         parser.add_argument('--verbose', action='store_true', 
@@ -799,15 +830,19 @@ async def main():
         auto_offset_reset = args.auto_offset_reset
         buffer_size = args.buffer_size
         buffer_flush_interval = args.buffer_flush_interval
-        compress_time = args.compress_time
+        
         # Immediate compression if requested
-        if args.compress_now or args.compress_vin:
+        if args.compress_now or args.compress_vin or args.deep_compress:
+            batch_size = 5 if args.deep_compress else args.batch_size
+            
             if args.compress_vin:
-                logger.info(f"Immediate compression mode for VIN: {args.compress_vin}")
-                await run_compress_now(specific_vin=args.compress_vin, batch_size=args.batch_size)
+                logger.info(f"Compression mode for VIN: {args.compress_vin}")
+                # Deep compression is now the default behavior
+                await run_compress_now(specific_vin=args.compress_vin, batch_size=batch_size, deep=True)
             else:
-                logger.info("Immediate compression mode for all vehicles")
-                await run_compress_now(batch_size=args.batch_size)
+                logger.info(f"Compression mode for all vehicles")
+                # Deep compression is now the default behavior  
+                await run_compress_now(batch_size=batch_size, deep=True)
             return
         
         # Start Kafka consumption
