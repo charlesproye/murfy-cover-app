@@ -235,32 +235,52 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         print(tss["in_charge_idx"].count() / len(tss))
         tss["in_charge_idx"] = tss["in_charge_idx"].fillna(-1).astype("uint16")
         return tss
-    def compute_charge_idx_bis(self, tss):
-# Calcul de l'évolution du SoC entre deux lignes successives
+    
+    def compute_charge_idx_bis(self, tss:pd.DataFrame) -> pd.DataFrame:
+        """Computes a charging session identifier (`in_charge_idx`) based on the evolution 
+        of the State of Charge (SoC) between successive telemetry readings.
+
+        This function helps segment the dataset into distinct charging/discharging sessions 
+        by analyzing SoC variations per vehicle (VIN) and identifying significant time gaps 
+        between measurements (greater than 120 minutes).
+
+        Args:
+            tss (pd.DatFrame): _description_
+
+        Returns:
+            pd.DataFrame: The input DataFrame enriched with the following columns: 'soc_diff' and 'in_charge_idx' 
+        """
         if self.make == 'tesla-fleet-telemetry':
-                    tss = tss.pipe(self.compute_enenergy_added)
+            tss = tss.pipe(self.compute_enenergy_added)
+            
+        # Compute soc_diff per VIN
         tss_na = tss.dropna(subset=['soc']).copy()
-
-        # Step 2: Compute soc_diff per VIN
-        tss_na['soc_diff'] = tss_na.groupby('vin', observed=True)['soc'].diff()
-
-        # Step 3: Determine trend
+        tss_na['soc_diff'] = tss_na.groupby('vin', observed=True)['soc'].diff() 
         tss_na['trend'] = tss_na['soc_diff'].apply(lambda x: 1 if x > 0 else -1 if x < 0 else 0)
 
-        # Step 4: Detect trend changes per VIN
+
         def detect_trend_change(group):
-            # Création d'une colonne avec les deux tendances précédentes
+            """Identifies points of trend change in the State of Charge (SoC) evolution 
+            for a group of telemetry data from the same vehicle.
+
+            A trend change is detected when:
+            - The direction of SoC variation (trend) differs from the previous value,
+            but the previous two trends were the same (indicating a stable trend shift).
+            - OR when there is a time gap of more than xx minutes between measurements,
+            indicating a potential break in vehicle activity.
+            """
+
             group['prev_trend'] = group['trend'].shift(1)
             group['prev_prev_trend'] = group['trend'].shift(2)
             
             group['date_diff'] = group['date'].shift(1)
 
-            # Différence de date
+
             group['prev_date'] = group['date'].shift(1)
             group['time_diff_min'] = (group['date'] - group['prev_date']).dt.total_seconds() / 60
-            group['time_gap'] = group['time_diff_min'] > 120  # plus de 30 minutes = rupture
+            group['time_gap'] = group['time_diff_min'] > 120  # plus de 120 minutes = rupture
 
-            # Nouvelle logique de trend_change
+
             group['trend_change'] = (
                 ((group['trend'] != group['prev_trend']) &
                 (group['prev_trend'] == group['prev_prev_trend'])) |
@@ -270,13 +290,12 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             return group
 
         tss_na = tss_na.groupby('vin', observed=True).apply(detect_trend_change).reset_index(drop=True)
-        # Step 5: Create a cumulative index that increments on trend change
 
+        # compute charge id
         tss_na['in_charge_idx'] = tss_na.groupby('vin',  observed=True)['trend_change'].cumsum()
         tss = tss.merge(tss_na[["soc", "date", "vin", 'soc_diff', 'in_charge_idx']], 
                         on=["soc", "date", "vin"], how="left")
         tss[["soc", "odometer","in_charge_idx"]] = tss[["soc", "odometer","in_charge_idx"]].ffill()
-        #tss['in_charge_idx'] = tss.groupby('vin',  observed=True)['trend_change'].cumsum()
         return tss
 
 
