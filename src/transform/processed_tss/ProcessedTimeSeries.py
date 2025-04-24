@@ -179,9 +179,9 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             tss
             .pipe(self.compute_charge_n_discharge_masks)
             .pipe(self.compute_charge_idx)
-            .pipe(self.compute_idx_from_masks, ["in_discharge"])
-            .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
-            .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
+            # .pipe(self.compute_idx_from_masks, ["in_discharge"])
+            # .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
+            # .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
         )
 
     def compute_charge_n_discharge_masks(self, tss:DF) -> DF:
@@ -234,6 +234,49 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
         print(tss["in_charge_idx"].count() / len(tss))
         tss["in_charge_idx"] = tss["in_charge_idx"].fillna(-1).astype("uint16")
+        return tss
+    def compute_charge_idx_bis(self, tss):
+# Calcul de l'évolution du SoC entre deux lignes successives
+        if self.make == 'tesla-fleet-telemetry':
+                    tss = tss.pipe(self.compute_enenergy_added)
+        tss_na = tss.dropna(subset=['soc']).copy()
+
+        # Step 2: Compute soc_diff per VIN
+        tss_na['soc_diff'] = tss_na.groupby('vin', observed=True)['soc'].diff()
+
+        # Step 3: Determine trend
+        tss_na['trend'] = tss_na['soc_diff'].apply(lambda x: 1 if x > 0 else -1 if x < 0 else 0)
+
+        # Step 4: Detect trend changes per VIN
+        def detect_trend_change(group):
+            # Création d'une colonne avec les deux tendances précédentes
+            group['prev_trend'] = group['trend'].shift(1)
+            group['prev_prev_trend'] = group['trend'].shift(2)
+            
+            group['date_diff'] = group['date'].shift(1)
+
+            # Différence de date
+            group['prev_date'] = group['date'].shift(1)
+            group['time_diff_min'] = (group['date'] - group['prev_date']).dt.total_seconds() / 60
+            group['time_gap'] = group['time_diff_min'] > 120  # plus de 30 minutes = rupture
+
+            # Nouvelle logique de trend_change
+            group['trend_change'] = (
+                ((group['trend'] != group['prev_trend']) &
+                (group['prev_trend'] == group['prev_prev_trend'])) |
+                group['time_gap']
+            )
+            group.loc[group.index[0:2], 'trend_change'] = True
+            return group
+
+        tss_na = tss_na.groupby('vin', observed=True).apply(detect_trend_change).reset_index(drop=True)
+        # Step 5: Create a cumulative index that increments on trend change
+
+        tss_na['in_charge_idx'] = tss_na.groupby('vin',  observed=True)['trend_change'].cumsum()
+        tss = tss.merge(tss_na[["soc", "date", "vin", 'soc_diff', 'in_charge_idx']], 
+                        on=["soc", "date", "vin"], how="left")
+        tss[["soc", "odometer","in_charge_idx"]] = tss[["soc", "odometer","in_charge_idx"]].ffill()
+        #tss['in_charge_idx'] = tss.groupby('vin',  observed=True)['trend_change'].cumsum()
         return tss
 
 
