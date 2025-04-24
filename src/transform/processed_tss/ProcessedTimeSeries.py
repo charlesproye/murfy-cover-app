@@ -273,22 +273,28 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             group['prev_trend'] = group['trend'].shift(1)
             group['prev_prev_trend'] = group['trend'].shift(2)
             
-            group['date_diff'] = group['date'].shift(1)
-
-
             group['prev_date'] = group['date'].shift(1)
             group['time_diff_min'] = (group['date'] - group['prev_date']).dt.total_seconds() / 60
-            group['time_gap'] = group['time_diff_min'] > 120  # plus de 120 minutes = rupture
+            group['time_gap'] = group['time_diff_min'] > 60  
 
 
             group['trend_change'] = (
-                ((group['trend'] != group['prev_trend']) &
-                (group['prev_trend'] == group['prev_prev_trend'])) |
-                group['time_gap']
+                (((group['trend'] != group['prev_trend']) & 
+                  (group['prev_trend'] == group['prev_prev_trend']) ) |
+                group['time_gap'])
             )
-            group.loc[group.index[0:2], 'trend_change'] = True
+            group.loc[group.index[0:2], 'trend_change'] = False
             return group
 
+
+        tss_na = tss_na.groupby('vin', observed=True).apply(detect_trend_change).reset_index(drop=True)
+        
+        # Compute charge id
+        tss_na['in_charge_idx'] = tss_na.groupby('vin',  observed=True)['trend_change'].cumsum()
+        tss = tss.merge(tss_na[["soc", "date", "vin", 'soc_diff', 'in_charge_idx']], 
+                        on=["soc", "date", "vin"], how="left")
+        tss[["odometer","in_charge_idx"]] = tss[["odometer", "in_charge_idx"]].ffill()
+        return tss
         tss_na = tss_na.groupby('vin', observed=True).apply(detect_trend_change).reset_index(drop=True)
 
         # compute charge id
