@@ -58,8 +58,11 @@ def run_entire_pipeline():
         # ProcessedTimeSeries.update_all_tss()
         # logging.info("Processed TSS update completed")
 
-        # fill_vehicle_data_table_with_results()
-        # logging.info("Results update completed")
+        update_all_raw_tss()
+        logging.info("Raw TSS results update completed")
+
+        update_vehicle_data_table()
+        logging.info("Results update completed")
 
         FrontUtils().update_scoring()
         logging.info("SOH comparison update completed")
@@ -74,7 +77,7 @@ def run_entire_pipeline():
 def run_scheduler():
     # Programmer l'exécution tous les jours à minuit
     logger.info("Scheduling pipeline execution")
-    # schedule.every().day.at("11:26").do(run_entire_pipeline)
+    schedule.every().day.at("12:00").do(run_entire_pipeline)
     ## For testing
     run_entire_pipeline()
     logger.info("Scheduler started - Pipeline will run daily at midnight")

@@ -17,7 +17,7 @@ logger = getLogger(f"transform.Tesla-RawTSS")
 @main_decorator
 def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform")
-    print(sanity_check(get_raw_tss(force_update=True)))
+    # print(sanity_check(get_raw_tss(force_update=True)))
 
 @cache_result(TESLA_RAW_TSS_KEY, on="s3")
 def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
