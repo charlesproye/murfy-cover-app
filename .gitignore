@@ -221,3 +221,5 @@ Thumbs.db
 
 *.conda
 
+# pkcs12.txt
+pkcs12.txt
