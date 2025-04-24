@@ -47,6 +47,18 @@ class RenaultApi:
         self._token_data: Optional[Dict] = None
         self._token_expiry: float = 0
         
+        # Model mapping dictionary
+        self.model_mapping = {
+            "megane e-tech": "megane e-tech",
+            "zoe": "zoe"
+        }
+        
+        # Type mapping dictionary
+        self.type_mapping = {
+            "r110": "r110",
+            "r135": "r135"
+        }
+        
         # Verify pkcs12.txt exists
         if not os.path.exists(self.pkcs12_file):
             raise FileNotFoundError(f"Required file {self.pkcs12_file} not found in current directory")
@@ -162,7 +174,7 @@ class RenaultApi:
         
         return self._token_data['access_token']
 
-    async def get_vehicle_info(self, session: aiohttp.ClientSession, vin: str) -> Tuple[str, str, Optional[str]]:
+    async def get_vehicle_info(self, session: aiohttp.ClientSession, vin: str) -> Tuple[str, str, str, Optional[str]]:
         """
         Get vehicle information from Renault API using the provided VIN.
         
@@ -171,12 +183,12 @@ class RenaultApi:
             vin (str): The Vehicle Identification Number
             
         Returns:
-            tuple: (model, type, start_date)
+            tuple: (model, version, type, start_date)
             
         Raises:
             RenaultAPIError: If the request fails after all retries
         """
-        url = f"https://apis.mint.renault.com/vehicle-information/v1/vehicles/{vin}"
+        url = f"{os.getenv('RENAULT_API_URL')}{vin}"
         max_retries = 3
         retry_count = 0
         
@@ -186,15 +198,36 @@ class RenaultApi:
                 headers = {
                     "Authorization": f"Bearer {access_token}",
                     "accept": "application/json",
-                    "apiKey": "xvmebcAO0JEPQL8gUKGds4lH2xrx9mzV"
+                    "apiKey": os.getenv("RENAULT_API_KEY")
                 }
                 
                 async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
+                        model = data.get("model", "unknown").lower()
+                        type_and_version = data.get("version", "unknown").lower()
+                        
+                        # Split type_and_version into version (first word) and type (remaining words)
+                        parts = type_and_version.split(maxsplit=1)
+                        version = parts[0] if parts else "unknown"
+                        type_ = parts[1] if len(parts) > 1 else "unknown"
+                        
+                        # Check if type contains any of the mapped values
+                        for key in self.type_mapping:
+                            if key in type_:
+                                type_ = self.type_mapping[key]
+                                break
+                        
+                        # Map the model using the mapping dictionary
+                        for key, value in self.model_mapping.items():
+                            if key in model:
+                                model = value
+                                break
+                                
                         return (
-                            data.get("model", "unknown").lower(),
-                            data.get("version", "unknown").lower(),
+                            model,
+                            type_,
+                            version,
                             data.get("firstRegistrationDate")
                         )
                         
