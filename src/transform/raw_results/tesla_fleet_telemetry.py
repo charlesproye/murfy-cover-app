@@ -21,8 +21,8 @@ def main():
 @cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla-fleet-telemetry"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw tesla fleet telemetry results.")
-    results = (TeslaProcessedTimeSeries('tesla-fleet-telemetry',  filters=[("trimmed_in_charge", "==", True)])
-               .groupby(["vin", "trimmed_in_charge_idx"], observed=True, as_index=False).agg(
+    results = (TeslaProcessedTimeSeries('tesla-fleet-telemetry',)
+               .groupby(["vin", "in_charge_idx"], observed=True, as_index=False).agg(
             ac_energy_added_min=pd.NamedAgg("ac_charge_energy_added", "min"),
             dc_energy_added_min=pd.NamedAgg("dc_charge_energy_added", "min"),
             ac_energy_added_end=pd.NamedAgg("ac_charge_energy_added", "last"),
