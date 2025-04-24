@@ -436,7 +436,7 @@ async def compress_worker(vehicles: List[str], date: datetime):
 async def is_midnight() -> bool:
     """Check if current time is within the first minute of the day (00:00-00:01)."""
     now = datetime.now()
-    is_compression_time = now.hour == 14 and now.minute == 31
+    is_compression_time = now.hour == 00 and now.minute == 00
     if is_compression_time:
         logger.info(f"Compression time detected: {now}")
     return is_compression_time
