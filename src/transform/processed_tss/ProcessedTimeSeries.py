@@ -295,16 +295,7 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
                         on=["soc", "date", "vin"], how="left")
         tss[["odometer","in_charge_idx"]] = tss[["odometer", "in_charge_idx"]].ffill()
         return tss
-        tss_na = tss_na.groupby('vin', observed=True).apply(detect_trend_change).reset_index(drop=True)
-
-        # compute charge id
-        tss_na['in_charge_idx'] = tss_na.groupby('vin',  observed=True)['trend_change'].cumsum()
-        tss = tss.merge(tss_na[["soc", "date", "vin", 'soc_diff', 'in_charge_idx']], 
-                        on=["soc", "date", "vin"], how="left")
-        tss[["soc", "odometer","in_charge_idx"]] = tss[["soc", "odometer","in_charge_idx"]].ffill()
-        return tss
-
-
+        
 @main_decorator
 def main():
     parser = argparse.ArgumentParser(description="Process time series data.")
