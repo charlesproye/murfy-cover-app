@@ -184,85 +184,93 @@ class RenaultApi:
             
         Returns:
             tuple: (model, version, type, start_date)
-            
-        Raises:
-            RenaultAPIError: If the request fails after all retries
+            Returns default values ("renault model unknown", "renault version unknown", "renault type unknown", None) if API call fails
         """
-        url = f"{os.getenv('RENAULT_API_URL')}{vin}"
-        max_retries = 3
-        retry_count = 0
-        
-        while retry_count < max_retries:
-            try:
-                access_token = await self._get_token()
-                headers = {
-                    "Authorization": f"Bearer {access_token}",
-                    "accept": "application/json",
-                    "apiKey": os.getenv("RENAULT_API_KEY")
-                }
-                
-                async with session.get(url, headers=headers) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        model = data.get("model", "unknown").lower()
-                        type_and_version = data.get("version", "unknown").lower()
-                        
-                        # Split type_and_version into version (first word) and type (remaining words)
-                        parts = type_and_version.split(maxsplit=1)
-                        version = parts[0] if parts else "unknown"
-                        type_ = parts[1] if len(parts) > 1 else "unknown"
-                        
-                        # Check if type contains any of the mapped values
-                        for key in self.type_mapping:
-                            if key in type_:
-                                type_ = self.type_mapping[key]
-                                break
-                        
-                        # Map the model using the mapping dictionary
-                        for key, value in self.model_mapping.items():
-                            if key in model:
-                                model = value
-                                break
-                                
-                        return (
-                            model,
-                            type_,
-                            version,
-                            data.get("firstRegistrationDate")
-                        )
-                        
-                    error_code = response.status
-                    error_message = RenaultAPIErrorCode.get_error_message(error_code)
+        try:
+            url = f"{os.getenv('RENAULT_API_URL')}{vin}"
+            max_retries = 3
+            retry_count = 0
+            
+            while retry_count < max_retries:
+                try:
+                    access_token = await self._get_token()
+                    headers = {
+                        "Authorization": f"Bearer {access_token}",
+                        "accept": "application/json",
+                        "apiKey": os.getenv("RENAULT_API_KEY")
+                    }
                     
-                    if error_code in [401, 429, 500, 503]:
-                        if error_code == 401:
-                            self._token_data = None
+                    async with session.get(url, headers=headers) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            model = data.get("model", "renault model unknown").lower()
+                            type_and_version = data.get("version").lower()
+                            
+                            # Split type_and_version into version (first word) and type (remaining words)
+                            parts = type_and_version.split(maxsplit=1)
+                            version = parts[0] if parts else "renault version unknown"
+                            type_ = parts[1] if len(parts) > 1 else "renault type unknown"
+                            
+                            # Check if type contains any of the mapped values
+                            for key in self.type_mapping:
+                                if key in type_:
+                                    type_ = self.type_mapping[key]
+                                    break
+                            
+                            # Map the model using the mapping dictionary
+                            for key, value in self.model_mapping.items():
+                                if key in model:
+                                    model = value
+                                    break
+                                    
+                            return (
+                                model,
+                                type_,
+                                version,
+                                data.get("firstRegistrationDate")
+                            )
+                            
+                        error_code = response.status
+                        error_message = RenaultAPIErrorCode.get_error_message(error_code)
                         
-                        if error_code == 429:
-                            retry_after = int(response.headers.get('Retry-After', 60))
-                            print(f"Rate limit exceeded. Waiting {retry_after} seconds before retry...")
-                            await asyncio.sleep(retry_after)
-                        else:
-                            wait_time = min(2 ** retry_count, 60)
-                            print(f"Retryable error occurred. Waiting {wait_time} seconds before retry...")
-                            await asyncio.sleep(wait_time)
+                        if error_code in [401, 429, 500, 503]:
+                            if error_code == 401:
+                                self._token_data = None
+                            
+                            if error_code == 429:
+                                retry_after = int(response.headers.get('Retry-After', 60))
+                                print(f"Rate limit exceeded. Waiting {retry_after} seconds before retry...")
+                                await asyncio.sleep(retry_after)
+                            else:
+                                wait_time = min(2 ** retry_count, 60)
+                                print(f"Retryable error occurred. Waiting {wait_time} seconds before retry...")
+                                await asyncio.sleep(wait_time)
+                            
+                            retry_count += 1
+                            continue
                         
+                        if error_code in [400, 403, 404]:
+                            raise RenaultAPIError(f"{error_message} (HTTP {error_code})")
+                        
+                        raise RenaultAPIError(f"Unexpected error: {error_message} (HTTP {error_code})")
+                        
+                except aiohttp.ClientError as e:
+                    if retry_count < max_retries - 1:
                         retry_count += 1
+                        wait_time = min(2 ** retry_count, 60)
+                        print(f"Network error occurred. Waiting {wait_time} seconds before retry...")
+                        await asyncio.sleep(wait_time)
                         continue
-                    
-                    if error_code in [400, 403, 404]:
-                        raise RenaultAPIError(f"{error_message} (HTTP {error_code})")
-                    
-                    raise RenaultAPIError(f"Unexpected error: {error_message} (HTTP {error_code})")
-                    
-            except aiohttp.ClientError as e:
-                if retry_count < max_retries - 1:
-                    retry_count += 1
-                    wait_time = min(2 ** retry_count, 60)
-                    print(f"Network error occurred. Waiting {wait_time} seconds before retry...")
-                    await asyncio.sleep(wait_time)
-                    continue
-                raise RenaultAPIError(f"Network error after {max_retries} retries: {str(e)}")
-        
-        raise RenaultAPIError(f"Request failed after {max_retries} retries")
+                    raise RenaultAPIError(f"Network error after {max_retries} retries: {str(e)}")
+            
+            raise RenaultAPIError(f"Request failed after {max_retries} retries")
+            
+        except Exception as e:
+            print(f"Error getting vehicle info for VIN {vin}: {str(e)}")
+            return (
+                "renault model unknown",
+                "renault version unknown",
+                "renault type unknown",
+                None
+            )
 
