@@ -118,13 +118,15 @@ class VehicleProcessor:
             
         return model_id
 
-    async def _update_or_create_other_models(self, cursor, model_name: str, type: str, make: str, oem: str) -> str:
+    async def _update_or_create_other_models(self, cursor, model_name: str, type: str, version: str, make: str, oem: str) -> str:
         """Get a model if it exists then update it, or create it if it doesn't exist."""
         if not model_name or model_name.strip() == '':
             model_name = 'unknown'
         if not type or type.strip() == '':
             type = 'unknown'
-        cursor.execute("SELECT id FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s", (model_name.lower(), type.lower()))
+        if not version or version.strip() == '':
+            version = 'unknown'
+        cursor.execute("SELECT id FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), type.lower(), version.lower()))
         result = cursor.fetchone()
         oem_id = await self._get_or_create_oem(cursor, oem)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
@@ -133,19 +135,20 @@ class VehicleProcessor:
             cursor.execute("""
                 UPDATE vehicle_model 
                 SET model_name = %s, 
-                    type = %s,  
+                    type = %s, 
+                    version = %s,
                     make_id = %s, 
                     oem_id = %s
                 WHERE id = %s
-            """, (model_name, type, make_id, oem_id, model_id))
+            """, (model_name, type, version, make_id, oem_id, model_id))
             logging.info(f"Updated existing model with name {model_name} and type {type}")
         else:
             model_id = str(uuid.uuid4())
             cursor.execute("""
                 INSERT INTO vehicle_model (
-                    id, model_name, type, make_id, oem_id
-                ) VALUES (%s, %s, %s, %s, %s)
-            """, (model_id, model_name, type, make_id, oem_id))
+                    id, model_name, type, version, make_id, oem_id
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+            """, (model_id, model_name, type, version, make_id, oem_id))
             logging.info(f"Created new model with name {model_name} and type {type}")
             
         return model_id
@@ -223,9 +226,9 @@ class VehicleProcessor:
                             vehicle_exists = cursor.fetchone()
                             fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
                             region_id = await self._get_or_create_region(cursor, vehicle['country'])
-                            model_name, type, start_date = await self.renault_api.get_vehicle_info(session, vehicle['vin'])
-                            print(f"Vehicle Details - VIN: {vehicle['vin']} | {model_name} | {type} | {start_date} -> {vehicle['end_of_contract']}")
-                            model_id = await self._update_or_create_other_models(cursor, model_name, type, vehicle['make'], vehicle['oem'])
+                            model_name, type, version, start_date = await self.renault_api.get_vehicle_info(session, vehicle['vin'])
+                            print(f"Vehicle Details - VIN: {vehicle['vin']} | {model_name} | {type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
+                            model_id = await self._update_or_create_other_models(cursor, model_name, type, version, vehicle['make'], vehicle['oem'])
                             if not vehicle_exists:
                                 vehicle_id = str(uuid.uuid4())
                                 insert_query = """
