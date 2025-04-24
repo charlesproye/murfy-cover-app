@@ -180,3 +180,28 @@ class HMApi:
                     return False
             except Exception as e:
                 return False
+            
+    async def get_eligibility(self, vin: str, brand: str, session: aiohttp.ClientSession) -> bool:
+        """Get vehicle eligibility."""
+        retry_count = 0
+        while retry_count < 2:
+            try:
+                url = f"{self.base_url}/v1/eligibility"
+                headers = await self._get_headers(session)
+                response = await session.post(url, headers=headers, json={"brand": brand, "vin": vin})
+                if response.status != 200:
+                    self._access_token = None
+                    retry_count += 1
+                    await asyncio.sleep(1)
+                    continue
+                if response.status == 200:
+                    response_data = await response.json()
+                    if response_data.get("eligible") == True:
+                        return True
+                    else:
+                        return False
+                else:
+                    return False
+            except Exception as e:
+                return False
+        

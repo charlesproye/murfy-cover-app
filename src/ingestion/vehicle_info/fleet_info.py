@@ -35,7 +35,7 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
             
             # Get headers from first row and use them as column names
             df = pd.DataFrame(data)
-
+            print(df)
             
             logger.info(f"Successfully fetched {len(df)} rows from Google Sheets")
             return df
