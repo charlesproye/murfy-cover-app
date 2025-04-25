@@ -217,26 +217,26 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             (tss['dc_charge_energy_added'] > 0), 
             tss['ac_charge_energy_added'])
         return tss
-    def compute_charge_idx(self, tss:DF) -> DF:
-        self.logger.debug("Computing tesla specific charge index.")
-        if self.make == 'tesla-fleet-telemetry':
-            tss = tss.pipe(self.compute_enenergy_added)
-        tss_grp = tss.groupby("vin", observed=False)
-        tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
-        energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
-        # charge_energy_added is cummulative and forward filled, 
-        # We check that the charge_energy_added decreases too fast to make sure that  correctly indentify two charging periods before and after a gap as two separate charging periods.
-        new_charge_mask = energy_added_over_time.lt(MIN_POWER_LOSS, fill_value=0) 
-        # For the same reason, we ensure that there are no gaps bigger than MAX_CHARGE_TD in between to rows of the same charging period.
-        new_charge_mask |= tss["time_diff"].gt(MAX_CHARGE_TD) 
-        # And of course we also check that there is no change of status. 
-        new_charge_mask |= (~tss_grp["in_charge"].shift() & tss["in_charge"]) 
-        tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
-        print(tss["in_charge_idx"].count() / len(tss))
-        tss["in_charge_idx"] = tss["in_charge_idx"].fillna(-1).astype("uint16")
-        return tss
+    # def compute_charge_idx(self, tss:DF) -> DF:
+    #     self.logger.debug("Computing tesla specific charge index.")
+    #     if self.make == 'tesla-fleet-telemetry':
+    #         tss = tss.pipe(self.compute_enenergy_added)
+    #     tss_grp = tss.groupby("vin", observed=False)
+    #     tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
+    #     energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
+    #     # charge_energy_added is cummulative and forward filled, 
+    #     # We check that the charge_energy_added decreases too fast to make sure that  correctly indentify two charging periods before and after a gap as two separate charging periods.
+    #     new_charge_mask = energy_added_over_time.lt(MIN_POWER_LOSS, fill_value=0) 
+    #     # For the same reason, we ensure that there are no gaps bigger than MAX_CHARGE_TD in between to rows of the same charging period.
+    #     new_charge_mask |= tss["time_diff"].gt(MAX_CHARGE_TD) 
+    #     # And of course we also check that there is no change of status. 
+    #     new_charge_mask |= (~tss_grp["in_charge"].shift() & tss["in_charge"]) 
+    #     tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
+    #     print(tss["in_charge_idx"].count() / len(tss))
+    #     tss["in_charge_idx"] = tss["in_charge_idx"].fillna(-1).astype("uint16")
+    #     return tss
     
-    def compute_charge_idx_bis(self, tss:pd.DataFrame) -> pd.DataFrame:
+    def compute_charge_idx(self, tss:pd.DataFrame) -> pd.DataFrame:
         """Computes a charging session identifier (`in_charge_idx`) based on the evolution 
         of the State of Charge (SoC) between successive telemetry readings.
 
