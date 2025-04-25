@@ -43,7 +43,7 @@ def get_results() -> DF:
         .eval("charging_power = ac_charging_power + dc_charging_power")
         .eval("ac_energy_added = ac_energy_added_end  - ac_energy_added_min")
         .eval("dc_energy_added = dc_energy_added_end  - dc_energy_added_min")
-        .assign(energy_added=lambda df: np.maximum(df["ac_energy_added"], df["dc_energy_added"]))
+        .assign(energy_added=lambda df: np.maximum(df["ac_energy_added"].replace([np.nan, -np.nan], 0), df["dc_energy_added"].replace([np.nan, -np.nan], 0)))
         .eval("soh = energy_added / (soc_diff / 100.0 * net_capacity)")
         .eval("level_1 = soc_diff * (charging_power < 8) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(8, 45)) / 100")
