@@ -118,22 +118,29 @@ class VehicleProcessor:
             
         return model_id
 
-    async def _get_or_create_other_model(self, cursor, model_name: str, type: str, version: str, make: str, oem: str) -> str:
+    async def _get_or_create_other_model(self, session: aiohttp.ClientSession, cursor, vin: str, model_name: str, type: str, version: str, make: str, oem: str) -> str:
         """Get a model if it exists then update it, or create it if it doesn't exist."""
-        cursor.execute("SELECT id FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), type.lower(), version.lower()))
+        cursor.execute("SELECT id,autonomy FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), type.lower(), version.lower()))
         result = cursor.fetchone()
+        model_exists = result[0]
+        autonomy = result[1]
         oem_id = await self._get_or_create_oem(cursor, oem)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
-        if result:
-            return result[0]
+        if model_exists:
+            if autonomy is None:
+                wltp_range = await self.renault_api.get_vehicle_wltp_range(session, vin)
+                cursor.execute("UPDATE vehicle_model SET autonomy = %s WHERE id = %s", (wltp_range, model_exists))
+                logging.info(f"Updated model with name {model_name} and type {type} and version {version} and autonomy {wltp_range}")
+            return model_exists
         else:
             model_id = str(uuid.uuid4())
+            wltp_range = await self.renault_api.get_vehicle_wltp_range(session, vin)
             cursor.execute("""
                 INSERT INTO vehicle_model (
-                    id, model_name, type, version, make_id, oem_id
+                    id, model_name, type, version, autonomy,make_id, oem_id
                 ) VALUES (%s, %s, %s, %s, %s, %s)
-            """, (model_id, model_name, type, version, make_id, oem_id))
-            logging.info(f"Created new model with name {model_name} and type {type} and version {version}")
+            """, (model_id, model_name, type, version, wltp_range, make_id, oem_id))
+            logging.info(f"Created new model with name {model_name} and type {type} and version {version} and autonomy {wltp_range}")
             
         return model_id
     
@@ -226,7 +233,7 @@ class VehicleProcessor:
                             
                             model_name, type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
                             logging.info(f"Processing Renault vehicle {vin} | {model_name} | {type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
-                            model_id = await self._get_or_create_other_model(cursor, model_name, type, version, vehicle['make'], vehicle['oem'])
+                            model_id = await self._get_or_create_other_model(session, cursor, vin, model_name, type, version, vehicle['make'], vehicle['oem'])
                             if not vehicle_exists:
                                 vehicle_id = str(uuid.uuid4())
                                 insert_query = """

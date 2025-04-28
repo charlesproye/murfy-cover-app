@@ -187,7 +187,7 @@ class RenaultApi:
             Returns default values ("renault model unknown", "renault version unknown", "renault type unknown", None) if API call fails
         """
         try:
-            url = f"{os.getenv('RENAULT_API_URL')}{vin}"
+            url = f"{os.getenv('RENAULT_API_URL')}/vehicle-information/v1/vehicles/{vin}"
             max_retries = 3
             retry_count = 0
             
@@ -197,7 +197,7 @@ class RenaultApi:
                     headers = {
                         "Authorization": f"Bearer {access_token}",
                         "accept": "application/json",
-                        "apiKey": os.getenv("RENAULT_API_KEY")
+                        "apiKey": f"{os.getenv('RENAULT_API_KEY')}"
                     }
                     
                     async with session.get(url, headers=headers) as response:
@@ -273,4 +273,55 @@ class RenaultApi:
                 "renault type unknown",
                 None
             )
+    
+    async def get_vehicle_wltp_range(self, session: aiohttp.ClientSession, vin: str) -> int:
+        """
+        Get the WLTP combined range for a vehicle using the provided VIN.
+        
+        Args:
+            session (aiohttp.ClientSession): The aiohttp session to use for the request
+            vin (str): The Vehicle Identification Number
+            
+        Returns:
+            int: The WLTP combined range for the vehicle
+            Returns 0 if API call fails
+        """
+        try:
+            url = f"{os.getenv('RENAULT_API_URL')}/import-vehicle-info/v1/wltp/vin?vin={vin}"
+            max_retries = 3
+            retry_count = 0
+            
+            while retry_count < max_retries:
+                try:
+                    access_token = await self._get_token()
+                    headers = {
+                        "Authorization": f"Bearer {access_token}",
+                        "accept": "application/json",
+                        "apiKey": os.getenv("RENAULT_API_KEY")
+                    }
+                    
+                    async with session.get(url, headers=headers) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            return data.get("wltpElecRangeCombined", 0)
+                        else:
+                            error_code = response.status
+                            error_message = RenaultAPIErrorCode.get_error_message(error_code)
+                            raise RenaultAPIError(f"Unexpected error: {error_message} (HTTP {error_code})")
+                            
+                except aiohttp.ClientError as e:
+                    if retry_count < max_retries - 1:
+                        retry_count += 1
+                        wait_time = min(2 ** retry_count, 60)
+                        print(f"Network error occurred. Waiting {wait_time} seconds before retry...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    raise RenaultAPIError(f"Network error after {max_retries} retries: {str(e)}")
+            
+            raise RenaultAPIError(f"Request failed after {max_retries} retries")
+            
+        except Exception as e:
+            print(f"Error getting vehicle WLTP range for VIN {vin}: {str(e)}")
+            return None
+        
 
