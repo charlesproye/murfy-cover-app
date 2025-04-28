@@ -222,3 +222,7 @@ Thumbs.db
 *.conda
 
 src/ingestion/vehicle_info/api/pkcs12.txt
+*.txt
+*.p12
+*.pfx
+
