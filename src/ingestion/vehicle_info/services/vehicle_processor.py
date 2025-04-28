@@ -360,13 +360,18 @@ class VehicleProcessor:
         try:
             with get_connection() as con:
                 cursor = con.cursor()
+                # First get the count of models to be deleted
+                cursor.execute("SELECT COUNT(*) FROM vehicle_model WHERE id NOT IN (SELECT vehicle_model_id FROM vehicle)")
+                count = cursor.fetchone()[0]
+                
+                # Delete the unused models
                 cursor.execute("DELETE FROM vehicle_model WHERE id NOT IN (SELECT vehicle_model_id FROM vehicle)")
                 con.commit()
-                logging.info("Deleted unused models")
+                
+                logging.info(f"Deleted {count} unused vehicle models from the database")
         except Exception as e:
             logging.error(f"Error in deleting unused models: {str(e)}")
             raise
-
         
 
         
