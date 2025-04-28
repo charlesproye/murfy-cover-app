@@ -220,3 +220,5 @@ Thumbs.db
 *.wmv
 
 *.conda
+
+src/ingestion/vehicle_info/api/pkcs12.txt
