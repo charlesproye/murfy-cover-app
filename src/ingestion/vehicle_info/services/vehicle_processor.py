@@ -122,10 +122,11 @@ class VehicleProcessor:
         """Get a model if it exists then update it, or create it if it doesn't exist."""
         cursor.execute("SELECT id,autonomy FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), type.lower(), version.lower()))
         result = cursor.fetchone()
-        model_exists = result[0]
-        autonomy = result[1]
+        model_exists = result[0] if result else None
+        autonomy = result[1] if result else None
         oem_id = await self._get_or_create_oem(cursor, oem)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
+
         if model_exists:
             if autonomy is None:
                 wltp_range = await self.renault_api.get_vehicle_wltp_range(session, vin)
@@ -141,7 +142,6 @@ class VehicleProcessor:
                 ) VALUES (%s, %s, %s, %s, %s, %s,%s)
             """, (model_id, model_name, type, version, wltp_range, make_id, oem_id))
             logging.info(f"Created new model with name {model_name} and type {type} and version {version} and autonomy {wltp_range}")
-            
         return model_id
     
     async def _get_or_create_other_model(self, cursor, model_name: str, type: str, version: str, make: str, oem: str) -> str:
@@ -250,6 +250,7 @@ class VehicleProcessor:
                             # Check if vehicle exists
                             cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
                             vehicle_exists = cursor.fetchone()
+                            vehicle_exists = vehicle_exists[0] if vehicle_exists else None
                             
                             model_name, type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
                             logging.info(f"Processing Renault vehicle {vin} | {model_name} | {type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
@@ -274,7 +275,7 @@ class VehicleProcessor:
                             else:
                                 cursor.execute(
                                     "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s, start_date = %s WHERE vin = %s",
-                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], start_date, vin))    
+                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], start_date, vin)) 
                             con.commit()
                         except Exception as e:
                             logging.error(f"Error processing Renault vehicle {vehicle['vin']}: {str(e)}")
