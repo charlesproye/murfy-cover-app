@@ -252,10 +252,13 @@ class VehicleProcessor:
                             vehicle_exists = cursor.fetchone()
                             vehicle_exists = vehicle_exists[0] if vehicle_exists else None
                             
-                            model_name, type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
-                            logging.info(f"Processing Renault vehicle {vin} | {model_name} | {type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
-                            model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, type, version, vehicle['make'], vehicle['oem'])
+                            
                             if not vehicle_exists:
+                                #Since each api call to get static infromatino is billed. We are limiting the call only to vehicles that are not in the db
+                                model_name, type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
+                                logging.info(f"Processing Renault vehicle {vin} | {model_name} | {type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
+                                model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, type, version, vehicle['make'], vehicle['oem'])
+
                                 vehicle_id = str(uuid.uuid4())
                                 insert_query = """
                                     INSERT INTO vehicle (
@@ -273,9 +276,10 @@ class VehicleProcessor:
                                 )
                                 logging.info(f"New Renault vehicle inserted in DB VIN: {vehicle['vin']}")
                             else:
+
                                 cursor.execute(
-                                    "UPDATE vehicle SET vehicle_model_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s, start_date = %s WHERE vin = %s",
-                                    (model_id, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], start_date, vin)) 
+                                    "UPDATE vehicle SET activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                    (vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vin)) 
                             con.commit()
                         except Exception as e:
                             logging.error(f"Error processing Renault vehicle {vehicle['vin']}: {str(e)}")
