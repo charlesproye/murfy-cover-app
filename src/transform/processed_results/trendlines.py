@@ -7,7 +7,7 @@ def log_function(x, a ,b):
     return 1 + a * np.log1p(x / b)
 
 
-def get_trendlines(df, oem=None, version=None):
+def get_trendlines(df, oem=None, version=None, update=False):
     """
     Computes logarithmic trendlines for the relationship between odometer and SOH (State of Health)
     from a given DataFrame, and updates the results in a database if `oem` or `version` are specified.
@@ -78,39 +78,40 @@ def get_trendlines(df, oem=None, version=None):
     trendline_min ={"trendline": f"{y_lower.max()} + {coef_lower[0]} * np.log1p(x/ {coef_lower[1]})"}
 
     # update des données dans dbeaver
-    if oem:
-        sql_request = text("""
-            UPDATE oem 
-            SET trendline = :trendline_json,
-                trendline_min = :trendline_min_json,
-                trendline_max = :trendline_max_json
-            WHERE oem_name = :oem_name
-        """)
+    if update is True:
+        if oem:
+            sql_request = text("""
+                UPDATE oem 
+                SET trendline = :trendline_json,
+                    trendline_min = :trendline_min_json,
+                    trendline_max = :trendline_max_json
+                WHERE oem_name = :oem_name
+            """)
 
-        with engine.begin() as conn:
-            conn.execute(sql_request, {
-                "trendline_json": json.dumps(trendline),
-                "trendline_max_json": json.dumps(trendline_max),
-                "trendline_min_json": json.dumps(trendline_min),
-                "oem_name": oem
-            })
+            with engine.begin() as conn:
+                conn.execute(sql_request, {
+                    "trendline_json": json.dumps(trendline),
+                    "trendline_max_json": json.dumps(trendline_max),
+                    "trendline_min_json": json.dumps(trendline_min),
+                    "oem_name": oem
+                })
 
-    if version:
-        sql_request = text("""
-            UPDATE vehicule_model 
-            SET trendline = :trendline_json,
-                trendline_min = :trendline_min_json,
-                trendline_max = :trendline_max_json
-            WHERE version = :version
-        """)
+        if version:
+            sql_request = text("""
+                UPDATE vehicule_model 
+                SET trendline = :trendline_json,
+                    trendline_min = :trendline_min_json,
+                    trendline_max = :trendline_max_json
+                WHERE version = :version
+            """)
 
-        with engine.begin() as conn:
-            conn.execute(sql_request, {
-                "trendline_json": json.dumps(trendline),
-                "trendline_max_json": json.dumps(trendline_max),
-                "trendline_min_json": json.dumps(trendline_min),
-                "version": version
-            })
+            with engine.begin() as conn:
+                conn.execute(sql_request, {
+                    "trendline_json": json.dumps(trendline),
+                    "trendline_max_json": json.dumps(trendline_max),
+                    "trendline_min_json": json.dumps(trendline_min),
+                    "version": version
+                })
     return trendline, trendline_max, trendline_min
 
 if __name__ == "__main__":
