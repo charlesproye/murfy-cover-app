@@ -16,6 +16,7 @@ The following environment variables need to be set:
 - HM credentials (BASE_URL, CLIENT_ID, CLIENT_SECRET)
 - Stellantis credentials (BASE_URL, EMAIL, PASSWORD, FLEET_ID, COMPANY_ID)
 - Tesla credentials (via Slack token)
+- Renault credentials (requires a pkcs12.txt file for token generation, place it in src/ingestion/vehicle_info/api)
 - Database connection details
 
 ## Usage
