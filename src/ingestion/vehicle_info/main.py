@@ -63,7 +63,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
 
         # Process all brands in parallel
         await asyncio.gather(
-            activation_service.activation_tesla(),
+            #activation_service.activation_tesla(),
             #activation_service.activation_bmw(),
             #activation_service.activation_hm(),
             #activation_service.activation_stellantis()
@@ -83,10 +83,11 @@ async def process_vehicles(owner_filter: Optional[str] = None):
         )
         await asyncio.gather(
             #vehicle_processor.process_other_vehicles(),
-            vehicle_processor.process_tesla(),
+            #vehicle_processor.process_tesla(),
             #vehicle_processor.process_deactivated_vehicles()
         )
-        # Add your vehicle processing logic here if needed
+
+        await vehicle_processor.generate_vehicle_summary()
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {str(e)}")
