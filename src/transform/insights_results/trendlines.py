@@ -2,6 +2,8 @@ import numpy as np
 from scipy.optimize import curve_fit
 from core.sql_utils import *
 import json
+import logging
+
 
 def log_function(x, a ,b):
     return 1 + a * np.log1p(x / b)
@@ -35,11 +37,17 @@ def get_trendlines(df, oem=None, version=None, update=False):
         A tuple of three dictionaries containing the string expressions of the mean, max, and min trendlines:
         (trendline, trendline_max, trendline_min)
     """
-
+    
     # On utilise dropna pour ne pas avoir de problèmes de calcul par la suite
     x_data = df.dropna(subset=['soh', 'odometer'])['odometer'].values
     y_data = df.dropna(subset=['soh', 'odometer'])['soh'].values
 
+    if len(y_data) < 100:
+        logging.warning(f"Pas assez de données pour calculer une trendline pour {oem} {version}")
+        return  
+
+    logging.info(f"Calcul de la trendline pour {oem} {version}")
+    
     # Tri des données
     sort_idx = np.argsort(x_data)
     x_sorted = x_data[sort_idx]
@@ -74,11 +82,12 @@ def get_trendlines(df, oem=None, version=None, update=False):
     coef_upper, _ = curve_fit(log_function_max, x_sorted, y_upper, maxfev=10000)
 
     trendline = {"trendline": f"1 + {coef_[0]} * np.log1p(x/{coef_[1]})"}
-    trendline_max ={"trendline": f"{y_upper.max()}+ {coef_upper[0]} * np.log1p(x/{coef_upper[1]})"}
-    trendline_min ={"trendline": f"{y_lower.max()} + {coef_lower[0]} * np.log1p(x/ {coef_lower[1]})"}
+    trendline_max ={"trendline": f"{max(y_upper.max(), 1)}+ {coef_upper[0]} * np.log1p(x/{coef_upper[1]})"}
+    trendline_min ={"trendline": f"{min(y_lower.max(), 1)} + {coef_lower[0]} * np.log1p(x/ {coef_lower[1]})"}
 
     # update des données dans dbeaver
     if update is True:
+        logging.info(f"Update data in database for {oem}")
         if oem:
             sql_request = text("""
                 UPDATE oem 
@@ -97,8 +106,9 @@ def get_trendlines(df, oem=None, version=None, update=False):
                 })
 
         if version:
+            logging.info(f"Update data in database for {version}")
             sql_request = text("""
-                UPDATE vehicule_model 
+                UPDATE vehicle_model 
                 SET trendline = :trendline_json,
                     trendline_min = :trendline_min_json,
                     trendline_max = :trendline_max_json
@@ -115,5 +125,23 @@ def get_trendlines(df, oem=None, version=None, update=False):
     return trendline, trendline_max, trendline_min
 
 if __name__ == "__main__":
-    pass
     
+    # update oem
+    for oem_name in ["ford", "bmw", "kia", "stellantis", "mercedes-benz", "volvo-cars", 
+                     "renault", "mercedes", "volvo", "volkswagen", "toyota", "tesla"]:
+        with engine.connect() as connection:
+            query = text("""
+                SELECT *  
+                FROM vehicle v	
+                JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
+                JOIN vehicle_data vd ON vd.vehicle_id = v.id
+                JOIN oem o ON o.id = vm.oem_id
+                JOIN battery b ON b.id = vm.battery_id
+                WHERE o.oem_name = :oem_name
+            """)
+
+            dbeaver_df = pd.read_sql(query, connection, params={"oem_name": oem_name})
+        get_trendlines(dbeaver_df, oem=oem_name, update=True)
+        ## update version
+        for version in dbeaver_df.version.unique()[dbeaver_df.version.unique()!= "unknown"]:
+            get_trendlines(dbeaver_df[dbeaver_df['version']==version], version=version, update=True)
