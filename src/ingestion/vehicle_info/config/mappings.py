@@ -208,3 +208,13 @@ mappings = {
             }
         }
     }
+
+TESLA_MODEL_MAPPING = {
+    '3': 'model 3',
+    'Y': 'model y',
+    'X': 'model x',
+    'S': 'model s',
+    'T': 'tesla semi',
+    'R': 'roadster',
+    'C': 'cybertruck'
+}
