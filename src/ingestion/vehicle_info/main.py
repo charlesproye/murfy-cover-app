@@ -96,7 +96,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             #vehicle_processor.process_deactivated_vehicles()
         )
         await vehicle_processor.delete_unused_models()
-        # Add your vehicle processing logic here if needed
+        await vehicle_processor.generate_vehicle_summary()
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {str(e)}")

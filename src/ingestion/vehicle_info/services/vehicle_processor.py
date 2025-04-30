@@ -404,7 +404,111 @@ class VehicleProcessor:
         except Exception as e:
             logging.error(f"Error in deleting unused models: {str(e)}")
             raise
-        
+    async def generate_vehicle_summary(self) -> None:
+        """Generate a summary report of vehicle statistics."""
+        try:
+            with get_connection() as con:
+                cursor = con.cursor()
+                
+                # Get total active vehicles
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM vehicle 
+                    WHERE activation_status = true
+                """)
+                active_vehicles = cursor.fetchone()[0]
+                
+                # Get total deactivated vehicles
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM vehicle 
+                    WHERE activation_status = false
+                """)
+                deactivated_vehicles = cursor.fetchone()[0]
+                
+                # Get vehicles by model
+                cursor.execute("""
+                    SELECT 
+                        vm.model_name,
+                        vm.type,
+                        vm.version,
+                        COUNT(v.id) as vehicle_count
+                    FROM vehicle_model vm
+                    LEFT JOIN vehicle v ON v.vehicle_model_id = vm.id
+                    GROUP BY vm.model_name, vm.type, vm.version
+                    ORDER BY vehicle_count DESC
+                """)
+                models_stats = cursor.fetchall()
+                
+                # Get vehicles by OEM
+                cursor.execute("""
+                    SELECT 
+                        o.oem_name,
+                        COUNT(v.id) as vehicle_count
+                    FROM oem o
+                    LEFT JOIN vehicle_model vm ON vm.oem_id = o.id
+                    LEFT JOIN vehicle v ON v.vehicle_model_id = vm.id
+                    GROUP BY o.oem_name
+                    ORDER BY vehicle_count DESC
+                """)
+                oem_stats = cursor.fetchall()
+                
+                # Get vehicles by region
+                cursor.execute("""
+                    SELECT 
+                        r.region_name,
+                        COUNT(v.id) as vehicle_count
+                    FROM region r
+                    LEFT JOIN vehicle v ON v.region_id = r.id
+                    GROUP BY r.region_name
+                    ORDER BY vehicle_count DESC
+                """)
+                region_stats = cursor.fetchall()
+                
+                # Print summary table
+                print("\n" + "=" * 60)
+                print("VEHICLE PROCESSING SUMMARY".center(60))
+                print("=" * 60)
+                
+                print(f"\n{'Total Active Vehicles:':<30} {active_vehicles:>10}")
+                print(f"{'Total Deactivated Vehicles:':<30} {deactivated_vehicles:>10}")
+                print(f"{'Total Vehicles:':<30} {active_vehicles + deactivated_vehicles:>10}")
+                
+                print("\n" + "VEHICLES BY MODEL".center(60))
+                print("=" * 120)
+                print(f"{'Model Name':<20} {'Type':<40} {'Version':<40} {'Count':>10}")
+                print("-" * 120)
+                for model in models_stats:
+                    model_name = model[0] or 'Unknown'
+                    model_type = model[1] or 'Unknown'
+                    model_version = model[2] or 'Unknown'
+                    count = model[3] or 0
+                    print(f"{model_name:<20} {model_type:<40} {model_version:<40} {count:>10}")
+                
+                print("\n" + "VEHICLES BY OEM".center(60))
+                print("=" * 60)
+                print(f"{'OEM':<40} {'Count':>15}")
+                print("-" * 60)
+                for oem in oem_stats:
+                    oem_name = oem[0] or 'Unknown'
+                    count = oem[1] or 0
+                    print(f"{oem_name:<40} {count:>15}")
+                
+                print("\n" + "VEHICLES BY REGION".center(60))
+                print("=" * 60)
+                print(f"{'Region':<40} {'Count':>15}")
+                print("-" * 60)
+                for region in region_stats:
+                    region_name = region[0] or 'Unknown'
+                    count = region[1] or 0
+                    print(f"{region_name:<40} {count:>15}")
+                
+                print("\n" + "=" * 60)
+                logging.info("Vehicle summary report generated successfully")
+                
+        except Exception as e:
+            logging.error(f"Error generating vehicle summary: {str(e)}")
+            raise        
 
         
         

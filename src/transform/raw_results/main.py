@@ -6,6 +6,8 @@ from transform.raw_results.tesla_results import get_results as tesla_results
 from transform.raw_results.volvo_results import get_results as volvo_results
 from transform.raw_results.renault_results import get_results as renault_results
 from transform.raw_results.mercedes_results import get_results as mercedes_results
+from transform.raw_results.tesla_fleet_telemetry import get_results as tesla_fleet_telemetry_results
+
 from transform.raw_results.config import *
 
 def update_all_raw_tss():
@@ -16,6 +18,7 @@ def update_all_raw_tss():
     renault_results(force_update=True)
     tesla_results(force_update=True)
     volvo_results(force_update=True)
+    tesla_fleet_telemetry_results(force_update=True)
 
 @main_decorator
 def main():
