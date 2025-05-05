@@ -161,7 +161,7 @@ class ProcessedTimeSeries(CachedETL):
     @classmethod
     def update_all_tss(cls, **kwargs):
         for make in ALL_MAKES:
-            if make == "tesla":
+            if make in ["tesla", "tesla-fleet-telemery"]:
                 cls = TeslaProcessedTimeSeries
             else:
                 cls = ProcessedTimeSeries
@@ -170,18 +170,18 @@ class ProcessedTimeSeries(CachedETL):
 class TeslaProcessedTimeSeries(ProcessedTimeSeries):
 
     def __init__(self, make:str="tesla", id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False, **kwargs):
-        self.logger = getLogger("tesla")
-        set_level_of_loggers_with_prefix(log_level, "tesla")
-        super().__init__("tesla", id_col, log_level, max_td, force_update, **kwargs)
+        self.logger = getLogger(make)
+        set_level_of_loggers_with_prefix(log_level, make)
+        super().__init__(make, id_col, log_level, max_td, force_update, **kwargs)
 
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (
             tss
             .pipe(self.compute_charge_n_discharge_masks)
             .pipe(self.compute_charge_idx)
-            .pipe(self.compute_idx_from_masks, ["in_discharge"])
-            .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
-            .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
+            # .pipe(self.compute_idx_from_masks, ["in_discharge"])
+            # .pipe(self.trim_leading_n_trailing_soc_off_masks, ["in_charge", "in_discharge"])
+            # .pipe(self.compute_idx_from_masks, ["trimmed_in_charge", "trimmed_in_discharge"])
         )
 
     def compute_charge_n_discharge_masks(self, tss:DF) -> DF:
@@ -211,24 +211,91 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         tss["in_discharge"] = tss.eval("nan_charging.notna() & ~nan_charging")
         return tss.drop(columns=["nan_charging", "ffill_charging", "bfill_charging", "ffill_date", "bfill_date"])
 
-    def compute_charge_idx(self, tss:DF) -> DF:
-        self.logger.debug("Computing tesla specific charge index.")
-        tss_grp = tss.groupby("vin", observed=False)
-        tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
-        energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
-        # charge_energy_added is cummulative and forward filled, 
-        # We check that the charge_energy_added decreases too fast to make sure that  correctly indentify two charging periods before and after a gap as two separate charging periods.
-        new_charge_mask = energy_added_over_time.lt(MIN_POWER_LOSS, fill_value=0) 
-        # For the same reason, we ensure that there are no gaps bigger than MAX_CHARGE_TD in between to rows of the same charging period.
-        new_charge_mask |= tss["time_diff"].gt(MAX_CHARGE_TD) 
-        # And of course we also check that there is no change of status. 
-        new_charge_mask |= (~tss_grp["in_charge"].shift() & tss["in_charge"]) 
-        tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
-        print(tss["in_charge_idx"].count() / len(tss))
-        tss["in_charge_idx"] = tss["in_charge_idx"].fillna(-1).astype("uint16")
+    def compute_enenergy_added(self, tss:DF) -> DF:
+        tss['charge_energy_added'] = tss['dc_charge_energy_added'].where(
+            tss['dc_charge_energy_added'].notnull() & 
+            (tss['dc_charge_energy_added'] > 0), 
+            tss['ac_charge_energy_added'])
         return tss
+    # def compute_charge_idx(self, tss:DF) -> DF:
+    #     self.logger.debug("Computing tesla specific charge index.")
+    #     if self.make == 'tesla-fleet-telemetry':
+    #         tss = tss.pipe(self.compute_enenergy_added)
+    #     tss_grp = tss.groupby("vin", observed=False)
+    #     tss["charge_energy_added"] = tss_grp["charge_energy_added"].ffill()
+    #     energy_added_over_time = tss_grp['charge_energy_added'].diff().div(tss["sec_time_diff"].values)
+    #     # charge_energy_added is cummulative and forward filled, 
+    #     # We check that the charge_energy_added decreases too fast to make sure that  correctly indentify two charging periods before and after a gap as two separate charging periods.
+    #     new_charge_mask = energy_added_over_time.lt(MIN_POWER_LOSS, fill_value=0) 
+    #     # For the same reason, we ensure that there are no gaps bigger than MAX_CHARGE_TD in between to rows of the same charging period.
+    #     new_charge_mask |= tss["time_diff"].gt(MAX_CHARGE_TD) 
+    #     # And of course we also check that there is no change of status. 
+    #     new_charge_mask |= (~tss_grp["in_charge"].shift() & tss["in_charge"]) 
+    #     tss["in_charge_idx"] = new_charge_mask.groupby(tss["vin"], observed=True).cumsum()
+    #     print(tss["in_charge_idx"].count() / len(tss))
+    #     tss["in_charge_idx"] = tss["in_charge_idx"].fillna(-1).astype("uint16")
+    #     return tss
+    
+    def compute_charge_idx(self, tss:pd.DataFrame) -> pd.DataFrame:
+        """Computes a charging session identifier (`in_charge_idx`) based on the evolution 
+        of the State of Charge (SoC) between successive telemetry readings.
+
+        This function helps segment the dataset into distinct charging/discharging sessions 
+        by analyzing SoC variations per vehicle (VIN) and identifying significant time gaps 
+        between measurements (greater than 120 minutes).
+
+        Args:
+            tss (pd.DatFrame): _description_
+
+        Returns:
+            pd.DataFrame: The input DataFrame enriched with the following columns: 'soc_diff' and 'in_charge_idx' 
+        """
+        if self.make == 'tesla-fleet-telemetry':
+            tss = tss.pipe(self.compute_enenergy_added)
+            
+        # Compute soc_diff per VIN
+        tss_na = tss.dropna(subset=['soc']).copy()
+        tss_na['soc_diff'] = tss_na.groupby('vin', observed=True)['soc'].diff() 
+        tss_na['trend'] = tss_na['soc_diff'].apply(lambda x: 1 if x > 0 else -1 if x < 0 else 0)
 
 
+        def detect_trend_change(group):
+            """Identifies points of trend change in the State of Charge (SoC) evolution 
+            for a group of telemetry data from the same vehicle.
+
+            A trend change is detected when:
+            - The direction of SoC variation (trend) differs from the previous value,
+            but the previous two trends were the same (indicating a stable trend shift).
+            - OR when there is a time gap of more than xx minutes between measurements,
+            indicating a potential break in vehicle activity.
+            """
+
+            group['prev_trend'] = group['trend'].shift(1)
+            group['prev_prev_trend'] = group['trend'].shift(2)
+            
+            group['prev_date'] = group['date'].shift(1)
+            group['time_diff_min'] = (group['date'] - group['prev_date']).dt.total_seconds() / 60
+            group['time_gap'] = group['time_diff_min'] > 60  
+
+
+            group['trend_change'] = (
+                (((group['trend'] != group['prev_trend']) & 
+                  (group['prev_trend'] == group['prev_prev_trend']) ) |
+                group['time_gap'])
+            )
+            group.loc[group.index[0:2], 'trend_change'] = False
+            return group
+
+
+        tss_na = tss_na.groupby('vin', observed=True).apply(detect_trend_change).reset_index(drop=True)
+        
+        # Compute charge id
+        tss_na['in_charge_idx'] = tss_na.groupby('vin',  observed=True)['trend_change'].cumsum()
+        tss = tss.merge(tss_na[["soc", "date", "vin", 'soc_diff', 'in_charge_idx']], 
+                        on=["soc", "date", "vin"], how="left")
+        tss[["odometer","in_charge_idx"]] = tss[["odometer", "in_charge_idx"]].ffill()
+        return tss
+        
 @main_decorator
 def main():
     parser = argparse.ArgumentParser(description="Process time series data.")
