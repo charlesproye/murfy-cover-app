@@ -5,8 +5,8 @@ import json
 import logging
 
 
-def log_function(x, a ,b):
-    return 1 + a * np.log1p(x / b)
+def log_function(x, a ,b, c):
+    return a + b * np.log1p(x / c)
 
 
 def get_trendlines(df, oem=None, version=None, update=False):
@@ -81,7 +81,7 @@ def get_trendlines(df, oem=None, version=None, update=False):
     coef_lower, _ = curve_fit(log_function_min, x_sorted, y_lower, maxfev=10000)
     coef_upper, _ = curve_fit(log_function_max, x_sorted, y_upper, maxfev=10000)
 
-    trendline = {"trendline": f"1 + {coef_[0]} * np.log1p(x/{coef_[1]})"}
+    trendline = {"trendline": f"{coef_[0]} + {coef_[1]} * np.log1p(x/{coef_[2]})"}
     trendline_max ={"trendline": f"{max(y_upper.max(), 1)}+ {coef_upper[0]} * np.log1p(x/{coef_upper[1]})"}
     trendline_min ={"trendline": f"{min(y_lower.max(), 1)} + {coef_lower[0]} * np.log1p(x/ {coef_lower[1]})"}
 
