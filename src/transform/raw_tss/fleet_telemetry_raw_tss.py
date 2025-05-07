@@ -27,8 +27,8 @@ def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
     keys = get_response_keys_to_parse(bucket)
     if bucket.check_file_exists(FLEET_TELEMETRY_RAW_TSS_KEY):
         raw_tss = bucket.read_parquet_df(FLEET_TELEMETRY_RAW_TSS_KEY)
-        keys_to_parse = keys[keys['date'] >= pd.to_datetime((pd.to_datetime(raw_tss.readable_date.max()).date() - timedelta(days=1)))].copy()
-        new_raw_tss = get_raw_tss_from_keys(keys_to_parse, bucket)
+        #keys_to_parse = keys[keys['date'] >= pd.to_datetime((pd.to_datetime(raw_tss.readable_date.max()).date() - timedelta(days=1)))].copy()
+        new_raw_tss = get_raw_tss_from_keys(keys, bucket)
         return concat([new_raw_tss, raw_tss])
     else:
         new_raw_tss = get_raw_tss_from_keys(keys, bucket)
@@ -53,8 +53,9 @@ def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
     )
 
 def get_raw_tss_from_keys(keys:DF, bucket:S3_Bucket) -> DF:
-    raw_tss = []
-    for week, week_keys in track(keys.groupby(pd.Grouper(key='date', freq='W-MON'))):
+    grouped = keys.groupby(pd.Grouper(key='date', freq='W-MON'))
+    grouped_items = list(grouped)[:3]
+    for week, week_keys in track(grouped_items, description="Processing weekly groups"):
         week_date = week.date().strftime('%Y-%m-%d')
         logger.debug(f"Parsing the responses of the week {week_date}:")
         logger.debug(f"{len(week_keys)} keys to parse for {week_keys['vin'].nunique()} vins.")
