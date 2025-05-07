@@ -42,9 +42,9 @@ def get_trendlines(df, oem=None, version=None, update=False):
     x_data = df.dropna(subset=['soh', 'odometer'])['odometer'].values
     y_data = df.dropna(subset=['soh', 'odometer'])['soh'].values
 
-    if len(y_data) < 100:
+    if df.dropna(subset=['soh', 'odometer']).vin.nunique() < 50:
         logging.warning(f"Pas assez de données pour calculer une trendline pour {oem} {version}")
-        return  
+        return 
 
     logging.info(f"Calcul de la trendline pour {oem} {version}")
     
@@ -82,8 +82,8 @@ def get_trendlines(df, oem=None, version=None, update=False):
     coef_upper, _ = curve_fit(log_function_max, x_sorted, y_upper, maxfev=10000)
 
     trendline = {"trendline": f"{coef_[0]} + {coef_[1]} * np.log1p(x/{coef_[2]})"}
-    trendline_max ={"trendline": f"{max(y_upper.max(), 1)}+ {coef_upper[0]} * np.log1p(x/{coef_upper[1]})"}
-    trendline_min ={"trendline": f"{min(y_lower.max(), 1)} + {coef_lower[0]} * np.log1p(x/ {coef_lower[1]})"}
+    trendline_max = {"trendline": f"{max(y_upper.max(), 1)}+ {coef_upper[0]} * np.log1p(x/{coef_upper[1]})"}
+    trendline_min = {"trendline": f"{min(y_lower.max(), 1)} + {coef_lower[0]} * np.log1p(x/ {coef_lower[1]})"}
 
     # update des données dans dbeaver
     if update is True:
@@ -125,7 +125,7 @@ def get_trendlines(df, oem=None, version=None, update=False):
     return trendline, trendline_max, trendline_min
 
 if __name__ == "__main__":
-    
+
     # update oem
     for oem_name in ["ford", "bmw", "kia", "stellantis", "mercedes-benz", "volvo-cars", 
                      "renault", "mercedes", "volvo", "volkswagen", "toyota", "tesla"]:
@@ -143,5 +143,37 @@ if __name__ == "__main__":
             dbeaver_df = pd.read_sql(query, connection, params={"oem_name": oem_name})
         get_trendlines(dbeaver_df, oem=oem_name, update=True)
         ## update version
-        for version in dbeaver_df.version.unique()[dbeaver_df.version.unique()!= "unknown"]:
-            get_trendlines(dbeaver_df[dbeaver_df['version']==version], version=version, update=True)
+
+        courbe_model = {}
+        for model in dbeaver_df.model_name.unique():
+            courbe_model[model] = get_trendlines(dbeaver_df[dbeaver_df['model_name']==model])
+
+        for version in dbeaver_df.version.unique():
+            if version == "unknown":
+                continue
+
+            version_df = dbeaver_df[dbeaver_df["version"] == version]
+            model_name = version_df["model_name"].iloc[0]
+    
+            if dbeaver_df[dbeaver_df["version"]==version].vin.nunique() > 100:
+                get_trendlines(dbeaver_df[dbeaver_df['version']==version], version=version, update=True)
+            else:
+                if courbe_model[model_name] is not None:
+                    logging.warning(f"Pas assez de données pour {version}, utilisation de la trendline du modèle {model_name}")
+                    trendline, trendline_max, trendline_min = courbe_model[model_name]
+                    sql_request = text("""
+                        UPDATE vehicle_model 
+                        SET trendline = :trendline_json,
+                            trendline_min = :trendline_min_json,
+                            trendline_max = :trendline_max_json
+                        WHERE version = :version
+                    """)
+
+                    with engine.begin() as conn:
+                        conn.execute(sql_request, {
+                            "trendline_json": json.dumps(trendline),
+                            "trendline_max_json": json.dumps(trendline_max),
+                            "trendline_min_json": json.dumps(trendline_min),
+                            "version": version
+                        })
+                
