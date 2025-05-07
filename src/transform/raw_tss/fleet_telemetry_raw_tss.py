@@ -53,8 +53,9 @@ def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
     )
 
 def get_raw_tss_from_keys(keys:DF, bucket:S3_Bucket) -> DF:
+    raw_tss = []
     grouped = keys.groupby(pd.Grouper(key='date', freq='W-MON'))
-    grouped_items = list(grouped)[:3]
+    grouped_items = list(grouped)
     for week, week_keys in track(grouped_items, description="Processing weekly groups"):
         week_date = week.date().strftime('%Y-%m-%d')
         logger.debug(f"Parsing the responses of the week {week_date}:")

@@ -244,7 +244,7 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
-    "tesla",
+    # "tesla",
     "bmw",
     "mercedes-benz",
     "ford",
