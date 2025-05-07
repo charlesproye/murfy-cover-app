@@ -29,7 +29,7 @@ def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
         raw_tss = bucket.read_parquet_df(FLEET_TELEMETRY_RAW_TSS_KEY)
         keys_to_parse = keys[keys['date'] >= pd.to_datetime((pd.to_datetime(raw_tss.readable_date.max()).date() - timedelta(days=1)))].copy()
         new_raw_tss = get_raw_tss_from_keys(keys_to_parse, bucket)
-        return concat([new_raw_tss, new_raw_tss])
+        return concat([new_raw_tss, raw_tss])
     else:
         new_raw_tss = get_raw_tss_from_keys(keys, bucket)
         return new_raw_tss
