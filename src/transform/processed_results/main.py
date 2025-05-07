@@ -47,7 +47,7 @@ def get_processed_results(brand:str) -> DF:
         .groupby('vin', observed=True)
         .apply(make_soh_presentable_per_vehicle, include_groups=False)
         .reset_index(level=0)
-        .pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
+        #.pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
         .sort_values(["vin", "date"])
     )
     results["soh"] = results.groupby("vin", observed=True)["soh"].ffill()

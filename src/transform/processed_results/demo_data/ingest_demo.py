@@ -10,7 +10,7 @@ import os
 import math
 from tqdm import tqdm
 
-from demo_data.db import deps
+from transform.processed_results.demo_data.db import deps
 
 async def get_session() -> AsyncSession:
     session = await deps.data_session()
