@@ -18,7 +18,7 @@ def main():
     set_level_of_loggers_with_prefix("DEBUG", "transform.raw_results")
     results = get_results(force_update=True)
 
-#@cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla-fleet-telemetry"), "s3")
+@cache_result(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make="tesla-fleet-telemetry"), "s3")
 def get_results() -> DF:
     logger.info("Processing raw tesla fleet telemetry results.")
     results = (TeslaProcessedTimeSeries('tesla-fleet-telemetry',)
@@ -43,7 +43,8 @@ def get_results() -> DF:
         .assign(charging_power = lambda df: df['ac_charging_power'].replace([np.nan, -np.nan], 0) + df['dc_charging_power'].replace([np.nan, -np.nan], 0))
         .eval("ac_energy_added = ac_energy_added_end  - ac_energy_added_min")
         .eval("dc_energy_added = dc_energy_added_end  - dc_energy_added_min")
-        .assign(energy_added=lambda df: np.maximum(df["ac_energy_added"].replace([np.nan, -np.nan], 0), df["dc_energy_added"].replace([np.nan, -np.nan], 0)))
+        #.assign(energy_added=lambda df: np.maximum(df["ac_energy_added"].replace([np.nan, -np.nan], 0), df["dc_energy_added"].replace([np.nan, -np.nan], 0)))
+        .assign(energy_added=lambda df: df["dc_energy_added"])
         .eval("soh = energy_added / (soc_diff / 100.0 * net_capacity)")
         .eval("level_1 = soc_diff * (charging_power < 8) / 100")
         .eval("level_2 = soc_diff * (charging_power.between(8, 45)) / 100")
