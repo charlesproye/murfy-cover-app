@@ -10,6 +10,8 @@ from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaError
 from aiokafka.consumer.consumer import ConsumerRecord
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
+from aiokafka.admin.config_resource import ConfigResource, ConfigResourceType
+from aiokafka.structs import TopicPartition
 
 logger = logging.getLogger("kafka-consumer")
 
@@ -51,6 +53,7 @@ class KafkaConsumer:
         self.group_id = group_id
         self.consumer = None
         self.running = False
+        self.paused = False
         self.auto_offset_reset = auto_offset_reset
         self.message_retention_hours = message_retention_hours
         
@@ -72,6 +75,55 @@ class KafkaConsumer:
         if message_retention_hours is not None:
             logger.info(f"Une politique de rétention de {message_retention_hours} heures sera appliquée au démarrage")
         logger.debug(f"Configuration complète: {self.config}")
+
+    def _ensure_topic_partitions(self, partitions):
+        """Convert partitions to proper TopicPartition objects."""
+        result = []
+        for p in partitions:
+            if isinstance(p, TopicPartition):
+                result.append(p)
+            else:
+                # If it's a string representation or other format, parse it
+                try:
+                    if hasattr(p, 'topic') and hasattr(p, 'partition'):
+                        result.append(TopicPartition(topic=p.topic, partition=p.partition))
+                    else:
+                        logger.warning(f"Skipping invalid partition object: {p}")
+                except Exception as e:
+                    logger.error(f"Error converting partition {p}: {str(e)}")
+        return result
+
+    async def pause(self):
+        """Pause la consommation des messages."""
+        logger.info("Mise en pause du consumer Kafka")
+        self.paused = True
+        if self.consumer:
+            try:
+                # Get current assignment as a list
+                topics_to_pause = list(self.consumer.assignment())
+                if topics_to_pause:
+                    logger.debug(f"Pausing consumption on {len(topics_to_pause)} partitions: {topics_to_pause}")
+                    # AIOKafkaConsumer.pause() n'est pas une coroutine, pas besoin de await
+                    self.consumer.pause(*topics_to_pause)
+                    logger.info(f"Consumer paused successfully on {len(topics_to_pause)} partitions")
+            except Exception as e:
+                logger.error(f"Error pausing consumer: {str(e)}", exc_info=True)
+
+    async def resume(self):
+        """Reprend la consommation des messages."""
+        logger.info("Reprise du consumer Kafka")
+        self.paused = False
+        if self.consumer:
+            try:
+                # Get current assignment as a list
+                topics_to_resume = list(self.consumer.assignment())
+                if topics_to_resume:
+                    logger.debug(f"Resuming consumption on {len(topics_to_resume)} partitions: {topics_to_resume}")
+                    # AIOKafkaConsumer.resume() n'est pas une coroutine, pas besoin de await
+                    self.consumer.resume(*topics_to_resume)
+                    logger.info(f"Consumer resumed successfully on {len(topics_to_resume)} partitions")
+            except Exception as e:
+                logger.error(f"Error resuming consumer: {str(e)}", exc_info=True)
 
     async def set_retention_policy(self, retention_hours: int = 48) -> bool:
         """
@@ -98,13 +150,12 @@ class KafkaConsumer:
             await admin_client.start()
             
             try:
-                # Configurer la rétention pour le topic
-                config_resource = {
-                    "topic": self.topic,
-                    "configs": {
-                        "retention.ms": str(retention_ms)
-                    }
-                }
+                # Créer la ressource de configuration
+                config_resource = ConfigResource(
+                    resource_type=ConfigResourceType.TOPIC,
+                    name=self.topic,
+                    configs={'retention.ms': str(retention_ms)}
+                )
                 
                 await admin_client.alter_configs([config_resource])
                 
@@ -159,7 +210,22 @@ class KafkaConsumer:
                 logger.info(f"Offsets de fin: {end_offsets}")
                 
                 self.running = True
-                logger.info(f"Consumer Kafka démarré sur le topic: {self.topic}")
+                
+                # Si le consumer était en pause, le remettre en pause
+                if self.paused:
+                    try:
+                        # Use the raw assignments directly as a list
+                        topics_to_pause = list(partitions)
+                        if topics_to_pause:
+                            logger.debug(f"Setting initial pause state on {len(topics_to_pause)} partitions: {topics_to_pause}")
+                            # AIOKafkaConsumer.pause() n'est pas une coroutine, pas besoin de await
+                            self.consumer.pause(*topics_to_pause)
+                            logger.info(f"Consumer redémarré en état pausé sur {len(topics_to_pause)} partitions")
+                    except Exception as e:
+                        logger.error(f"Error setting initial pause state: {str(e)}", exc_info=True)
+                        # Continue anyway, as this is not fatal
+                else:
+                    logger.info(f"Consumer Kafka démarré sur le topic: {self.topic}")
                 
             except Exception as e:
                 logger.error(f"Erreur lors de l'initialisation du consumer AIOKafka: {str(e)}", exc_info=True)
