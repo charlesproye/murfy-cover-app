@@ -3,6 +3,7 @@ from logging import Logger, getLogger
 import plotly.express as px
 
 from core.pandas_utils import *
+from core.stats_utils import estimate_cycles
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
@@ -22,7 +23,6 @@ def main():
         })
         .reset_index()
     )
-    print(df)
     if not df.empty:
         fig = px.line(df, x="date", y="soh", color="vin")
         fig.show()
@@ -36,8 +36,10 @@ def get_results() -> DF:
         .eval("soh = estimated_range / soc / range / 0.87")
         # .query("soc > 0.7")
     )
-    logger.debug("Sanity check of the results:")
-    logger.debug(sanity_check(results))
+    # # logger.debug("Sanity check of the results:")
+    # # logger.debug(sanity_check(results))
+    results['cycles'] = results.apply(lambda x: estimate_cycles(x['odometer'], x['range'], x['soh']), axis=1)
+
     return results
 
 if __name__ == "__main__":

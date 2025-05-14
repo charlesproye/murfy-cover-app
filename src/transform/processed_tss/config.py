@@ -6,6 +6,7 @@ S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss.par
 
 ODOMETER_MILES_TO_KM = {
     "tesla": 1.60934,
+    "tesla-fleet-telemetry": 1.60934,
 }
 
 COLS_TO_CPY_FROM_FLEET_INFO = [
@@ -58,13 +59,65 @@ RENAME_COLS_DICT:dict[str, str] = {
     "capacity": "capacity_according_to_data_provider",
     "model": "model_according_to_data_provider",
     # Tesla
-    "battery_level": "soc",
+    #"battery_level": "soc",
     "readable_date": "date",
     "charging_state": "charging_status",
     "fast_charger_type": "charging_method",
     "charge_rate": "charging_rate",
     "charger_power": "charging_power",
-}
+    # fleet telemetry
+    'readable_date': 'date',
+    'BatteryLevel_stringValue': 'battery_level',
+    'Soc_stringValue': 'soc',
+    'OutsideTemp_stringValue': 'outside_temp',
+    #'LifetimeEnergyUsed_stringValue': 'lifetime_energy_used',
+    #'DefrostMode_defrostModeValue': 'defrost_mode',
+    #'BrickVoltageMin_stringValue': 'brick_voltage_min',
+    'Odometer_stringValue': 'odometer',
+    'RatedRange_stringValue': 'rated_range', # True battery range lower than battery range line 98
+    #'HvacAutoMode_hvacAutoModeValue': 'hvac_auto_mode',
+    'ChargeCurrentRequest_stringValue': 'charge_current_request',
+    'PackCurrent_stringValue': 'pack_current',
+    #'HvacACEnabled_booleanValue': 'hvac_ace_nabled',
+    'ChargeRateMilePerHour_doubleValue': 'charge_rate_mileper_hour',
+    'CarType_stringValue': 'model',
+    'EnergyRemaining_stringValue': 'energy_remaining', # energie en kWh
+    'DetailedChargeState_detailedChargeStateValue': 'charging_status', # Etat de charge détiallé mieux que charge_state
+    #'HvacPower_hvacPowerValue': 'hvac_power',
+    'InsideTemp_stringValue': 'inside_temp',
+    #'EstBatteryRange_stringValue': 'est_battery_range',
+    #'ChargeCurrentRequestMax_stringValue': 'charge_current_request_max',
+    'DCChargingPower_stringValue': 'dc_charging_power',
+    #'PackVoltage_stringValue': 'pack_voltage',
+    'VehicleSpeed_stringValue': 'speed',
+    'ChargeLimitSoc_stringValue': 'charge_limit_soc',
+    #'BMSState_stringValue': 'bms_state',
+    #'DCDCEnable_stringValue': 'dc_dc_enable',
+    'IdealBatteryRange_stringValue': 'battery_range', # Battery range classic
+    'RearDefrostEnabled_booleanValue': 'rear_defrost_enabled',
+    'ChargePort_stringValue': 'charge_port',
+    'BmsFullchargecomplete_stringValue': 'bms_full_charge_complete',
+    'ACChargingPower_stringValue': 'ac_charging_power',
+    'ACChargingEnergyIn_stringValue': 'ac_charge_energy_added', 
+    'FastChargerPresent_stringValue': 'fast_charger_present',
+    # 'ModuleTempMin_stringValue': 'module_temp_min',
+    'DCChargingEnergyIn_stringValue': 'dc_charge_energy_added',
+    # 'ChargePortColdWeatherMode_stringValue': 'charge_port_cold_weather_mode',
+    # 'ChargeAmps_stringValue': 'charge_amps',
+    #'ChargeState_stringValue': 'charge_state',
+    # 'ModuleTempMax_stringValue': 'module_temp_max',
+    # 'EfficiencyPackage_stringValue': 'efficiency_package',
+    # 'ChargeEnableRequest_stringValue': 'charge_enable_request',
+    # 'BrickVoltageMax_stringValue': 'brick_voltage_max',
+    # 'PreconditioningEnabled_stringValue': 'precondition_ingenabled',
+    # 'DefrostForPreconditioning_booleanValue': 'defrost_for_preconditioning',
+    # 'ChargerVoltage_doubleValue': 'charger_voltage',
+    # 'ChargingCableType_cableTypeValue': 'charging_cable_type',
+    # 'EstimatedHoursToChargeTermination_doubleValue': 'estimated_hours_to_charge_termination',
+    # 'FastChargerType_fastChargerValue': 'fast_charger_type',
+    # 'ChargerPhases_stringValue': 'charger_phases',
+    # 'BatteryHeaterOn_stringValue': 'battery_heater'
+    }
 
 # The keys will be used to determine what columns to keep.
 COL_DTYPES = {
@@ -121,6 +174,12 @@ COL_DTYPES = {
     "charging_rate": "float32",
     "engine_speed": "float32",
     "soh_oem": "float32",
+    # Fleet-telemetry
+    "charging_state": "category",
+    "ac_charge_energy_added":'float32',
+    "dc_charge_energy_added": 'float32',
+    "ac_charging_power": 'float32',
+    "dc_charging_power": 'float32',
 }
 
 DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
@@ -141,6 +200,9 @@ IN_CHARGE_CHARGING_STATUS_VALS = [
     'fast_charging',
     'initialization',
     "in-progress",
+    # fleet-telemetry
+    'detailedchargestatecharging', 
+    'detailedchargestatestarting'
 ]
 
 IN_DISCHARGE_CHARGING_STATUS_VALS = [
@@ -149,6 +211,12 @@ IN_DISCHARGE_CHARGING_STATUS_VALS = [
     'chargingerror',
     'cable_unplugged',
     'disconnected', # Tesla
+     # fleet-telemetry
+    "detailedchargestatedisconnected",
+    "detailedchargestatenopower",
+    "detailedchargestatestopped",
+    "detailedchargestatecomplete",
+  
 ]
 
 CHARGING_STATUS_VAL_TO_MASK = {
@@ -171,15 +239,18 @@ CHARGING_STATUS_VAL_TO_MASK = {
     # Mobilisight
     "cable_unplugged": False,
     "Disconnected": False,
+    #fleet-telemetry
+    "DetailedChargeStateDisconnected": False
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
-    "tesla",
+    # "tesla",
     "bmw",
     "mercedes-benz",
     "ford",
     "volvo-cars",
     "stellantis",
+    "tesla-fleet-telemetry"
 ]
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [

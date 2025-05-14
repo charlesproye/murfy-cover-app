@@ -38,22 +38,34 @@ main() {
     # Ajoutez le répertoire `src` au PYTHONPATH
     export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src"
 
+    # Set memory-related environment variables if not already set
+    export PYTHONMALLOC=${PYTHONMALLOC:-debug}
+    export PYTHONFAULTHANDLER=${PYTHONFAULTHANDLER:-1}
+    export PYTHONASYNCIODEBUG=${PYTHONASYNCIODEBUG:-0}
+    export PYTHONOPTIMIZE=${PYTHONOPTIMIZE:-2}
+
     LOG_LEVEL=${LOG_LEVEL:-INFO}
-    MAX_WORKERS=${MAX_WORKERS:-}
+    MAX_WORKERS=${MAX_WORKERS:-4}  # Default to fewer workers
     REFRESH_INTERVAL=${REFRESH_INTERVAL:-}
     COMPRESS_INTERVAL=${COMPRESS_INTERVAL:-}
-    COMPRESS_THREADED=${COMPRESS_THREADED:-}
-    # ACCESSLOG=${ACCESSLOG:-true}
-    # ERRORLOG=${ERRORLOG:-true}
+    COMPRESS_THREADED=${COMPRESS_THREADED:-1}  # Default to threaded mode
+    BATCH_SIZE=${BATCH_SIZE:-25}  # Default to smaller batch size
 
-    chunks=("python3" "./src/ingestion/high_mobility")
+    msg "Starting High Mobility ingestion with memory optimization"
+    msg "Memory optimization settings: PYTHONMALLOC=$PYTHONMALLOC, PYTHONOPTIMIZE=$PYTHONOPTIMIZE"
+    msg "Max workers: $MAX_WORKERS, Batch size: $BATCH_SIZE"
 
-    # [[ "$ACCESSLOG" == "true" ]] && chunks+=("--access-logfile" "-")
-    # [[ "$ERRORLOG" == "true" ]] && chunks+=("--error-logfile" "-")
-    [[ ! -z "$MAX_WORKERS" ]] && chunks+=("--max_workers" "$MAX_WORKERS")
+    # Configure Python command with memory-optimized settings
+    chunks=("python3" "-B")  # -B prevents writing bytecode
+
+    # Set command arguments
+    chunks+=("./src/ingestion/high_mobility")
+    chunks+=("--max_workers" "$MAX_WORKERS")
+    chunks+=("--batch_size" "$BATCH_SIZE")
+
     [[ ! -z "$REFRESH_INTERVAL" ]] && chunks+=("--refresh_interval" "$REFRESH_INTERVAL")
     [[ ! -z "$COMPRESS_INTERVAL" ]] && chunks+=("--compress_interval" "$COMPRESS_INTERVAL")
-    [[ ! -z "$COMPRESS_THREADED" ]] && chunks+=("--compress_threaded")
+    [[ "$COMPRESS_THREADED" == "1" ]] && chunks+=("--compress_threaded")
 
     for e in "${chunks[@]}"
     do
@@ -61,6 +73,12 @@ main() {
     done
 
     msg "Exec: $cmd"
+    
+    # Display memory usage before starting
+    free -m
+    msg "Starting High Mobility ingestion process"
+    
+    # Execute the command
     exec $cmd
 }
 

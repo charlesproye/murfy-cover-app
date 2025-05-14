@@ -6,16 +6,17 @@ from typing import Optional, Dict, Any, List
 import time
 from gspread.exceptions import APIError
 from gspread import Cell
+import re
+
 
 from core.pandas_utils import *
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from core.config import *
-from .config.credentials import SPREADSHEET_ID 
-from .config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES
-from .config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
-from .utils.google_sheets_utils import get_google_client
-# from config import COL_DTYPES
+from ingestion.vehicle_info.config.credentials import SPREADSHEET_ID 
+from ingestion.vehicle_info.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
+from ingestion.vehicle_info.config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
+from ingestion.vehicle_info.utils.google_sheets_utils import get_google_client
 
 logger = getLogger("ingestion.vehicle_info")
  
@@ -29,9 +30,15 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
     for attempt in range(max_retries):
         try:
             sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+            # Get all values including headers
             data = sheet.get_all_records()
-            logger.info(f"Successfully fetched {len(data)} rows from Google Sheets")
-            return data
+            
+            # Get headers from first row and use them as column names
+            df = pd.DataFrame(data)
+            print(df)
+            
+            logger.info(f"Successfully fetched {len(df)} rows from Google Sheets")
+            return df
             
         except APIError as e:
             last_error = e
@@ -69,9 +76,11 @@ def safe_astype(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
         if col in df.columns:
             try:
                 if dtype == bool:
+                    # First replace all empty values with False
                     df[col] = df[col].fillna(False)
+                    # Then map the remaining values
                     df[col] = df[col].map({'TRUE': True, 'True': True, True: True,
-                                         'FALSE': False, 'False': False, False: False})
+                                         'FALSE': False, 'False': False, False: False, '': False})
                 else:
                     df[col] = df[col].astype(dtype)
             except Exception as e:
@@ -94,14 +103,86 @@ def map_col_to_dict(df: pd.DataFrame, col: str, mapping: Dict[str, str]) -> pd.D
         df[col] = df[col].str.lower().map(lambda x: mapping.get(x, x) if pd.notna(x) else x)
     return df
 
+def clean_version(df, model_col='model', version_col='type'):
+    """Clean version strings by removing model name if it appears in the version.
+    
+    Args:
+        df: DataFrame containing model and version columns
+        model_col: Name of the column containing model information
+        version_col: Name of the column containing version information
+        
+    Returns:
+        DataFrame with cleaned version strings
+    """
+    return df.assign(**{version_col: lambda df: df.apply(lambda row: row[version_col].replace(row[model_col], '') 
+                                                         if pd.notna(row[model_col]) and pd.notna(row[version_col]) and row[model_col] in row[version_col] 
+                                                         else row[version_col], axis=1)})
+
+def format_licence_plate(df, licence_plate_col='licence_plate'):
+    """Format licence plate strings by adding dashes between letters and numbers.
+    
+    Args:
+        df: DataFrame containing licence plate column
+        licence_plate_col: Name of the column containing licence plate information
+        
+    Returns:
+        DataFrame with formatted licence plate strings
+    """
+    return df.assign(**{licence_plate_col: lambda df: df[licence_plate_col].apply(lambda plate: re.sub(r"([a-zA-Z]+)(\d{3})([a-zA-Z]+)", r"\1-\2-\3", plate) if pd.notna(plate) else plate)})
+
+def standardize_model_type(df: pd.DataFrame, oem_col='oem', model_col='model', type_col='type') -> pd.DataFrame:
+    """Standardize model and type strings based on predefined mappings.
+    
+    Args:
+        df: DataFrame containing model and type columns
+        oem_col: Name of the column containing OEM/make information
+        model_col: Name of the column containing model information
+        type_col: Name of the column containing type/version information
+        
+    Returns:
+        DataFrame with standardized model and type strings
+    """
+    df = df.copy()
+    
+    def _standardize_row(row):
+        make = str(row[oem_col]).lower() if pd.notna(row[oem_col]) else ''
+        model = str(row[model_col]).lower() if pd.notna(row[model_col]) else ''
+        type_val = str(row[type_col]).lower() if pd.notna(row[type_col]) else ''
+        
+        if not type_val or type_val == 'x' or type_val == 'unknown':
+            return pd.Series({model_col: model, type_col: None})
+            
+        # Remove common suffixes
+        for suffix in suffixes_to_remove:
+            type_val = type_val.replace(f" {suffix}", "")
+            
+        if make in mappings and model in mappings[make]:
+            model_info = mappings[make][model]
+            
+            # # Apply model cleaning if specified
+            # if 'model_clean' in model_info:
+            #     model = model_info['model_clean'](model)
+                
+            # Apply type patterns
+            for pattern, replacement in model_info['patterns']:
+                if re.search(pattern, type_val):
+                    return pd.Series({model_col: model, type_col: str(replacement).lower()})
+                    
+        return pd.Series({model_col: model, type_col: type_val.strip()})
+    
+    result = df.apply(_standardize_row, axis=1)
+    df[model_col] = result[model_col]
+    df[type_col] = result[type_col]
+    
+    return df
+
 async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     """Read fleet information from Google Sheets."""
     try:
         logger.info("Starting to read fleet information...")
         # Get data with retries
-        data = get_google_sheet_data()
-        df = pd.DataFrame(data)
-        
+        df = get_google_sheet_data()
+
         if df.empty:
             raise ValueError("No data retrieved from Google Sheets")
             
@@ -109,7 +190,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         
         # Clean column names
         df.columns = [col if col == "EValue" else col.lower().strip().replace(' ', '_') for col in df.columns]
-                
+   
         # Handle potential variations of the owner column name
         owner_column_variants = ['owner', 'ownership', 'ownership_', 'fleet_owner', 'fleet']
         owner_col = None
@@ -121,7 +202,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
                 
         if owner_col is None:
             raise ValueError(f"Could not find owner column. Available columns: {df.columns.tolist()}")
-            
+
         # Rename the owner column to 'owner' for consistency
         df = df.rename(columns={owner_col: 'owner'})
         
@@ -131,32 +212,39 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
             initial_count = len(df)
             df = df[df['owner'].str.lower() == owner_filter.lower()]
             logger.info(f"Found {len(df)} vehicles for owner {owner_filter} (filtered from {initial_count})")
-            
+        
+
         # Clean and standardize data
-        df = df.pipe(map_col_to_dict, "country", COUNTRY_MAPPING)
+        # df = df.pipe(map_col_to_dict, "country", COUNTRY_MAPPING)
         
         # Map OEM names
         if 'oem' in df.columns:
             df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
         
+        df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].apply(lambda x: x.str.lower())
+        
         # Convert dates with explicit format handling
         date_columns = ['start_date', 'end_of_contract']
         for col in date_columns:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col], format='%d-%m-%Y', dayfirst=True, errors='coerce')
+                df[col] = pd.to_datetime(df[col], yearfirst=True, errors='coerce').dt.strftime('%Y-%m-%d')
         
         # Remove duplicates and convert types
         df = df.drop_duplicates(subset="vin")
+        df = df.replace({pd.NaT: None})
         
         # Ensure all required columns exist before type conversion
         for col in COL_DTYPES:
             if col not in df.columns:
                 logger.warning(f"Missing column {col}, adding empty column")
                 df[col] = None
-                
+        # Add this before safe_astype
         df = df.pipe(safe_astype, COL_DTYPES)
-        
+        df = df.pipe(clean_version, model_col='model', version_col='type')
+        df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
+        df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
         logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
+        
         return df
         
     except Exception as e:
@@ -164,6 +252,4 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         raise
 
 if __name__ == "__main__":
-    df = asyncio.run(read_fleet_info())
-    print(df)
-    
+    df = asyncio.run(read_fleet_info(owner_filter=''))
