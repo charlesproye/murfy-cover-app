@@ -38,12 +38,12 @@ for model in df_sheet.Modèle.unique():
     if True in dbeaver_df['trendline_active'].values:
         df_model = df_sheet[df_sheet["Modèle"] == model]
         logging.info(f"Processing trendline for model: {model}")
-        get_trendlines(df_model, version=model, update=True, source='excel')
+        get_trendlines(df_model, version=model, update=True)
         
         # ecriture dans la gsheet de trendlines
         df_to_write = dbeaver_df[['oem_name', 'model_name', 'type']].iloc[[-1]]
-        df_to_write['source'] = "excel"
         df_to_write['version'] = "None"
+        df_to_write['source'] = "excel"
         sheet_out = client.open("BP - Rapport Freemium")
         worksheet = sheet_out.worksheet("Trendline")
         worksheet.append_rows(df_to_write.values.tolist())
