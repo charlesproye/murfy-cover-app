@@ -11,9 +11,10 @@ client = gspread.authorize(CREDS)
 
 sheet = client.open("202505 - Courbes SoH")
 worksheets = sheet.worksheets()
-coubes_sheet = sheet.worksheet("Courbes OS")
+courbes_sheet = sheet.worksheet("Courbes OS")
 
-df_spreed_sheet = pd.DataFrame(coubes_sheet.get_all_values()[1:], columns=coubes_sheet.get_all_values()[0])
+df_spreed_sheet = pd.DataFrame(np.array(courbes_sheet.get_all_values())[1:,:6], 
+                               columns=courbes_sheet.get_all_values()[0][:6])
 df_spreed_sheet["Odomètre (km)"] = df_spreed_sheet["Odomètre (km)"].apply(lambda x: x.replace(" ", "")).astype(int)
 df_spreed_sheet["SoH"] = df_spreed_sheet["SoH"].apply(lambda x: x.replace("%", "")).astype(float)
 df_spreed_sheet.rename(columns={"Odomètre (km)": "odometer",
