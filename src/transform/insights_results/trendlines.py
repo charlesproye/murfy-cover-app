@@ -15,12 +15,13 @@ CREDS = Credentials.from_service_account_file(
     cred_path,
     scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 )
+client = gspread.authorize(CREDS)
 
 def log_function(x, a ,b, c):
     return a + b * np.log1p(x / c)
 
 
-def get_trendlines(df, oem=None, version=None, update=False, source='dbeaver'):
+def get_trendlines(df, oem=None, version=None, update=False):
     """
     Computes logarithmic trendlines for the relationship between odometer and SOH (State of Health)
     from a given DataFrame, and updates the results in a database if `oem` or `version` are specified.
@@ -156,45 +157,62 @@ if __name__ == "__main__":
         ## trendline oem     
         #get_trendlines(dbeaver_df, oem=oem_name, update=True)
         
-        ## update version
-
+        
+        # Calcule trendlines modèles
         courbe_model = {}
-        for model in dbeaver_df.model_name.unique():
-            courbe_model[model] = get_trendlines(dbeaver_df[dbeaver_df['model_name']==model])
-
+        for model in dbeaver_df["model_name"].unique():
+            try:
+                courbe_model[model] = get_trendlines(dbeaver_df[dbeaver_df['model_name'] == model])
+            except Exception as e:
+                logging.error(f"Erreur trendline modèle {model}: {e}")
+                courbe_model[model] = None
+        
+        ## update version
         for version in dbeaver_df.version.unique():
             if version == "unknown":
                 continue
 
             version_df = dbeaver_df[dbeaver_df["version"] == version]
+            if version_df.empty:
+                continue
+            
             model_name = version_df["model_name"].iloc[0]
 
             if version_df["trendline_active"].iloc[-1] is True:
-                get_trendlines(version_df, version=version, update=True)
-                logging.warning("Update google sheet")
-                df_to_write = pd.DataFrame(version_df[['oem_name', 'model_name', 'type', 'version']].iloc[-1]).T
-                df_to_write['source'] = "dbeaver"
-                client = gspread.authorize(CREDS)
-                sheet = client.open("BP - Rapport Freemium")  
-                worksheet = sheet.worksheet("Trendline")
-                worksheet.append_rows(df_to_write.values.tolist())
-                
+                try:
+                    
+                    get_trendlines(version_df, version=version, update=True)
+                    logging.warning(f"Trendline mise à jour pour {version}")
+                    
+                    df_to_write = version_df[['oem_name', 'model_name', 'type', 'version']].iloc[[-1]]
+                    df_to_write['source'] = "dbeaver"
+                    
+                    sheet = client.open("BP - Rapport Freemium")
+                    worksheet = sheet.worksheet("Trendline")
+                    worksheet.append_rows(df_to_write.values.tolist())
+                except Exception as e:
+                    logging.error(f'Erreur omise à jour de la trendline {version}: {e}')
             else:
-                if courbe_model[model_name] is not None:
+                trendline_info = courbe_model.get(model_name)
+                if trendline_info is not None:
                     logging.warning(f"Pas assez de données pour {version}, utilisation de la trendline du modèle {model_name}")
-                    trendline, trendline_max, trendline_min = courbe_model[model_name]
-                    sql_request = text("""
-                        UPDATE vehicle_model 
-                        SET trendline = :trendline_json,
-                            trendline_min = :trendline_min_json,
-                            trendline_max = :trendline_max_json
-                        WHERE version = :version
-                    """)
+                    try:
+                        trendline, trendline_max, trendline_min = trendline_info
+                        sql_request = text("""
+                            UPDATE vehicle_model 
+                            SET trendline = :trendline_json,
+                                trendline_min = :trendline_min_json,
+                                trendline_max = :trendline_max_json
+                            WHERE version = :version
+                        """)
 
-                    with engine.begin() as conn:
-                        conn.execute(sql_request, {
-                            "trendline_json": json.dumps(trendline),
-                            "trendline_max_json": json.dumps(trendline_max),
-                            "trendline_min_json": json.dumps(trendline_min),
-                            "version": version
-                        })
+                        with engine.begin() as conn:
+                            conn.execute(sql_request, {
+                                "trendline_json": json.dumps(trendline),
+                                "trendline_max_json": json.dumps(trendline_max),
+                                "trendline_min_json": json.dumps(trendline_min),
+                                "version": version
+                            })
+                            
+                    except Exception as e:
+                        logging.error(f"Erreur fallback trendline pour {version}: {e}")
