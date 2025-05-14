@@ -3,13 +3,24 @@ from scipy.optimize import curve_fit
 from core.sql_utils import *
 import json
 import logging
+import os
+import gspread
+from google.oauth2.service_account import Credentials
 
+
+root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+cred_path = os.path.join(root_dir, "ingestion", "vehicle_info", "config", "config.json")
+
+CREDS = Credentials.from_service_account_file(
+    cred_path,
+    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+)
 
 def log_function(x, a ,b, c):
     return a + b * np.log1p(x / c)
 
 
-def get_trendlines(df, oem=None, version=None, update=False):
+def get_trendlines(df, oem=None, version=None, update=False, source='dbeaver'):
     """
     Computes logarithmic trendlines for the relationship between odometer and SOH (State of Health)
     from a given DataFrame, and updates the results in a database if `oem` or `version` are specified.
@@ -42,8 +53,8 @@ def get_trendlines(df, oem=None, version=None, update=False):
     x_data = df.dropna(subset=['soh', 'odometer'])['odometer'].values
     y_data = df.dropna(subset=['soh', 'odometer'])['soh'].values
 
-    if df.dropna(subset=['soh', 'odometer']).vin.nunique() < 50:
-        logging.warning(f"Pas assez de données pour calculer une trendline pour {oem} {version}")
+    if df.dropna(subset=['soh', 'odometer']).shape[0] < 1:
+        logging.warning(f"Pas de SoH pour calculer une trendline pour {oem} {version}")
         return 
 
     logging.info(f"Calcul de la trendline pour {oem} {version}")
@@ -141,7 +152,10 @@ if __name__ == "__main__":
             """)
 
             dbeaver_df = pd.read_sql(query, connection, params={"oem_name": oem_name})
-        get_trendlines(dbeaver_df, oem=oem_name, update=True)
+            
+        ## trendline oem     
+        #get_trendlines(dbeaver_df, oem=oem_name, update=True)
+        
         ## update version
 
         courbe_model = {}
@@ -154,9 +168,17 @@ if __name__ == "__main__":
 
             version_df = dbeaver_df[dbeaver_df["version"] == version]
             model_name = version_df["model_name"].iloc[0]
-    
-            if dbeaver_df[dbeaver_df["version"]==version].vin.nunique() > 100:
-                get_trendlines(dbeaver_df[dbeaver_df['version']==version], version=version, update=True)
+
+            if version_df["trendline_active"].iloc[-1] is True:
+                get_trendlines(version_df, version=version, update=True)
+                logging.warning("Update google sheet")
+                df_to_write = pd.DataFrame(version_df[['oem_name', 'model_name', 'type', 'version']].iloc[-1]).T
+                df_to_write['source'] = "dbeaver"
+                client = gspread.authorize(CREDS)
+                sheet = client.open("BP - Rapport Freemium")  
+                worksheet = sheet.worksheet("Trendline")
+                worksheet.append_rows(df_to_write.values.tolist())
+                
             else:
                 if courbe_model[model_name] is not None:
                     logging.warning(f"Pas assez de données pour {version}, utilisation de la trendline du modèle {model_name}")
@@ -176,4 +198,3 @@ if __name__ == "__main__":
                             "trendline_min_json": json.dumps(trendline_min),
                             "version": version
                         })
-                
