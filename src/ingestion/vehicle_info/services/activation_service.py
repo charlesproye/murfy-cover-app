@@ -11,16 +11,18 @@ from ingestion.vehicle_info.api.hm_client import HMApi
 from ingestion.vehicle_info.api.stellantis_client import StellantisApi
 from ingestion.vehicle_info.api.tesla_client import TeslaApi
 from ingestion.vehicle_info.api.renault_client import RenaultApi
+from ingestion.vehicle_info.api.tesla_particulier import TeslaParticulierApi
 from ingestion.vehicle_info.config.settings import ACTIVATION_TIMEOUT
 from ingestion.vehicle_info.services.google_sheet_service import update_vehicle_activation_data
 
 class VehicleActivationService:
 
-    def __init__(self, bmw_api: BMWApi, hm_api: HMApi, stellantis_api: StellantisApi, tesla_api: TeslaApi, renault_api: RenaultApi, fleet_info_df: pd.DataFrame):
+    def __init__(self, bmw_api: BMWApi, hm_api: HMApi, stellantis_api: StellantisApi, tesla_api: TeslaApi, tesla_particulier_api: TeslaParticulierApi, renault_api: RenaultApi, fleet_info_df: pd.DataFrame):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
         self.tesla_api = tesla_api
+        self.tesla_particulier_api = tesla_particulier_api
         self.renault_api = renault_api
         self.fleet_info_df = fleet_info_df
         

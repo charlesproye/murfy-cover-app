@@ -13,11 +13,12 @@ from ..services.activation_service import VehicleActivationService
 from core.sql_utils import get_connection
 
 class VehicleProcessor:
-    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, renault_api: callable, df: pd.DataFrame):
+    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, tesla_particulier_api: callable, renault_api: callable, df: pd.DataFrame):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
         self.tesla_api = tesla_api
+        self.tesla_particulier_api = tesla_particulier_api
         self.renault_api = renault_api
         self.df = df
     
@@ -234,6 +235,19 @@ class VehicleProcessor:
         except Exception as e:
             logging.error(f"Error in Tesla processing: {str(e)}")
             raise
+    
+    async def process_tesla_particulier(self) -> None:
+        """Process Tesla vehicles."""
+        with get_connection() as con:
+            cursor = con.cursor()
+            cursor.execute("SELECT vin FROM tesla.user")
+            vins = cursor.fetchall()
+            for vin in vins:
+                vin = vin[0]
+                access_token = await self.tesla_particulier_api.refresh_tokens(vin)
+                version, vehicle_type = await self.tesla_particulier_api.get_options_particulier(vin,access_token)
+                warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin,access_token)
+                print(version, vehicle_type, warranty_km, warranty_date, start_date)
 
     async def process_renault(self) -> None:
         """Process Renault vehicles."""
