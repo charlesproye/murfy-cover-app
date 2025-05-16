@@ -15,7 +15,7 @@ from ingestion.vehicle_info.api.tesla_client import TeslaApi
 from ingestion.vehicle_info.services.activation_service import VehicleActivationService
 from ingestion.vehicle_info.services.vehicle_processor import VehicleProcessor
 from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
-
+from ingestion.vehicle_info.api.renault_client import RenaultApi
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -49,7 +49,13 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             slack_token=SLACK_TOKEN,
             slack_channel_id=SLACK_CHANNEL_ID
         )
-
+        renault_api = RenaultApi(
+            kid=RENAULT_KID,
+            aud=RENAULT_AUD,
+            client=RENAULT_CLIENT,
+            scope=RENAULT_SCOPE,
+            pwd=RENAULT_PWD
+        )
         # Get initial fleet info
         df = await fleet_info(owner_filter=owner_filter)
         # Initialize activation service
@@ -58,12 +64,13 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             hm_api=hm_api,
             stellantis_api=stellantis_api,
             tesla_api=tesla_api,
+            renault_api=renault_api,
             fleet_info_df=df
         )
 
         # Process all brands in parallel
         await asyncio.gather(
-            activation_service.activation_tesla(),
+            #activation_service.activation_tesla(),
             #activation_service.activation_bmw(),
             #activation_service.activation_hm(),
             #activation_service.activation_stellantis()
@@ -79,14 +86,17 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             hm_api=hm_api,
             stellantis_api=stellantis_api,
             tesla_api=tesla_api,
+            renault_api=renault_api,
             df=df
         )
         await asyncio.gather(
             #vehicle_processor.process_other_vehicles(),
-            vehicle_processor.process_tesla(),
+            #vehicle_processor.process_tesla(),
+            vehicle_processor.process_renault(),
             #vehicle_processor.process_deactivated_vehicles()
         )
-        # Add your vehicle processing logic here if needed
+        await vehicle_processor.delete_unused_models()
+        await vehicle_processor.generate_vehicle_summary()
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {str(e)}")

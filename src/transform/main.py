@@ -3,6 +3,7 @@ from datetime import datetime as DT
 from datetime import timedelta as TD
 import logging.config
 import schedule 
+import asyncio
 import time
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -14,6 +15,7 @@ from transform.raw_tss.main import update_all_raw_tss
 from transform.processed_tss.ProcessedTimeSeries import ProcessedTimeSeries
 from transform.raw_results.main import update_all_raw_tss
 from transform.processed_results.main import update_vehicle_data_table
+from transform.processed_results.demo_data.ingest_demo import ingest_demo
 from transform.vehicle_info.main import VehicleInfoProcessor
 from transform.front_utils.main import FrontUtils
 
@@ -58,10 +60,11 @@ def run_entire_pipeline():
         # ProcessedTimeSeries.update_all_tss()
         # logging.info("Processed TSS update completed")
 
-        update_all_raw_tss()
-        logging.info("Raw TSS results update completed")
+        # update_all_raw_tss()
+        # logging.info("Raw TSS results update completed")
 
-        update_vehicle_data_table()
+        # update_vehicle_data_table()
+        asyncio.run(ingest_demo())
         logging.info("Results update completed")
 
         FrontUtils().update_scoring()
