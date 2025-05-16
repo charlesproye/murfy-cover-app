@@ -176,9 +176,9 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in str(dtype)}
     logger.debug(f"dtypes:\n{col_dtypes}")
     logger.debug(f"datetime_cols:{datetime_cols}")
-    df = df.astype(col_dtypes, errors="ignore")
+    df = df.astype(col_dtypes)
     for col in datetime_cols:
-        df[col] = pd.to_datetime(df[col], format='mixed').dt.as_unit("s")
+        df[col] = pd.to_datetime(df[col], format='mixed').floor("s")
     return df
 
 def sanity_check(df:DF) -> DF:
