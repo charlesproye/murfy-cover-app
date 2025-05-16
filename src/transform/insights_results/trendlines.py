@@ -100,7 +100,7 @@ def get_trendlines(df, oem=None, version=None, update=False):
 
     coef_mean, _ = curve_fit(log_function, x_sorted, y_sorted, maxfev=10000)
     y_fit = log_function(x_sorted, *coef_mean)
-    y_lower, y_upper = compute_trendline_bounds(x_sorted, y_sorted, y_fit)
+    y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
 
     coef_lower, coef_upper = generate_trendline_functions(x_sorted, y_lower, y_upper)
     trendlines = build_trendline_expressions(coef_mean, coef_lower, coef_upper, y_lower, y_upper)
