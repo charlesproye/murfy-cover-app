@@ -12,6 +12,7 @@ from core.s3_utils import S3_Bucket
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
+from core.console_utils import single_dataframe_script_main
 
 
 logger = getLogger("transform.Tesla-fleet-telemetry-RawTSS")
@@ -26,7 +27,7 @@ def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
     logger.debug("Getting raw tss from responses provided by tesla fleet telemetry.")
     keys = get_response_keys_to_parse(bucket)
     if bucket.check_file_exists(FLEET_TELEMETRY_RAW_TSS_KEY):
-        raw_tss = bucket.read_parquet_df(FLEET_TELEMETRY_RAW_TSS_KEY)
+        raw_tss, _ = bucket.read_parquet_df_dask(FLEET_TELEMETRY_RAW_TSS_KEY)
         #keys_to_parse = keys[keys['date'] >= pd.to_datetime((pd.to_datetime(raw_tss.readable_date.max()).date() - timedelta(days=1)))].copy()
         new_raw_tss = get_raw_tss_from_keys(keys, bucket)
         return concat([new_raw_tss, raw_tss])
@@ -36,15 +37,15 @@ def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
 
 def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
     if bucket.check_file_exists(FLEET_TELEMETRY_RAW_TSS_KEY):
-        raw_tss_subset = bucket.read_parquet_df(FLEET_TELEMETRY_RAW_TSS_KEY, columns=["vin", "readable_date"])
+        raw_tss_subset, _ = bucket.read_parquet_df_dask(FLEET_TELEMETRY_RAW_TSS_KEY, columns=["vin", "readable_date"])
     else:
         raw_tss_subset = DEFAULT_TESLA_RAW_TSS_DF
     last_parsed_date = (
         raw_tss_subset
-        .groupby("vin", observed=True, as_index=False)
+        .groupby("vin", observed=True)
         # Use "max" instead of "last" as the keys are not sorted
         .agg(last_parsed_date=pd.NamedAgg("readable_date", "max"))
-    )
+    ).compute()
     return (
         bucket.list_responses_keys_of_brand("tesla-fleet-telemetry")
         .assign(date=lambda df: df["file"].str[:-5].astype("datetime64[ns]"))
@@ -74,5 +75,6 @@ def get_raw_tss_from_keys(keys:DF, bucket:S3_Bucket) -> DF:
 
 if __name__ == "__main__":
     main()
-    get_raw_tss()
+    single_dataframe_script_main(get_raw_tss, force_update=True)
+
 
