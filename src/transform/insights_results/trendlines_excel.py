@@ -7,6 +7,7 @@ from google.oauth2.service_account import Credentials
 from sqlalchemy import text
 
 from transform.insights_results.trendlines import get_trendlines
+from core.stats_utils import log_function
 from core.sql_utils import engine
 
 def get_gspread_client():
@@ -17,7 +18,6 @@ def get_gspread_client():
         scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     )
     return gspread.authorize(creds)
-logging.basicConfig(level=logging.INFO)
 
 
 def load_excel_data(client):

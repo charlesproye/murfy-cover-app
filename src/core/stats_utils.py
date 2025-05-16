@@ -179,3 +179,5 @@ def estimate_cycles(total_range:float=0, initial_range:float=1, soh:float=1.0):
         return np.nan
 
 
+def log_function(x, a ,b, c):
+    return a + b * np.log1p(x / c)
