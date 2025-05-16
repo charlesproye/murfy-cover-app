@@ -167,3 +167,6 @@ def run_trendline_main():
                 except Exception as e:
                     logging.error(f"Erreur fallback pour {version}: {e}")
 
+
+if __name__ == "__main__":
+    run_trendline_main()

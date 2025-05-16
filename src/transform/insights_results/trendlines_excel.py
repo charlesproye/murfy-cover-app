@@ -70,3 +70,6 @@ def run_excel_trendlines():
         except Exception as e:
             logging.error(f"Erreur lors du traitement du modèle {model} : {e}")
 
+
+if __name__ == "__main__":
+    run_excel_trendlines()
