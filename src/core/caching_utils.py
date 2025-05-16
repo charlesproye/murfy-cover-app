@@ -5,7 +5,7 @@ from functools import wraps
 from os import makedirs
 import inspect
 import logging
-
+import dask.dataframe as dd
 import pandas as pd
 from pandas import DataFrame as DF
 
@@ -44,9 +44,9 @@ class CachedETL(DF, ABC):
                 data.to_parquet(path)
         else:
             if on == "s3":
-                data = bucket.read_parquet_df(path, **kwargs)
+                data, _ = bucket.read_parquet_df_dask(path, **kwargs)
             elif on == "local_storage":
-                data = pd.read_parquet(path, **kwargs)
+                data = dd.read_parquet(path, **kwargs)
 
         super().__init__(data)
 
@@ -84,13 +84,14 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
                     bucket.save_df_as_parquet(data, path)                                   # Save the data to S3 as parquet
                     return data
                 else:
-                    return bucket.read_parquet_df(path, **read_parquet_kwargs)              # Read cached data from S3
+                    file, _ = bucket.read_parquet_df_dask(path, **read_parquet_kwargs)
+                    return file            # Read cached data from S3
             elif on == "local_storage":
                 if force_update or not exists(path):                                        # Check if we need to update the cache or if the cache does not exist
                     data: pd.DataFrame = data_gen_func(*args, **kwargs)                     # Generate the data using the wrapped function
                     save_cache_locally_to(data, path)                                       # Save the data locally
                     return data
-                return pd.read_parquet(path, engine="pyarrow")                              # Read cached data from local file
+                return dd.read_parquet(path, engine="pyarrow")                              # Read cached data from local file
         return wrapper
     return decorator
 
