@@ -164,7 +164,7 @@ def src_dest_for_left_merge(lhs:DF, rhs:DF, left_on:list[str], right_on:list[str
         raise ValueError(f"src_dest_cols must be None, list, or dict, received: {type(src_dest_cols)}")
     return src_cols, dest_cols
 
-def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
+def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger, dask=False) -> DF:
     """
     Warp around pd.astype to ignore errors.
     Removes keys from col_dtypes that are not in df.columns.
@@ -177,8 +177,12 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     logger.debug(f"dtypes:\n{col_dtypes}")
     logger.debug(f"datetime_cols:{datetime_cols}")
     df = df.astype(col_dtypes)
-    for col in datetime_cols:
-        df[col] = pd.to_datetime(df[col], format='mixed').floor("s")
+    if dask is True:
+        for col in datetime_cols:
+            df[col] = df[col].map_partitions(to_datetime_floor_s, meta=(col, 'datetime64[ns]'))
+    else:
+        for col in datetime_cols:
+            df[col] = pd.to_datetime(df[col], format='mixed').floor("s")
     return df
 
 def sanity_check(df:DF) -> DF:
@@ -270,3 +274,6 @@ def explode_data(df: pd.DataFrame) -> pd.DataFrame:
     else:
         return df
     return df_merge
+
+def to_datetime_floor_s(series):
+    return pd.to_datetime(series, format='mixed').dt.floor("s")
