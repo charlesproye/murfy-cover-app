@@ -58,7 +58,7 @@ class VehicleProcessor:
             return cursor.fetchone()[0]
         return result[0]
 
-    async def _get_fleet_id(self, cursor, owner: str) -> Optional[str]:
+    async def  _get_fleet_id(self, cursor, owner: str) -> Optional[str]:
         """Get Fleet ID by owner name."""
         cursor.execute(
             "SELECT id FROM fleet WHERE LOWER(fleet_name) = LOWER(%s)",
@@ -237,17 +237,90 @@ class VehicleProcessor:
             raise
     
     async def process_tesla_particulier(self) -> None:
-        """Process Tesla vehicles."""
-        with get_connection() as con:
-            cursor = con.cursor()
-            cursor.execute("SELECT vin FROM tesla.user")
-            vins = cursor.fetchall()
-            for vin in vins:
-                vin = vin[0]
-                access_token = await self.tesla_particulier_api.refresh_tokens(vin)
-                version, vehicle_type = await self.tesla_particulier_api.get_options_particulier(vin,access_token)
-                warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin,access_token)
-                print(version, vehicle_type, warranty_km, warranty_date, start_date)
+        """Process Tesla particulier vehicles."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                with get_connection() as con:
+                    cursor = con.cursor()
+                    cursor.execute("SELECT vin FROM tesla.user")
+                    vins = cursor.fetchall()
+                    for vin in vins:
+                        try:
+                            vin = vin[0]
+                            model_code = vin[3]
+                            model_name = TESLA_MODEL_MAPPING.get(model_code, 'unknown')
+                            logging.info(f"Processing Tesla particulier vehicle {vin} with model {model_name}")
+                            cursor.execute("SELECT full_name FROM tesla.user WHERE vin = %s", (vin,))
+                            user_info = cursor.fetchone()
+                            owner = user_info[0]
+                            fleet_id = await self._get_fleet_id(cursor, owner)
+                            region_id = await self._get_or_create_region(cursor, 'France')
+                            
+                            # Check if vehicle exists
+                            cursor.execute("SELECT id, vehicle_model_id FROM vehicle WHERE vin = %s", (vin,))
+                            result = cursor.fetchone()
+
+                            if not result:
+                                # CASE 1: Vehicle doesn't exist
+                                access_token = await self.tesla_particulier_api.refresh_tokens(vin)
+                                version, type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
+                                warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
+                                
+                                # Create/get model and related records
+                                model_id = await self._get_or_create_tesla_model(cursor, model_name, type, version, 'tesla', 'tesla', warranty_km, warranty_date)
+                                
+                                # Insert new vehicle
+                                vehicle_id = str(uuid.uuid4())
+                                cursor.execute("""
+                                    INSERT INTO vehicle (
+                                        id, vin, fleet_id, region_id, vehicle_model_id,
+                                        licence_plate, end_of_contract_date, start_date,
+                                        activation_status, is_displayed
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """, (
+                                    vehicle_id, vin, fleet_id, region_id, model_id,
+                                    None, None, start_date, True, True
+                                ))
+                                logging.info(f"New Tesla particulier vehicle inserted in DB VIN: {vin}")
+                            else:
+                                # CASE 2: Vehicle exists
+                                vehicle_id = result[0]
+                                model_id = result[1]
+                                
+                                # Check current model version
+                                cursor.execute("SELECT version FROM vehicle_model WHERE id = %s", (model_id,))
+                                current_version = cursor.fetchone()[0]
+                                
+                                if current_version == 'MTU':
+                                    # CASE 2.2: Current version is unknown, check API
+                                    access_token = await self.tesla_particulier_api.refresh_tokens(vin)
+                                    api_version, type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
+                                    
+                                    if api_version != 'MTU':
+                                        # Only update if API returns a known version
+                                        warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
+                                        new_model_id = await self._get_or_create_tesla_model(cursor, model_name, type, api_version, 'tesla', 'tesla', warranty_km, warranty_date)
+                                        
+                                        # Update vehicle with new model
+                                        cursor.execute("UPDATE vehicle SET vehicle_model_id = %s WHERE id = %s", (new_model_id, vehicle_id))
+                                else:
+                                    access_token = await self.tesla_particulier_api.refresh_tokens(vin)
+                                    warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
+                                    cursor.execute("""
+                                        UPDATE vehicle_model 
+                                        SET warranty_km = COALESCE(warranty_km, %s),
+                                            warranty_date = COALESCE(warranty_date, %s)
+                                        WHERE id = %s
+                                    """, (warranty_km, warranty_date, model_id))
+
+                            con.commit()
+                        except Exception as e:
+                            logging.error(f"Error processing Tesla particulier vehicle {vin}: {str(e)}")
+                            con.rollback()
+                            continue
+        except Exception as e:
+            logging.error(f"Error in Tesla particulier processing: {str(e)}")
+            raise
 
     async def process_renault(self) -> None:
         """Process Renault vehicles."""

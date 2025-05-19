@@ -56,7 +56,7 @@ class TeslaParticulierApi:
                                 JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id 
                                 WHERE vin = %s""", (vin,))
                 result = cursor.fetchone()
-                print(f"Old refresh token: {result[0]}")
+                logging.info(f"Old refresh token: {result[0]}")
                 url = "https://auth.tesla.com/oauth2/v3/token"
                 data = {
                     "grant_type": "refresh_token",
@@ -66,9 +66,9 @@ class TeslaParticulierApi:
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, data=data) as response:
                     response_data = await response.json()
-                    print(f"New refresh token: {response_data['refresh_token']}")
+                    logging.info(f"New refresh token: {response_data['refresh_token']}")
                     if response_data['access_token'] is None or response_data['refresh_token'] is None:
-                        print(f"Error refreshing tokens: {response_data}")
+                        logging.error(f"Error refreshing tokens: {response_data}")
                         return None
                     with get_connection() as con:
                         cursor = con.cursor()
@@ -77,11 +77,11 @@ class TeslaParticulierApi:
                                         WHERE user_id IN (
                                             SELECT id FROM tesla.user WHERE vin = %s
                                         )""", (response_data['access_token'], response_data['refresh_token'], vin))
-                        print(f"Refresh Token: {response_data['refresh_token']} fully inserted")
+                        logging.info(f"Refresh Token: {response_data['refresh_token']} fully inserted")
                         con.commit()
                     return response_data['access_token']
         except Exception as e:
-            print(f"Error refreshing tokens: {e}")
+            logging.info(f"Error refreshing tokens: {e}")
             return None
                 
     async def get_options_particulier(self, vin, access_token):
@@ -141,4 +141,44 @@ class TeslaParticulierApi:
                     return warranty_km,warranty_date,start_date
                 return None, None, None
             
+    async def get_status(self, vin, session,cursor):
+        """Check if a vehicle exists in the Tesla API.
+        
+        Args:
+            vin: Vehicle Identification Number
+            session: aiohttp client session
+            
+        Returns:
+            bool: True if vehicle exists and is accessible, False otherwise
+        """
+        url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles?page=1"
+        try:
+            cursor.execute("SELECT access_token FROM tesla.user_tokens JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id WHERE vin = %s", (vin,))
+            result = cursor.fetchone()
+            if not result:
+                logging.warning(f"No access token found for VIN: {vin}")
+                return False
+                
+            access_token = result[0]
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            async with session.get(url, headers=headers) as response:
+                if response.status != 200:
+                    logging.warning(f"Failed to fetch vehicle status for VIN {vin}: HTTP {response.status}")
+                    return False
+                    
+                data = await response.json()
+                vehicles = data.get('response', [])
+                
+                # Check if the VIN exists in the response
+                return any(vehicle.get('vin') == vin for vehicle in vehicles)
+                
+        except Exception as e:
+            logging.error(f"Error checking vehicle status for VIN {vin}: {str(e)}")
+            return False
+            
+    
             
