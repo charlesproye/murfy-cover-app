@@ -124,7 +124,7 @@ def evaluate_single_soh_estimation(results:DF, soh_col:DF) -> DF:
         "MAE_to_1_intercept": lr_params["intercept"].sub(1).abs().mean(),
     })
 
-def force_decay(df, window_size=3, max_drop=0.001):
+def force_decay(df, window_size=3, max_drop=0.003):
     """
     Génère une série strictement décroissante à partir d'une liste de valeurs en :
       - Calcule d'abord une moyenne mobile,
