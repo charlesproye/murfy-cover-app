@@ -293,6 +293,7 @@ class VehicleActivationService:
                 for vin, full_name in vins:
                     try:
                         actual_state = await self.tesla_particulier_api.get_status(vin, session,cursor)
+                        print(f"Actual state: {actual_state}")
                         
                         if actual_state:
                             vehicle_data = {
