@@ -179,7 +179,7 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger, dask=False) -> DF:
     df = df.astype(col_dtypes)
     if dask is True:
         for col in datetime_cols:
-            df[col] = df[col].map_partitions(to_datetime_floor_s, meta=(col, 'datetime64[ns]'))
+            df[col] = pd.to_datetime(df[col])
     else:
         for col in datetime_cols:
             df[col] = pd.to_datetime(df[col], format='mixed').floor("s")
