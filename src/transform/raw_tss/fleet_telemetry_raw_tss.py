@@ -1,18 +1,20 @@
 from os.path import splitext
 from concurrent.futures import ThreadPoolExecutor
-
+from datetime import timedelta
 from logging import getLogger
+import pandas as pd
+
 from rich.progress import track
 
-from core.pandas_utils import *
-from core.s3_utils import S3_Bucket
 from transform.raw_tss.config import *
+from core.pandas_utils import concat, explode_data
+from core.s3_utils import S3_Bucket
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
 
 
-logger = getLogger(f"transform.Tesla-fleet-telemetry-RawTSS")
+logger = getLogger("transform.Tesla-fleet-telemetry-RawTSS")
 
 @main_decorator
 def main():
@@ -23,10 +25,13 @@ def main():
 def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
     logger.debug("Getting raw tss from responses provided by tesla fleet telemetry.")
     keys = get_response_keys_to_parse(bucket)
-    new_raw_tss = get_raw_tss_from_keys(keys, bucket)
     if bucket.check_file_exists(FLEET_TELEMETRY_RAW_TSS_KEY):
-        return concat([bucket.read_parquet_df(FLEET_TELEMETRY_RAW_TSS_KEY), new_raw_tss])
+        raw_tss = bucket.read_parquet_df(FLEET_TELEMETRY_RAW_TSS_KEY)
+        #keys_to_parse = keys[keys['date'] >= pd.to_datetime((pd.to_datetime(raw_tss.readable_date.max()).date() - timedelta(days=1)))].copy()
+        new_raw_tss = get_raw_tss_from_keys(keys, bucket)
+        return concat([new_raw_tss, raw_tss])
     else:
+        new_raw_tss = get_raw_tss_from_keys(keys, bucket)
         return new_raw_tss
 
 def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
@@ -49,11 +54,13 @@ def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
 
 def get_raw_tss_from_keys(keys:DF, bucket:S3_Bucket) -> DF:
     raw_tss = []
-    for week, week_keys in track(keys.groupby(pd.Grouper(key='date', freq='W-MON'))):
+    grouped = keys.groupby(pd.Grouper(key='date', freq='W-MON'))
+    grouped_items = list(grouped)
+    for week, week_keys in track(grouped_items, description="Processing weekly groups"):
         week_date = week.date().strftime('%Y-%m-%d')
         logger.debug(f"Parsing the responses of the week {week_date}:")
         logger.debug(f"{len(week_keys)} keys to parse for {week_keys['vin'].nunique()} vins.")
-        logger.debug(f"This represents {len(week_keys) / len(keys):.2f}% of the total keys to parse.")
+        logger.debug(f"This represents {round(len(week_keys) / len(keys) * 100)}% of the total keys to parse.")
         responses = bucket.read_multiple_json_files(week_keys["key"].tolist(), max_workers=64)
         logger.debug(f"Read the responses.")
         with ThreadPoolExecutor(max_workers=64) as executor:
