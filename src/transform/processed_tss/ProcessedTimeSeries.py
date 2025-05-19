@@ -1,7 +1,11 @@
 import argparse
 from logging import getLogger
+import os
+import shutil
 
 from scipy.integrate import cumulative_trapezoid
+import dask.dataframe as dd
+import pandas as pd
 from core.constants import *
 
 from core.pandas_utils import *
@@ -182,7 +186,7 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         self.logger = getLogger(make)
         set_level_of_loggers_with_prefix(log_level, make)
         super().__init__(make, id_col, log_level, max_td, force_update, **kwargs)
-
+        
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (
             tss
@@ -304,6 +308,29 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
                         on=["soc", "date", "vin"], how="left")
         tss[["odometer","in_charge_idx"]] = tss[["odometer", "in_charge_idx"]].ffill()
         return tss
+    
+    def _compute_tss_with_temp_dir(self, tss: dd.DataFrame) -> pd.DataFrame:
+        """Divise le DataFrame Dask en fichiers par VIN, les sauvegarde temporairement,
+        les relit en un seul DataFrame pandas, puis supprime les fichiers temporaires."""
+        chemin = "processed_tss_files"
+        os.makedirs(chemin, exist_ok=True)
+        self.logger.info(f"Dossier {chemin} créé.")
+
+        vin_list = tss["vin"].drop_duplicates().compute()
+        for vin in vin_list:
+            df_vin = tss[tss["vin"] == vin].compute()
+            processed_vin = self.run(df_vin)  # Tu peux adapter si `run()` est autre chose
+            processed_vin.to_parquet(f'{chemin}/{vin}.parquet')
+
+        processed_tss = dd.read_parquet(chemin).compute()
+
+        if os.path.exists(chemin):
+            shutil.rmtree(chemin)
+            self.logger.info(f"Dossier '{chemin}' (et son contenu) supprimé.")
+        else:
+            self.logger.warning(f"Le dossier '{chemin}' n'existe pas.")
+        
+        return processed_tss
         
 @main_decorator
 def main():
