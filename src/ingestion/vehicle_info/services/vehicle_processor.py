@@ -262,7 +262,8 @@ class VehicleProcessor:
 
                             if not result:
                                 # CASE 1: Vehicle doesn't exist
-                                access_token = await self.tesla_particulier_api.refresh_tokens(vin)
+                                cursor.execute("SELECT access_token FROM tesla.user WHERE vin = %s", (vin,))
+                                access_token = cursor.fetchone()[0]
                                 version, type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
                                 warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
                                 
@@ -293,7 +294,8 @@ class VehicleProcessor:
                                 
                                 if current_version == 'MTU':
                                     # CASE 2.2: Current version is unknown, check API
-                                    access_token = await self.tesla_particulier_api.refresh_tokens(vin)
+                                    cursor.execute("SELECT access_token FROM tesla.user_tokens JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id WHERE vin = %s", (vin,))
+                                    access_token = cursor.fetchone()[0]
                                     api_version, type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
                                     
                                     if api_version != 'MTU':
@@ -304,7 +306,8 @@ class VehicleProcessor:
                                         # Update vehicle with new model
                                         cursor.execute("UPDATE vehicle SET vehicle_model_id = %s WHERE id = %s", (new_model_id, vehicle_id))
                                 else:
-                                    access_token = await self.tesla_particulier_api.refresh_tokens(vin)
+                                    cursor.execute("SELECT access_token FROM tesla.user_tokens JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id WHERE vin = %s", (vin,))
+                                    access_token = cursor.fetchone()[0]
                                     warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
                                     cursor.execute("""
                                         UPDATE vehicle_model 

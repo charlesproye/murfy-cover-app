@@ -153,28 +153,33 @@ class TeslaParticulierApi:
         """
         url = f"https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/vehicles?page=1"
         try:
-            cursor.execute("SELECT access_token FROM tesla.user_tokens JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id WHERE vin = %s", (vin,))
-            result = cursor.fetchone()
-            if not result:
-                logging.warning(f"No access token found for VIN: {vin}")
-                return False
-                
-            access_token = result[0]
-            headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json"
-            }
-            
-            async with session.get(url, headers=headers) as response:
-                if response.status != 200:
-                    logging.warning(f"Failed to fetch vehicle status for VIN {vin}: HTTP {response.status}")
+            for attempt in range(3):
+                cursor.execute("SELECT access_token FROM tesla.user_tokens JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id WHERE vin = %s", (vin,))
+                result = cursor.fetchone()
+                if not result:
+                    logging.warning(f"No access token found for VIN: {vin}")
                     return False
                     
-                data = await response.json()
-                vehicles = data.get('response', [])
+                access_token = result[0]
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json"
+                }
                 
-                # Check if the VIN exists in the response
-                return any(vehicle.get('vin') == vin for vehicle in vehicles)
+                async with session.get(url, headers=headers) as response:
+                    if response.status != 200:
+                        logging.warning(f"Failed to fetch vehicle status for VIN {vin}: HTTP {response.status}")
+                        if attempt < 2:
+                            await self.refresh_tokens(vin)
+                            continue
+                        else:
+                            return False
+                        
+                    data = await response.json()
+                    vehicles = data.get('response', [])
+                    
+                    # Check if the VIN exists in the response
+                    return any(vehicle.get('vin') == vin for vehicle in vehicles)
                 
         except Exception as e:
             logging.error(f"Error checking vehicle status for VIN {vin}: {str(e)}")
