@@ -1,36 +1,15 @@
-import os
+
 import logging
-import gspread
 import numpy as np
 import pandas as pd
-from google.oauth2.service_account import Credentials
+
 from sqlalchemy import text
 
 from transform.insights_results.trendlines import get_trendlines
 from core.stats_utils import log_function
 from core.sql_utils import engine
+from core.gsheet_utils import *
 
-def get_gspread_client():
-    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    cred_path = os.path.join(root_dir, "ingestion", "vehicle_info", "config", "config.json")
-    creds = Credentials.from_service_account_file(
-        cred_path,
-        scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    )
-    return gspread.authorize(creds)
-
-
-def load_excel_data(client):
-    sheet = client.open("202505 - Courbes SoH")
-    courbes_sheet = sheet.worksheet("Courbes OS")
-    sheet_data = np.array(courbes_sheet.get_all_values())
-    df_sheet = pd.DataFrame(sheet_data[1:, :6], columns=sheet_data[0, :6])
-
-    df_sheet["Odomètre (km)"] = df_sheet["Odomètre (km)"].apply(lambda x: x.replace(" ", "")).astype(int)
-    df_sheet["SoH"] = df_sheet["SoH"].apply(lambda x: x.replace("%", "")).astype(float)
-    df_sheet.rename(columns={"Odomètre (km)": "odometer", "SoH": "soh"}, inplace=True)
-    
-    return df_sheet
 
 def process_model_trendline(model, df_sheet, client):
     logging.info(f"Processing trendline for model: {model}")
@@ -62,7 +41,11 @@ def process_model_trendline(model, df_sheet, client):
 def run_excel_trendlines():
     logging.basicConfig(level=logging.INFO)
     client = get_gspread_client()
-    df_sheet = load_excel_data(client)
+    sheet_data = load_excel_data(client, "202505 - Courbes SoH", 'Courbes OS' )
+    df_sheet = pd.DataFrame(sheet_data[1:, :6], columns=sheet_data[0, :6])
+    df_sheet["Odomètre (km)"] = df_sheet["Odomètre (km)"].apply(lambda x: x.replace(" ", "")).astype(int)
+    df_sheet["SoH"] = df_sheet["SoH"].apply(lambda x: x.replace("%", "")).astype(float)
+    df_sheet.rename(columns={"Odomètre (km)": "odometer", "SoH": "soh"}, inplace=True)
 
     for model in df_sheet["Modèle"].unique():
         try:

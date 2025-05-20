@@ -7,42 +7,16 @@ import gspread
 import pprint
 
 from scipy.optimize import curve_fit
-from google.oauth2.service_account import Credentials
 from sqlalchemy.sql import text
 from core.sql_utils import engine
 from core.stats_utils import log_function
+from core.gsheet_utils import *
 from config_trendlines import TRENDLINE_MODEL as existing_config
 
 logging.basicConfig(level=logging.INFO)
 
 TRENDLINE_MODEL = dict(existing_config)
 
-def get_gspread_client():
-    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    cred_path = os.path.join(root_dir, "ingestion", "vehicle_info", "config", "config.json")
-    creds = Credentials.from_service_account_file(
-        cred_path,
-        scopes=["https://www.googleapis.com/auth/spreadsheets", 
-                "https://www.googleapis.com/auth/drive"]
-    )
-    return gspread.authorize(creds)
-
-def clean_gsheet(gsheet, feuille, keep_first_line=True):
-    client = get_gspread_client()
-
-    spreadsheet = client.open(gsheet)
-    worksheet = spreadsheet.worksheet(feuille)
-
-    # Récupérer le nombre total de lignes et colonnes utilisées
-    rows = worksheet.row_count
-    cols = worksheet.col_count
-
-    # Construire la plage à effacer (tout sauf la 1ère ligne)
-    if keep_first_line is True:
-        range_to_clear = f'A2:{chr(64 + cols)}{rows}' 
-        worksheet.batch_clear([range_to_clear])
-    else:
-        worksheet.clear()
 
 def compute_trendline_bounds(true, fit, window_size=50):
     local_std = np.array([
@@ -140,7 +114,6 @@ def run_trendline_main():
     oems = ["ford", "bmw", "kia", "stellantis", "mercedes-benz", "volvo-cars",
            "renault", "mercedes", "volvo", "volkswagen", "toyota", "tesla"]
 
-    clean_gsheet("BP - Rapport Freemium", "Trendline")
     logging.info(f"Clean gsheet Done")
     for oem_name in oems:
         with engine.connect() as connection:
