@@ -4,14 +4,18 @@ import logging
 import numpy as np
 import pandas as pd
 import gspread
+import pprint
 
 from scipy.optimize import curve_fit
 from google.oauth2.service_account import Credentials
 from sqlalchemy.sql import text
 from core.sql_utils import engine
 from core.stats_utils import log_function
+from config_trendlines import TRENDLINE_MODEL as existing_config
 
 logging.basicConfig(level=logging.INFO)
+
+TRENDLINE_MODEL = dict(existing_config)
 
 def get_gspread_client():
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -22,6 +26,23 @@ def get_gspread_client():
                 "https://www.googleapis.com/auth/drive"]
     )
     return gspread.authorize(creds)
+
+def clean_gsheet(gsheet, feuille, keep_first_line=True):
+    client = get_gspread_client()
+
+    spreadsheet = client.open(gsheet)
+    worksheet = spreadsheet.worksheet(feuille)
+
+    # Récupérer le nombre total de lignes et colonnes utilisées
+    rows = worksheet.row_count
+    cols = worksheet.col_count
+
+    # Construire la plage à effacer (tout sauf la 1ère ligne)
+    if keep_first_line is True:
+        range_to_clear = f'A2:{chr(64 + cols)}{rows}' 
+        worksheet.batch_clear([range_to_clear])
+    else:
+        worksheet.clear()
 
 def compute_trendline_bounds(true, fit, window_size=50):
     local_std = np.array([
@@ -117,8 +138,10 @@ def get_trendlines(df, oem=None, version=None, update=False):
 def run_trendline_main():
     client = get_gspread_client()
     oems = ["ford", "bmw", "kia", "stellantis", "mercedes-benz", "volvo-cars",
-            "renault", "mercedes", "volvo", "volkswagen", "toyota", "tesla"]
+           "renault", "mercedes", "volvo", "volkswagen", "toyota", "tesla"]
 
+    clean_gsheet("BP - Rapport Freemium", "Trendline")
+    logging.info(f"Clean gsheet Done")
     for oem_name in oems:
         with engine.connect() as connection:
             query = text("""
@@ -131,14 +154,15 @@ def run_trendline_main():
             """)
             df = pd.read_sql(query, connection, params={"oem_name": oem_name})
 
-        model_trends = {}
+        
         for model in df["model_name"].unique():
             try:
-                model_trends[model] = get_trendlines(df[df["model_name"] == model])
+                TRENDLINE_MODEL[model] = list(get_trendlines(df[df["model_name"] == model]))
             except Exception as e:
                 logging.error(f"Erreur modèle {model}: {e}")
-                model_trends[model] = None
-
+                TRENDLINE_MODEL[model] = None
+        
+        
         for version in df["version"].unique():
             if version == "unknown":
                 continue
@@ -146,27 +170,34 @@ def run_trendline_main():
             version_df = df[df["version"] == version]
             if version_df.empty:
                 continue
-
-            model_name = version_df["model_name"].iloc[0]
-            if version_df["trendline_active"].iloc[-1]:
+            
+            
+            s = version_df.iloc[-1]
+            model_name = s["model_name"]
+            try:
+                get_trendlines(version_df, version=version, update=True)
+                logging.info(f"Trendline mise à jour pour {version}")
+                info_df = pd.DataFrame(s[['oem_name', 'model_name', 'type', 'version']]).T
+                info_df['source'] = "dbeaver"
+                info_df['Used'] = (s[['trendline_version', 'trendline_model']][s[['trendline_version', 'trendline_model']] == True].index[0] 
+                                   if (s[['trendline_version', 'trendline_model']] == True).any() else None)
+                sheet = client.open("BP - Rapport Freemium")
+                worksheet = sheet.worksheet("Trendline")
+                worksheet.append_rows(info_df.values.tolist())
+            except Exception as e:
+                logging.error(f"Erreur mise à jour trendline {version}: {e}")
+            if version_df["trendline_version"].iloc[-1]:
                 try:
-                    get_trendlines(version_df, version=version, update=True)
-                    logging.info(f"Trendline mise à jour pour {version}")
-
-                    info_df = version_df[['oem_name', 'model_name', 'type', 'version']].iloc[[-1]]
-                    info_df['source'] = "dbeaver"
-                    sheet = client.open("BP - Rapport Freemium")
-                    worksheet = sheet.worksheet("Trendline")
-                    worksheet.append_rows(info_df.values.tolist())
-                except Exception as e:
-                    logging.error(f"Erreur mise à jour trendline {version}: {e}")
-            elif model_trends.get(model_name):
-                try:
-                    update_database_trendlines("vehicle_model", "version", version, model_trends[model_name])
+                    update_database_trendlines("vehicle_model", "version", version, TRENDLINE_MODEL[model_name])
                     logging.warning(f"Fallback trendline appliqué pour {version} (modèle {model_name})")
                 except Exception as e:
                     logging.error(f"Erreur fallback pour {version}: {e}")
-
+    with open("config_trendlines.py", "w", encoding="utf-8") as f:
+        logging.info("Ecriture des trendlines de chaque modèle dans config_trendlines")
+        f.write("# Fichier généré automatiquement pour les trendlines de chaque modèle\n\n")
+        f.write("TRENDLINE_MODEL = ")
+        f.write(pprint.pformat(TRENDLINE_MODEL, indent=4))
+        f.write("\n")
 
 if __name__ == "__main__":
     run_trendline_main()
