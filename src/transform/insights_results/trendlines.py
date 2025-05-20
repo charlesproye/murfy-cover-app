@@ -11,7 +11,7 @@ from sqlalchemy.sql import text
 from core.sql_utils import engine
 from core.stats_utils import log_function
 from core.gsheet_utils import *
-from config_trendlines import TRENDLINE_MODEL as existing_config
+from transform.insights_results.config_trendlines import TRENDLINE_MODEL as existing_config
 
 logging.basicConfig(level=logging.INFO)
 
