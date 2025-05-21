@@ -6,23 +6,20 @@ from bs4 import BeautifulSoup
 import time
 import re
 import pandas as pd
-import os
-import gspread
-from transform.insights_results.trendlines_excel import get_gspread_client
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from google.oauth2.service_account import Credentials
+from core.gsheet_utils import *
 
 
 BASE_URL = "https://www.autosphere.fr"
 SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
 STEP = 23
-START_OFFSET = 23
-STOP_OFFSET = 40
+START_OFFSET = 115
+STOP_OFFSET = 100
 
 
 def get_all_vehicle_links():
