@@ -37,3 +37,10 @@ def load_excel_data(client, gsheet, feuille):
 
     
     return sheet_data
+
+def export_to_excel(df_to_write, gsheet, feuille):
+    client = get_gspread_client()
+    sheet_out = client.open(gsheet)
+    worksheet = sheet_out.worksheet(feuille)
+    worksheet.append_rows(df_to_write.values.tolist())
+    print(f"Données écritent dans {gsheet} {feuille}")
