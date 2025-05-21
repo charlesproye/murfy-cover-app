@@ -132,14 +132,6 @@ def extract_vehicle_info(link, car_nbr):
     return infos
 
 
-def export_to_excel(df_to_write, gsheet):
-    client = get_gspread_client()
-    sheet_out = client.open("202505 - Courbes SoH")
-    worksheet = sheet_out.worksheet(gsheet)
-    worksheet.append_rows(df_to_write.values.tolist())
-    print(f"Données écritent dans {gsheet}")
-
-
 def main():
     all_links = get_all_vehicle_links()
     all_infos = {}
@@ -152,10 +144,10 @@ def main():
         except Exception as e:
             print(f"[{i}] Erreur sur le lien {link} : {e}")
         time.sleep(1)
-    
+    # Bien ordonner les colonnes par rapoort à la gsheet
     infos_clean = pd.DataFrame(all_infos).T.dropna(subset='SoH')[["OEM","Modèle","Type","Année","Odomètre (km)","SoH", "lien"]]
     print(infos_clean.shape)
-    export_to_excel(infos_clean, "Courbes OS")
+    export_to_excel(infos_clean, "202505 - Courbes SoH", "Courbes OS")
 
 
 if __name__ == "__main__":
