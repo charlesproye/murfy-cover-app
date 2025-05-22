@@ -32,6 +32,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "climate.outside_temperature": "outside_temp",
     "charging.status": "charging_status",
     "charging.battery_charge_type": "charging_method",
+    "usage.electric_consumption_average": 'consumption',
     # Mobilisight
     "datetime": "date",
     "engine.oilTemperature": "oil_temp",
