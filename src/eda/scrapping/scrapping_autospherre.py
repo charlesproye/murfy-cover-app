@@ -16,10 +16,10 @@ from core.gsheet_utils import *
 
 
 BASE_URL = "https://www.autosphere.fr"
-SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
+SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Citroen&fuel_type=Electrique&from={}"#"https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
 STEP = 23
-START_OFFSET = 115
-STOP_OFFSET = 100
+START_OFFSET = 0
+STOP_OFFSET = 1000
 
 
 def get_all_vehicle_links():
@@ -64,7 +64,7 @@ def extract_vehicle_info(link, car_nbr):
     infos = {}
 
     options = webdriver.ChromeOptions()
-    # options.add_argument("--headless")  # Décommente pour exécuter sans interface
+    options.add_argument("--headless")  # Décommente pour exécuter sans interface
     driver = webdriver.Chrome(options=options)
 
     try:
@@ -79,7 +79,9 @@ def extract_vehicle_info(link, car_nbr):
         for li in all_li:
             text = li.text.strip()
             if "Santé" in text and not score_sante:
-                match = re.search(r"(\d+\s?%)", text)
+                match = re.search(r"score d'intégrité\s+(\d+)\s*%", text, re.IGNORECASE)
+                if not match:
+                    match = re.search(r"(\d+)\s*%", text)
                 if match:
                     score_sante = match.group(1)
 
@@ -116,7 +118,6 @@ def extract_vehicle_info(link, car_nbr):
             version_complete = version_complete.replace('Achat Integral', "").strip()
         except Exception as e:
             print(f"[{car_nbr}] Erreur fil d’Ariane : {e}")
-
         infos["lien"] = link
         infos["SoH"] = score_sante
         infos["Année"] = int(annee)
@@ -125,10 +126,10 @@ def extract_vehicle_info(link, car_nbr):
         infos["Modèle"] = modele
         infos["OEM"] = marque
 
-    finally:
+    finally:    
         driver.quit()
 
-
+    print(infos)
     return infos
 
 
@@ -152,4 +153,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
