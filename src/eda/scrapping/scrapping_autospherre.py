@@ -119,7 +119,7 @@ def extract_vehicle_info(link, car_nbr):
         except Exception as e:
             print(f"[{car_nbr}] Erreur fil d’Ariane : {e}")
         infos["lien"] = link
-        infos["SoH"] = score_sante
+        infos["SoH"] = int(score_sante)
         infos["Année"] = int(annee)
         infos["Odomètre (km)"] = int(kilometrage)
         infos["Type"] = version_complete
