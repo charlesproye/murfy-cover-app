@@ -2,7 +2,11 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class Trip(BaseModel):
+class BaseModelWithVin(BaseModel):
+    vin: str | None = None
+
+
+class Trip(BaseModelWithVin):
     event: str  # = Field(..., pattern="^TRIP$", example="TRIP")
     tripId: str | None = None
     vin: str | None = None
@@ -19,7 +23,7 @@ class Trip(BaseModel):
     endLongitude: float | None = None
 
 
-class Maintenance(BaseModel):
+class Maintenance(BaseModelWithVin):
     event: str  # = Field(..., pattern="^MAINTENANCE$", example="MAINTENANCE")
     maintenanceId: str | None = None
     vin: str | None = None
@@ -32,7 +36,7 @@ class Maintenance(BaseModel):
     nextServiceTime: int | None = None
 
 
-class Location(BaseModel):
+class Location(BaseModelWithVin):
     event: str
     locationId: str | None = None
     vin: str | None = None
@@ -43,7 +47,7 @@ class Location(BaseModel):
     longitude: float | None = None
 
 
-class CruisingRange(BaseModel):
+class CruisingRange(BaseModelWithVin):
     event: str
     cruisingRangeId: str | None = None
     vin: str | None = None
@@ -56,7 +60,7 @@ class CruisingRange(BaseModel):
     cruisingRangeSecondaryEngine: int | None = None
 
 
-class DashboardErrorWarning(BaseModel):
+class DashboardErrorWarning(BaseModelWithVin):
     event: str
     dashboardErrorWarningId: str | None = None
     vin: str | None = None
@@ -68,7 +72,7 @@ class DashboardErrorWarning(BaseModel):
     warningCategory: str | None = None
 
 
-class EnergyLevel(BaseModel):
+class EnergyLevel(BaseModelWithVin):
     event: str
     energyLevelId: str | None = None
     vin: str | None = None
@@ -81,7 +85,7 @@ class EnergyLevel(BaseModel):
     energyLevelSecondaryEnginePercentage: int | None = None
 
 
-class ChargingState(BaseModel):
+class ChargingState(BaseModelWithVin):
     event: str
     chargingStateId: str | None = None
     vin: str | None = None
@@ -90,7 +94,7 @@ class ChargingState(BaseModel):
     targetSoc: int | None = None
 
 
-class ChargingRemainingTime(BaseModel):
+class ChargingRemainingTime(BaseModelWithVin):
     event: str
     chargingRemainingTimeId: str | None = None
     vin: str | None = None
