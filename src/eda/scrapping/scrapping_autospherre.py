@@ -16,7 +16,7 @@ from core.gsheet_utils import *
 
 
 BASE_URL = "https://www.autosphere.fr"
-SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Citroen&fuel_type=Electrique&from={}"#"https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
+SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Peugeot&fuel_type=Electrique&from={}"#"https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
 STEP = 23
 START_OFFSET = 0
 STOP_OFFSET = 1000
@@ -128,8 +128,8 @@ def extract_vehicle_info(link, car_nbr):
 
     finally:    
         driver.quit()
-
-    print(infos)
+    if score_sante:
+        print(f"SoH récupéré = {score_sante}")
     return infos
 
 
