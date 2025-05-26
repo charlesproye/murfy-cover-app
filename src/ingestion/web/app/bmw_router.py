@@ -2,17 +2,18 @@ from pprint import pprint
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
 from pydantic_settings import BaseSettings
+from core.logging_utils import LoggerDep
 
 
 class BmwSettings(BaseSettings):
     BMW_PUSH_API_KEY: str = Field(default=...)
 
 
-def authenticate(request: Request):
+def authenticate(request: Request, logger: LoggerDep):
     settings = BmwSettings()
-    print(f"GETTING AUTH")
+    logger.debug(f"GETTING AUTH")
     api_key = request.headers.get("x-push-payload-key")
-    print(f"{api_key = }")
+    logger.debug(f"{api_key = }")
     if api_key != settings.BMW_PUSH_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -27,8 +28,8 @@ bmw_router = APIRouter(
 
 
 @bmw_router.post("/api/push")
-async def receive_data(request: Request):
-    print(f"BODY")
+async def receive_data(request: Request, logger: LoggerDep):
+    logger.debug(f"BODY")
     pprint(await request.body())
     return
 
