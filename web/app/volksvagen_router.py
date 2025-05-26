@@ -1,5 +1,4 @@
 import logging
-from pprint import pprint
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from .schemas import (
     Trip,
@@ -14,10 +13,14 @@ from .schemas import (
 from .response_storage import ResponseStorageDep
 
 
+# # TODO:
+# - remove useless logs
+# - enforce security over endpoint when we have confirmation vw call them with the good api key
+
+
 def authenticate(
     request: Request,
 ):
-    logging.info(f"GETTING AUTH")
     api_key = request.headers.get("api-key")
     logging.info(f"{api_key = }")
     # if api_key is None:
@@ -35,13 +38,11 @@ volkswagen_router = APIRouter(
 )
 
 
-# TODO finish each end point to store data in response storage object
 @volkswagen_router.post("/trips")
 async def post_trips(
     trips: list[Trip],
     storage_service: ResponseStorageDep,
 ):
-    logging.info("/trips CALLED")
     logging.info(f"CONTENT = {trips}")
     storage_service.store_basemodels_with_vin(trips)
     return
@@ -52,7 +53,6 @@ async def post_maintenances(
     storage_service: ResponseStorageDep,
     maintenances: list[Maintenance],
 ):
-    logging.info("/maintenances CALLED")
     logging.info(f"CONTENT = {maintenances}")
     storage_service.store_basemodels_with_vin(maintenances)
     return {}
@@ -63,7 +63,6 @@ async def post_locations(
     locations: list[Location],
     storage_service: ResponseStorageDep,
 ):
-    logging.info("/locations CALLED")
     logging.info(f"CONTENT = {locations}")
     storage_service.store_basemodels_with_vin(locations)
     return {}
@@ -74,7 +73,6 @@ async def post_cruising_ranges(
     cruising_ranges: list[CruisingRange],
     storage_service: ResponseStorageDep,
 ):
-    logging.info("/cruising-ranges CALLED")
     logging.info(f"CONTENT = {cruising_ranges}")
     storage_service.store_basemodels_with_vin(cruising_ranges)
     return {}
@@ -85,7 +83,6 @@ async def post_dashboard_error_warnings(
     dashboard_error_warnings: list[DashboardErrorWarning],
     storage_service: ResponseStorageDep,
 ):
-    logging.info("/dashboard-error-warnings CALLED")
     logging.info(f"CONTENT = {dashboard_error_warnings}")
     storage_service.store_basemodels_with_vin(dashboard_error_warnings)
     return {}
@@ -96,7 +93,6 @@ async def post_energy_levels(
     energy_levels: list[EnergyLevel],
     storage_service: ResponseStorageDep,
 ):
-    logging.info("/energy-levels CALLED")
     logging.info(f"CONTENT = {energy_levels}")
     storage_service.store_basemodels_with_vin(energy_levels)
     return {}
@@ -107,7 +103,6 @@ async def post_charging_states(
     charging_states: list[ChargingState],
     storage_service: ResponseStorageDep,
 ):
-    logging.info("/charging-states CALLED")
     logging.info(f"CONTENT = {charging_states}")
     storage_service.store_basemodels_with_vin(charging_states)
     return {}
@@ -118,7 +113,6 @@ async def post_charging_remaining_times(
     charging_remaining_times: list[ChargingRemainingTime],
     storage_service: ResponseStorageDep,
 ):
-    logging.info("/charging-remaining-times CALLED")
     logging.info(f"CONTENT = {charging_remaining_times}")
     storage_service.store_basemodels_with_vin(charging_remaining_times)
     return {}
@@ -126,8 +120,6 @@ async def post_charging_remaining_times(
 
 # Test route
 @volkswagen_router.post("/")
-async def test_post(request: Request):
-    api_key = authenticate(request)
-    if api_key is not None:
-        logging.info(f"API received {api_key}")
+async def test_post():
+    return
 

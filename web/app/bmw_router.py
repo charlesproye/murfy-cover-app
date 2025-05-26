@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
+# TODO
+# - enforce security when we have th proof BMW have the api key
+# - build a parser for the body when we know th format and store the infos
+
 
 class BmwSettings(BaseSettings):
     BMW_PUSH_API_KEY: str = Field(default=...)
@@ -11,19 +15,20 @@ class BmwSettings(BaseSettings):
 
 def authenticate(request: Request):
     settings = BmwSettings()
-    logging.info(f"GETTING AUTH")
     api_key = request.headers.get("x-push-payload-key")
-    logging.info(f"{api_key = }")
-    if api_key != settings.BMW_PUSH_API_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="api-key header missing",
-        )
+    logging.info(f"BMW {api_key = }")
+    # if api_key != settings.BMW_PUSH_API_KEY:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_401_UNAUTHORIZED,
+    #         detail="api-key header missing",
+    #     )
     return api_key
 
 
 bmw_router = APIRouter(
-    prefix="/bmw", dependencies=[Depends(authenticate)], tags=["BMW"]
+    prefix="/bmw",
+    dependencies=[Depends(authenticate)],
+    tags=["BMW"],
 )
 
 
