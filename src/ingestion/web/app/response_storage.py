@@ -36,7 +36,7 @@ class ResponseStorage:
 
 
 @lru_cache
-async def get_s3_client():
+def get_s3_client():
     return boto3.client("s3")
 
 
@@ -44,7 +44,7 @@ S3ClientDep = Annotated[Any, Depends(get_s3_client)]
 
 
 @lru_cache
-async def get_response_storage():
+def get_response_storage():
     return ResponseStorage()
 
 
