@@ -1,25 +1,15 @@
 from datetime import datetime
 from functools import lru_cache
-from typing import Annotated, Any, Sequence
-
-import boto3
+from typing import Annotated, Sequence
 from fastapi import Depends
 import msgspec
-from pydantic import BaseModel
 from .schemas import BaseModelWithVin
+from core.s3_utils import S3Dep, S3Service
 
 
 class ResponseStorage:
-    def __init__(self, s3_client=None) -> None:
-        self.s3_client = s3_client or boto3.client("s3")
-        self.bucket = "bucket"
-
-    def store_object(self, object: bytes, filename: str):
-        self.s3_client.put_object(
-            Body=object,
-            Bucket=self.bucket,
-            Key=filename,
-        )
+    def __init__(self, s3: S3Service | None = None) -> None:
+        self._s3 = s3 or S3Service()
 
     def store_basemodels_with_vin(self, objects: Sequence[BaseModelWithVin]):
         timestamp = int(datetime.now().timestamp() * 10e6)
@@ -27,25 +17,12 @@ class ResponseStorage:
             vin = object.vin
             filename = f"response/volkswagen/{vin}/temp/{timestamp}.json"
             encoded = msgspec.json.encode(object.model_dump_json())
-            self.s3_client.put_object(
-                Body=encoded,
-                Bucket=self.bucket,
-                Key=filename,
-            )
-        return
+            self._s3.store_object(encoded, filename)
 
 
 @lru_cache
-async def get_s3_client():
-    return boto3.client("s3")
-
-
-S3ClientDep = Annotated[Any, Depends(get_s3_client)]
-
-
-@lru_cache
-async def get_response_storage():
-    return ResponseStorage()
+def get_response_storage(s3: S3Dep):
+    return ResponseStorage(s3)
 
 
 ResponseStorageDep = Annotated[ResponseStorage, Depends(get_response_storage)]

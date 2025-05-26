@@ -9,8 +9,8 @@ import logging
 import pandas as pd
 from pandas import DataFrame as DF
 
-from core.s3_utils import S3_Bucket
-from core.singleton_s3_bucket import bucket
+from core.s3_utils import S3Service
+from core.singleton_s3_bucket import S3
 from core.config import *
 
 R = TypeVar('R')
@@ -19,7 +19,7 @@ P = ParamSpec('P')
 logger = logging.getLogger("caching_utils")
 
 class CachedETL(DF, ABC):
-    def __init__(self, path: str, on: str, force_update: bool = False, bucket: S3_Bucket = bucket, **kwargs):
+    def __init__(self, path: str, on: str, force_update: bool = False, bucket: S3Service = S3, **kwargs):
         """
         Initialize a CachedETL with caching capabilities.
         The calculation of the result of the ETL must be implemented in the abstract `run` method.  
@@ -94,14 +94,14 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
         return wrapper
     return decorator
 
-def get_bucket_from_func_args(func:Callable, *args, **kwargs) -> tuple[S3_Bucket, bool]:
+def get_bucket_from_func_args(func:Callable, *args, **kwargs) -> tuple[S3Service, bool]:
     signature = inspect.signature(func)                                                     # Get the function's signature
     bound_args = signature.bind_partial(*args, **kwargs)                                    # Map the positional args to the parameter names
     bound_args.apply_defaults()                                                             # Apply default values to the bound arguments
     bucket_is_in_func_args = 'bucket' in bound_args.arguments                               # Check if 'bucket' is in the arguments
     if not bucket_is_in_func_args:
         logger.debug(NO_BUCKET_ARG_FOUND.format(func_name=func.__name__))
-    bucket_value = bound_args.arguments.get('bucket', bucket)
+    bucket_value = bound_args.arguments.get('bucket', S3)
     # Return the bucket value and a bool indicating presence
     return bucket_value, bucket_is_in_func_args
 

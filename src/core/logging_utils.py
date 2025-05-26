@@ -1,5 +1,7 @@
 import logging
 import logging.config
+from typing import Annotated
+from fastapi import Depends
 from rich.logging import RichHandler
 
 RICH_HANDLER = RichHandler()
@@ -31,3 +33,6 @@ def set_level_of_loggers_with_prefix(level, logger_name_prefix: str):
             },
         },
     })
+
+
+LoggerDep = Annotated[logging.Logger, Depends(logging.getLogger)]

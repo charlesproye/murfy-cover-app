@@ -10,8 +10,8 @@ import re
 
 
 from core.pandas_utils import *
-from core.s3_utils import S3_Bucket
-from core.singleton_s3_bucket import bucket
+from core.s3_utils import S3Service
+from core.singleton_s3_bucket import S3
 from core.config import *
 from ingestion.vehicle_info.config.credentials import SPREADSHEET_ID 
 from ingestion.vehicle_info.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings

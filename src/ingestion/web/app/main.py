@@ -16,18 +16,7 @@ logging.basicConfig(level=logging.INFO)
 # Middleware for testing
 class LogRequestMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # # Read request body (must buffer and reset)
-        # body = await request.body()
-
-        # Log headers
         logging.info(f"Request Headers: {dict(request.headers)}")
-
-        # # Log body
-        # logging.info(f"Request Body: {body.decode('utf-8')}")
-
-        # # Recreate the request stream for downstream (body can be read only once)
-        # request._receive = lambda: {"type": "http.request", "body": body}
-
         response = await call_next(request)
         return response
 
