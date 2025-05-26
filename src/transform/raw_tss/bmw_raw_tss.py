@@ -3,8 +3,8 @@ from logging import Logger, getLogger
 from rich.progress import Progress
 
 from core.pandas_utils import *
-from core.s3_utils import S3_Bucket
-from core.singleton_s3_bucket import bucket
+from core.s3_utils import S3Service
+from core.singleton_s3_bucket import S3
 from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
@@ -15,7 +15,7 @@ from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_ts
 logger:Logger = getLogger("transform.raw_tss.bmw_raw_tss")
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="BMW"), on="s3")
-def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
+def get_raw_tss(bucket:S3Service=S3) -> DF:
     logger.debug("Getting raw tss from responses provided by bmw.")
     with Progress() as progress:
         keys = bucket.list_responses_keys_of_brand("BMW")
@@ -27,7 +27,7 @@ def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
             .reset_index(drop=False)
         )
 
-def parse_responses_of_vin(responses:DF, bucket:S3_Bucket, logger:Logger, progress:Progress, task:int) -> DF:
+def parse_responses_of_vin(responses:DF, bucket:S3Service, logger:Logger, progress:Progress, task:int) -> DF:
     progress.update(task, visible=True, advance=1, description=f"vin: {responses.name}")
     responses_dicts = responses["key"].apply(bucket.read_json_file)
     cat_responses_dicts = reduce(lambda cat_rep, rep_2: cat_rep + rep_2["data"], responses_dicts, [])

@@ -10,8 +10,8 @@ import logging
 from sqlalchemy import Connection as Con
 from core.sql_utils import get_connection
 
-from core.s3_utils import S3_Bucket
-from core.singleton_s3_bucket import bucket
+from core.s3_utils import S3Service
+from core.singleton_s3_bucket import S3
 from core.sql_utils import con
 
 logging.basicConfig(level=logging.INFO)
@@ -33,7 +33,7 @@ class VehicleInfoProcessor:
         """Get the date of the most recent file for a specific VIN"""
         try:
             # List objects in the VIN's folder
-            keys = bucket.list_responses_keys_of_brand(brand)
+            keys = S3.list_responses_keys_of_brand(brand)
             
             # Check if keys is empty before processing
             if keys.empty:
@@ -86,7 +86,7 @@ class VehicleInfoProcessor:
 
 def main():
     # Get configuration from environment variables
-    s3_bucket = bucket
+    s3_bucket = S3
 
     df = VehicleInfoProcessor().process_all_vehicles()
     print(df)
