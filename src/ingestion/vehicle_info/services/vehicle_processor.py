@@ -195,13 +195,13 @@ class VehicleProcessor:
                                 
                                 # Insert new vehicle
                                 vehicle_id = str(uuid.uuid4())
-                                cursor.execute("INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, end_of_contract_date, start_date, activation_status, is_displayed) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (vehicle_id, vin, fleet_id, region_id, model_id, vehicle['licence_plate'], vehicle['end_of_contract'], start_date, vehicle['real_activation'], vehicle['EValue']))
+                                cursor.execute("INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, end_of_contract_date, start_date, activation_status, is_displayed,is_eligible) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (vehicle_id, vin, fleet_id, region_id, model_id, vehicle['licence_plate'], vehicle['end_of_contract'], start_date, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility']))
                                 logging.info(f"New Tesla vehicle inserted in DB VIN: {vin}")
                             else:
                                 # CASE 2: Vehicle exists
                                 vehicle_id = result[0]
                                 model_id = result[1]
-                                cursor.execute("UPDATE vehicle SET activation_status = %s, is_displayed = %s WHERE id = %s", (vehicle['real_activation'], vehicle['EValue'], vehicle_id))
+                                cursor.execute("UPDATE vehicle SET activation_status = %s, is_displayed = %s, is_eligible = %s WHERE id = %s", (vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vehicle_id))
                                 logging.info(f"Updated Tesla vehicle in DB VIN: {vin}")
                                 # Check current model version
                                 cursor.execute("SELECT version FROM vehicle_model WHERE id = %s", (model_id,))
