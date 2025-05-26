@@ -2,7 +2,7 @@ from pprint import pprint
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from core.logging_utils import LoggerDep
+from src.core.logging_utils import LoggerDep
 
 
 class BmwSettings(BaseSettings):

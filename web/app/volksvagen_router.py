@@ -1,7 +1,7 @@
 from pprint import pprint
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from core.logging_utils import LoggerDep
+from src.core.logging_utils import LoggerDep
 from .schemas import (
     Trip,
     Maintenance,
