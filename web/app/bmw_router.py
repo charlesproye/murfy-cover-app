@@ -29,6 +29,7 @@ bmw_router = APIRouter(
 
 @bmw_router.post("/api/push")
 async def receive_data(request: Request):
+    # TODO: waiting to have sample of what bodies look like for this requests to build a parser to store them.
     logging.info(f"BODY")
     pprint(await request.body())
     return
