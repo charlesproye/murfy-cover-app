@@ -1,4 +1,4 @@
-from core.s3_utils import S3Service
+from .s3_utils import S3Service
 import logging
 
 def main():
