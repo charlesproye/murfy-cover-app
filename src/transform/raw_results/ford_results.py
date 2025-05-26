@@ -42,7 +42,7 @@ def get_results() -> DF:
 
 def compute_consuption(tss:DF) -> DF:
     tss_filter = tss.dropna(subset=('odometer', 'soc')).copy()
-    consumption =  (tss_filter.groupby(['vin', 'trimmed_in_discharge_idx'], observed=True).agg(
+    consumption =  (tss_filter[tss_filter['status']=='moving'].groupby(['vin', 'trimmed_in_discharge_idx'], observed=True).agg(
         soc_start=("soc", "first"),
         soc_end=('soc', 'last'),
         odometer_start=("odometer", "first"),
