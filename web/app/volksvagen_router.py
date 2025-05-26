@@ -1,7 +1,6 @@
+import logging
 from pprint import pprint
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-
-from src.core.logging_utils import LoggerDep
 from .schemas import (
     Trip,
     Maintenance,
@@ -15,10 +14,12 @@ from .schemas import (
 from .response_storage import ResponseStorageDep
 
 
-def authenticate(request: Request, logger: LoggerDep):
-    logger.debug(f"GETTING AUTH")
+def authenticate(
+    request: Request,
+):
+    logging.info(f"GETTING AUTH")
     api_key = request.headers.get("api-key")
-    logger.debug(f"{api_key = }")
+    logging.info(f"{api_key = }")
     # if api_key is None:
     #     raise HTTPException(
     #         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -28,7 +29,9 @@ def authenticate(request: Request, logger: LoggerDep):
 
 
 volkswagen_router = APIRouter(
-    prefix="", dependencies=[Depends(authenticate)], tags=["Volkswagen"]
+    prefix="",
+    dependencies=[Depends(authenticate)],
+    tags=["Volkswagen"],
 )
 
 
@@ -37,10 +40,9 @@ volkswagen_router = APIRouter(
 async def post_trips(
     trips: list[Trip],
     storage_service: ResponseStorageDep,
-    logger: LoggerDep,
 ):
-    logger.debug("/trips CALLED")
-    logger.debug(f"CONTENT = {trips}")
+    logging.info("/trips CALLED")
+    logging.info(f"CONTENT = {trips}")
     storage_service.store_basemodels_with_vin(trips)
     return
 
@@ -49,10 +51,9 @@ async def post_trips(
 async def post_maintenances(
     storage_service: ResponseStorageDep,
     maintenances: list[Maintenance],
-    logger: LoggerDep,
 ):
-    logger.debug("/maintenances CALLED")
-    logger.debug(f"CONTENT = {maintenances}")
+    logging.info("/maintenances CALLED")
+    logging.info(f"CONTENT = {maintenances}")
     storage_service.store_basemodels_with_vin(maintenances)
     return {}
 
@@ -61,10 +62,9 @@ async def post_maintenances(
 async def post_locations(
     locations: list[Location],
     storage_service: ResponseStorageDep,
-    logger: LoggerDep,
 ):
-    logger.debug("/locations CALLED")
-    logger.debug(f"CONTENT = {locations}")
+    logging.info("/locations CALLED")
+    logging.info(f"CONTENT = {locations}")
     storage_service.store_basemodels_with_vin(locations)
     return {}
 
@@ -73,10 +73,9 @@ async def post_locations(
 async def post_cruising_ranges(
     cruising_ranges: list[CruisingRange],
     storage_service: ResponseStorageDep,
-    logger: LoggerDep,
 ):
-    logger.debug("/cruising-ranges CALLED")
-    logger.debug(f"CONTENT = {cruising_ranges}")
+    logging.info("/cruising-ranges CALLED")
+    logging.info(f"CONTENT = {cruising_ranges}")
     storage_service.store_basemodels_with_vin(cruising_ranges)
     return {}
 
@@ -85,10 +84,9 @@ async def post_cruising_ranges(
 async def post_dashboard_error_warnings(
     dashboard_error_warnings: list[DashboardErrorWarning],
     storage_service: ResponseStorageDep,
-    logger: LoggerDep,
 ):
-    logger.debug("/dashboard-error-warnings CALLED")
-    logger.debug(f"CONTENT = {dashboard_error_warnings}")
+    logging.info("/dashboard-error-warnings CALLED")
+    logging.info(f"CONTENT = {dashboard_error_warnings}")
     storage_service.store_basemodels_with_vin(dashboard_error_warnings)
     return {}
 
@@ -97,10 +95,9 @@ async def post_dashboard_error_warnings(
 async def post_energy_levels(
     energy_levels: list[EnergyLevel],
     storage_service: ResponseStorageDep,
-    logger: LoggerDep,
 ):
-    logger.debug("/energy-levels CALLED")
-    logger.debug(f"CONTENT = {energy_levels}")
+    logging.info("/energy-levels CALLED")
+    logging.info(f"CONTENT = {energy_levels}")
     storage_service.store_basemodels_with_vin(energy_levels)
     return {}
 
@@ -109,10 +106,9 @@ async def post_energy_levels(
 async def post_charging_states(
     charging_states: list[ChargingState],
     storage_service: ResponseStorageDep,
-    logger: LoggerDep,
 ):
-    logger.debug("/charging-states CALLED")
-    logger.debug(f"CONTENT = {charging_states}")
+    logging.info("/charging-states CALLED")
+    logging.info(f"CONTENT = {charging_states}")
     storage_service.store_basemodels_with_vin(charging_states)
     return {}
 
@@ -121,23 +117,19 @@ async def post_charging_states(
 async def post_charging_remaining_times(
     charging_remaining_times: list[ChargingRemainingTime],
     storage_service: ResponseStorageDep,
-    logger: LoggerDep,
 ):
-    logger.debug("/charging-remaining-times CALLED")
-    logger.debug(f"CONTENT = {charging_remaining_times}")
+    logging.info("/charging-remaining-times CALLED")
+    logging.info(f"CONTENT = {charging_remaining_times}")
     storage_service.store_basemodels_with_vin(charging_remaining_times)
     return {}
 
 
 # Test route
 @volkswagen_router.post("/")
-async def test_post(
-    request: Request,
-    logger: LoggerDep,
-):
-    logger.debug("HEADERS")
+async def test_post(request: Request):
+    logging.info("HEADERS")
     pprint(request.headers.__dict__)
-    logger.debug("BODY")
+    logging.info("BODY")
     pprint(await request.body())
     return
 
