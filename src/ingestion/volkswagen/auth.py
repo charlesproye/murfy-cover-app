@@ -17,7 +17,7 @@ class VolksWagenAuth:
 
     @property
     def token(self) -> str:
-        if self._token_value is None or self._expiration_date > now() - timedelta(
+        if self._token_value is None or now() > self._expiration_date - timedelta(
             minutes=1
         ):
             return self.get_token()
