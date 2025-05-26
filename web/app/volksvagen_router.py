@@ -127,9 +127,7 @@ async def post_charging_remaining_times(
 # Test route
 @volkswagen_router.post("/")
 async def test_post(request: Request):
-    logging.info("HEADERS")
-    pprint(request.headers.__dict__)
-    logging.info("BODY")
-    pprint(await request.body())
-    return
+    api_key = authenticate(request)
+    if api_key is not None:
+        logging.info(f"API received {api_key}")
 
