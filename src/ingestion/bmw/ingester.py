@@ -155,7 +155,7 @@ class BMWIngester:
         )
         self.__request_shutdown()
     
-    def __retry_with_exponential_backoff(func: Callable, max_retries: int = 5, initial_delay: int = 1, backoff_factor: int = 2):
+    def __retry_with_exponential_backoff(self, func: Callable, max_retries: int = 5, initial_delay: int = 1, backoff_factor: int = 2):
         """
         Retry a function with exponential backoff.
 
@@ -411,4 +411,3 @@ class BMWIngester:
                     self.__compress_scheduler.run_pending()
                 time.sleep(1)
             self.__shutdown()
-

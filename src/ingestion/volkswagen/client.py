@@ -1,7 +1,27 @@
-from typing import Final
+from typing import Final, Literal
 import httpx
+from pydantic import BaseModel, Field
 from .auth import VolksWagenAuth
 from .schemas import VehicleConfirmation
+
+
+class ConnectionApiKey(BaseModel):
+    name: str
+    value: str
+
+
+class ConnectionAuthentication(BaseModel):
+    type: Literal["BASIC_AUTH"]
+    username: str
+    password: str
+
+
+class ConnectionUpdate(BaseModel):
+    id: int
+    type: Literal["WEBDAV", "WEBSERVICE"]
+    url: str
+    api_key: ConnectionApiKey | None = Field(default=None, alias="api-key")
+    authentication: ConnectionAuthentication | None = None
 
 
 class VolksWagenClient:
@@ -122,16 +142,38 @@ class VolksWagenClient:
         )
         return response
 
-    async def get_contexts_vehicles(self, context_id: str):
+    async def get_context_vehicles(self, context_id: int):
         response = await self._client.get(
             url=f"{self.FDE_URL}/context/{context_id}/vehicles",
             headers=self._auth_headers,
         )
         return response
 
-    async def get_contexts_data(self, context_id: str):
+    async def get_context_data(self, context_id: int):
         response = await self._client.get(
-            url=f"{self.FDE_URL}/context/{context_id}/vehicles",
+            url=f"{self.FDE_URL}/context/{context_id}/data",
+            headers=self._auth_headers,
+        )
+        return response
+
+    async def get_connections_status(self):
+        response = await self._client.get(
+            url=f"{self.CS_URL}/connections/status",
+            headers=self._auth_headers,
+        )
+        return response
+
+    async def put_connections(self, connection: ConnectionUpdate):
+        response = await self._client.put(
+            url=f"{self.CS_URL}/connections",
+            headers=self._auth_headers,
+            json=connection.model_dump(by_alias=True),
+        )
+        return response
+
+    async def put_connections_status(self):
+        response = await self._client.put(
+            url=f"{self.CS_URL}/connections/status",
             headers=self._auth_headers,
         )
         return response
