@@ -1,12 +1,12 @@
 import boto3
 import datetime
 import os
-from core.s3_utils import S3_Bucket
+from core.s3_utils import S3Service
 import requests
 
 
 
-s3 = S3_Bucket()
+s3 = S3Service()
 
 bucket_name = os.getenv("S3_BUCKET")
 folder_name = 'response/ituran/'  # Ensure this ends with '/'
