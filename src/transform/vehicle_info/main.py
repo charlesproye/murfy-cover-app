@@ -10,7 +10,7 @@ import logging
 from sqlalchemy import Connection as Con
 from core.sql_utils import get_connection
 
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 from core.singleton_s3_bucket import S3
 from core.sql_utils import con
 

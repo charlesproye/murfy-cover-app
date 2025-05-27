@@ -3,7 +3,7 @@ from logging import Logger, getLogger
 from rich.progress import Progress
 
 from core.pandas_utils import *
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 from core.singleton_s3_bucket import S3
 from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT
 from core.logging_utils import set_level_of_loggers_with_prefix

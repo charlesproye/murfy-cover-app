@@ -8,7 +8,7 @@ from rich.progress import track
 
 from transform.raw_tss.config import *
 from core.pandas_utils import concat, explode_data
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix

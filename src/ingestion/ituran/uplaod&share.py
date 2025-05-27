@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 
 def generate_presigned_url_and_upload(local_file_path, custom_filename=None):
     """

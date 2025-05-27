@@ -5,7 +5,7 @@ from logging import getLogger
 from rich.progress import track
 
 from core.pandas_utils import *
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 from transform.raw_tss.config import *
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
