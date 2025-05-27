@@ -15,8 +15,8 @@ from pandas import DataFrame as DF
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
-from core.config import *
-from core.pandas_utils import str_split_and_retain_src
+from .config import *
+from .pandas_utils import str_split_and_retain_src
 
 
 class S3Settings(BaseSettings):
