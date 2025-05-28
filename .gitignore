@@ -1,6 +1,7 @@
 test2.ipynb
 test.py
 test.ipynb
+draft/*
 data_cache/*
 data_cache
 .not_to_track_dir
@@ -222,7 +223,6 @@ Thumbs.db
 *.conda
 
 src/ingestion/vehicle_info/api/pkcs12.txt
-*.txt
 *.p12
 *.pfx
 

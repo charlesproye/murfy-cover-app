@@ -45,8 +45,8 @@ def get_processed_results(brand:str) -> DF:
         .eval(SOH_FILTER_EVAL_STRINGS[brand])
         .pipe(agg_results_by_update_frequency)
         .groupby('vin', observed=True)
-        .apply(make_soh_presentable_per_vehicle, include_groups=False)
-        .reset_index(level=0)
+        .apply(make_soh_presentable_per_vehicle, include_groups=True)
+        .reset_index(drop=True)
         #.pipe(filter_results_by_lines_bounds, VALID_SOH_POINTS_LINE_BOUNDS, logger=logger)
         .sort_values(["vin", "date"])
     )
@@ -106,7 +106,12 @@ def make_soh_presentable_per_vehicle(df:DF) -> DF:
         assert outliser_mask.any(), f"There seems to be only outliers???:\n{df['soh']}."
         df = df[outliser_mask].copy()
     if df["soh"].count() >= 2:
-        df["soh"] = force_decay(df[["soh", "odometer"]])
+        print(df.columns)
+        if df['vin'].iloc[0].startswith('VF1'):
+            print('yeah')
+            df["soh"] = force_decay(df[["soh", "odometer"]], max_drop=0.001)
+        else:
+            df["soh"] = force_decay(df[["soh", "odometer"]])
     return df
 
 if __name__ == "__main__":
