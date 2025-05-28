@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import time
 import re
 import pandas as pd
+from PyPDF2 import PdfReader
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -19,7 +20,7 @@ BASE_URL = "https://www.autosphere.fr"
 SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Peugeot&fuel_type=Electrique&from={}"#"https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
 STEP = 23
 START_OFFSET = 0
-STOP_OFFSET = 1000
+STOP_OFFSET = 10
 
 
 def get_all_vehicle_links():
@@ -59,6 +60,61 @@ def get_all_vehicle_links():
     print(f"\nNombre total de fiches uniques récupérées : {len(all_links)}")
     return list(all_links)
 
+def extract_soh_from_pdf(pdf_path):
+    try:
+        with open(pdf_path, 'rb') as f:
+            reader = PdfReader(f)
+            for page in reader.pages:
+                text = page.extract_text()
+                for line in text.splitlines():
+                    if "SoH" in line or "état de santé" in line.lower():
+                        match = re.search(r"(\d{1,3}[.,]?\d{0,2})\s*%", line)
+                        if match:
+                            return float(match.group(1).replace(',', '.'))
+    except Exception as e:
+        print(f"[PDF] Erreur lecture SoH : {e}")
+    return None
+
+def extract_aviloo_data_from_pdf(pdf_path):
+    result = {
+        "SoH": None,
+        "kilometrage": None,
+        "OEM": None,
+        "Modèle": None
+    }
+
+    try:
+        with open(pdf_path, 'rb') as f:
+            reader = PdfReader(f)
+            full_text = ""
+            for page in reader.pages:
+                full_text += page.extract_text() + "\n"
+
+        lines = full_text.splitlines()
+
+        for line in lines:
+            line_lower = line.lower()
+
+            if result["SoH"] is None and ("soh" in line_lower or "état de santé" in line_lower):
+                match = re.search(r"(\d{1,3}[.,]?\d{0,2})\s*%", line)
+                if match:
+                    result["SoH"] = float(match.group(1).replace(",", "."))
+
+            if result["kilometrage"] is None and ("km" in line_lower or "mileage" in line_lower):
+                match = re.search(r"(\d{1,3}[ \u202f]?\d{3})\s*km", line_lower)
+                if match:
+                    result["kilometrage"] = int(match.group(1).replace(" ", "").replace("\u202f", ""))
+
+            if result["OEM"] is None and ("marque" in line_lower or "oem" in line_lower or "brand" in line_lower):
+                result["OEM"] = line.split(":")[-1].strip()
+
+            if result["Modèle"] is None and ("modèle" in line_lower or "model" in line_lower):
+                result["Modèle"] = line.split(":")[-1].strip()
+
+    except Exception as e:
+        print(f"[PDF] Erreur lecture rapport AVILOO : {e}")
+
+    return result
 
 def extract_vehicle_info(link, car_nbr):
     infos = {}
@@ -69,37 +125,38 @@ def extract_vehicle_info(link, car_nbr):
 
     try:
         driver.get(link)
-        wait = WebDriverWait(driver, 15)
+        wait = WebDriverWait(driver, 5)
         all_li = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//li")))
-
-        score_sante = None
-        kilometrage = None
+        modele = None
         annee = None
 
         for li in all_li:
             text = li.text.strip()
-            if "Santé" in text and not score_sante:
-                match = re.search(r"score d'intégrité\s+(\d+)\s*%", text, re.IGNORECASE)
-                if not match:
-                    match = re.search(r"(\d+)\s*%", text)
-                if match:
-                    score_sante = match.group(1)
-
-            if "km" in text and not kilometrage:
-                match = re.search(r"([\d\s]+km)", text)
-                if match:
-                    kilometrage = match.group(1).strip().replace("\u202f", "").replace(" ", "").replace("km", "").strip()
 
             if re.search(r"\b20\d{2}\b", text) and not annee:
-                annee = re.search(r"\b(20\d{2})\b", text).group(1)
-
+                annee = re.search(r"\b(20(?:0[0-79]|0[9]|[1-9]\d))\b", text).group(1)
+        try:
+            aviloo_link_elem = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[href*='certs.aviloo.com/pdf']")))
+            pdf_url = aviloo_link_elem.get_attribute("href")
+            if pdf_url:
+                pdf_response = requests.get(pdf_url)
+                with open("aviloo_tmp.pdf", "wb") as f:
+                    f.write(pdf_response.content)
+                data = extract_aviloo_data_from_pdf("aviloo_tmp.pdf")
+                if data["SoH"]:
+                    score_sante = data["SoH"]
+                if data["kilometrage"]:
+                    kilometrage = data["kilometrage"]
+                if data["OEM"]:
+                    marque = data["OEM"]
+                if data["Modèle"]:
+                    modele = data["Modèle"]
+        except:
+            pass
         titre_element = wait.until(EC.presence_of_element_located((By.XPATH, "//h1")))
         titre_text = titre_element.text.strip()
 
         match = re.search(r"\d+ch\s+\w+", titre_text)
-
-        marque = None
-        modele = None
         version_complete = None
 
         try:
@@ -115,7 +172,7 @@ def extract_vehicle_info(link, car_nbr):
                 version_complete = version_complete[:version_complete.find(' - ')]
             if modele != "2008":
                 version_complete = re.sub(r"\b20\d{2}\b", "", version_complete)
-            version_complete = version_complete.replace('Achat Integral', "").strip()
+            version_complete = version_complete.replace('Achat Integral', "").replace('Achat Intégral', "").strip()
         except Exception as e:
             print(f"[{car_nbr}] Erreur fil d’Ariane : {e}")
         infos["lien"] = link
