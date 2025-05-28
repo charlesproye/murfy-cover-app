@@ -125,7 +125,7 @@ def extract_vehicle_info(link, car_nbr):
 
     try:
         driver.get(link)
-        wait = WebDriverWait(driver, 5)
+        wait = WebDriverWait(driver, 2)
         all_li = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//li")))
         modele = None
         annee = None
@@ -144,27 +144,21 @@ def extract_vehicle_info(link, car_nbr):
                     f.write(pdf_response.content)
                 data = extract_aviloo_data_from_pdf("aviloo_tmp.pdf")
                 if data["SoH"]:
-                    score_sante = data["SoH"]
+                    infos["SoH"] = float(data["SoH"]) / 100
                 if data["kilometrage"]:
-                    kilometrage = data["kilometrage"]
+                    infos["Odomètre (km)"] = int(data["kilometrage"])
                 if data["OEM"]:
-                    marque = data["OEM"]
+                    infos["OEM"] = data["OEM"]
                 if data["Modèle"]:
                     modele = data["Modèle"]
         except:
             pass
-        titre_element = wait.until(EC.presence_of_element_located((By.XPATH, "//h1")))
-        titre_text = titre_element.text.strip()
-
-        match = re.search(r"\d+ch\s+\w+", titre_text)
         version_complete = None
-
         try:
             links_breadcrumb = wait.until(EC.presence_of_all_elements_located(
                 (By.CSS_SELECTOR, "li.inline-flex.items-center a.text-blue-700")
             ))
             if len(links_breadcrumb) >= 4:
-                marque = links_breadcrumb[2].text.strip()
                 modele = links_breadcrumb[3].text.strip()
             version_span = driver.find_element(By.CSS_SELECTOR, "span.text-black-600")
             version_complete = version_span.text.strip()
@@ -176,17 +170,10 @@ def extract_vehicle_info(link, car_nbr):
         except Exception as e:
             print(f"[{car_nbr}] Erreur fil d’Ariane : {e}")
         infos["lien"] = link
-        infos["SoH"] = int(score_sante)
-        infos["Année"] = int(annee)
-        infos["Odomètre (km)"] = int(kilometrage)
         infos["Type"] = version_complete
         infos["Modèle"] = modele
-        infos["OEM"] = marque
-
     finally:    
         driver.quit()
-    if score_sante:
-        print(f"SoH récupéré = {score_sante}")
     return infos
 
 
