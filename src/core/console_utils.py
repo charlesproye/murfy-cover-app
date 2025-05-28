@@ -6,7 +6,7 @@ from logging import Logger
 from rich.traceback import install as install_rich_traceback
 from rich import print
 
-from core.pandas_utils import *
+from .pandas_utils import *
 
 def parse_kwargs(cli_args: dict[str, dict[str, str]] = [], **kwargs):
     parser = ArgumentParser(**kwargs)                                                                 # Set up argparse to accept known arguments
