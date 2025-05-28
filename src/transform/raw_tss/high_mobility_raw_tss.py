@@ -5,13 +5,13 @@ from core.pandas_utils import *
 from rich.progress import Progress
 from transform.raw_tss.config import *
 from core.logging_utils import set_level_of_loggers_with_prefix
-from core.s3_utils import S3_Bucket
+from core.s3_utils import S3Service
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 from core.pandas_utils import concat
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT, path_params=["brand"], on="s3")
-def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
+def get_raw_tss(brand:str, bucket: S3Service=S3Service()) -> DF:
     logger = getLogger(f"transform.HighMobility-{brand}-RawTSS")
     logger.debug(f"Starting to compute raw time series for {brand} vehicles.")
     keys = bucket.list_responses_keys_of_brand(brand)
@@ -26,7 +26,7 @@ def get_raw_tss(brand:str, bucket: S3_Bucket=S3_Bucket()) -> DF:
             .pipe(concat)
         )
 
-def parse_response_as_raw_ts(key:Series, bucket:S3_Bucket, logger:Logger, progress:Progress, task:int) -> DF:
+def parse_response_as_raw_ts(key:Series, bucket:S3Service, logger:Logger, progress:Progress, task:int) -> DF:
     # The responses are first indexed by "capability" (see any high mobility's air table data catalog).
     # We don't really need to know what capability we are reading from.
     # But some variables that belong to different capabilities may have the same name.
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "transform")
     single_dataframe_script_main(
         get_raw_tss,
-        bucket=S3_Bucket(),
+        bucket=S3Service(),
         force_update=True,
         brand="ford",
     )
