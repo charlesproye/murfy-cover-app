@@ -1,49 +1,36 @@
-import os
+from functools import lru_cache
 import json
 import logging
-from typing import Any
+from typing import Annotated, Any
 from datetime import datetime
-from io import BytesIO, StringIO
+from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
 
 import boto3
+from fastapi import Depends
 import pandas as pd
-import pyarrow as pa
 from pandas import Series
 import pyarrow.parquet as pq
 from pandas import DataFrame as DF
 
-from core.config import *
-from core.env_utils import get_env_var
-from core.pandas_utils import str_split_and_retain_src
+from ..config import *
+from ..pandas_utils import str_split_and_retain_src
+from .settings import S3Settings
 
-
-class S3_Bucket():
-    def __init__(self, creds: dict[str, str]=None):
-
-        assert "S3_ENDPOINT" in os.environ, "S3_ENDPOINT variable is not in the environement."
-        if creds is None:
-            creds = S3_Bucket.get_creds_from_dot_env()
-        self.creds = creds
-
-        self._s3_client = boto3.client(
+class S3Service():
+    def __init__(self, settings:S3Settings|None = None):
+        settings = settings or S3Settings()
+        self._settings = settings
+        self._s3_client =  boto3.client(
             "s3",
-            region_name="fr-par",
-            endpoint_url=get_env_var("S3_ENDPOINT"),
-            aws_access_key_id=creds["aws_access_key_id"],
-            aws_secret_access_key=creds["aws_secret_access_key"],
+            region_name=settings.S3_REGION,
+            endpoint_url=settings.S3_ENDPOINT,
+            aws_access_key_id=settings.S3_KEY,
+            aws_secret_access_key=settings.S3_SECRET,
         )
-        self.bucket_name = creds["bucket_name"]
+        self.bucket_name = settings.S3_BUCKET
         self.logger = logging.getLogger("S3_BUCKET")
 
-    @classmethod
-    def get_creds_from_dot_env(cls) -> dict[str, str]:
-        return {
-            "endpoint_url": get_env_var("S3_ENDPOINT"),
-            "aws_access_key_id": get_env_var("S3_KEY"),
-            "aws_secret_access_key": get_env_var("S3_SECRET"),
-            "bucket_name": get_env_var("S3_BUCKET"),
-        }
 
     def save_df_as_parquet(self, df:DF, key:str):
         out_buffer = BytesIO()
@@ -284,3 +271,15 @@ class S3_Bucket():
             }
         )
 
+    def store_object(self, object: bytes, filename: str):
+        self._s3_client.put_object(
+            Body=object,
+            Bucket=self.bucket_name,
+            Key=filename,
+        )
+
+@lru_cache
+def get_s3():
+    return S3Service()
+
+S3Dep = Annotated[S3Service,Depends(get_s3)]

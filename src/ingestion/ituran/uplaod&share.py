@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from core.s3_utils import S3_Bucket
+from core.s3.s3_utils import S3Service
 
 def generate_presigned_url_and_upload(local_file_path, custom_filename=None):
     """
@@ -10,7 +10,7 @@ def generate_presigned_url_and_upload(local_file_path, custom_filename=None):
         local_file_path (str): Chemin du fichier local à uploader
         custom_filename (str, optional): Nom personnalisé pour le fichier distant
     """
-    s3 = S3_Bucket()
+    s3 = S3Service()
     bucket_name = os.getenv("S3_BUCKET")
     folder_name = 'response/ituran/'
     

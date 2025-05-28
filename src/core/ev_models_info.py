@@ -1,10 +1,10 @@
 import pandas as pd
 from pandas import DataFrame as DF
 
-from core.sql_utils import con
-from core.pandas_utils import set_all_str_cols_to_lower, safe_locate
-from core.console_utils import single_dataframe_script_main
-from core.config import *
+from .sql_utils import con
+from .pandas_utils import set_all_str_cols_to_lower, safe_locate
+from .console_utils import single_dataframe_script_main
+from .config import *
 
 def get_ev_models_infos() -> DF:
     return (

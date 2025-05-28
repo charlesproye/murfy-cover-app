@@ -4,8 +4,8 @@ from logging import getLogger
 from rich.progress import Progress
 
 from core.pandas_utils import *
-from core.s3_utils import S3_Bucket
-from core.singleton_s3_bucket import bucket
+from core.s3.s3_utils import S3Service
+from core.singleton_s3_bucket import S3
 from core.caching_utils import cache_result
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.console_utils import single_dataframe_script_main
@@ -14,7 +14,7 @@ from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT
 logger = getLogger("transform.raw_tss.mobilisight_raw_tss")
 
 @cache_result(S3_RAW_TSS_KEY_FORMAT.format(brand="stellantis"), "s3")
-def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
+def get_raw_tss(bucket:S3Service=S3) -> DF:
     logger.info(f"get_raw_tss called for Stellantis.")
     with Progress() as progress:
         mobilisight_responses_keys = bucket.list_responses_keys_of_brand("stellantis")
@@ -32,7 +32,7 @@ def get_raw_tss(bucket:S3_Bucket=bucket) -> DF:
             .pipe(concat)
         )
 
-def parse_mobilisight_response(response_key:str, bucket:S3_Bucket, logger:Logger=logger, progress:Progress=None, task=None) -> DF:
+def parse_mobilisight_response(response_key:str, bucket:S3Service, logger:Logger=logger, progress:Progress=None, task=None) -> DF:
     progress.update(task, advance=1, description=f"key: {response_key['key']}, vin: {response_key['vin']}.")
     response = bucket.read_json_file(response_key['key'])
     return parse_unstructured_json(response, no_prefix_path=["datetime"], no_suffix_path=["value"]).assign(vin=response_key["vin"])
