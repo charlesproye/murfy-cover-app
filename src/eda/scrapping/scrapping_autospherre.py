@@ -191,8 +191,10 @@ def main():
         time.sleep(1)
     # Bien ordonner les colonnes par rapoort à la gsheet
     infos_clean = pd.DataFrame(all_infos).T.dropna(subset='SoH')[["OEM","Modèle","Type","Année","Odomètre (km)","SoH", "lien"]]
-    print(infos_clean.shape)
-    export_to_excel(infos_clean, "202505 - Courbes SoH", "Courbes OS")
+    df_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
+    df_filtré = infos_clean[~infos_clean['lien'].isin(df_sheet['lien'])]
+    print(df_filtré.shape)
+    export_to_excel(df_filtré, "202505 - Courbes SoH", "Courbes OS")
 
 
 if __name__ == "__main__":
