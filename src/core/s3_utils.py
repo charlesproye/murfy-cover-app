@@ -4,7 +4,7 @@ import logging
 from typing import Any
 from datetime import datetime
 from io import BytesIO, StringIO
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 import boto3
 import pandas as pd
@@ -127,7 +127,7 @@ class S3_Bucket():
                 return [obj["Key"] for obj in page["Contents"] if obj["Key"] != key_prefix]
             return []
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
             results = list(executor.map(process_page, page_iterator))
         
         # Flatten the list
@@ -157,6 +157,7 @@ class S3_Bucket():
 
         # Return the Dask dataframe AND the file path so you can delete it later
         return ddf, tmp_file_path
+    
     def read_csv_df(self, key:str, **kwargs) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
         status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
