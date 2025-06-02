@@ -12,6 +12,7 @@ from ingestion.vehicle_info.api.bmw_client import BMWApi
 from ingestion.vehicle_info.api.hm_client import HMApi
 from ingestion.vehicle_info.api.stellantis_client import StellantisApi
 from ingestion.vehicle_info.api.tesla_client import TeslaApi
+from ingestion.vehicle_info.api.tesla_particulier import TeslaParticulierApi
 from ingestion.vehicle_info.services.activation_service import VehicleActivationService
 from ingestion.vehicle_info.services.vehicle_processor import VehicleProcessor
 from ingestion.vehicle_info.fleet_info import read_fleet_info as fleet_info
@@ -49,6 +50,11 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             slack_token=SLACK_TOKEN,
             slack_channel_id=SLACK_CHANNEL_ID
         )
+        tesla_particulier_api = TeslaParticulierApi(
+            base_url=TESLA_BASE_URL,
+            token_url= TESLA_TOKEN_URL,
+            client_id=TESLA_CLIENT_ID,
+        )
         renault_api = RenaultApi(
             kid=RENAULT_KID,
             aud=RENAULT_AUD,
@@ -64,6 +70,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             hm_api=hm_api,
             stellantis_api=stellantis_api,
             tesla_api=tesla_api,
+            tesla_particulier_api=tesla_particulier_api,
             renault_api=renault_api,
             fleet_info_df=df
         )
@@ -74,7 +81,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             #activation_service.activation_bmw(),
             #activation_service.activation_hm(),
             #activation_service.activation_stellantis()
-        )
+            activation_service.activation_tesla_particulier())
 
         # Get updated fleet info after activation
         logging.info('-------------------------------Activation completed-------------------------------')
@@ -86,17 +93,18 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             hm_api=hm_api,
             stellantis_api=stellantis_api,
             tesla_api=tesla_api,
+            tesla_particulier_api=tesla_particulier_api,
             renault_api=renault_api,
             df=df
         )
         await asyncio.gather(
             #vehicle_processor.process_other_vehicles(),
             #vehicle_processor.process_tesla(),
-            vehicle_processor.process_renault(),
-            #vehicle_processor.process_deactivated_vehicles()
-        )
-        await vehicle_processor.delete_unused_models()
-        await vehicle_processor.generate_vehicle_summary()
+            #vehicle_processor.process_renault(),
+            #vehicle_processor.process_deactivated_vehicles(),
+            vehicle_processor.process_tesla_particulier())
+        #await vehicle_processor.delete_unused_models()
+        #await vehicle_processor.generate_vehicle_summary()
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {str(e)}")

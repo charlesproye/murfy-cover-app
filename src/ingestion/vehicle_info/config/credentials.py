@@ -26,6 +26,8 @@ SLACK_TOKEN = get_env_var('SLACK_TOKEN')
 SLACK_CHANNEL_ID = get_env_var('SLACK_CHANNEL_ID')
 SPREADSHEET_ID = get_env_var('SPREADSHEET_ID')
 TESLA_BASE_URL = get_env_var('TESLA_BASE_URL')
+TESLA_TOKEN_URL = get_env_var('TESLA_TOKEN_URL')
+TESLA_CLIENT_ID = get_env_var('TESLA_CLIENT_ID')
 
 RENAULT_KID = get_env_var('RENAULT_KID')
 RENAULT_AUD = get_env_var('RENAULT_AUD')
