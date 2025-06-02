@@ -5,22 +5,25 @@ from typing import Tuple, Optional
 import pandas as pd
 import requests
 import uuid
+from core.sql_utils import get_connection
 
 from ingestion.vehicle_info.api.bmw_client import BMWApi
 from ingestion.vehicle_info.api.hm_client import HMApi
 from ingestion.vehicle_info.api.stellantis_client import StellantisApi
 from ingestion.vehicle_info.api.tesla_client import TeslaApi
 from ingestion.vehicle_info.api.renault_client import RenaultApi
+from ingestion.vehicle_info.api.tesla_particulier import TeslaParticulierApi
 from ingestion.vehicle_info.config.settings import ACTIVATION_TIMEOUT
 from ingestion.vehicle_info.services.google_sheet_service import update_vehicle_activation_data
 
 class VehicleActivationService:
 
-    def __init__(self, bmw_api: BMWApi, hm_api: HMApi, stellantis_api: StellantisApi, tesla_api: TeslaApi, renault_api: RenaultApi, fleet_info_df: pd.DataFrame):
+    def __init__(self, bmw_api: BMWApi, hm_api: HMApi, stellantis_api: StellantisApi, tesla_api: TeslaApi, tesla_particulier_api: TeslaParticulierApi, renault_api: RenaultApi, fleet_info_df: pd.DataFrame):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
         self.tesla_api = tesla_api
+        self.tesla_particulier_api = tesla_particulier_api
         self.renault_api = renault_api
         self.fleet_info_df = fleet_info_df
         
@@ -276,7 +279,53 @@ class VehicleActivationService:
             status_df = pd.concat([api_vehicles, missing_vehicles], ignore_index=True)
             print(f"Total tesla vehicles: {len(status_df)}")
             await update_vehicle_activation_data(status_df)
+
+    async def activation_tesla_particulier(self):
+        """Process Tesla particulier vehicle activation/deactivation"""
+        status_data = []
         
+        async with aiohttp.ClientSession() as session:
+            with get_connection() as con:
+                cursor = con.cursor()
+                cursor.execute("SELECT vin,full_name FROM tesla.user")
+                vins = cursor.fetchall()
+                
+                for vin, full_name in vins:
+                    try:
+                        actual_state = await self.tesla_particulier_api.get_status(vin, session,cursor)
+                        print(f"Actual state: {actual_state}")
+                        
+                        if actual_state:
+                            vehicle_data = {
+                                'vin': vin,
+                                'Eligibility': True,
+                                'Real_Activation': True,
+                                'Activation_Error': None,
+                                'account_owner': full_name
+                            }
+                            status_data.append(vehicle_data)
+                        else:
+                            vehicle_data = {
+                                'vin': vin,
+                                'Eligibility': False,
+                                'Real_Activation': False,
+                                'Activation_Error': 'Particulier Tesla account not found',
+                                'account_owner': full_name
+                            }
+                            status_data.append(vehicle_data)
+                            
+                    except Exception as e:
+                        status_data.append({
+                            'vin': vin,
+                            'Eligibility': False,
+                            'Real_Activation': False,
+                            'Activation_Error': f'Error processing vehicle: {str(e)}',
+                            'account_owner': full_name
+                        })
+                
+                status_df = pd.DataFrame(status_data)
+                await update_vehicle_activation_data(status_df)
+                
     async def activation_bmw(self):
         """Process BMW vehicle activation/deactivation."""
         df_bmw = self.fleet_info_df[self.fleet_info_df['oem'] == 'bmw']
