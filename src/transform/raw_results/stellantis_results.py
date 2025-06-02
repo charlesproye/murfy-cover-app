@@ -16,8 +16,9 @@ def main():
         .eval("date = date.dt.date")
         .groupby(["vin", "date"])
         .agg({
-            "soh": "median",
+            "soh_oem": "median",
             "odometer": "last",
+            "soh": "median"
         })
         .reset_index()
     )
