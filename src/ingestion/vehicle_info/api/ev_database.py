@@ -63,8 +63,8 @@ def fetch_ev_data():
                     
                     # Check if model already exists
                     cursor.execute(
-                        "SELECT id FROM vehicle_model WHERE LOWER(model_name) = LOWER(%s) AND LOWER(type) = LOWER(%s)",
-                        (vehicle.get("Vehicle_Model", "unknown"), vehicle.get("Vehicle_Model_Version", "unknown"))
+                        "SELECT id FROM vehicle_model WHERE model_name = LOWER(%s) AND LOWER(type) = LOWER(%s)",
+                        (vehicle.get("Vehicle_Model", "unknown"), vehicle.get("Vehicle_Model_Version") or "unknown")
                     )
                     model_result = cursor.fetchone()
                     
@@ -78,7 +78,7 @@ def fetch_ev_data():
                         """, (
                             model_id,
                             vehicle.get("Vehicle_Model", "unknown"),
-                            vehicle.get("Vehicle_Model_Version", "unknown"),
+                            vehicle.get("Vehicle_Model_Version") or "unknown",
                             make_id,
                             oem_id,
                             vehicle.get("Range_WLTP"),
