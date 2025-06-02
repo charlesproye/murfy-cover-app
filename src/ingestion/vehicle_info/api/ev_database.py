@@ -3,9 +3,9 @@ import json
 import uuid
 from core.sql_utils import get_connection
 import logging
-
+import os
 def fetch_ev_data():
-    url = "https://ev-database.org/export_v31/m1/bev/19052863/mji92WSoafoOEIF3lvEB1v"
+    url = os.getenv("EV_DATABASE_URL")
     
     try:
         # Make the GET request
