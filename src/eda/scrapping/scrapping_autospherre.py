@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from core.gsheet_utils import *
-
+from transform.insights_results.config_trendlines import TYPE_MAPPING
 
 BASE_URL = "https://www.autosphere.fr"
 SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Peugeot&fuel_type=Electrique&from={}"#"https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
@@ -167,11 +167,13 @@ def extract_vehicle_info(link, car_nbr):
             if modele != "2008":
                 version_complete = re.sub(r"\b20\d{2}\b", "", version_complete)
             version_complete = version_complete.replace('Achat Integral', "").replace('Achat Intégral', "").strip()
+            version_complete = TYPE_MAPPING.get(version_complete, version_complete)
         except Exception as e:
             print(f"[{car_nbr}] Erreur fil d’Ariane : {e}")
         infos["lien"] = link
         infos["Type"] = version_complete
         infos["Modèle"] = modele
+        infos['Année'] = int(annee) if annee else None
     finally:    
         driver.quit()
     return infos
