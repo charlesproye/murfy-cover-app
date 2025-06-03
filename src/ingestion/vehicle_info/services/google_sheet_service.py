@@ -67,7 +67,7 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
                 })
                 updates.append({
                     'range': f'R{row_idx}C{error_col}',
-                    'values': [[row['Activation_Error']]]
+                    'values': [[row['Activation_Error'] if row['Activation_Error'] is not None else '']]
                 })
                 updates.append({
                     'range': f'R{row_idx}C{account_owner_col}',

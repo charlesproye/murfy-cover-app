@@ -5,9 +5,9 @@ from sqlalchemy import Engine, create_engine, text, inspect
 from sqlalchemy import Connection as Con
 from contextlib import contextmanager
 
-from core.pandas_utils import *
-from core.config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR, DB_URI_FORMAT_KEYS_PROD, DB_URI_FORMAT_STR_PROD
-from core.env_utils import get_env_var
+from .pandas_utils import *
+from .config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR, DB_URI_FORMAT_KEYS_PROD, DB_URI_FORMAT_STR_PROD
+from .env_utils import get_env_var
 
 logger = getLogger("core.sql_utils")
 

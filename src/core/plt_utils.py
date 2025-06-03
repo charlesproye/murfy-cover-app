@@ -7,8 +7,8 @@ from plotly.graph_objects import Figure
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy.optimize import curve_fit
-from core.pandas_utils import *
-from core.config import *
+from .pandas_utils import *
+from .config import *
 
 def plt_3d_df(
         df: DF,

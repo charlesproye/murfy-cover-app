@@ -47,7 +47,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "electricity.charging.planned": "charging_planned",
     "electricity.charging.rate": "charging_rate",
     "electricity.engineSpeed": "engine_speed",
-    "electricity.battery.stateOfHealth": "soh_oem",
+    "electricity.battery.stateOfHealth.percentage": "soh_oem",
     # Mercedes
     "charging.max_range": "max_range",
     "charging.charging_rate": "charging_rate",
