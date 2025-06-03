@@ -252,9 +252,8 @@ class VehicleProcessor:
                             vehicle_exists = cursor.fetchone()
                             vehicle_exists = vehicle_exists[0] if vehicle_exists else None
                             
-                            
                             if not vehicle_exists:
-                                #Since each api call to get static infromatino is billed. We are limiting the call only to vehicles that are not in the db
+                                #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
                                 model_name, type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
                                 logging.info(f"Processing Renault vehicle {vin} | {model_name} | {type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
                                 model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, type, version, vehicle['make'], vehicle['oem'])
@@ -288,11 +287,65 @@ class VehicleProcessor:
         except Exception as e:
             logging.error(f"Error in Renault processing: {str(e)}")
             raise
+    async def process_bmw(self) -> None:
+        """Process BMW vehicles."""
+        try:
+            bmw_df = self.df[(self.df['oem'] == 'bmw') & (self.df['real_activation'] == True)]
+            async with aiohttp.ClientSession() as session:
+                with get_connection() as con:
+                    cursor = con.cursor()
+                    for _, vehicle in bmw_df.iterrows():
+                        try:
+                            vin = vehicle['vin']
+                            fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+                            region_id = await self._get_or_create_region(cursor, vehicle['country'])
+                            #Check if vehicle exists
+                            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
+                            vehicle_exists = cursor.fetchone()
+                            vehicle_exists = vehicle_exists[0] if vehicle_exists else None
+
+                            if not vehicle_exists:
+                                #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
+                                model_name, model_type = await self.bmw_api.get_data(session, vin)
+                                print(model_name, model_type)
+                                logging.info(f"Processing BMW vehicle {vin} | {model_name} | {model_type}")
+                                model_id = await self._get_or_create_other_model(cursor, model_name, model_type, 'unknown', vehicle['make'], vehicle['oem'])
+                                vehicle_id = str(uuid.uuid4())
+                                insert_query = """
+                                    INSERT INTO vehicle (
+                                        id, vin, fleet_id, region_id, vehicle_model_id,
+                                        licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """
+                                cursor.execute(
+                                    insert_query,
+                                    (
+                                        vehicle_id, vin, fleet_id, region_id, model_id,
+                                        vehicle['licence_plate'], vehicle['end_of_contract'], vehicle['start_date'], vehicle['real_activation'], vehicle['EValue'], 
+                                        vehicle['eligibility']
+                                    )
+                                )
+                                logging.info(f"New BMW vehicle inserted in DB VIN: {vehicle['vin']}")
+                            else:
+                                cursor.execute(
+                                    "UPDATE vehicle SET activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                    (vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vin)
+                                )
+                            con.commit()
+                        except Exception as e:
+                            logging.error(f"Error processing BMW vehicle {vehicle['vin']}: {str(e)}")
+                            con.rollback()
+                            continue
+        except Exception as e:
+            logging.error(f"Error in BMW processing: {str(e)}")
+            raise
+                            
+                            
 
     async def process_other_vehicles(self) -> None:
         """Process other vehicles."""
         try:
-            other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['oem'] != 'renault') & (self.df['oem'].notna()) & (self.df['oem'] != '') & (self.df['real_activation'] == True)]
+            other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['oem'] != 'renault') & (self.df['oem'] != 'bmw') & (self.df['oem'].notna()) & (self.df['oem'] != '') & (self.df['real_activation'] == True)]
             with get_connection() as con:
                 cursor = con.cursor()
                 for _, vehicle in other_df.iterrows():
