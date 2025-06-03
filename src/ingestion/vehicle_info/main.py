@@ -80,7 +80,8 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             activation_service.activation_bmw(),
             #activation_service.activation_hm(),
             #activation_service.activation_stellantis(),
-            #activation_service.activation_tesla_particulier())
+            #activation_service.activation_tesla_particulier()
+        )
 
         # Get updated fleet info after activation
         logging.info('-------------------------------Activation completed-------------------------------')
@@ -103,8 +104,9 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             #vehicle_processor.process_deactivated_vehicles(),
             vehicle_processor.process_bmw()
             #vehicle_processor.process_tesla_particulier())
-        ##await vehicle_processor.delete_unused_models()
-        ##await vehicle_processor.generate_vehicle_summary()
+        )
+        #await vehicle_processor.delete_unused_models()
+        #await vehicle_processor.generate_vehicle_summary()
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {str(e)}")
