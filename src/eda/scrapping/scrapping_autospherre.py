@@ -17,10 +17,10 @@ from core.gsheet_utils import *
 from transform.insights_results.config_trendlines import TYPE_MAPPING
 
 BASE_URL = "https://www.autosphere.fr"
-SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Peugeot&fuel_type=Electrique&from={}"#"https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
+SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Fiat&fuel_type=Electrique&from={}"#"https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
 STEP = 23
 START_OFFSET = 0
-STOP_OFFSET = 10
+STOP_OFFSET = 1000
 
 
 def get_all_vehicle_links():
@@ -106,10 +106,10 @@ def extract_aviloo_data_from_pdf(pdf_path):
                     result["kilometrage"] = int(match.group(1).replace(" ", "").replace("\u202f", ""))
 
             if result["OEM"] is None and ("marque" in line_lower or "oem" in line_lower or "brand" in line_lower):
-                result["OEM"] = line.split(":")[-1].strip()
+                result["OEM"] = line.split(":")[-1].replace('Marque', "").strip()
 
             if result["Modèle"] is None and ("modèle" in line_lower or "model" in line_lower):
-                result["Modèle"] = line.split(":")[-1].strip()
+                result["Modèle"] = line.split(":")[-1].replace('Modèle', "").strip()
 
     except Exception as e:
         print(f"[PDF] Erreur lecture rapport AVILOO : {e}")
@@ -125,7 +125,7 @@ def extract_vehicle_info(link, car_nbr):
 
     try:
         driver.get(link)
-        wait = WebDriverWait(driver, 2)
+        wait = WebDriverWait(driver, 1)
         all_li = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//li")))
         modele = None
         annee = None
@@ -192,8 +192,11 @@ def main():
             print(f"[{i}] Erreur sur le lien {link} : {e}")
         time.sleep(1)
     # Bien ordonner les colonnes par rapoort à la gsheet
+
     infos_clean = pd.DataFrame(all_infos).T.dropna(subset='SoH')[["OEM","Modèle","Type","Année","Odomètre (km)","SoH", "lien"]]
-    df_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
+    data_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
+    df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
+    print(infos_clean.shape)
     df_filtré = infos_clean[~infos_clean['lien'].isin(df_sheet['lien'])]
     print(df_filtré.shape)
     export_to_excel(df_filtré, "202505 - Courbes SoH", "Courbes OS")
