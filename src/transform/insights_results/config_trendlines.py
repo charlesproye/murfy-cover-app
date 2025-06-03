@@ -27,7 +27,10 @@ TYPE_MAPPING = {
     "Moteur électrique 136ch (100 kW) Shine Automatique": "C4 100 kW",
 
 #### Fiat ####
-
+    "e 118ch La Prima": "42kwh",
+    "e 95ch Action Plus": "24 kWh",
+    "e 118ch Icône Plus (step1)": "42kwh",
+    
 #### DS ####
 
 #### Dacia ####
