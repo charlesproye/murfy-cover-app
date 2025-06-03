@@ -167,7 +167,6 @@ def extract_vehicle_info(link, car_nbr):
             if modele != "2008":
                 version_complete = re.sub(r"\b20\d{2}\b", "", version_complete)
             version_complete = version_complete.replace('Achat Integral', "").replace('Achat Intégral', "").strip()
-            version_complete = TYPE_MAPPING.get(version_complete, version_complete)
         except Exception as e:
             print(f"[{car_nbr}] Erreur fil d’Ariane : {e}")
         infos["lien"] = link
@@ -198,7 +197,8 @@ def main():
     df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
     print(infos_clean.shape)
     df_filtré = infos_clean[~infos_clean['lien'].isin(df_sheet['lien'])]
-    print(df_filtré.shape)
+    df_filtré['Type'] =  df_filtré['Type'].map(TYPE_MAPPING)
+    print(df_filtré.shape) 
     export_to_excel(df_filtré, "202505 - Courbes SoH", "Courbes OS")
 
 
