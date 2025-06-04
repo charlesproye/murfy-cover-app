@@ -12,7 +12,7 @@ import pyarrow as pa
 from pandas import Series
 import pyarrow.parquet as pq
 from pandas import DataFrame as DF
-import dask.dataframe as dd
+# import dask.dataframe as dd
 from core.config import *
 from core.env_utils import get_env_var
 from core.pandas_utils import str_split_and_retain_src
@@ -107,7 +107,7 @@ class S3_Bucket():
         keys["date"] = keys["file"].str[:-5]
 
         return keys
-
+    
     def list_keys(self, key_prefix: str = "", max_workers: int = 32) -> Series:
         """
         Returns a pandas Series of the keys present in the bucket.
@@ -127,7 +127,7 @@ class S3_Bucket():
                 return [obj["Key"] for obj in page["Contents"] if obj["Key"] != key_prefix]
             return []
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(executor.map(process_page, page_iterator))
         
         # Flatten the list
@@ -142,21 +142,21 @@ class S3_Bucket():
         table = pq.read_table(parquet_buffer, **kwargs)             # Convert the table to a pandas DataFrame
         return table.to_pandas()
     
-    def read_parquet_df_dask(self, key: str, **kwargs) -> dd.DataFrame:
-        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-        parquet_bytes = response["Body"].read()
-        parquet_buffer = BytesIO(parquet_bytes)
+    # def read_parquet_df_dask(self, key: str, **kwargs) -> dd.DataFrame:
+    #     response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
+    #     parquet_bytes = response["Body"].read()
+    #     parquet_buffer = BytesIO(parquet_bytes)
 
-        tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
-        tmp_file.write(parquet_buffer.read())
-        tmp_file_path = tmp_file.name
-        tmp_file.close()
+    #     tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+    #     tmp_file.write(parquet_buffer.read())
+    #     tmp_file_path = tmp_file.name
+    #     tmp_file.close()
 
-        # Read with Dask
-        ddf = dd.read_parquet(tmp_file_path, **kwargs)
+    #     # Read with Dask
+    #     ddf = dd.read_parquet(tmp_file_path, **kwargs)
 
-        # Return the Dask dataframe AND the file path so you can delete it later
-        return ddf, tmp_file_path
+    #     # Return the Dask dataframe AND the file path so you can delete it later
+    #     return ddf, tmp_file_path
     
     def read_csv_df(self, key:str, **kwargs) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)

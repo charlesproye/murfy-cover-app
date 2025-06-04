@@ -4,7 +4,6 @@ import os
 import shutil
 
 from scipy.integrate import cumulative_trapezoid
-import dask.dataframe as dd
 import pandas as pd
 from core.constants import *
 
@@ -288,11 +287,11 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             
             group['prev_date'] = group['date'].shift(1)
             group['time_diff_min'] = (group['date'] - group['prev_date']).dt.total_seconds() / 60
-            group['time_gap'] = group['time_diff_min'] > 60
+            group['time_gap'] = group['time_diff_min'] > 60  
 
 
             group['trend_change'] = (
-                (((group['trend'] != group['prev_trend']) &
+                (((group['trend'] != group['prev_trend']) & 
                   (group['prev_trend'] == group['prev_prev_trend']) ) |
                 group['time_gap'])
             )
@@ -308,29 +307,6 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
                         on=["soc", "date", "vin"], how="left")
         tss[["odometer","in_charge_idx"]] = tss[["odometer", "in_charge_idx"]].ffill()
         return tss
-    
-    def _compute_tss_with_temp_dir(self, tss: dd.DataFrame) -> pd.DataFrame:
-        """Divise le DataFrame Dask en fichiers par VIN, les sauvegarde temporairement,
-        les relit en un seul DataFrame pandas, puis supprime les fichiers temporaires."""
-        chemin = "processed_tss_files"
-        os.makedirs(chemin, exist_ok=True)
-        self.logger.info(f"Dossier {chemin} créé.")
-
-        vin_list = tss["vin"].drop_duplicates().compute()
-        for vin in vin_list:
-            df_vin = tss[tss["vin"] == vin].compute()
-            processed_vin = self.run(df_vin)  # Tu peux adapter si `run()` est autre chose
-            processed_vin.to_parquet(f'{chemin}/{vin}.parquet')
-
-        processed_tss = dd.read_parquet(chemin).compute()
-
-        if os.path.exists(chemin):
-            shutil.rmtree(chemin)
-            self.logger.info(f"Dossier '{chemin}' (et son contenu) supprimé.")
-        else:
-            self.logger.warning(f"Le dossier '{chemin}' n'existe pas.")
-        
-        return processed_tss
         
 @main_decorator
 def main():
