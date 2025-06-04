@@ -4,8 +4,10 @@ import uuid
 from core.sql_utils import get_connection
 import logging
 import os
+
 def fetch_ev_data():
     url = os.getenv("EV_DATABASE_URL")
+    print(f"Fetching data from URL: {url}")
     
     try:
         # Make the GET request
@@ -16,17 +18,20 @@ def fetch_ev_data():
         
         # Parse the JSON response
         data = response.json()
+        print(f"Successfully fetched {len(data)} vehicles from the API")
         
         with get_connection() as con:
             cursor = con.cursor()
             
             for vehicle in data:
                 try:
+                    if vehicle.get("Vehicle_Make", "").lower() == "tesla":
+                        print(f"Skipping Tesla model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
+                        continue
                     # Get or create OEM
                     cursor.execute(
                         "SELECT id FROM oem WHERE LOWER(oem_name) = LOWER(%s)",
-                        (vehicle.get("Vehicle_Make", ""),)
-                    )
+                        (vehicle.get("Vehicle_Make", ""),))
                     oem_result = cursor.fetchone()
                     
                     if not oem_result:
@@ -38,11 +43,6 @@ def fetch_ev_data():
                         oem_id = cursor.fetchone()[0]
                     else:
                         oem_id = oem_result[0]
-                    
-                    # Skip if OEM is Tesla
-                    if vehicle.get("Vehicle_Make", "").lower() == "tesla":
-                        logging.info(f"Skipping Tesla model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
-                        continue
                     
                     # Get or create Make
                     cursor.execute(
@@ -67,14 +67,35 @@ def fetch_ev_data():
                         (vehicle.get("Vehicle_Model", "unknown"), vehicle.get("Vehicle_Model_Version") or "unknown")
                     )
                     model_result = cursor.fetchone()
+                    battery_chemistry = vehicle.get("Battery_Chemistry", "unknown")
+                    if 'nmc' in battery_chemistry.lower() or 'ncm' in battery_chemistry.lower():
+                        battery_chemistry = 'NMC'
+                        print(f"Standardized battery chemistry to NMC for {vehicle.get('Vehicle_Model')}")
+                    
+                    # Check battery type
+                    cursor.execute(
+                        "SELECT id FROM battery WHERE LOWER(battery_chemistry) = LOWER(%s) AND LOWER(battery_oem) = LOWER(%s) AND capacity = %s AND net_capacity = %s",
+                        (battery_chemistry, vehicle.get("Battery_Manufacturer", ""), vehicle.get("Battery_Capacity_Full"), vehicle.get("Battery_Capacity_Useable")))
+                    battery_type_result = cursor.fetchone()
+                    if not battery_type_result:
+                        battery_id = str(uuid.uuid4())
+                        cursor.execute(
+                            "INSERT INTO battery (id, battery_chemistry, battery_oem, capacity, net_capacity) VALUES (%s, LOWER(%s), LOWER(%s), %s, %s) RETURNING id",
+                            (battery_id, battery_chemistry, vehicle.get("Battery_Manufacturer", ""), vehicle.get("Battery_Capacity_Full"), vehicle.get("Battery_Capacity_Useable"))
+                        )
+                        battery_id = cursor.fetchone()[0]
+                        print(f"Created new battery: Chemistry={battery_chemistry}, OEM={vehicle.get('Battery_Manufacturer')}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
+                    else:
+                        battery_id = battery_type_result[0]
+                        print(f"Using existing battery: Chemistry={battery_chemistry}, OEM={vehicle.get('Battery_Manufacturer')}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
                     
                     if not model_result:
                         # Create new model
                         model_id = str(uuid.uuid4())
                         cursor.execute("""
                             INSERT INTO vehicle_model (
-                                id, model_name, type, make_id, oem_id, autonomy, warranty_date, warranty_km
-                            ) VALUES (%s, LOWER(%s), LOWER(%s), %s, %s, %s, %s, %s)
+                                id, model_name, type, make_id, oem_id, autonomy, warranty_date, warranty_km,source,battery_id
+                            ) VALUES (%s, LOWER(%s), LOWER(%s), %s, %s, %s, %s, %s, %s, %s)
                         """, (
                             model_id,
                             vehicle.get("Vehicle_Model", "unknown"),
@@ -83,9 +104,11 @@ def fetch_ev_data():
                             oem_id,
                             vehicle.get("Range_WLTP"),
                             vehicle.get("Battery_Warranty_Period"),
-                            vehicle.get("Battery_Warranty_Mileage")
+                            vehicle.get("Battery_Warranty_Mileage"),
+                            vehicle.get("EVDB_Detail_URL"),
+                            battery_id
                         ))
-                        logging.info(f"Created new vehicle model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
+                        print(f"Created new vehicle model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
                     else:
                         # Update existing model
                         cursor.execute("""
@@ -95,22 +118,22 @@ def fetch_ev_data():
                                 warranty_km = COALESCE(%s, warranty_km)
                             WHERE id = %s
                         """, (vehicle.get("Range_WLTP"), vehicle.get("Battery_Warranty_Period"), vehicle.get("Battery_Warranty_Mileage"), model_result[0]))
-                        logging.info(f"Updated existing vehicle model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
+                        print(f"Updated existing vehicle model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
                     
                 except Exception as e:
-                    logging.error(f"Error processing vehicle {vehicle.get('Vehicle_Model')}: {str(e)}")
+                    print(f"Error processing vehicle {vehicle.get('Vehicle_Model')}: {str(e)}")
                     continue
             
             con.commit()
-            logging.info("Successfully processed all vehicle models")
+            print("Successfully processed all vehicle models")
             
         return data
         
     except requests.exceptions.RequestException as e:
-        logging.error(f"Error making the request: {e}")
+        print(f"Error making the request: {e}")
         return None
     except json.JSONDecodeError as e:
-        logging.error(f"Error decoding JSON: {e}")
+        print(f"Error decoding JSON: {e}")
         return None
 
 if __name__ == "__main__":
