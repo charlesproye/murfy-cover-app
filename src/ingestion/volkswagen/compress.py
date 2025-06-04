@@ -1,5 +1,5 @@
 import asyncio
-from core.compressor import Compressor
+from src.core.compressor import Compressor
 
 
 def main():
