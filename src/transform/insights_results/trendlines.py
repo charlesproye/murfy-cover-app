@@ -1,13 +1,60 @@
-import numpy as np
-from scipy.optimize import curve_fit
-from core.sql_utils import *
+import os
 import json
 import logging
+import numpy as np
+import pandas as pd
+import gspread
+import pprint
+
+from scipy.optimize import curve_fit
+from sqlalchemy.sql import text
+from core.sql_utils import engine
+from core.stats_utils import log_function
+from core.gsheet_utils import *
+from transform.insights_results.config_trendlines import TRENDLINE_MODEL as existing_config
+
+logging.basicConfig(level=logging.INFO)
+
+TRENDLINE_MODEL = dict(existing_config)
 
 
-def log_function(x, a ,b):
-    return 1 + a * np.log1p(x / b)
+def compute_trendline_bounds(true, fit, window_size=50):
+    local_std = np.array([
+        np.std(true[max(0, i - window_size):min(len(true), i + window_size)])
+        for i in range(len(true))
+    ])
+    smooth = np.linspace(local_std[0], local_std[-1], len(local_std))
+    return fit - smooth, fit + smooth
 
+def generate_trendline_functions(x_sorted, y_lower, y_upper):
+    def log_func_min(x, a, b): return y_lower.max() + a * np.log1p(x / b)
+    def log_func_max(x, a, b): return y_upper.max() + a * np.log1p(x / b)
+    coef_lower, _ = curve_fit(log_func_min, x_sorted, y_lower, maxfev=10000)
+    coef_upper, _ = curve_fit(log_func_max, x_sorted, y_upper, maxfev=10000)
+    return coef_lower, coef_upper
+
+def build_trendline_expressions(coef_mean, coef_lower, coef_upper, y_lower, y_upper):
+    return (
+        {"trendline": f"{coef_mean[0]} + {coef_mean[1]} * np.log1p(x/{coef_mean[2]})"},
+        {"trendline": f"{max(y_upper.max(), 1)} + {coef_upper[0]} * np.log1p(x/{coef_upper[1]})"},
+        {"trendline": f"{min(y_lower.max(), 1)} + {coef_lower[0]} * np.log1p(x/{coef_lower[1]})"}
+    )
+
+def update_database_trendlines(table, identifier_field, identifier, trendline_data):
+    sql_request = text(f"""
+        UPDATE {table}
+        SET trendline = :trendline_json,
+            trendline_min = :trendline_min_json,
+            trendline_max = :trendline_max_json
+        WHERE {identifier_field} = :identifier
+    """)
+    with engine.begin() as conn:
+        conn.execute(sql_request, {
+            "trendline_json": json.dumps(trendline_data[0]),
+            "trendline_min_json": json.dumps(trendline_data[2]),
+            "trendline_max_json": json.dumps(trendline_data[1]),
+            "identifier": identifier
+        })
 
 def get_trendlines(df, oem=None, version=None, update=False):
     """
@@ -37,111 +84,93 @@ def get_trendlines(df, oem=None, version=None, update=False):
         A tuple of three dictionaries containing the string expressions of the mean, max, and min trendlines:
         (trendline, trendline_max, trendline_min)
     """
-    
-    # On utilise dropna pour ne pas avoir de problèmes de calcul par la suite
-    x_data = df.dropna(subset=['soh', 'odometer'])['odometer'].values
-    y_data = df.dropna(subset=['soh', 'odometer'])['soh'].values
+    df_clean = df.dropna(subset=["soh", "odometer"])
+    if df_clean.empty:
+        logging.warning(f"Aucune donnée pour {oem} {version}")
+        return
 
-    if len(y_data) < 100:
-        logging.warning(f"Pas assez de données pour calculer une trendline pour {oem} {version}")
-        return  
-
-    logging.info(f"Calcul de la trendline pour {oem} {version}")
-    
-    # Tri des données
+    x_data, y_data = df_clean["odometer"].values, df_clean["soh"].values
     sort_idx = np.argsort(x_data)
-    x_sorted = x_data[sort_idx]
-    y_sorted = y_data[sort_idx]
+    x_sorted, y_sorted = x_data[sort_idx], y_data[sort_idx]
 
-    # Ajustement de la fonction sur les données
-    coef_, _ = curve_fit(log_function, x_sorted, y_sorted, maxfev=10000)
-    y_fit = log_function(x_sorted, *coef_)
+    coef_mean, _ = curve_fit(log_function, x_sorted, y_sorted, maxfev=10000)
+    y_fit = log_function(x_sorted, *coef_mean)
+    y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
 
-    # Calcul de l'écart-type local
-    window_size = 50
-    local_std = np.array([
-        np.std(y_sorted[max(0, i-window_size):min(len(y_sorted), i+window_size)])
-        for i in range(len(y_sorted))
-    ])
+    coef_lower, coef_upper = generate_trendline_functions(x_sorted, y_lower, y_upper)
+    trendlines = build_trendline_expressions(coef_mean, coef_lower, coef_upper, y_lower, y_upper)
 
-    # Interpolation linéaire entre le premier et le dernier point
-    smooth = np.linspace(local_std[0], local_std[-1], len(local_std))
-
-    # Calcul des intervalles de confiance & création des trendlines associées
-    # On peut augmenter le coef devant smooth pour augmenter la taille des intervalles
-    y_lower = y_fit - 1 * smooth
-    y_upper = y_fit +  1 * smooth
-
-
-    def log_function_min(x, a, b):
-        return y_lower.max() + a * np.log1p(x/b)
-    def log_function_max(x, a, b):
-        return y_upper.max() + a * np.log1p(x/b)
-
-    coef_lower, _ = curve_fit(log_function_min, x_sorted, y_lower, maxfev=10000)
-    coef_upper, _ = curve_fit(log_function_max, x_sorted, y_upper, maxfev=10000)
-
-    trendline = {"trendline": f"1 + {coef_[0]} * np.log1p(x/{coef_[1]})"}
-    trendline_max ={"trendline": f"{max(y_upper.max(), 1)}+ {coef_upper[0]} * np.log1p(x/{coef_upper[1]})"}
-    trendline_min ={"trendline": f"{min(y_lower.max(), 1)} + {coef_lower[0]} * np.log1p(x/ {coef_lower[1]})"}
-
-    # update des données dans dbeaver
-    if update is True:
-        logging.info(f"Update data in database for {oem}")
+    if update:
+        logging.info(f"Update trendlines for {oem or version}")
         if oem:
-            sql_request = text("""
-                UPDATE oem 
-                SET trendline = :trendline_json,
-                    trendline_min = :trendline_min_json,
-                    trendline_max = :trendline_max_json
-                WHERE oem_name = :oem_name
-            """)
-
-            with engine.begin() as conn:
-                conn.execute(sql_request, {
-                    "trendline_json": json.dumps(trendline),
-                    "trendline_max_json": json.dumps(trendline_max),
-                    "trendline_min_json": json.dumps(trendline_min),
-                    "oem_name": oem
-                })
-
+            update_database_trendlines("oem", "oem_name", oem, trendlines)
         if version:
-            logging.info(f"Update data in database for {version}")
-            sql_request = text("""
-                UPDATE vehicle_model 
-                SET trendline = :trendline_json,
-                    trendline_min = :trendline_min_json,
-                    trendline_max = :trendline_max_json
-                WHERE version = :version
-            """)
+            update_database_trendlines("vehicle_model", "version", version, trendlines)
 
-            with engine.begin() as conn:
-                conn.execute(sql_request, {
-                    "trendline_json": json.dumps(trendline),
-                    "trendline_max_json": json.dumps(trendline_max),
-                    "trendline_min_json": json.dumps(trendline_min),
-                    "version": version
-                })
-    return trendline, trendline_max, trendline_min
+    return trendlines
 
-if __name__ == "__main__":
-    
-    # update oem
-    for oem_name in ["ford", "bmw", "kia", "stellantis", "mercedes-benz", "volvo-cars", 
-                     "renault", "mercedes", "volvo", "volkswagen", "toyota", "tesla"]:
+def run_trendline_main():
+    client = get_gspread_client()
+    oems = ["ford", "bmw", "kia", "stellantis", "mercedes-benz", "volvo-cars",
+           "renault", "mercedes", "volvo", "volkswagen", "toyota", "tesla"]
+
+    logging.info(f"Clean gsheet Done")
+    for oem_name in oems:
         with engine.connect() as connection:
             query = text("""
-                SELECT *  
-                FROM vehicle v	
+                SELECT * FROM vehicle v
                 JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
                 JOIN vehicle_data vd ON vd.vehicle_id = v.id
                 JOIN oem o ON o.id = vm.oem_id
                 JOIN battery b ON b.id = vm.battery_id
                 WHERE o.oem_name = :oem_name
             """)
+            df = pd.read_sql(query, connection, params={"oem_name": oem_name})
 
-            dbeaver_df = pd.read_sql(query, connection, params={"oem_name": oem_name})
-        get_trendlines(dbeaver_df, oem=oem_name, update=True)
-        ## update version
-        for version in dbeaver_df.version.unique()[dbeaver_df.version.unique()!= "unknown"]:
-            get_trendlines(dbeaver_df[dbeaver_df['version']==version], version=version, update=True)
+        
+        for model in df["model_name"].unique():
+            try:
+                TRENDLINE_MODEL[model] = list(get_trendlines(df[df["model_name"] == model]))
+            except Exception as e:
+                logging.error(f"Erreur modèle {model}: {e}")
+                TRENDLINE_MODEL[model] = None
+        
+        
+        for version in df["version"].unique():
+            if version == "unknown":
+                continue
+
+            version_df = df[df["version"] == version]
+            if version_df.empty:
+                continue
+            
+            
+            s = version_df.iloc[-1]
+            model_name = s["model_name"]
+            try:
+                get_trendlines(version_df, version=version, update=True)
+                logging.info(f"Trendline mise à jour pour {version}")
+                info_df = pd.DataFrame(s[['oem_name', 'model_name', 'type', 'version']]).T
+                info_df['source'] = "dbeaver"
+                info_df['Used'] = (s[['trendline_version', 'trendline_model']][s[['trendline_version', 'trendline_model']] == True].index[0] 
+                                   if (s[['trendline_version', 'trendline_model']] == True).any() else None)
+                sheet = client.open("BP - Rapport Freemium")
+                worksheet = sheet.worksheet("Trendline")
+                worksheet.append_rows(info_df.values.tolist())
+            except Exception as e:
+                logging.error(f"Erreur mise à jour trendline {version}: {e}")
+            if version_df["trendline_version"].iloc[-1]:
+                try:
+                    update_database_trendlines("vehicle_model", "version", version, TRENDLINE_MODEL[model_name])
+                    logging.warning(f"Fallback trendline appliqué pour {version} (modèle {model_name})")
+                except Exception as e:
+                    logging.error(f"Erreur fallback pour {version}: {e}")
+    with open("config_trendlines.py", "w", encoding="utf-8") as f:
+        logging.info("Ecriture des trendlines de chaque modèle dans config_trendlines")
+        f.write("# Fichier généré automatiquement pour les trendlines de chaque modèle\n\n")
+        f.write("TRENDLINE_MODEL = ")
+        f.write(pprint.pformat(TRENDLINE_MODEL, indent=4))
+        f.write("\n")
+
+if __name__ == "__main__":
+    run_trendline_main()
