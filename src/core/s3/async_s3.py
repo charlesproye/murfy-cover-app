@@ -1,6 +1,8 @@
 import asyncio
+from typing import Iterable
 import aioboto3
 from botocore.exceptions import ClientError
+from core.typing_utils import remove_none
 from .settings import S3Settings
 
 
@@ -57,6 +59,18 @@ class AsyncS3:
                         return None
                     raise
 
+    async def get_files(self, paths: Iterable[str]) -> dict[str,bytes]:
+        results: dict[str, bytes] = {}
+
+        async def download(key: str):
+            async with self._sem:
+                data = await self.get_file(key)
+                if data is not None:
+                    results[key] = data
+        
+        await asyncio.gather(*(download(f) for f in paths))
+        return results
+
     async def upload_file(self, path: str, file: bytes) -> None:
         async with self._client as client:  # type: ignore
             await client.put_object(Bucket=self.bucket, Key=path, Body=file)
@@ -74,17 +88,8 @@ class AsyncS3:
 
     async def download_folder(self, folder_path: str) -> dict[str, bytes]:
         _, files = await self.list_content(folder_path)
-        results: dict[str, bytes] = {}
-
-        async def download(key: str):
-            async with self._sem:
-                data = await self.get_file(key)
-                if data is not None:
-                    results[key] = data
-
-        await asyncio.gather(*(download(f) for f in files))
-        return results
-
+        return await self.get_files(files)
+        
     async def delete_folder(self, prefix: str) -> int:
         deleted_count = 0
         async with self._sem:
