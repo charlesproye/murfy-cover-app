@@ -1,7 +1,7 @@
 import boto3
 import datetime
 import os
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 import requests
 
 

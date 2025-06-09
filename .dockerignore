@@ -5,4 +5,5 @@ docker-compose.yaml
 *.md
 .gitignore
 __pycache__/
+*.ipynb
 

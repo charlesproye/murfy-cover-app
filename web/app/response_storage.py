@@ -4,7 +4,7 @@ from typing import Annotated, Sequence
 from fastapi import Depends
 import msgspec
 from .schemas import BaseModelWithVin
-from src.core.s3_utils import S3Dep, S3Service
+from core.s3.s3_utils import S3Dep, S3Service
 
 
 class ResponseStorage:

@@ -12,24 +12,15 @@ import pandas as pd
 from pandas import Series
 import pyarrow.parquet as pq
 from pandas import DataFrame as DF
-from pydantic import Field
-from pydantic_settings import BaseSettings
 
-from .config import *
-from .pandas_utils import str_split_and_retain_src
-
-
-class S3Settings(BaseSettings):
-    S3_REGION: str = Field(default="fr-par")
-    S3_ENDPOINT: str = Field(default="https://s3.fr-par.scw.cloud")
-    S3_BUCKET: str = Field(default=...)
-    S3_KEY: str = Field(default=...)
-    S3_SECRET: str = Field(default=...)
-
+from ..config import *
+from ..pandas_utils import str_split_and_retain_src
+from .settings import S3Settings
 
 class S3Service():
     def __init__(self, settings:S3Settings|None = None):
         settings = settings or S3Settings()
+        self._settings = settings
         self._s3_client =  boto3.client(
             "s3",
             region_name=settings.S3_REGION,

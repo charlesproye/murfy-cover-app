@@ -10,7 +10,7 @@ import re
 
 
 from core.pandas_utils import *
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 from core.singleton_s3_bucket import S3
 from core.config import *
 from ingestion.vehicle_info.config.credentials import SPREADSHEET_ID 
