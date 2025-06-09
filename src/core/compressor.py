@@ -1,7 +1,7 @@
 import asyncio
 
 import msgspec
-from core.s3.async_s3 import AsyncS3
+from src.core.s3.async_s3 import AsyncS3
 from datetime import datetime
 
 
