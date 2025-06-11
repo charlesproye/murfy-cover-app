@@ -74,20 +74,20 @@ def fetch_ev_data():
                     
                     # Check battery type
                     cursor.execute(
-                        "SELECT id FROM battery WHERE LOWER(battery_chemistry) = LOWER(%s) AND LOWER(battery_oem) = LOWER(%s) AND capacity = %s AND net_capacity = %s",
-                        (battery_chemistry, vehicle.get("Battery_Manufacturer", ""), vehicle.get("Battery_Capacity_Full"), vehicle.get("Battery_Capacity_Useable")))
+                        "SELECT id FROM battery WHERE UPPER(battery_name) = UPPER(%s) AND UPPER(battery_chemistry) = UPPER(%s) AND UPPER(battery_oem) = UPPER(%s) AND capacity = %s AND net_capacity = %s",
+                        (vehicle.get("Vehicle_Model","unknown"),battery_chemistry.upper(), vehicle.get("Battery_Manufacturer", "unknown").upper(), vehicle.get("Battery_Capacity_Full"), vehicle.get("Battery_Capacity_Useable")))
                     battery_type_result = cursor.fetchone()
                     if not battery_type_result:
                         battery_id = str(uuid.uuid4())
                         cursor.execute(
-                            "INSERT INTO battery (id, battery_chemistry, battery_oem, capacity, net_capacity) VALUES (%s, LOWER(%s), LOWER(%s), %s, %s) RETURNING id",
-                            (battery_id, battery_chemistry, vehicle.get("Battery_Manufacturer", ""), vehicle.get("Battery_Capacity_Full"), vehicle.get("Battery_Capacity_Useable"))
+                            "INSERT INTO battery (id, battery_name,battery_chemistry, battery_oem, capacity, net_capacity) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                            (battery_id, vehicle.get("Vehicle_Model","unknown"),battery_chemistry.upper(), vehicle.get("Battery_Manufacturer", "").upper(), vehicle.get("Battery_Capacity_Full"), vehicle.get("Battery_Capacity_Useable"))
                         )
                         battery_id = cursor.fetchone()[0]
-                        print(f"Created new battery: Chemistry={battery_chemistry}, OEM={vehicle.get('Battery_Manufacturer')}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
+                        print(f"Created new battery: Battery Name={vehicle.get('Vehicle_Model')}, Chemistry={battery_chemistry}, OEM={vehicle.get('Battery_Manufacturer')}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
                     else:
                         battery_id = battery_type_result[0]
-                        print(f"Using existing battery: Chemistry={battery_chemistry}, OEM={vehicle.get('Battery_Manufacturer')}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
+                        print(f"Using existing battery: Battery Name={vehicle.get('Vehicle_Model')}, Chemistry={battery_chemistry}, OEM={vehicle.get('Battery_Manufacturer')}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
                     
                     if not model_result:
                         # Create new model
