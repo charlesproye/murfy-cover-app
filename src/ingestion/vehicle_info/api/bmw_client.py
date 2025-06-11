@@ -133,3 +133,35 @@ class BMWApi:
         except Exception as e:
             logging.error(f"Failed to add vehicle to BMW fleet: {str(e)}")
             return 500, str(e) 
+        
+    async def get_data(self, vin: str, session: aiohttp.ClientSession) -> Tuple[str, str]:
+        """Get data from BMW API.
+        
+        Returns:
+            Tuple containing (model_name, type) where model_name is the base model (e.g. "i3")
+            and type is the specific variant (e.g. "94")
+        """
+        try:
+            url = f"{self.base_url}/data/vehicle/{vin}"
+            headers = await self._get_headers(session)
+            response = await session.get(url, headers=headers)
+            response_data = await response.json()
+            
+            # Find the model entry in the data array
+            model_entry = next((item for item in response_data.get('data', []) 
+                              if item.get('key') == 'model'), None)
+            
+            if not model_entry or not model_entry.get('value'):
+                model_name = "unknown"
+                model_type = "unknown"
+                
+            # Split the model value into name and type
+            model_parts = model_entry['value'].split()
+                
+            model_name = model_parts[0]
+            model_type = model_parts[1]
+            
+            return model_name, model_type
+        except Exception as e:
+            logging.error(f"Failed to get BMW data: {str(e)}")
+            return "500", str(e)
