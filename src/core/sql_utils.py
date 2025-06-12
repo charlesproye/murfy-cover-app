@@ -11,32 +11,34 @@ from .env_utils import get_env_var
 
 logger = getLogger("core.sql_utils")
 
-def get_sqlalchemy_engine() -> Engine:
-    db_uri_format_dict = {key: get_env_var(key) for key in DB_URI_FORMAT_KEYS}
-    db_uri = DB_URI_FORMAT_STR.format(**db_uri_format_dict)
-    engine = create_engine(db_uri)
-
-    return engine
-
-def get_sqlalchemy_engine_prod() -> Engine:
-    db_uri_format_dict = {key: get_env_var(key) for key in DB_URI_FORMAT_KEYS_PROD}
-    db_uri = DB_URI_FORMAT_STR_PROD.format(**db_uri_format_dict)
-    engine = create_engine(db_uri)
-
-    return engine
-
-engine = get_sqlalchemy_engine()
-con = engine.connect()
+def get_sqlalchemy_engine(is_prod: bool = False) -> Engine:
+    """Get a SQLAlchemy engine for the specified environment.
+    
+    Args:
+        is_prod (bool): If True, uses production database configuration. Defaults to False.
+    
+    Returns:
+        Engine: SQLAlchemy engine instance
+    """
+    keys = DB_URI_FORMAT_KEYS_PROD if is_prod else DB_URI_FORMAT_KEYS
+    format_str = DB_URI_FORMAT_STR_PROD if is_prod else DB_URI_FORMAT_STR
+    db_uri_format_dict = {key: get_env_var(key) for key in keys}
+    db_uri = format_str.format(**db_uri_format_dict)
+    return create_engine(db_uri)
 
 @contextmanager
-def get_connection():
-    """Context manager pour obtenir une connexion à la base de données"""
+def get_connection(is_prod: bool = False):
+    """Context manager pour obtenir une connexion à la base de données
+    
+    Args:
+        is_prod (bool): If True, uses the production database connection. Defaults to False.
+    """
+    engine = get_sqlalchemy_engine(is_prod)
     conn = engine.raw_connection()
     try:
         yield conn
     finally:
         conn.close()
-
 
 def left_merge_rdb_table(
         lhs: DF,
@@ -44,7 +46,7 @@ def left_merge_rdb_table(
         left_on: str|list[str],
         right_on: str|list[str],
         src_dest_cols: list|dict|None=None,
-        con: Con=con,
+        is_prod: bool = False,
         logger: Logger=logger,
     ) -> DF:
     """
@@ -52,10 +54,17 @@ def left_merge_rdb_table(
     Take a look at the doc string of `core.pandas_utils.left_merge` to understand how the other arguments are used.
     """
     logger.info(f"Left merging {lhs.shape[0]} rows with {rhs} on {left_on} and {right_on}")
-    rhs = pd.read_sql_table(rhs, con)
+    engine = get_sqlalchemy_engine(is_prod)
+    rhs = pd.read_sql_table(rhs, engine)
     return left_merge(lhs, rhs, left_on, right_on, src_dest_cols, logger)
 
-def truncate_rdb_table_and_insert_df(df: DF, table_name: str, src_dest_cols: dict[str, str]|list[str], logger:Logger=logger) -> DF:
+def truncate_rdb_table_and_insert_df(
+        df: DF, 
+        table_name: str, 
+        src_dest_cols: dict[str, str]|list[str], 
+        is_prod: bool = False,
+        logger: Logger=logger
+    ) -> DF:
     """
     Warp around `DataFram.to_sql`.    
     Instead of appending on the table or deleting it and creating a new one with the same name, we simply empty the table and fill it with the DF.
@@ -69,6 +78,8 @@ def truncate_rdb_table_and_insert_df(df: DF, table_name: str, src_dest_cols: dic
         .rename(columns=src_dest_cols)
         .loc[:, src_dest_cols.values()]
     )
+    
+    engine = get_sqlalchemy_engine(is_prod)
     # Check for a required not null "id" column in the table
     inspector = inspect(engine)
     table_columns_info = inspector.get_columns(table_name)
