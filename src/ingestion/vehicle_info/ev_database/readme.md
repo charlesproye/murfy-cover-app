@@ -28,7 +28,7 @@ The module fetches EV data from a configured API endpoint and processes it to st
   - `requests`
   - Database connection utilities (from core.sql_utils)
 - Environment variable:
-  - `EV_DATABASE_URL`: URL of the EV data API endpoint
+  - `EV_DATABASE_URL`: Full URL of the EV data API endpoint (e.g., "https://api.example.com/ev-data")
 
 ## Usage
 
@@ -36,16 +36,67 @@ The module fetches EV data from a configured API endpoint and processes it to st
 from ev_database import fetch_ev_data
 
 # Fetch and process EV data
-data = fetch_ev_data()
+data = fetch_ev_data()  # Returns the raw API data or None on failure
 ```
+
+## API Response Format
+
+The module expects the API to return a JSON array of vehicle objects with the following key fields:
+- `Vehicle_Make`: Manufacturer name
+- `Vehicle_Model`: Model name
+- `Vehicle_Model_Version`: Model version/variant
+- `Battery_Chemistry`: Battery chemistry type
+- `Battery_Manufacturer`: Battery OEM
+- `Battery_Capacity_Full`: Full battery capacity in kWh
+- `Battery_Capacity_Useable`: Usable battery capacity in kWh
+- `Range_WLTP`: WLTP range in km
+- `Battery_Warranty_Period`: Battery warranty period
+- `Battery_Warranty_Mileage`: Battery warranty mileage
+- `EVDB_Detail_URL`: Source URL for the vehicle data
 
 ## Database Schema
 
 The module interacts with the following database tables:
-- `oem`: Stores Original Equipment Manufacturer information
-- `make`: Stores vehicle make information
-- `vehicle_model`: Stores vehicle model details
-- `battery`: Stores battery specifications
+
+### oem
+- `id` (UUID): Primary key
+- `oem_name` (text): Original Equipment Manufacturer name
+
+### make
+- `id` (UUID): Primary key
+- `make_name` (text): Vehicle make name
+- `oem_id` (UUID): Foreign key to oem table
+
+### vehicle_model
+- `id` (UUID): Primary key
+- `model_name` (text): Vehicle model name
+- `type` (text): Model version/variant
+- `make_id` (UUID): Foreign key to make table
+- `oem_id` (UUID): Foreign key to oem table
+- `autonomy` (numeric): WLTP range
+- `warranty_date` (numeric): Battery warranty period
+- `warranty_km` (numeric): Battery warranty mileage
+- `source` (text): Source URL
+- `battery_id` (UUID): Foreign key to battery table
+
+### battery
+- `id` (UUID): Primary key
+- `battery_name` (text): Battery name
+- `battery_chemistry` (text): Standardized battery chemistry
+- `battery_oem` (text): Battery manufacturer
+- `capacity` (numeric): Full battery capacity
+- `net_capacity` (numeric): Usable battery capacity
+- `source` (text): Source URL
+
+## Error Handling
+
+The module handles the following error cases:
+- API request failures (connection errors, timeouts)
+- JSON decode errors
+- Database operation failures
+- General exceptions during vehicle processing
+
+All errors are logged with appropriate error messages.
 
 ## Notes
 
