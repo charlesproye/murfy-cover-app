@@ -81,7 +81,7 @@ class S3_Bucket():
                 return False
             else:
                 raise e
-def save_df_as_parquet_spark(self, df:DF, key:str):
+    def save_df_as_parquet_spark(self, df:DF, key:str):
         s3_path = f"s3a://{self.bucket_name}/{key}"
         writer = df.write.mode('append').option("parquet.block.size", 67108864).partitionBy('vin')
         writer.parquet(s3_path)
