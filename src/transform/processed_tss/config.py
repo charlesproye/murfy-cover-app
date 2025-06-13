@@ -2,7 +2,7 @@ from pandas.api.types import CategoricalDtype
 from pandas import Timedelta as TD
 import pandas as pd
 
-S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss.parquet'
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss_spark.parquet'
 
 ODOMETER_MILES_TO_KM = {
     "tesla": 1.60934,
@@ -117,7 +117,28 @@ RENAME_COLS_DICT:dict[str, str] = {
     # 'FastChargerType_fastChargerValue': 'fast_charger_type',
     # 'ChargerPhases_stringValue': 'charger_phases',
     # 'BatteryHeaterOn_stringValue': 'battery_heater'
-    }
+    
+    ########## Spark  
+    "readable_date": "date",
+    "Odometer" : "odometer",
+    "ACChargingEnergyIn": "ac_charge_energy_added",
+    "Soc": "soc",
+    "CarType": 'model',
+    "DCChargingEnergyIn": "dc_charge_energy_added",
+    "BatteryLevel": "battery_level",
+    "ACChargingPower": "ac_charging_power",
+    "DCChargingPower": "dc_charging_power",
+    "DetailedChargeState": "charging_status",
+}
+
+COL_TO_SELECT = [
+    'vin', 'date', 'odometer', 'soc', 
+    "battery_level",
+    "ac_charge_energy_added",
+    "dc_charge_energy_added",
+    "ac_charging_power",
+    "dc_charging_power",
+    "charging_status"]
 
 # The keys will be used to determine what columns to keep.
 COL_DTYPES = {
