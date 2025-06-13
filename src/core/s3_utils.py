@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any
 from datetime import datetime
-from io import BytesIO, StringIO
+from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 import boto3
@@ -17,7 +17,7 @@ from core.config import *
 from core.env_utils import get_env_var
 from core.pandas_utils import str_split_and_retain_src
 import tempfile
-
+from pyspark.sql import SparkSession
 
 class S3_Bucket():
     def __init__(self, creds: dict[str, str]=None):
@@ -50,6 +50,7 @@ class S3_Bucket():
         out_buffer = BytesIO()
         df.to_parquet(out_buffer)
         self._s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=out_buffer.getvalue())
+        
 
     def check_file_exists(self, key: str) -> bool:
         """
@@ -69,6 +70,21 @@ class S3_Bucket():
             else:
                 raise e
 
+    def check_spark_file_exists(self, prefix):
+        try:
+            response = self._s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
+            if "Contents" not in response:
+                return False
+            return True
+        except Exception as e:
+            if e.response['Error']['Code'] == '404':
+                return False
+            else:
+                raise e
+def save_df_as_parquet_spark(self, df:DF, key:str):
+        s3_path = f"s3a://{self.bucket_name}/{key}"
+        writer = df.write.mode('append').option("parquet.block.size", 67108864).partitionBy('vin')
+        writer.parquet(s3_path)
     # This should be moved else wehere as this is a method specific to the way BIB oragnizes its responses.  
     # Ideally this would be moved to transform.raw_tss.
     def list_responses_keys_of_brand(self, brand:str="") -> DF:
@@ -142,21 +158,9 @@ class S3_Bucket():
         table = pq.read_table(parquet_buffer, **kwargs)             # Convert the table to a pandas DataFrame
         return table.to_pandas()
     
-    # def read_parquet_df_dask(self, key: str, **kwargs) -> dd.DataFrame:
-    #     response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-    #     parquet_bytes = response["Body"].read()
-    #     parquet_buffer = BytesIO(parquet_bytes)
-
-    #     tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
-    #     tmp_file.write(parquet_buffer.read())
-    #     tmp_file_path = tmp_file.name
-    #     tmp_file.close()
-
-    #     # Read with Dask
-    #     ddf = dd.read_parquet(tmp_file_path, **kwargs)
-
-    #     # Return the Dask dataframe AND the file path so you can delete it later
-    #     return ddf, tmp_file_path
+    def read_parquet_df_spark(self, spark: SparkSession, key: str, **kwargs):
+        s3_path = f"s3a://{self.bucket_name}/{key}"
+        return spark.read.parquet(s3_path, **kwargs)
     
     def read_csv_df(self, key:str, **kwargs) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
