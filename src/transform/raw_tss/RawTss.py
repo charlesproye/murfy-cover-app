@@ -1,21 +1,22 @@
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType
-from pyspark.sql.functions import col, trunc, to_timestamp, expr
+from pyspark.sql.functions import col, trunc, to_timestamp, expr, collect_list
 from pyspark.sql import DataFrame, SparkSession
 from functools import reduce, partial
 from rich.progress import track
 from core.s3_utils import S3_Bucket
 from core.spark_utils import *
+from transform.processed_tss.config import S3_PROCESSED_TSS_KEY_FORMAT
 from transform.raw_tss.config import *
 from core.caching_utils import cache_result_spark
 from typing import Optional, List
-from core.caching_utils import CachedETL
+from core.caching_utils import CachedETLSpark
 
-class RawTss:
+class RawTss(CachedETLSpark):
     """
     Classe pour traiter les données de télémétrie de la flotte Tesla
     """
     
-    def __init__(self, bucket: S3_Bucket = S3_Bucket(), spark: SparkSession = None):
+    def __init__(self, make, bucket: S3_Bucket = S3_Bucket(), spark: SparkSession = None):
         """
         Initialise le processeur de télémétrie
         
@@ -26,7 +27,8 @@ class RawTss:
         self.bucket = bucket
         self.spark = spark
         self.base_s3_path = "s3a://bib-platform-prod-data"
-        
+        super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3")
+
     def _ensure_spark_session(self):
         """Vérifie qu'une session Spark est disponible"""
         if self.spark is None:
@@ -134,40 +136,72 @@ class RawTss:
         print("week_raw_tss done")
         return weekly_data
     
-    def get_raw_tss_from_keys(self, keys: DataFrame) -> DataFrame:
-        """
-        Traite les clés pour extraire les données TSS brutes
+    def get_raw_tss_from_keys_spark(keys: DataFrame, bucket: S3_Bucket, spark, max_vins: int = None) -> DataFrame:
+        # Cache du DataFrame pour éviter les recalculs
+        df = keys.select("vin", "key").distinct().cache()
         
-        Args:
-            keys: DataFrame contenant les clés à traiter
-            
-        Returns:
-            DataFrame avec les données TSS brutes
-        """
-        self._ensure_spark_session()
+        # Collecte groupée des données par VIN
+        vin_keys_grouped = (df.groupBy("vin")
+                        .agg(collect_list("key").alias("keys"))
+                        .orderBy("vin"))
         
-        # Ajout de la colonne week_start
-        df = keys.withColumn("week_start", trunc(col("date"), "week"))
-        df = df.withColumn("week_start", expr("date_sub(trunc(date, 'week'), 6)"))
+        # Limit pour test le code
+        if max_vins:
+            vin_keys_grouped = vin_keys_grouped.limit(max_vins)
+        
+        # Collecte une seule fois
+        vin_data = vin_keys_grouped.collect()
         
         all_data = []
         
-        # Traitement par semaine
-        weeks = df.select("week_start").distinct().orderBy("week_start").collect()
+        # Traitement par batch
+        batch_size = 10  # Ajustable
+        all_keys_to_process = []
+        vin_key_mapping = {}
         
-        for row in track(weeks, description="Processing weekly groups"):
-            week_keys = df.filter(df.week_start == row["week_start"])
-            weekly_data = self._process_weekly_group(week_keys)
-            all_data.extend(weekly_data)
+        # prépareration des keys
+        for row in vin_data:
+            vin = row["vin"]
+            keys_list = row["keys"]
+            all_keys_to_process.extend(keys_list)
+            for key in keys_list:
+                vin_key_mapping[key] = vin
         
-        # Union de tous les DataFrames
+        print(f"Total keys to process: {len(all_keys_to_process)}")
+        
+        # traitement par batch des fichiers S3
+        for i in track(range(0, len(all_keys_to_process), batch_size), 
+                    description="Processing batches"):
+            batch_keys = all_keys_to_process[i:i + batch_size]
+            
+            try:
+                responses = bucket.read_multiple_json_files(batch_keys, max_workers=128)
+                batch_data = []
+                for response in responses:
+                    try:
+                        rows = explode_data_spark(response, spark)
+                        batch_data.append(rows)
+                    except Exception as e:
+                        print(f"Error parsing response: {e}")
+                
+                # Union des données du batch
+                if batch_data:
+                    batch_df = reduce(lambda df1, df2: df1.unionByName(df2, allowMissingColumns=True), 
+                                    batch_data)
+                    all_data.append(batch_df)
+                    
+            except Exception as e:
+                print(f"Error processing batch {i//batch_size + 1}: {e}")
+        
         if all_data:
-            return reduce(
-                lambda df1, df2: df1.unionByName(df2, allowMissingColumns=True), 
-                all_data
-            )
+            # Cache le résultat final si besoin plus tard
+            final_df = reduce(lambda df1, df2: df1.unionByName(df2, allowMissingColumns=True), all_data)
+            return final_df.cache()
         
-        return self.spark.createDataFrame([])
+        # Suppression cache
+        df.unpersist()
+        
+        return spark.createDataFrame([], schema=keys.schema)
     
     @cache_result_spark(SPARK_FLEET_TELEMETRY_RAW_TSS_KEY, on="s3")
     def get_raw_tss(self) -> DataFrame:
@@ -184,17 +218,9 @@ class RawTss:
         print("keys loaded")
         
         if self.bucket.check_file_exists(SPARK_FLEET_TELEMETRY_RAW_TSS_KEY):
-            # Fusion des données existantes avec les nouvelles
-            raw_tss = self.read_parquet(SPARK_FLEET_TELEMETRY_RAW_TSS_KEY)
-            print("raw_tss loaded")
-            
-            new_raw_tss = self.get_raw_tss_from_keys(keys)
+            new_raw_tss = self.get_raw_tss_from_keys_spark(keys)
             print("new_raw_tss loaded")
-            
-            return raw_tss.unionByName(new_raw_tss, allowMissingColumns=True)
-        else:
-            # Première exécution - traitement de toutes les clés
-            return self.get_raw_tss_from_keys(keys)
+            return new_raw_tss
     
     def configure_spark_optimization(self):
         """Configure les optimisations Spark"""
