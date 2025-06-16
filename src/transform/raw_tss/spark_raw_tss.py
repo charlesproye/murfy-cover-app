@@ -44,10 +44,6 @@ def get_response_keys_to_parse_spark(bucket:S3_Bucket, spark) -> DF:
     )
 
 def get_raw_tss_from_keys_spark_V2(keys: DataFrame, bucket: S3_Bucket, spark, max_vins: int = None) -> DataFrame:
-    """
-    Version optimisée de la fonction avec plusieurs améliorations de performance
-    """
-    print(keys.printSchema())
     
     # Cache du DataFrame pour éviter les recalculs
     df = keys.select("vin", "key").distinct().cache()
