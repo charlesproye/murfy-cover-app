@@ -62,6 +62,7 @@ def get_results() -> DF:
         .pipe(hot_fix_in_charge_idx)
         .pipe(compute_charging_power)
         .pipe(charge_levels)
+        .pipe(compute_consuption)
         # No methode define at the 
         .eval("level_1 = 0")
         .eval("level_2 = 0")
@@ -116,6 +117,20 @@ def hot_fix_in_charge_idx(tss:DF) -> DF:
     tss["in_charge_idx"] = tss.groupby("vin", observed=True)["in_new_charge"].cumsum()
     return tss
 
+def compute_consuption(tss:DF) -> DF:
+    tss_filter = tss[(tss['in_discharge'] == True)].dropna(subset=('odometer', 'soc')).copy()
+    consumption = (tss_filter.groupby(['vin', 'trimmed_in_discharge_idx']).agg(
+        soc_start=("soc", "first"),
+        soc_end=('soc', 'last'),
+        odometer_start=("odometer", "first"),
+        odometer_end=('odometer', 'last'),
+        net_capacity=('net_capacity', 'first')
+        )
+    .eval('soc_diff=soc_start-soc_end')
+    .eval('odometer_diff=odometer_end-odometer_start')
+    .eval('consumption=soc_diff * net_capacity * 100 / odometer_diff '))[["consumption"]]
+    consumption.reset_index(inplace=True)
+    return tss.merge(consumption, on=['vin', 'trimmed_in_discharge_idx'], how='left')
 
 if __name__ == "__main__":
     main()
