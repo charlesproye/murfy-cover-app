@@ -200,7 +200,6 @@ class RawTss():
             
             # Cache du DataFrame pour éviter les recalculs
             df = keys.select("vin", "key").distinct().cache()
-            
             # Collecte groupée des données par VIN
             vin_keys_grouped = (df.groupBy("vin")
                             .agg(collect_list("key").alias("keys"))
@@ -211,8 +210,9 @@ class RawTss():
                 vin_keys_grouped = vin_keys_grouped.limit(max_vins)
             
             # Collecte une seule fois
+            print('ici')
             vin_data = vin_keys_grouped.collect()
-            
+            print('la')
             if not vin_data:
                 logger.warning("Aucune donnée VIN trouvée")
                 df.unpersist()
@@ -221,7 +221,7 @@ class RawTss():
             all_data = []
             
             # Traitement par batch
-            batch_size = 10  # Ajustable
+            batch_size = 2  # Ajustable
             all_keys_to_process = []
             vin_key_mapping = {}
             
@@ -232,7 +232,6 @@ class RawTss():
                 all_keys_to_process.extend(keys_list)
                 for key in keys_list:
                     vin_key_mapping[key] = vin
-            
             logger.info(f"Total keys to process: {len(all_keys_to_process)}")
             
             if not all_keys_to_process:
@@ -278,6 +277,7 @@ class RawTss():
         except Exception as e:
             logger.error(f"Erreur dans get_raw_tss_from_keys_spark: {e}")
             return self._create_empty_raw_tss_schema()
+        
     
     @cache_result_spark(SPARK_FLEET_TELEMETRY_RAW_TSS_KEY, on="s3")
     def get_raw_tss(self, spark: SparkSession = None) -> DataFrame:
@@ -293,9 +293,8 @@ class RawTss():
         try:
             keys = self.get_response_keys_to_parse()
             logger.info("keys loaded")
-            print(keys)
             # Correction: passer self.spark au lieu de spark
-            new_raw_tss = self.get_raw_tss_from_keys_spark(keys, 50)
+            new_raw_tss = self.get_raw_tss_from_keys_spark(keys)
             logger.info("new_raw_tss loaded")
             return new_raw_tss
             
@@ -335,9 +334,9 @@ def main():
             creds["aws_secret_access_key"]
         )
         processor.set_spark_session(spark_session)
-        
+
         logger.info('Spark session launched')
-        
+
         # Configuration des optimisations
         processor.configure_spark_optimization()
         

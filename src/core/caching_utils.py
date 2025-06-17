@@ -167,7 +167,7 @@ def cache_result_spark(path_template: str, on: str, path_params: List[str] = [])
                 if force_update or not bucket.check_spark_file_exists(path):
                     spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
                     data = data_gen_func(*args, **kwargs)
-                    writer = data.write
+                    writer = data.repartition(1, "vin").write
                     num_partitions = max(1, data.rdd.getNumPartitions() // 4)
                     if data.rdd.getNumPartitions() > num_partitions:
                             data = data.coalesce(num_partitions)
@@ -186,7 +186,6 @@ def cache_result_spark(path_template: str, on: str, path_params: List[str] = [])
                         .option("spark.sql.adaptive.advisoryPartitionSizeInBytes", "134217728")
                         
                     writer.mode("overwrite")
-                    writer = writer.repartition(1, "vin")
                     writer.parquet(s3_path)
                     return data
                 else:
