@@ -1,15 +1,16 @@
+
+from typing import Optional, List
+import logging
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType
-from pyspark.sql.functions import col, trunc, to_timestamp, expr, collect_list
+from pyspark.sql.functions import col, to_timestamp, expr, collect_list
 from pyspark.sql import DataFrame, SparkSession
-from functools import reduce, partial
+from functools import reduce
 from rich.progress import track
 from core.s3_utils import S3_Bucket
 from core.spark_utils import *
 from transform.raw_tss.config import *
 from core.caching_utils import cache_result_spark
-from typing import Optional, List
-from core.caching_utils import CachedETLSpark
-import logging
+
 
 # Configuration du logger
 logger = logging.getLogger(__name__)
