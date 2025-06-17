@@ -17,11 +17,11 @@ def authenticate(request: Request):
     settings = BmwSettings()
     api_key = request.headers.get("x-push-payload-key")
     logging.info(f"BMW {api_key = }")
-    # if api_key != settings.BMW_PUSH_API_KEY:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="api-key header missing",
-    #     )
+    if api_key != settings.BMW_PUSH_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="api-key header missing",
+        )
     return api_key
 
 
