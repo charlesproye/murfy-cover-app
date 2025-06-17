@@ -102,3 +102,20 @@ class ChargingRemainingTime(BaseModelWithVin):
     vehicleTimeLocal: datetime | None = None
     remainingTimeMinutes: int | None = None
 
+
+class PushKeyValue(BaseModel):
+    key: str
+    value: str
+    unit: str | None = None
+    info: str | None = None
+    date_of_value: datetime
+
+
+class VehiclePushKeyValues(BaseModelWithVin):
+    vin: str | None = None
+    pushKeyValues: list[PushKeyValue]
+
+
+class PushDataRequest(BaseModel):
+    vehiclePushKeyValues: list[VehiclePushKeyValues]
+
