@@ -11,7 +11,6 @@ from core.spark_utils import *
 from transform.raw_tss.config import *
 from core.caching_utils import cache_result_spark
 
-
 # Configuration du logger
 logger = logging.getLogger(__name__)
 
@@ -150,41 +149,6 @@ class RawTss():
                     StructField("date", TimestampType(), True)
                 ]))
     
-    def _process_weekly_group(self, week_keys: DataFrame) -> List[DataFrame]:
-        """
-        Traite un groupe de clés pour une semaine donnée
-        
-        Args:
-            week_keys: DataFrame contenant les clés pour une semaine
-            
-        Returns:
-            Liste des DataFrames traités
-        """
-        try:
-            key_list = [r["key"] for r in week_keys.select("key").distinct().collect()]
-            logger.info(f"Processing {len(key_list)} keys")
-            
-            if not key_list:
-                return []
-            
-            weekly_data = []
-            responses = self.bucket.read_multiple_json_files(key_list, max_workers=64)
-            
-            for response in responses:
-                try:
-                    rows = explode_data_spark(response, self.spark)
-                    if rows is not None:
-                        weekly_data.append(rows)
-                except Exception as e:
-                    logger.error(f"Error parsing response: {e}")
-            
-            logger.info(f"week_raw_tss done - {len(weekly_data)} DataFrames created")
-            return weekly_data
-            
-        except Exception as e:
-            logger.error(f"Erreur dans _process_weekly_group: {e}")
-            return []
-    
     def get_raw_tss_from_keys_spark(self, keys: DataFrame, max_vins: int = None) -> DataFrame:
         """
         Récupère les données TSS brutes à partir des clés
@@ -200,6 +164,7 @@ class RawTss():
             
             # Cache du DataFrame pour éviter les recalculs
             df = keys.select("vin", "key").distinct().cache()
+            
             # Collecte groupée des données par VIN
             vin_keys_grouped = (df.groupBy("vin")
                             .agg(collect_list("key").alias("keys"))
@@ -210,9 +175,8 @@ class RawTss():
                 vin_keys_grouped = vin_keys_grouped.limit(max_vins)
             
             # Collecte une seule fois
-            print('ici')
             vin_data = vin_keys_grouped.collect()
-            print('la')
+            
             if not vin_data:
                 logger.warning("Aucune donnée VIN trouvée")
                 df.unpersist()
@@ -221,7 +185,7 @@ class RawTss():
             all_data = []
             
             # Traitement par batch
-            batch_size = 2  # Ajustable
+            batch_size = 10  # Ajustable
             all_keys_to_process = []
             vin_key_mapping = {}
             
@@ -232,6 +196,7 @@ class RawTss():
                 all_keys_to_process.extend(keys_list)
                 for key in keys_list:
                     vin_key_mapping[key] = vin
+            
             logger.info(f"Total keys to process: {len(all_keys_to_process)}")
             
             if not all_keys_to_process:
@@ -294,7 +259,7 @@ class RawTss():
             keys = self.get_response_keys_to_parse()
             logger.info("keys loaded")
             # Correction: passer self.spark au lieu de spark
-            new_raw_tss = self.get_raw_tss_from_keys_spark(keys)
+            new_raw_tss = self.get_raw_tss_from_keys_spark(keys, 100)
             logger.info("new_raw_tss loaded")
             return new_raw_tss
             
@@ -337,11 +302,9 @@ def main():
 
         logger.info('Spark session launched')
 
-        # Configuration des optimisations
         processor.configure_spark_optimization()
         
-        # Traitement des données
-        data = processor.get_raw_tss(spark_session, force_update=True)
+        processor.get_raw_tss(spark_session, force_update=True)
         
         logger.info("Processing completed successfully")
         
