@@ -165,21 +165,11 @@ def cache_result_spark(path_template: str, on: str, path_params: List[str] = [])
                 s3_path = f"s3a://{bucket.bucket_name}/{path}"
                 if force_update or not bucket.check_spark_file_exists(path):
                     data = data_gen_func(*args, **kwargs)
-                    writer = writer.option("parquet.block.size", 134217728) \
-                        .option("parquet.page.size", 1048576) \
-                        .option("parquet.compression", "snappy") \
-                        .option("parquet.enable.dictionary", "true") \
-                        .option("mapreduce.fileoutputcommitter.algorithm.version", "2") \
-                        .option("spark.hadoop.fs.s3a.committer.name", "partitioned") \
-                        .option("spark.hadoop.fs.s3a.committer.staging.conflict-mode", "append") \
-                        .option("spark.sql.parquet.mergeSchema", "false") \
-                        .option("spark.sql.parquet.filterPushdown", "true") \
-                        .option("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-                        .option("spark.sql.adaptive.enabled", "true") \
-                        .option("spark.sql.adaptive.coalescePartitions.enabled", "true")
-                    writer.mode("append")
-                    writer = writer.partitionBy("vin")
-                    writer.parquet(s3_path)
+                    data.coalesce(1) \
+                        .write \
+                        .mode("overwrite") \
+                        .partitionBy("vin") \
+                        .parquet(s3_path)
                     return data
                 else:
                     return spark.read.parquet(s3_path, **read_parquet_kwargs)
