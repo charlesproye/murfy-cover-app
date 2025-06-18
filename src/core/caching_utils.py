@@ -163,29 +163,22 @@ def cache_result_spark(path_template: str, on: str, path_params: List[str] = [])
             if on == "s3":
                 bucket, _ = get_bucket_from_func_args(data_gen_func, *args, **kwargs)
                 s3_path = f"s3a://{bucket.bucket_name}/{path}"
-                print(s3_path)
                 if force_update or not bucket.check_spark_file_exists(path):
-                    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
                     data = data_gen_func(*args, **kwargs)
-                    writer = data.repartition(1, "vin").write
-                    num_partitions = max(1, data.rdd.getNumPartitions() // 4)
-                    if data.rdd.getNumPartitions() > num_partitions:
-                            data = data.coalesce(num_partitions)
                     writer = writer.option("parquet.block.size", 134217728) \
                         .option("parquet.page.size", 1048576) \
                         .option("parquet.compression", "snappy") \
                         .option("parquet.enable.dictionary", "true") \
                         .option("mapreduce.fileoutputcommitter.algorithm.version", "2") \
                         .option("spark.hadoop.fs.s3a.committer.name", "partitioned") \
-                        .option("spark.hadoop.fs.s3a.committer.staging.conflict-mode", "replace") \
+                        .option("spark.hadoop.fs.s3a.committer.staging.conflict-mode", "append") \
                         .option("spark.sql.parquet.mergeSchema", "false") \
                         .option("spark.sql.parquet.filterPushdown", "true") \
                         .option("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
                         .option("spark.sql.adaptive.enabled", "true") \
-                        .option("spark.sql.adaptive.coalescePartitions.enabled", "true")\
-                        .option("spark.sql.adaptive.advisoryPartitionSizeInBytes", "134217728")
-                        
-                    writer.mode("overwrite")
+                        .option("spark.sql.adaptive.coalescePartitions.enabled", "true")
+                    writer.mode("append")
+                    writer = writer.partitionBy("vin")
                     writer.parquet(s3_path)
                     return data
                 else:
