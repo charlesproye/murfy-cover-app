@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request
 from .schemas import (
     Trip,
     Maintenance,
@@ -44,7 +44,7 @@ async def post_trips(
     storage_service: ResponseStorageDep,
 ):
     logging.info(f"CONTENT = {trips}")
-    storage_service.store_basemodels_with_vin(trips)
+    await storage_service.store_basemodels_with_vin("volkswagen", trips)
     return
 
 
@@ -54,7 +54,7 @@ async def post_maintenances(
     maintenances: list[Maintenance],
 ):
     logging.info(f"CONTENT = {maintenances}")
-    storage_service.store_basemodels_with_vin(maintenances)
+    await storage_service.store_basemodels_with_vin("volkswagen", maintenances)
     return {}
 
 
@@ -64,7 +64,7 @@ async def post_locations(
     storage_service: ResponseStorageDep,
 ):
     logging.info(f"CONTENT = {locations}")
-    storage_service.store_basemodels_with_vin(locations)
+    await storage_service.store_basemodels_with_vin("volkswagen", locations)
     return {}
 
 
@@ -74,7 +74,7 @@ async def post_cruising_ranges(
     storage_service: ResponseStorageDep,
 ):
     logging.info(f"CONTENT = {cruising_ranges}")
-    storage_service.store_basemodels_with_vin(cruising_ranges)
+    await storage_service.store_basemodels_with_vin("volkswagen", cruising_ranges)
     return {}
 
 
@@ -84,7 +84,9 @@ async def post_dashboard_error_warnings(
     storage_service: ResponseStorageDep,
 ):
     logging.info(f"CONTENT = {dashboard_error_warnings}")
-    storage_service.store_basemodels_with_vin(dashboard_error_warnings)
+    await storage_service.store_basemodels_with_vin(
+        "volkswagen", dashboard_error_warnings
+    )
     return {}
 
 
@@ -94,7 +96,7 @@ async def post_energy_levels(
     storage_service: ResponseStorageDep,
 ):
     logging.info(f"CONTENT = {energy_levels}")
-    storage_service.store_basemodels_with_vin(energy_levels)
+    await storage_service.store_basemodels_with_vin("volkswagen", energy_levels)
     return {}
 
 
@@ -104,7 +106,7 @@ async def post_charging_states(
     storage_service: ResponseStorageDep,
 ):
     logging.info(f"CONTENT = {charging_states}")
-    storage_service.store_basemodels_with_vin(charging_states)
+    await storage_service.store_basemodels_with_vin("volkswagen", charging_states)
     return {}
 
 
@@ -114,7 +116,9 @@ async def post_charging_remaining_times(
     storage_service: ResponseStorageDep,
 ):
     logging.info(f"CONTENT = {charging_remaining_times}")
-    storage_service.store_basemodels_with_vin(charging_remaining_times)
+    await storage_service.store_basemodels_with_vin(
+        "volkswagen", charging_remaining_times
+    )
     return {}
 
 
