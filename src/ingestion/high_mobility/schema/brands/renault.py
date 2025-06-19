@@ -28,22 +28,27 @@ class RenaultCharging(msgspec.Struct):
     battery_charge_type: Optional[HMApiValue[str]] = None
     status: Optional[HMApiValue[str]] = None
 
+
 class RenaultClimate(msgspec.Struct):
     outside_temperature: Optional[HMApiValue[DataWithUnit[float]]] = None
+
 
 class RenaultEngine(msgspec.Struct):
     status: Optional[HMApiValue[DataWithUnit[float]]] = None
 
+
 class RenaultOffroad(msgspec.Struct):
     route_incline: Optional[HMApiValue[DataWithUnit[float]]] = None
+
+
 class RenaultRace(msgspec.Struct):
     accelerations: Optional[HMApiValue[DataWithUnit[float]]] = None
     acceleration_duration: Optional[HMApiValue[DataWithUnit[float]]] = None
+
+
 class RenaultUsage(msgspec.Struct):
     last_trip_battery_remaining: Optional[HMApiValue[DataWithUnit[float]]] = None
     last_trip_energy_consumption: Optional[HMApiValue[DataWithUnit[float]]] = None
-
-
 
 
 @register_brand(rate_limit=36)
@@ -51,6 +56,11 @@ class RenaultInfo(HMApiResponse):
     diagnostics: Optional[RenaultDiagnostics] = None
     charging: Optional[RenaultCharging] = None
     climate: Optional[RenaultClimate] = None
+    engine: Optional[RenaultEngine] = None
+    offroad: Optional[RenaultOffroad] = None
+    race: Optional[RenaultRace] = None
+    usage: Optional[RenaultUsage] = None
+
 
 class MergedRenaultDiagnostics(msgspec.Struct):
     odometer: list[HMApiValue[DataWithUnit[float]]] = []
@@ -150,6 +160,7 @@ class MergedRenaultCharging(msgspec.Struct):
             if is_new_value(self.status, other.status):
                 self.status.append(cast(HMApiValue[str], other.status))
 
+
 class MergedRenaultClimate(msgspec.Struct):
     outside_temperature: list[HMApiValue[DataWithUnit[float]]] = []
 
@@ -165,6 +176,7 @@ class MergedRenaultClimate(msgspec.Struct):
     def merge(self, other: Optional[RenaultClimate]):
         if other is not None and is_new_value(self.outside_temperature, other.outside_temperature):
             self.outside_temperature.append(cast(HMApiValue[DataWithUnit[float]], other.outside_temperature))
+
 
 class MergedRenaultEngine(msgspec.Struct):
     status: list[HMApiValue[DataWithUnit[float]]] = []
@@ -182,6 +194,7 @@ class MergedRenaultEngine(msgspec.Struct):
         if other is not None and is_new_value(self.status, other.status):
             self.status.append(cast(HMApiValue[DataWithUnit[float]], other.status))
 
+
 class MergedRenaultOffroad(msgspec.Struct):
     route_incline: list[HMApiValue[DataWithUnit[float]]] = []
 
@@ -196,7 +209,8 @@ class MergedRenaultOffroad(msgspec.Struct):
 
     def merge(self, other: Optional[RenaultOffroad]):
         if other is not None and is_new_value(self.route_incline, other.route_incline):
-            self.route_incline.append(cast(HMApiValue[DataWithUnit[float]], other.route_incline))   
+            self.route_incline.append(cast(HMApiValue[DataWithUnit[float]], other.route_incline))
+
 
 class MergedRenaultRace(msgspec.Struct):
     accelerations: list[HMApiValue[DataWithUnit[float]]] = []
@@ -219,6 +233,7 @@ class MergedRenaultRace(msgspec.Struct):
             if is_new_value(self.acceleration_duration, other.acceleration_duration):
                 self.acceleration_duration.append(cast(HMApiValue[DataWithUnit[float]], other.acceleration_duration))
 
+
 class MergedRenaultUsage(msgspec.Struct):
     last_trip_battery_remaining: list[HMApiValue[DataWithUnit[float]]] = []
     last_trip_energy_consumption: list[HMApiValue[DataWithUnit[float]]] = []
@@ -240,18 +255,27 @@ class MergedRenaultUsage(msgspec.Struct):
             if is_new_value(self.last_trip_energy_consumption, other.last_trip_energy_consumption):
                 self.last_trip_energy_consumption.append(cast(HMApiValue[DataWithUnit[float]], other.last_trip_energy_consumption))
 
+
 @register_merged
 class MergedRenaultInfo(msgspec.Struct):
     diagnostics: MergedRenaultDiagnostics
     charging: MergedRenaultCharging
     climate: MergedRenaultClimate
+    engine: MergedRenaultEngine
+    offroad: MergedRenaultOffroad
+    race: MergedRenaultRace
+    usage: MergedRenaultUsage
 
     @classmethod
     def new(cls) -> Self:
         return cls(
             MergedRenaultDiagnostics(), 
             MergedRenaultCharging(),
-            MergedRenaultClimate()
+            MergedRenaultClimate(),
+            MergedRenaultEngine(),
+            MergedRenaultOffroad(),
+            MergedRenaultRace(),
+            MergedRenaultUsage()
         )
 
     @classmethod
@@ -260,12 +284,20 @@ class MergedRenaultInfo(msgspec.Struct):
             MergedRenaultDiagnostics.from_initial(initial.diagnostics),
             MergedRenaultCharging.from_initial(initial.charging),
             MergedRenaultClimate.from_initial(initial.climate),
+            MergedRenaultEngine.from_initial(initial.engine),
+            MergedRenaultOffroad.from_initial(initial.offroad),
+            MergedRenaultRace.from_initial(initial.race),
+            MergedRenaultUsage.from_initial(initial.usage),
         )
 
     def merge(self, other: RenaultInfo):
         self.diagnostics.merge(other.diagnostics)
         self.charging.merge(other.charging)
         self.climate.merge(other.climate)
+        self.engine.merge(other.engine)
+        self.offroad.merge(other.offroad)
+        self.race.merge(other.race)
+        self.usage.merge(other.usage)
 
 
 
