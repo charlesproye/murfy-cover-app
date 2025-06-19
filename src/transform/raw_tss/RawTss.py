@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class RawTss():
     """
-    Classe pour traiter les données de télémétrie de la flotte Tesla
+    Classe pour traiter les données renvoyées par les API stocké dans response sur scaleway
     """
     
     def __init__(self, make: str):
@@ -185,7 +185,7 @@ class RawTss():
             all_data = []
             
             # Traitement par batch
-            batch_size = 10  # Ajustable
+            batch_size = 100  # Ajustable
             all_keys_to_process = []
             vin_key_mapping = {}
             
@@ -259,7 +259,7 @@ class RawTss():
             keys = self.get_response_keys_to_parse()
             logger.info("keys loaded")
             # Correction: passer self.spark au lieu de spark
-            new_raw_tss = self.get_raw_tss_from_keys_spark(keys, 100)
+            new_raw_tss = self.get_raw_tss_from_keys_spark(keys)
             logger.info("new_raw_tss loaded")
             return new_raw_tss
             
