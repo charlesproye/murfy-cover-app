@@ -1,7 +1,9 @@
+from logging import getLogger
+
 from pyspark.sql import DataFrame as DF, Window
 from pyspark.sql.functions import (
-    col, lag, unix_timestamp, when, lit, last,
-    expr, coalesce, sum as spark_sum
+    col, lag, unix_timestamp, when, lit, last, first,
+    expr, coalesce, sum as spark_sum, pandas_udf
 )
 from pyspark.sql.types import DoubleType
 from pyspark.sql import SparkSession
@@ -11,7 +13,7 @@ import pandas as pd
 from core.constants import KJ_TO_KWH
 from core.caching_utils import CachedETLSpark
 from core.logging_utils import set_level_of_loggers_with_prefix
-from core.spark_utils import rename_and_select, safe_astype_spark
+from core.spark_utils import safe_astype_spark_with_error_handling, create_spark_session, timedelta_to_interval
 from transform.raw_tss.main import get_raw_tss
 from transform.fleet_info.main import fleet_info
 from transform.processed_tss.config import *
@@ -32,19 +34,34 @@ class ProcessedTimeSeries(CachedETLSpark):
         self.max_td = max_td
         self.spark = spark
         super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update, spark=spark, **kwargs)
+    
     # No need to call run, it will be called in CachedETL init.
     def run(self):
         self.logger.info(f"{'Processing ' + self.make + ' raw tss.':=^{50}}")
-        tss = get_raw_tss(self.spark)
+        tss = get_raw_tss(self.make, spark=self.spark)
         print('load data')
-        tss = rename_and_select(tss, RENAME_COLS_DICT, COL_TO_SELECT)
-        tss = safe_astype_spark(tss)
+        tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
+        tss = safe_astype_spark_with_error_handling(tss)
         tss = self.normalize_units_to_metric(tss)
         tss = tss.orderBy(["vin", "date"])
         tss = self.compute_date_vars(tss)
         tss = self.compute_charge_n_discharge_vars(tss)
+        print('la')
         tss = tss.join(self.spark.createDataFrame(fleet_info), 'vin', 'left')
         print("process done")
+        return tss
+    
+    def compute_charge_n_discharge_vars(self, tss):
+        tss = self.compute_charge_n_discharge_masks(tss, IN_CHARGE_CHARGING_STATUS_VALS, IN_DISCHARGE_CHARGING_STATUS_VALS)
+        # Compute the correspding indices to perfrom split-apply-combine ops
+        tss = self.compute_idx_from_masks(tss, ["in_charge", "in_discharge"])
+        # We recompute the masks by trimming off the points that have the first and last soc values
+        # This is done to reduce the noise in the output due to measurments noise.
+        tss = self.trim_leading_n_trailing_soc_off_masks(tss, ["in_charge", "in_discharge"]) 
+        tss = self.compute_idx_from_masks(tss, ["trimmed_in_charge", "trimmed_in_discharge"])
+        tss = self.compute_cum_var(tss, "power", "cum_energy")
+        tss = self.compute_cum_var(tss, "charger_power", "cum_charge_energy_added")
+        tss = self.compute_status_col(tss)
         return tss
     
     def normalize_units_to_metric(self, tss):
@@ -64,14 +81,12 @@ class ProcessedTimeSeries(CachedETLSpark):
 
         @pandas_udf(schema, functionType="grouped_map")
         def integrate_trapezoid(df: pd.DataFrame) -> pd.DataFrame:
-            # Ordonne les données par date (important !)
+
             df = df.sort_values("date").copy()
 
-            # Conversion x en secondes (numpy int64)
             x = df["date"].astype('int64') // 10**9  # Convertit ns → s
             y = df[var_col].fillna(0).astype("float64")
 
-            # Intégration cumulée
             cum = cumulative_trapezoid(y=y.values, x=x.values, initial=0) * KJ_TO_KWH
 
             # Ajuste pour que ça commence à zéro
@@ -138,22 +153,36 @@ class ProcessedTimeSeries(CachedETLSpark):
         self.logger.debug(f"Computing charging and discharging vars using charging status dictionary.")
         assert "charging_status" in tss.columns, NO_CHARGING_STATUS_COL_ERROR
         return (
-            tss
-            .eval(f"in_charge = charging_status in {in_charge_vals}")
-            .eval(f"in_discharge = charging_status in {in_discharge_vals}")
-        )
+        tss
+        .withColumn("in_charge", col("charging_status").isin(in_charge_vals))
+        .withColumn("in_discharge", col("charging_status").isin(in_discharge_vals))
+    )
 
     def trim_leading_n_trailing_soc_off_masks(self, tss:DF, masks:list[str]) -> DF:
         self.logger.debug(f"Computing trimmed masks of{masks}.")
         for mask in masks:
-            tss["naned_soc"] = tss["soc"].where(tss[mask])
-            soc_grp = tss.groupby(["vin", mask + "_idx"], observed=True)["naned_soc"]
-            trailing_soc = soc_grp.transform("first")
-            leading_soc = soc_grp.transform("last")
-            tss["trailing_soc"] = trailing_soc
-            tss["leading_soc"] = leading_soc
-            tss[f"trimmed_{mask}"] = tss[mask] & (tss["soc"] != trailing_soc) & (tss["soc"] != leading_soc)
-        tss = tss.drop(columns="naned_soc")
+            # Créer une colonne temporaire contenant 'soc' uniquement lorsque le masque est vrai
+            tss = tss.withColumn("naned_soc", when(col(mask), col("soc")))
+            print(tss)
+            # Fenêtre pour grouper par 'vin' et l'index associé au masque
+            w = Window.partitionBy("vin", col(f"{mask}_idx")).orderBy("date")  # assuming you have a 'timestamp' for ordering
+            print(w)
+            # Calcul des premières et dernières valeurs non nulles de 'naned_soc' dans chaque groupe
+            trailing_soc = first("naned_soc", ignorenulls=True).over(w)
+            leading_soc = last("naned_soc", ignorenulls=True).over(w)
+            print(trailing_soc)
+            # Ajouter ces colonnes
+            tss = (
+                tss
+                .withColumn("trailing_soc", trailing_soc)
+                .withColumn("leading_soc", leading_soc)
+                .withColumn(
+                    f"trimmed_{mask}",
+                    (col(mask)) & (col("soc") != col("trailing_soc")) & (col("soc") != col("leading_soc"))
+                )
+                .drop("naned_soc")
+            )
+
         return tss
     
     
@@ -173,7 +202,7 @@ class ProcessedTimeSeries(CachedETLSpark):
         for mask in masks:
             idx_col_name = f"{mask}_idx"
 
-            w = Window.partitionBy(self.id_col).orderBy("time")  # adapte 'time' à ta colonne temporelle
+            w = Window.partitionBy(self.id_col).orderBy("date")
 
             # Décalage de mask par groupe
             shifted_mask = lag(col(mask), 1).over(w)
@@ -183,7 +212,7 @@ class ProcessedTimeSeries(CachedETLSpark):
 
             # Si max_td est défini, on ajoute aussi condition sur time_diff
             if self.max_td is not None:
-                new_period_start_mask = new_period_start_mask | (col("time_diff") > lit(self.max_td))
+                new_period_start_mask = new_period_start_mask | (col("sec_time_diff") > lit(timedelta_to_interval(self.max_td)))
 
             # Génère l'index via cumul
             tss = tss.withColumn(
