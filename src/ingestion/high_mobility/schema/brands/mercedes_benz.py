@@ -43,6 +43,14 @@ class MercedesBenzUsage(msgspec.Struct):
     electric_duration_last_trip: Optional[HMApiValue[DataWithUnit[int]]] = None
     electric_duration_since_reset: Optional[HMApiValue[DataWithUnit[int]]] = None
 
+class MercedesBenzChargingSession(msgspec.Struct):
+    start_time: Optional[HMApiValue[Time]] = None
+    displayed_start_state_of_charge: Optional[HMApiValue[float]] = None
+    end_time: Optional[HMApiValue[Time]] = None
+    displayed_state_of_charge: Optional[HMApiValue[float]] = None
+    energy_charged: Optional[HMApiValue[DataWithUnit[float]]] = None
+    total_charging_duration: Optional[HMApiValue[DataWithUnit[int]]] = None
+
 @register_brand(rate_limit=36)
 class MercedesBenzInfo(HMApiResponse):
     diagnostics: Optional[MercedesBenzDiagnostics] = None
