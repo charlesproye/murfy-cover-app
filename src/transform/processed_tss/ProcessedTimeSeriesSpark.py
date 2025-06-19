@@ -1,4 +1,6 @@
 from logging import getLogger
+import argparse
+import logging
 
 from pyspark.sql import DataFrame as DF, Window
 from pyspark.sql.functions import (
@@ -9,7 +11,7 @@ from pyspark.sql.types import DoubleType
 from pyspark.sql import SparkSession
 from scipy.integrate import cumulative_trapezoid
 import pandas as pd
-
+from core.console_utils import main_decorator
 from core.constants import KJ_TO_KWH
 from core.caching_utils import CachedETLSpark
 from core.logging_utils import set_level_of_loggers_with_prefix
@@ -37,7 +39,7 @@ class ProcessedTimeSeries(CachedETLSpark):
     
     # No need to call run, it will be called in CachedETL init.
     def run(self):
-        self.logger.info(f"{'Processing ' + self.make + ' raw tss.':=^{50}}")
+        #self.logger.info(f"{'Processing ' + self.make + ' raw tss.':=^{50}}")
         tss = get_raw_tss(self.make, spark=self.spark)
         print('load data')
         tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
@@ -46,8 +48,14 @@ class ProcessedTimeSeries(CachedETLSpark):
         tss = tss.orderBy(["vin", "date"])
         tss = self.compute_date_vars(tss)
         tss = self.compute_charge_n_discharge_vars(tss)
-        print('la')
+        print(tss)
         tss = tss.join(self.spark.createDataFrame(fleet_info), 'vin', 'left')
+        # tss = tss.withColumn("BatteryHeaterOn", when(col("BatteryHeaterOn").cast("string").isin("0.0", "1.0"), 
+        #                                              when(col("BatteryHeaterOn") == 1.0, "true").otherwise("false"))
+        #                      .otherwise(col("BatteryHeaterOn").cast("string"))) \
+        #         .withColumn("BatteryBmsFullchargecompleteHeaterOn", when(col("BmsFullchargecomplete").cast("string").isin("0.0", "1.0"), 
+        #                                              when(col("BmsFullchargecomplete") == 1.0, "true").otherwise("false"))
+        #                      .otherwise(col("BmsFullchargecomplete").cast("string")))
         print("process done")
         return tss
     
@@ -251,14 +259,15 @@ class ProcessedTimeSeries(CachedETLSpark):
         return tss.withColumn("status", status)
 
     @classmethod
-    def update_all_tss(cls, **kwargs):
+    def update_all_tss(cls, spark, **kwargs):
         for make in ALL_MAKES:
             if make in ["tesla", "tesla-fleet-telemery"]:
-                cls = TeslaProcessedTimeSeries
+                print('ici')
+                cls = TeslaProcessedTimeSeries(spark)
             else:
-                cls = ProcessedTimeSeries
+                cls = ProcessedTimeSeries(spark)
             cls(make, force_update=True, **kwargs)
-            
+
             
 class TeslaProcessedTimeSeries(ProcessedTimeSeries):
     def __init__(self, make:str="tesla-fleet-telemery", id_col:str="vin", log_level:str="INFO", max_td:TD=MAX_TD, force_update:bool=False, spark=None, **kwargs):
@@ -359,4 +368,18 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         return tss
     
     
+
+        
+@main_decorator
+def main():
+    parser = argparse.ArgumentParser(description="Process time series data.")
+    parser.add_argument('--log_level', type=str, default='INFO', help='Set the logging level (default: INFO)')
+    args = parser.parse_args()
+
+    log_level = getattr(logging, args.log_level.upper(), logging.INFO)
+
+    ProcessedTimeSeries.update_all_tss(log_level=log_level)
+
+if __name__ == "__main__":
+    main()
 
