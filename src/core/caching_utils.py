@@ -167,7 +167,7 @@ def cache_result_spark(path_template: str, on: str, path_params: List[str] = [])
                     data = data_gen_func(*args, **kwargs)
                     data.coalesce(1) \
                         .write \
-                        .mode("overwrite") \
+                        .mode("append") \
                         .partitionBy("vin") \
                         .parquet(s3_path)
                     return data
