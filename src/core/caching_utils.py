@@ -10,6 +10,7 @@ from pandas import DataFrame as DF
 
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
+from core.spark_utils import create_spark_session
 from core.config import *
 from pyspark.sql import SparkSession
 
@@ -71,8 +72,9 @@ class CachedETLSpark(ABC):
         - force_update (bool): If True, regenerate and cache the result even if it exists.
         - bucket_instance (S3_Bucket): S3 bucket instance, defaults to the global bucket.
         """
-        print(f"spark = {spark}")
-        assert spark is not None
+        if spark is None:
+            spark = create_spark_session(S3_Bucket.get_creds_from_dot_env()["aws_access_key_id"],
+                                         S3_Bucket.get_creds_from_dot_env()["aws_secret_access_key"])
         self._spark = spark
         assert on in ["s3", "local_storage"], "CachedETL's 'on' argument must be 's3' or 'local_storage'"
         assert path.endswith(".parquet"), "Path must end with '.parquet'"
