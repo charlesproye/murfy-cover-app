@@ -9,7 +9,7 @@ import logging
 import pandas as pd
 from pandas import DataFrame as DF
 
-from .s3_utils import S3Service
+from .s3.s3_utils import S3Service
 from .singleton_s3_bucket import S3
 from .config import *
 

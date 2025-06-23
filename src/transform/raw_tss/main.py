@@ -3,7 +3,7 @@ import inspect
 
 from pandas import DataFrame as DF
 
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss

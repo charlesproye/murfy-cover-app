@@ -10,6 +10,10 @@ def ensure_exists(something: T | None, except_type=ValueError) -> T:
     return something
 
 
+def remove_none(l: list[T | None])-> list[T]:
+    return [elem for elem in l if elem is not None]
+
+
 def now(tz=UTC):
     return datetime.now(tz=tz)
 

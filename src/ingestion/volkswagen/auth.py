@@ -1,6 +1,6 @@
 from typing import Final
 import httpx
-from .utils import ensure_exists, now
+from src.core.typing_utils import ensure_exists, now
 from datetime import datetime, timedelta
 from .settings import VolksWagenSettings
 

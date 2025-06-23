@@ -32,6 +32,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "climate.outside_temperature": "outside_temp",
     "charging.status": "charging_status",
     "charging.battery_charge_type": "charging_method",
+    "usage.electric_consumption_average": 'consumption',
     # Mobilisight
     "datetime": "date",
     "engine.oilTemperature": "oil_temp",
@@ -58,6 +59,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "soc_hv_header": "soc",
     "capacity": "capacity_according_to_data_provider",
     "model": "model_according_to_data_provider",
+    "avg_electric_range_consumption": "consumption",
     # Tesla
     #"battery_level": "soc",
     "readable_date": "date",
@@ -141,6 +143,7 @@ COL_DTYPES = {
     "charging_ac_voltage": "float32",
     "coolant_temperature": "float32",
     "kombi_remaining_electric_range": "float32",
+    "consumption": "float32",
     # Tesla
     "battery_heater": "bool",
     "battery_heater_no_power": "bool",

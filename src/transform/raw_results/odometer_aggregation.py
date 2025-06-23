@@ -32,6 +32,7 @@ def agg_last_odometer(make:str) -> DF:
             "make": "first",
             "model": "first",
             "version": "first",
+            "consumption": "mean",
         })
         .reset_index()
         .rename(columns={"floored_date": "date"})

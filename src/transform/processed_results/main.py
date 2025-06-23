@@ -81,7 +81,8 @@ def agg_results_by_update_frequency(results:DF) -> DF:
             version=pd.NamedAgg("version", "first"),
             level_1=pd.NamedAgg("level_1", "sum"),
             level_2=pd.NamedAgg("level_2", "sum"),
-            level_3=pd.NamedAgg("level_3", "sum"),            
+            level_3=pd.NamedAgg("level_3", "sum"), 
+            consumption=pd.NamedAgg("consumption", "mean")           
         )
     )
 

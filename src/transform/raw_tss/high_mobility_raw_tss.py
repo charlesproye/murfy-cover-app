@@ -5,7 +5,7 @@ from core.pandas_utils import *
 from rich.progress import Progress
 from transform.raw_tss.config import *
 from core.logging_utils import set_level_of_loggers_with_prefix
-from core.s3_utils import S3Service
+from core.s3.s3_utils import S3Service
 from core.console_utils import single_dataframe_script_main
 from core.caching_utils import cache_result
 from core.pandas_utils import concat

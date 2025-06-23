@@ -140,6 +140,7 @@ def force_decay(df, window_size=3, max_drop=0.003):
     
     # Pour le démarrage, on part du maximum de la série lissée / pas forcéement optimal
     output = [max(smoothed[1:])]
+    odometer_fill = [odometer[1]]
     for i in range(1, n):
         candidate = smoothed[i]
         prev = output[-1]
@@ -153,6 +154,9 @@ def force_decay(df, window_size=3, max_drop=0.003):
         # Vérifier que le drop n'est pas trop important
         drop = prev - candidate
         if drop > max_drop:
+            # On cheeck qu'il y'a une variation de 1000km mini pour appliquer le drop 
+            if odometer[i] - odometer_fill[-1] < 1000:
+                candidate = prev
             candidate = prev - max_drop
         output.append(candidate)
         
@@ -179,3 +183,5 @@ def estimate_cycles(total_range:float=0, initial_range:float=1, soh:float=1.0):
         return np.nan
 
 
+def log_function(x, a ,b, c):
+    return a + b * np.log1p(x / c)
