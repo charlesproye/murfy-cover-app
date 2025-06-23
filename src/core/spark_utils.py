@@ -32,6 +32,7 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
     return spark
 
 def explode_data_spark(response: dict, spark: SparkSession):
+    #### dépolaceer dans transform.raw_tss.parsing -> parsing_fleet_teleemtry
     """
     Parse dict from api response 
 
@@ -61,7 +62,6 @@ def explode_data_spark(response: dict, spark: SparkSession):
                 if not value_dict:
                     continue
                 value = list(value_dict.values())[0]  # Récupère la valeur quel que soit le type
-                row_data[key] = value
                 value = str(value)
                 row_data[key] = value
         flattened_data.append({**base, **row_data})
