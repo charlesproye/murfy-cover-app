@@ -61,18 +61,21 @@ def get_or_create_make(cursor, vehicle_make: str, oem_id: str) -> str:
 
 def standardize_battery_chemistry(battery_chemistry: str) -> str:
     """Standardize battery chemistry values."""
+    if not battery_chemistry:
+        return "unknown"
     if 'nmc' in battery_chemistry.lower() or 'ncm' in battery_chemistry.lower():
         return 'NMC'
     return battery_chemistry
 
 def get_or_create_battery(cursor, vehicle: Dict[str, Any]) -> str:
     """Get or create a Battery record and return its ID."""
-    battery_chemistry = standardize_battery_chemistry(vehicle.get("Battery_Chemistry", "unknown"))
+    battery_chemistry = standardize_battery_chemistry(vehicle.get("Battery_Chemistry"))
+    battery_manufacturer = vehicle.get("Battery_Manufacturer") or "unknown"
     
     cursor.execute(
         "SELECT id FROM battery WHERE UPPER(battery_name) = UPPER(%s) AND UPPER(battery_chemistry) = UPPER(%s) AND UPPER(battery_oem) = UPPER(%s) AND capacity = %s AND net_capacity = %s",
         (vehicle.get("Vehicle_Model","unknown"), battery_chemistry.upper(), 
-         vehicle.get("Battery_Manufacturer", "unknown").upper(), 
+         battery_manufacturer.upper(), 
          vehicle.get("Battery_Capacity_Full"), 
          vehicle.get("Battery_Capacity_Useable"))
     )
@@ -83,22 +86,25 @@ def get_or_create_battery(cursor, vehicle: Dict[str, Any]) -> str:
         cursor.execute(
             "INSERT INTO battery (id, battery_name, battery_chemistry, battery_oem, capacity, net_capacity, source) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (battery_id, vehicle.get("Vehicle_Model","unknown"), battery_chemistry.upper(), 
-             vehicle.get("Battery_Manufacturer", "").upper(), vehicle.get("Battery_Capacity_Full"), 
+             battery_manufacturer.upper(), vehicle.get("Battery_Capacity_Full"), 
              vehicle.get("Battery_Capacity_Useable"), vehicle.get("EVDB_Detail_URL"))
         )
         battery_id = cursor.fetchone()[0]
-        print(f"Created new battery: Battery Name={vehicle.get('Vehicle_Model')}, Chemistry={battery_chemistry}, OEM={vehicle.get('Battery_Manufacturer')}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
+        print(f"Created new battery: Battery Name={vehicle.get('Vehicle_Model')}, Chemistry={battery_chemistry}, OEM={battery_manufacturer}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
     else:
         battery_id = battery_type_result[0]
-        print(f"Using existing battery: Battery Name={vehicle.get('Vehicle_Model')}, Chemistry={battery_chemistry}, OEM={vehicle.get('Battery_Manufacturer')}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
+        print(f"Using existing battery: Battery Name={vehicle.get('Vehicle_Model')}, Chemistry={battery_chemistry}, OEM={battery_manufacturer}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh")
     
     return battery_id
 
 def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, oem_id: str, battery_id: str) -> None:
     """Get or create a Vehicle Model record."""
+    vehicle_model = vehicle.get("Vehicle_Model", "unknown")
+    vehicle_model_version = vehicle.get("Vehicle_Model_Version") or "unknown"
+    
     cursor.execute(
         "SELECT id FROM vehicle_model WHERE model_name = LOWER(%s) AND LOWER(type) = LOWER(%s)",
-        (vehicle.get("Vehicle_Model", "unknown"), vehicle.get("Vehicle_Model_Version") or "unknown")
+        (vehicle_model, vehicle_model_version)
     )
     model_result = cursor.fetchone()
     
@@ -110,8 +116,8 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, o
             ) VALUES (%s, LOWER(%s), LOWER(%s), %s, %s, %s, %s, %s, %s, %s)
         """, (
             model_id,
-            vehicle.get("Vehicle_Model", "unknown"),
-            vehicle.get("Vehicle_Model_Version") or "unknown",
+            vehicle_model,
+            vehicle_model_version,
             make_id,
             oem_id,
             vehicle.get("Range_WLTP"),
@@ -120,7 +126,7 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, o
             vehicle.get("EVDB_Detail_URL"),
             battery_id
         ))
-        print(f"Created new vehicle model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
+        print(f"Created new vehicle model: {vehicle_model} {vehicle_model_version}")
     else:
         cursor.execute("""
             UPDATE vehicle_model 
@@ -132,7 +138,7 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, o
         """, (vehicle.get("Range_WLTP"), vehicle.get("Battery_Warranty_Period"), 
               vehicle.get("Battery_Warranty_Mileage"), vehicle.get("EVDB_Detail_URL"), 
               model_result[0]))
-        print(f"Updated existing vehicle model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
+        print(f"Updated existing vehicle model: {vehicle_model} {vehicle_model_version}")
 
 def process_vehicle(cursor, vehicle: Dict[str, Any]) -> None:
     """Process a single vehicle record."""
@@ -158,7 +164,7 @@ def fetch_ev_data():
     if not data:
         return None
         
-    with get_connection() as con:
+    with get_connection(is_prod=True) as con:
         cursor = con.cursor()
         for vehicle in data:
             process_vehicle(cursor, vehicle)
