@@ -10,6 +10,7 @@ from core.s3_utils import S3_Bucket
 from core.spark_utils import *
 from transform.raw_tss.config import *
 from core.caching_utils import cache_result_spark
+from core.console_utils import main_decorator
 
 # Configuration du logger
 logger = logging.getLogger(__name__)
@@ -95,9 +96,9 @@ class RawTss():
         
         try:
             # Récupération des données TSS brutes existantes ou création d'un DataFrame vide
-            if self.bucket.check_spark_file_exists(FLEET_TELEMETRY_RAW_TSS_KEY):
+            if self.bucket.check_spark_file_exists("raw_ts/tesla-fleet-telemetry/time_series/spark_raw_tss.parquet"):
                 raw_tss_subset = self.read_parquet(
-                    FLEET_TELEMETRY_RAW_TSS_KEY, 
+                    "raw_ts/tesla-fleet-telemetry/time_series/spark_raw_tss.parquet",
                     columns=["vin", "readable_date"]
                 )
                 
@@ -243,7 +244,6 @@ class RawTss():
             logger.error(f"Erreur dans get_raw_tss_from_keys_spark: {e}")
             return self._create_empty_raw_tss_schema()
         
-    
     @cache_result_spark(SPARK_FLEET_TELEMETRY_RAW_TSS_KEY, on="s3")
     def get_raw_tss(self, spark: SparkSession = None) -> DataFrame:
         """
@@ -259,7 +259,7 @@ class RawTss():
             keys = self.get_response_keys_to_parse()
             logger.info("keys loaded")
             # Correction: passer self.spark au lieu de spark
-            new_raw_tss = self.get_raw_tss_from_keys_spark(keys)
+            new_raw_tss = self.get_raw_tss_from_keys_spark(keys, 30)
             logger.info("new_raw_tss loaded")
             return new_raw_tss
             
@@ -277,9 +277,15 @@ class RawTss():
             logger.info("Optimisations Spark configurées")
         except Exception as e:
             logger.error(f"Erreur lors de la configuration des optimisations Spark: {e}")
+    
+    @classmethod
+    def update_all_tss(cls, spark, **kwargs):
+        for make in ALL_MAKES:
+            cls = RawTss(spark)
+            cls(make, force_update=True, **kwargs)
 
 
-
+@main_decorator
 def main():
     """Fonction principale d'exécution"""
     # Configuration du logging
