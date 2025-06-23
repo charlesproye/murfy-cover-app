@@ -73,8 +73,8 @@ parquet raw time series in S3     single fleet_info dataframe (not cached)
 -  **raw_tss.XX_raw_time_series.py**:  
     goal: Provide time series data in tabular format.  
     Input: Json responses from the data providers, one json file per vehicle per day.  
-    Output: A dataframe that contains unprocessed data, one dataframe(.parquet file) per brand/data provider.
-    Output location: `raw_tss/XX/time_series/raw_tss.parquet` (should just be `raw_tss/XX_raw_tss.parquet`...)  
+    Output: A spark dataframe that contains unprocessed data, one dataframe(.parquet file) per brand/data provider.
+    Output location: `raw_tss/XX/time_series/spark_raw_tss.parquet` (should just be `raw_tss/XX_raw_tss.parquet`...)  
     How: Parses json responses into DataFrames and concatenates them into a single one.  
     Note: We nickname raw time series to raw_tss and not raw_ts because there are multiple time series per DF (one per vehicle).
 - **raw_tss/main.py**:   
@@ -94,7 +94,7 @@ parquet raw time series in S3     single fleet_info dataframe (not cached)
     All the processed time series have:   
     -   Normalized names:   
             Raw time series columns `diagnostic.odometer` and `car.mileage` will be normalized to `odometer`.   
-    -   Nomralized units: Imperial units will be converted to metric.   
+    -   Normalized units: Imperial units will be converted to metric.   
     -   Segmentation columns: `in_charge`, `in_discharge`, ...   
     -   Segment indexing: `in_discahrge_idx`, `in_discharge_idx`, ...   
         Segment indexing columns should have the same name as the segment mask column they are indexing + "_idx"
