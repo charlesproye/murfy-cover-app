@@ -81,9 +81,16 @@ class S3_Bucket():
                 return False
             else:
                 raise e
-    def save_df_as_parquet_spark(self, df:DF, key:str):
+    def save_df_as_parquet_spark(self, df:DF, key:str, spark):
+        ### A tester ####
+        """Censée faire une concat de ce qui existe et écraser les fichiers déjà présents dans scaleway.
+            Aucune idée de la rapidité ni de la viabilité.
+        
+        """
         s3_path = f"s3a://{self.bucket_name}/{key}"
-        writer = df.write.mode('append').option("parquet.block.size", 67108864).partitionBy('vin')
+        processed = spark.read.parquet(s3_path)
+        df_write = processed.union(df).dropDuplicates()
+        writer = df_write.write.mode('overwrite').option("parquet.block.size", 67108864).partitionBy('vin')
         writer.parquet(s3_path)
     # This should be moved else wehere as this is a method specific to the way BIB oragnizes its responses.  
     # Ideally this would be moved to transform.raw_tss.
