@@ -48,14 +48,8 @@ class ProcessedTimeSeries(CachedETLSpark):
         tss = tss.orderBy(["vin", "date"])
         tss = self.compute_date_vars(tss)
         tss = self.compute_charge_n_discharge_vars(tss)
-        print(tss)
         tss = tss.join(self.spark.createDataFrame(fleet_info), 'vin', 'left')
-        # tss = tss.withColumn("BatteryHeaterOn", when(col("BatteryHeaterOn").cast("string").isin("0.0", "1.0"), 
-        #                                              when(col("BatteryHeaterOn") == 1.0, "true").otherwise("false"))
-        #                      .otherwise(col("BatteryHeaterOn").cast("string"))) \
-        #         .withColumn("BatteryBmsFullchargecompleteHeaterOn", when(col("BmsFullchargecomplete").cast("string").isin("0.0", "1.0"), 
-        #                                              when(col("BmsFullchargecomplete") == 1.0, "true").otherwise("false"))
-        #                      .otherwise(col("BmsFullchargecomplete").cast("string")))
+        tss = tss.sort("vin", ascending=True)
         print("process done")
         return tss
     
@@ -76,7 +70,7 @@ class ProcessedTimeSeries(CachedETLSpark):
         tss = tss.withColumn("odometer", col("odometer") * 1.609)
         return tss
 
-    
+
     def compute_cum_var(self, tss, var_col: str, cum_var_col: str):
         if var_col not in tss.columns:
             self.logger.debug(f"{var_col} not found, not computing {cum_var_col}.")
@@ -171,14 +165,11 @@ class ProcessedTimeSeries(CachedETLSpark):
         for mask in masks:
             # Créer une colonne temporaire contenant 'soc' uniquement lorsque le masque est vrai
             tss = tss.withColumn("naned_soc", when(col(mask), col("soc")))
-            print(tss)
             # Fenêtre pour grouper par 'vin' et l'index associé au masque
             w = Window.partitionBy("vin", col(f"{mask}_idx")).orderBy("date")  # assuming you have a 'timestamp' for ordering
-            print(w)
             # Calcul des premières et dernières valeurs non nulles de 'naned_soc' dans chaque groupe
             trailing_soc = first("naned_soc", ignorenulls=True).over(w)
             leading_soc = last("naned_soc", ignorenulls=True).over(w)
-            print(trailing_soc)
             # Ajouter ces colonnes
             tss = (
                 tss
