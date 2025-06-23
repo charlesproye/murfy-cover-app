@@ -2,7 +2,6 @@ import asyncio
 from typing import Annotated, Iterable
 import aioboto3
 from botocore.exceptions import ClientError
-from core.typing_utils import remove_none
 from fastapi import Depends
 from .settings import S3Settings
 
