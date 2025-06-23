@@ -83,7 +83,8 @@ class CachedETLSpark(ABC):
         if force_update or (on == "s3" and not bucket.check_spark_file_exists(path)) or (on == "local_storage" and not exists(path)):
             self.data = self.run()  # Call the abstract run method to generate data
             if on == "s3":
-                bucket.save_df_as_parquet_spark(self.data, path)
+                print(self.data)
+                bucket.save_df_as_parquet_spark(self.data, path, self.spark)
             elif on == "local_storage":
                 self.data.write.parquet(path)
         else:
@@ -154,11 +155,12 @@ def cache_result_spark(path_template: str, on: str, path_params: List[str] = [])
     def decorator(data_gen_func):
         @wraps(data_gen_func)
         def wrapper(*args, force_update=False, read_parquet_kwargs={}, **kwargs):
-            
             all_args = data_gen_func.__code__.co_varnames
             arg_values = {**dict(zip(all_args, args)), **kwargs}
             format_dict = {param: str(arg_values[param]) for param in path_params}
             path = path_template.format(**format_dict)
+            # self_obj = args[0]
+            # path = path_template(self_obj, *args[1:], **kwargs)
             assert path.endswith(".parquet"), f"Cache path must end with .parquet, got: {path}"
             spark = arg_values.get("spark")
             assert isinstance(spark, SparkSession)
