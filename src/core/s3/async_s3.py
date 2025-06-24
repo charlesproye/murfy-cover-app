@@ -1,8 +1,8 @@
 import asyncio
-from typing import Iterable
+from typing import Annotated, Iterable
 import aioboto3
 from botocore.exceptions import ClientError
-from core.typing_utils import remove_none
+from fastapi import Depends
 from .settings import S3Settings
 
 
@@ -112,3 +112,8 @@ class AsyncS3:
 
             return deleted_count
 
+
+def get_async_s3() -> AsyncS3:
+    return AsyncS3()
+
+AsyncS3Dep = Annotated[AsyncS3,Depends(get_async_s3)]
