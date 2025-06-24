@@ -88,10 +88,14 @@ class S3_Bucket():
         
         """
         s3_path = f"s3a://{self.bucket_name}/{key}"
-        processed = spark.read.parquet(s3_path)
-        df_write = processed.union(df).dropDuplicates()
-        writer = df_write.write.mode('overwrite').option("parquet.block.size", 67108864).partitionBy('vin')
-        writer.parquet(s3_path)
+        if self.check_spark_file_exists(s3_path):
+            processed = spark.read.parquet(s3_path)
+            df_write = processed.union(df).dropDuplicates()
+            writer = df_write.write.mode('overwrite').partitionBy('vin')
+            writer.parquet(s3_path)
+        else :
+            df.write.mode('overwrite').partitionBy('vin').parquet(s3_path)
+
     # This should be moved else wehere as this is a method specific to the way BIB oragnizes its responses.  
     # Ideally this would be moved to transform.raw_tss.
     def list_responses_keys_of_brand(self, brand:str="") -> DF:

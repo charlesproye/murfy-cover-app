@@ -83,8 +83,7 @@ class CachedETLSpark(ABC):
         if force_update or (on == "s3" and not bucket.check_spark_file_exists(path)) or (on == "local_storage" and not exists(path)):
             self.data = self.run()  # Call the abstract run method to generate data
             if on == "s3":
-                print(self.data)
-                bucket.save_df_as_parquet_spark(self.data, path, self.spark)
+                bucket.save_df_as_parquet_spark(self.data, path, self._spark)
             elif on == "local_storage":
                 self.data.write.parquet(path)
         else:
