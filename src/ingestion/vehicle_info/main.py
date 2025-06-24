@@ -62,7 +62,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             pwd=RENAULT_PWD
         )
         # Get initial fleet info
-        df = await fleet_info(owner_filter=owner_filter)
+        """df = await fleet_info(owner_filter=owner_filter)
         # Initialize activation service
         activation_service = VehicleActivationService(
             bmw_api=bmw_api,
@@ -83,7 +83,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             #activation_service.activation_tesla_particulier()
         )
 
-        # Get updated fleet info after activation
+        # Get updated fleet info after activation"""
         logging.info('-------------------------------Activation completed-------------------------------')
         df = await fleet_info(owner_filter=owner_filter)
         
@@ -97,15 +97,15 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             renault_api=renault_api,
             df=df
         )
-        await asyncio.gather(
+        """await asyncio.gather(
             #vehicle_processor.process_other_vehicles(),
             #vehicle_processor.process_tesla(),
             ##vehicle_processor.process_renault(),
             #vehicle_processor.process_deactivated_vehicles(),
             vehicle_processor.process_bmw()
             #vehicle_processor.process_tesla_particulier())
-        )
-        #await vehicle_processor.delete_unused_models()
+        )"""
+        await vehicle_processor.delete_unused_models()
         #await vehicle_processor.generate_vehicle_summary()
 
     except Exception as e:
