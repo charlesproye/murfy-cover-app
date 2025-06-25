@@ -176,7 +176,7 @@ def main():
     scraper = AramisautoScraper()
     
     # Scraper les voitures électriques
-    infos = scraper.scrape_electric_cars(1)
+    infos = scraper.scrape_electric_cars(100)
     data_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
     print(infos)
     df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
