@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import re
 import time
 import pandas as pd
+import numpy as np
 from urllib.parse import urljoin, urlparse
 from typing import List, Dict, Optional
 from core.gsheet_utils import get_gspread_client, load_excel_data, export_to_excel
@@ -97,7 +98,6 @@ class AramisautoScraper:
             if km_match:
                 car_info['Odomètre (km)'] = int(km_match.group(0).replace('km', '').replace(' ', ''))
             # Date
-            
             date_pattern = r'\d{1,2}\/\d{1,2}\/\d{2,4}'
             date = re.search(date_pattern, page_text)
             if date:
@@ -105,6 +105,12 @@ class AramisautoScraper:
                 # else:
                 #     car_info['Année'] = int(date.group(1)[-4:].strip())
                 # print(car_info['Année'])
+            
+            # Batterie capacity
+            battery_pattern = r'\d{2,5}\s*kWh'
+            battery_match = re.search(battery_pattern, page_text)
+            if battery_match:
+                car_info['battery_capacity'] = battery_match.group(0)
             
             # Type
             price_info_elements = soup.select('.default-body.price-information-row, .price-information-row, .default-body')
@@ -169,18 +175,28 @@ class AramisautoScraper:
             time.sleep(1)
             
         
-        return pd.DataFrame(all_cars)[["OEM", "Modèle", "Type", "Année", "Odomètre (km)", "SoH", "lien"]].dropna(subset='SoH')
+        return all_cars
     
-
+    def clean_data(self, data):
+        # ordonner les données par rapport a la gsheet
+        df = pd.DataFrame(data)[["OEM", "Modèle", "Type", "Année", "Odomètre (km)", "SoH", "lien", "battery_capacity"]]
+        # Si pas de SoH pas intérressant
+        df = df.dropna(subset='SoH')
+        # éviter que ça casse s'il manque une info
+        df = df.replace(np.nan, "unknown").replace(pd.NA, "unknown")
+        print(df.battery_capacity.unique())
+        return df
+        
+        
 def main():
     scraper = AramisautoScraper()
     
     # Scraper les voitures électriques
     infos = scraper.scrape_electric_cars(100)
+    df_infos = scraper.clean_data(infos)
     data_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
-    print(infos)
-    df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
-    df_filtré = infos[~infos['lien'].isin(df_sheet['lien'])]
+    df_sheet = pd.DataFrame(columns=data_sheet[0,:8], data=data_sheet[1:,:8])
+    df_filtré = df_infos[~df_infos['lien'].isin(df_sheet['lien'])]
    # df_filtré['Type'] =  df_filtré['Type'].map(TYPE_MAPPING)
     print(df_filtré.isna().sum())
     export_to_excel(df_filtré, "202505 - Courbes SoH", "Courbes OS")
