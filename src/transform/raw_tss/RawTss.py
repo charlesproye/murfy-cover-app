@@ -344,11 +344,8 @@ class RawTss(CachedETLSpark):
     @classmethod
     def update_all_tss(cls, spark, **kwargs):
         for make in ALL_MAKES:
-            if make == "stellantis":
-                cls = RawTss
-                cls(make, force_update=True, spark=spark, **kwargs)
-            else:
-                pass
+            cls = RawTss
+            cls(make, force_update=True, spark=spark, **kwargs)
 
 
 @main_decorator
