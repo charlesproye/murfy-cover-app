@@ -107,7 +107,7 @@ class AramisautoScraper:
                 # print(car_info['Année'])
             
             # Batterie capacity
-            battery_pattern = r'\d{2,5}\s*kWh'
+            battery_pattern = r'\d*.\d*\s[k][W][h]'
             battery_match = re.search(battery_pattern, page_text)
             if battery_match:
                 car_info['battery_capacity'] = battery_match.group(0)

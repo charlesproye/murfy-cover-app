@@ -136,7 +136,7 @@ def extract_vehicle_info(link, car_nbr):
             if re.search(r"\b20\d{2}\b", text) and not annee:
                 annee = re.search(r"\b(20(?:0[0-79]|0[9]|[1-9]\d))\b", text).group(1)
             
-            battery_pattern = r'\d{1, 5}\s*kWh'
+            battery_pattern = r'\d*.\d*\s[k][W][h]'
             if re.search(battery_pattern, text) and not battery_capacity:
                 battery_capacity = re.search(battery_pattern, text).group(0)
             
