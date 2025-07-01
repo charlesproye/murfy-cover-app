@@ -25,6 +25,8 @@ class Compressor(ABC):
 
     async def compress_temp_vin_data(self, vin_folder_path: str):
         new_files = await self._s3.download_folder(f"{vin_folder_path}temp/")
+        if len(new_files) == 0:
+            return
         encoded_data = self.temp_data_to_daily_file(new_files)
         await self._s3.upload_file(
             path=f"{vin_folder_path}{self.filename()}", file=encoded_data
