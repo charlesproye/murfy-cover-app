@@ -25,6 +25,21 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
     os.environ["PYSPARK_SUBMIT_ARGS"] = (
         "--packages org.apache.hadoop:hadoop-aws:3.3.4 pyspark-shell"
     )
+
+    g1gc_options = (
+        "-XX:+UseG1GC "                    # Activer G1GC
+        "-XX:MaxGCPauseMillis=100 "        # Pause GC max de 100ms
+        "-XX:G1HeapRegionSize=32m "        # Taille des régions G1
+        "-XX:+UseStringDeduplication "     # Déduplication des chaînes
+        "-XX:+UnlockExperimentalVMOptions " # Débloquer les options expérimentales
+        "-XX:+UseZGC "                     # ZGC pour les gros heaps (Java 11+)
+        "-XX:+DisableExplicitGC "          # Désactiver System.gc()
+        "-XX:+UseGCOverheadLimit "         # Activer la limite de surcharge GC
+        "-XX:GCTimeRatio=9 "               # Ratio temps GC vs temps application
+        "-XX:+PrintGCDetails "             # Logs détaillés du GC (optionnel)
+        "-XX:+PrintGCTimeStamps "          # Timestamps dans les logs GC
+        "-Xloggc:/tmp/spark-gc.log"        # Fichier de log GC
+    )
     spark = (
         SparkSession.builder.appName("Scaleway S3 Read JSON")
         .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4")
@@ -38,8 +53,13 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
             "spark.hadoop.fs.s3a.aws.credentials.provider",
             "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
         )
-        .config("spark.executor.memory", "12g")
-        .config("spark.driver.memory", "12g")
+        .config("spark.executor.memory", "10g")  # Garder une mémoire suffisante
+        .config("spark.driver.memory", "10g")    # Garder une mémoire suffisante
+        .config("spark.driver.maxResultSize", "4g")
+        # Configuration G1GC pour les executors
+        .config("spark.executor.extraJavaOptions", g1gc_options)
+        # Configuration G1GC pour le driver
+        .config("spark.driver.extraJavaOptions", g1gc_options)
         .getOrCreate()
     )
     # .config("spark.sql.debug.maxToStringFields", "0") \
@@ -201,3 +221,87 @@ def safe_astype_spark_with_error_handling(tss):
     result_df = result_df.drop("model")
     return result_df
 
+
+def safe_astype_spark_with_error_handling_results(ptss):
+    """
+    Conversion sécurisée des types pour les colonnes spécifiées
+    """
+    
+    existing_columns = set(ptss.columns)
+    result_df = ptss
+    
+    # Mapping des types pandas vers Spark
+    COL_DTYPES = {
+        # String/Object types
+        "vin": StringType(),
+        "version": StringType(),
+        "model": StringType(),
+        "tesla_code": StringType(),
+        
+        # Integer types
+        "in_charge_idx": IntegerType(),
+        "size": IntegerType(),
+        
+        # Float32 -> FloatType (Spark FloatType = 32-bit)
+        "ac_energy_added_min": FloatType(),
+        "dc_energy_added_min": FloatType(),
+        "ac_energy_added_end": FloatType(),
+        "dc_energy_added_end": FloatType(),
+        "odometer": FloatType(),
+        "ac_charging_power": FloatType(),
+        "dc_charging_power": FloatType(),
+        "charging_power": FloatType(),
+        "ac_energy_added": FloatType(),
+        "dc_energy_added": FloatType(),
+        "energy_added": FloatType(),
+        
+        # Float64 -> DoubleType (Spark DoubleType = 64-bit)
+        "soc_diff": DoubleType(),
+        "net_capacity": DoubleType(),
+        "range": DoubleType(),
+        "soh": DoubleType(),
+        "level_1": DoubleType(),
+        "level_2": DoubleType(),
+        "level_3": DoubleType(),
+        "cycles": DoubleType(),
+        
+        # Datetime
+        "date": TimestampType(),
+    }
+    
+    for column_name, target_type in COL_DTYPES.items():
+        if column_name in existing_columns:
+            try:
+                result_df = result_df.withColumn(
+                    column_name, col(column_name).cast(target_type)
+                )
+                print(f"✓ Colonne '{column_name}' convertie en {target_type}")
+            except Exception as e:
+                print(f"⚠ Erreur lors de la conversion de '{column_name}': {e}")
+                # En cas d'erreur, essayer de convertir en string
+                try:
+                    result_df = result_df.withColumn(
+                        column_name, col(column_name).cast(StringType())
+                    )
+                    print(f"  → Colonne '{column_name}' convertie en StringType (fallback)")
+                except Exception as e2:
+                    print(f"  ❌ Impossible de convertir '{column_name}' même en string: {e2}")
+    
+    return result_df
+
+
+def align_column_order(df1, df2):
+    """Aligne l'ordre des colonnes entre deux DataFrames spark"""
+
+    cols1 = df1.columns
+    cols2 = df2.columns
+    
+    # Utiliser l'ordre du premier DataFrame comme référence
+    reference_order = cols1
+    
+    # Réorganiser le deuxième DataFrame
+    df2_aligned = df2.select(*reference_order)
+    
+    print(f"✓ Colonnes alignées selon l'ordre: {reference_order}")
+    
+    return df1, df2_aligned

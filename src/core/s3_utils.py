@@ -13,13 +13,13 @@ from pandas import Series
 import pyarrow.parquet as pq
 from pandas import DataFrame as DF
 
-# import dask.dataframe as dd
 from core.config import *
 from core.env_utils import get_env_var
 from core.pandas_utils import str_split_and_retain_src
 import tempfile
 from pyspark.sql import SparkSession
-
+from pyspark.sql.functions import regexp_extract, col
+from core.spark_utils import align_column_order
 
 class S3_Bucket:
     def __init__(self, creds: dict[str, str] = None):
@@ -98,12 +98,21 @@ class S3_Bucket:
         s3_path = f"s3a://{self.bucket_name}/{key}"
 
         try:
+            print('s3_path')
+            print(s3_path)
             # Essayer de lire le fichier existant
             processed = spark.read.parquet(s3_path)
+
+            print(df.columns)
+
+            processed, df = align_column_order(processed, df)
+
+            
 
             # Vérifier si le DataFrame n'est pas vide
             if processed.count() > 0:
                 df_write = processed.union(df).dropDuplicates()
+
             else:
                 df_write = df
 
@@ -119,13 +128,12 @@ class S3_Bucket:
                 # Autre erreur, on la relance
                 raise e
 
-            # Coalescer pour optimiser le nombre de partitions
-            df_optimized = df_write.repartition("vin").coalesce(1)
 
-            # Écriture optimisée
-            df_optimized.write.mode("overwrite").option(
-                "parquet.compression", "snappy"
-            ).option("parquet.block.size", 67108864).partitionBy("vin").parquet(s3_path)
+        print(df_write.explain(mode="formatted"))
+        # Écriture optimisée
+        df_write.write.mode("overwrite").option(
+            "parquet.compression", "snappy"
+        ).option("parquet.block.size", 67108864).partitionBy("vin").parquet(s3_path)
 
     # This should be moved else wehere as this is a method specific to the way BIB oragnizes its responses.
     # Ideally this would be moved to transform.raw_tss.

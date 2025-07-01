@@ -1,7 +1,7 @@
 from pyspark.sql import functions as F, Window, SparkSession
 from pyspark.sql import DataFrame
-from pyspark.sql.types import DoubleType
 from core.s3_utils import S3_Bucket
+from core.spark_utils import create_spark_session, safe_astype_spark_with_error_handling_results
 from transform.raw_results.config import *
 from core.caching_utils import CachedETLSpark
 from transform.processed_tss.ProcessedTimeSeriesSpark import ProcessedTimeSeries
@@ -33,6 +33,7 @@ class RawResult(CachedETLSpark):
             DataFrame: DataFrame traité avec les métriques calculées
         """
         window_spec = Window.partitionBy("vin", "in_charge_idx").orderBy("date")
+
         df = ProcessedTimeSeries(self.make, spark=self.spark).data
         # Agrégation des données
         results = df.groupBy("vin", "in_charge_idx").agg(
@@ -52,7 +53,6 @@ class RawResult(CachedETLSpark):
             F.first("tesla_code", ignorenulls=True).alias("tesla_code"),
         )
         print("agg done")
-        print(df)
         # Calcul de la différence SOC
         results = self._compute_soc_diff(df, results, window_spec)
         
@@ -74,8 +74,13 @@ class RawResult(CachedETLSpark):
         
         # Calcul des cycles (nécessite la fonction estimate_cycles)
         results = self._estimate_cycles(results)
-        
-        return results
+
+        # Pour faciliter l'union des dataframes avec Spark
+        results = safe_astype_spark_with_error_handling_results(results)
+        print('astype done')
+
+
+        return results.cache()
     
     def _compute_soc_diff(self, df: DataFrame, results: DataFrame,  window_spec) -> DataFrame:
         """
@@ -174,3 +179,27 @@ class RawResult(CachedETLSpark):
                                               F.lit(initial_range)).otherwise(F.col("range"))) * 
                                       ((F.when(F.col("soh").isNull() | F.isnan(F.col("soh")), 
                                                F.lit(default_soh)).otherwise(F.col("soh"))) + F.lit(1)) / F.lit(2))))
+
+
+    @classmethod
+    def update_all_raw_results(cls, spark:SparkSession, **kwargs):
+        for make in MAKES_WITHOUT_SOH:
+            RawResult(make, spark=spark, **kwargs)
+
+
+if __name__ == "__main__":
+
+    # Initialisation
+    bucket = S3_Bucket()
+
+    # Création de la session Spark
+    creds = bucket.get_creds_from_dot_env()
+    spark_session = create_spark_session(
+        creds["aws_access_key_id"], creds["aws_secret_access_key"]
+    )
+    
+    RawResult.update_all_raw_results(spark=spark_session, force_update=True)
+
+    if "spark_session" in locals():
+        spark_session.stop()
+
