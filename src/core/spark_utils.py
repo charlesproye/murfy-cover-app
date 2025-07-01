@@ -2,7 +2,7 @@
 
 import os
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, lit
 from pyspark.sql.types import (
     FloatType,
     TimestampType,
@@ -11,7 +11,6 @@ from pyspark.sql.types import (
     IntegerType,
     DoubleType,
 )
-from transform.processed_tss.config import COL_DTYPES
 
 
 LIST_COL_TO_DROP = ["model"]
@@ -27,18 +26,18 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
     )
 
     g1gc_options = (
-        "-XX:+UseG1GC "                    # Activer G1GC
-        "-XX:MaxGCPauseMillis=100 "        # Pause GC max de 100ms
-        "-XX:G1HeapRegionSize=32m "        # Taille des régions G1
-        "-XX:+UseStringDeduplication "     # Déduplication des chaînes
-        "-XX:+UnlockExperimentalVMOptions " # Débloquer les options expérimentales
-        "-XX:+UseZGC "                     # ZGC pour les gros heaps (Java 11+)
-        "-XX:+DisableExplicitGC "          # Désactiver System.gc()
-        "-XX:+UseGCOverheadLimit "         # Activer la limite de surcharge GC
-        "-XX:GCTimeRatio=9 "               # Ratio temps GC vs temps application
-        "-XX:+PrintGCDetails "             # Logs détaillés du GC (optionnel)
-        "-XX:+PrintGCTimeStamps "          # Timestamps dans les logs GC
-        "-Xloggc:/tmp/spark-gc.log"        # Fichier de log GC
+        "-XX:+UseG1GC "  # Activer G1GC
+        "-XX:MaxGCPauseMillis=100 "  # Pause GC max de 100ms
+        "-XX:G1HeapRegionSize=32m "  # Taille des régions G1
+        "-XX:+UseStringDeduplication "  # Déduplication des chaînes
+        "-XX:+UnlockExperimentalVMOptions "  # Débloquer les options expérimentales
+        "-XX:+UseZGC "  # ZGC pour les gros heaps (Java 11+)
+        "-XX:+DisableExplicitGC "  # Désactiver System.gc()
+        "-XX:+UseGCOverheadLimit "  # Activer la limite de surcharge GC
+        "-XX:GCTimeRatio=9 "  # Ratio temps GC vs temps application
+        "-XX:+PrintGCDetails "  # Logs détaillés du GC (optionnel)
+        "-XX:+PrintGCTimeStamps "  # Timestamps dans les logs GC
+        "-Xloggc:/tmp/spark-gc.log"  # Fichier de log GC
     )
     spark = (
         SparkSession.builder.appName("Scaleway S3 Read JSON")
@@ -54,7 +53,7 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
             "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
         )
         .config("spark.executor.memory", "10g")  # Garder une mémoire suffisante
-        .config("spark.driver.memory", "10g")    # Garder une mémoire suffisante
+        .config("spark.driver.memory", "10g")  # Garder une mémoire suffisante
         .config("spark.driver.maxResultSize", "4g")
         # Configuration G1GC pour les executors
         .config("spark.executor.extraJavaOptions", g1gc_options)
@@ -69,7 +68,6 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
 
 
 def explode_data_spark(response: dict, spark: SparkSession):
-    #### dépolaceer dans transform.raw_tss.parsing -> parsing_fleet_teleemtry
     """
     Parse dict from api response
 
@@ -110,6 +108,10 @@ def explode_data_spark(response: dict, spark: SparkSession):
 
 
 def timedelta_to_interval(td):
+    """
+    Convert a timedelta to an interval
+    """
+
     total_seconds = int(td.total_seconds())
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -226,10 +228,10 @@ def safe_astype_spark_with_error_handling_results(ptss):
     """
     Conversion sécurisée des types pour les colonnes spécifiées
     """
-    
+
     existing_columns = set(ptss.columns)
     result_df = ptss
-    
+
     # Mapping des types pandas vers Spark
     COL_DTYPES = {
         # String/Object types
@@ -237,11 +239,9 @@ def safe_astype_spark_with_error_handling_results(ptss):
         "version": StringType(),
         "model": StringType(),
         "tesla_code": StringType(),
-        
         # Integer types
         "in_charge_idx": IntegerType(),
         "size": IntegerType(),
-        
         # Float32 -> FloatType (Spark FloatType = 32-bit)
         "ac_energy_added_min": FloatType(),
         "dc_energy_added_min": FloatType(),
@@ -254,7 +254,6 @@ def safe_astype_spark_with_error_handling_results(ptss):
         "ac_energy_added": FloatType(),
         "dc_energy_added": FloatType(),
         "energy_added": FloatType(),
-        
         # Float64 -> DoubleType (Spark DoubleType = 64-bit)
         "soc_diff": DoubleType(),
         "net_capacity": DoubleType(),
@@ -264,11 +263,10 @@ def safe_astype_spark_with_error_handling_results(ptss):
         "level_2": DoubleType(),
         "level_3": DoubleType(),
         "cycles": DoubleType(),
-        
         # Datetime
         "date": TimestampType(),
     }
-    
+
     for column_name, target_type in COL_DTYPES.items():
         if column_name in existing_columns:
             try:
@@ -283,25 +281,68 @@ def safe_astype_spark_with_error_handling_results(ptss):
                     result_df = result_df.withColumn(
                         column_name, col(column_name).cast(StringType())
                     )
-                    print(f"  → Colonne '{column_name}' convertie en StringType (fallback)")
+                    print(
+                        f"  → Colonne '{column_name}' convertie en StringType (fallback)"
+                    )
                 except Exception as e2:
-                    print(f"  ❌ Impossible de convertir '{column_name}' même en string: {e2}")
-    
+                    print(
+                        f"  ❌ Impossible de convertir '{column_name}' même en string: {e2}"
+                    )
+
     return result_df
 
 
-def align_column_order(df1, df2):
-    """Aligne l'ordre des colonnes entre deux DataFrames spark"""
 
-    cols1 = df1.columns
-    cols2 = df2.columns
-    
-    # Utiliser l'ordre du premier DataFrame comme référence
-    reference_order = cols1
-    
-    # Réorganiser le deuxième DataFrame
-    df2_aligned = df2.select(*reference_order)
-    
-    print(f"✓ Colonnes alignées selon l'ordre: {reference_order}")
-    
-    return df1, df2_aligned
+def align_dataframes_for_union(df1, df2, strategy="intersection"):
+    """
+    Aligne deux DataFrames pour l'union
+
+    Args:
+        df1, df2: DataFrames à unir
+        strategy: "intersection" (colonnes communes) ou "union" (toutes les colonnes)
+    """
+
+    cols1 = set(df1.columns)
+    cols2 = set(df2.columns)
+
+    print(f"DataFrame 1: {len(cols1)} colonnes")
+    print(f"DataFrame 2: {len(cols2)} colonnes")
+
+    if strategy == "intersection":
+        # Utiliser seulement les colonnes communes
+        common_cols = cols1 & cols2
+        print(f"Colonnes communes: {len(common_cols)}")
+
+        # Colonnes manquantes dans chaque DataFrame
+        missing_in_df1 = cols2 - cols1
+        missing_in_df2 = cols1 - cols2
+
+        if missing_in_df1:
+            print(f"Colonnes manquantes dans df1: {missing_in_df1}")
+        if missing_in_df2:
+            print(f"Colonnes manquantes dans df2: {missing_in_df2}")
+
+        # Sélectionner seulement les colonnes communes
+        df1_aligned = df1.select(*sorted(common_cols))
+        df2_aligned = df2.select(*sorted(common_cols))
+
+    elif strategy == "union":
+        # Utiliser toutes les colonnes, ajouter des colonnes NULL pour les manquantes
+        all_cols = sorted(cols1 | cols2)
+        print(f"Toutes les colonnes: {len(all_cols)}")
+
+        # Ajouter les colonnes manquantes à df1
+        for col in all_cols:
+            if col not in cols1:
+                df1 = df1.withColumn(col, lit(None).cast("string"))
+
+        # Ajouter les colonnes manquantes à df2
+        for col in all_cols:
+            if col not in cols2:
+                df2 = df2.withColumn(col, lit(None).cast("string"))
+
+        df1_aligned = df1.select(*all_cols)
+        df2_aligned = df2.select(*all_cols)
+
+    return df1_aligned, df2_aligned
+

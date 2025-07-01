@@ -184,7 +184,7 @@ class RawResult(CachedETLSpark):
     @classmethod
     def update_all_raw_results(cls, spark:SparkSession, **kwargs):
         for make in MAKES_WITHOUT_SOH:
-            RawResult(make, spark=spark, **kwargs)
+            RawResult(make, spark=spark, **kwargs).run()
 
 
 if __name__ == "__main__":

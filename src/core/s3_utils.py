@@ -19,7 +19,8 @@ from core.pandas_utils import str_split_and_retain_src
 import tempfile
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import regexp_extract, col
-from core.spark_utils import align_column_order
+from core.spark_utils import align_dataframes_for_union
+
 
 class S3_Bucket:
     def __init__(self, creds: dict[str, str] = None):
@@ -98,19 +99,14 @@ class S3_Bucket:
         s3_path = f"s3a://{self.bucket_name}/{key}"
 
         try:
-            print('s3_path')
-            print(s3_path)
             # Essayer de lire le fichier existant
             processed = spark.read.parquet(s3_path)
 
-            print(df.columns)
-
-            processed, df = align_column_order(processed, df)
-
-            
-
             # Vérifier si le DataFrame n'est pas vide
             if processed.count() > 0:
+                processed, df = align_dataframes_for_union(
+                    processed, df, strategy="intersection"
+                )
                 df_write = processed.union(df).dropDuplicates()
 
             else:
@@ -128,12 +124,10 @@ class S3_Bucket:
                 # Autre erreur, on la relance
                 raise e
 
-
-        print(df_write.explain(mode="formatted"))
         # Écriture optimisée
-        df_write.write.mode("overwrite").option(
-            "parquet.compression", "snappy"
-        ).option("parquet.block.size", 67108864).partitionBy("vin").parquet(s3_path)
+        df_write.coalesce(20).write.mode("overwrite").option("parquet.compression", "snappy").option(
+            "parquet.block.size", 67108864
+        ).partitionBy("vin").parquet(s3_path)
 
     # This should be moved else wehere as this is a method specific to the way BIB oragnizes its responses.
     # Ideally this would be moved to transform.raw_tss.
