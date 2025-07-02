@@ -1,7 +1,14 @@
 MAKES_WITHOUT_SOH = [
-  'bmw',
-  'kia',
+    "tesla-fleet-telemetry",
+    "bmw",
+    "mercedes-benz",
+    "ford",
+    "volvo-cars",
+    "stellantis",
+    "kia",
+    "renault",
 ]
+
 
 LEVEL_1_MAX_POWER = 8 #this is to approximate the power of the charger that can go up to 7 kW
 LEVEL_2_MAX_POWER = 45 #this is to approximate the power of the charger that can go up to 44 kW
@@ -12,7 +19,7 @@ MERCEDES_SOH_MODEL_CALCULATIONS:dict[str,str] = {
     'default': "estimated_range / soc / range",
 }
 
-RAW_RESULTS_CACHE_KEY_TEMPLATE = "raw_results/{make}_spark.parquet"
+RAW_RESULTS_CACHE_KEY_TEMPLATE = "raw_results/spark_{make}.parquet"
 
 TESLA_USE_COLS = [
     "vin",

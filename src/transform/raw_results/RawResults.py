@@ -36,6 +36,7 @@ class RawResult(CachedETLSpark):
 
         df = ProcessedTimeSeries(self.make, spark=self.spark).data
         # Agrégation des données
+
         results = df.groupBy("vin", "in_charge_idx").agg(
             F.min("ac_charge_energy_added").alias("ac_energy_added_min"),
             F.min("dc_charge_energy_added").alias("dc_energy_added_min"),
@@ -52,23 +53,24 @@ class RawResult(CachedETLSpark):
             F.expr("percentile_approx(dc_charging_power, 0.5)").alias("dc_charging_power"),
             F.first("tesla_code", ignorenulls=True).alias("tesla_code"),
         )
+
         print("agg done")
         # Calcul de la différence SOC
         results = self._compute_soc_diff(df, results, window_spec)
-        
+
         # Calcul de la puissance de charge
         results = self._compute_charging_power(results)
+
+        
         
         # Calcul de l'énergie ajoutée
         results = self._compute_energy_added(results)
         
         # Calcul du SOH (State of Health)
-        print(results)
         results = SOH_FUNCTION[self.make](results)
         
         # Calcul des niveaux de charge
         results = self._compute_charge_levels(results)
-        print(results)
         # Tri des résultats
         results = results.orderBy("tesla_code", "vin", "date")
         
@@ -78,7 +80,6 @@ class RawResult(CachedETLSpark):
         # Pour faciliter l'union des dataframes avec Spark
         results = safe_astype_spark_with_error_handling_results(results)
         print('astype done')
-
 
         return results.cache()
     
@@ -94,13 +95,12 @@ class RawResult(CachedETLSpark):
         Returns:
             DataFrame: df avec soc_diff ajouté
         """
-        df = df.withColumn("soc_start",  F.first("soc").over(window_spec))
-        df = df.withColumn("soc_end",  F.last("soc").over(window_spec))
-        df = df.withColumn("soc_diff", F.col("soc_start") - F.col("soc_end"))
-        print("soc diff done")
-        
-        # Ajouter soc_diff aux résultats
-        soc_diff_df = df.select("vin", "in_charge_idx", "soc_diff").distinct()
+        soc_diff_df = df.groupBy("vin", "in_charge_idx").agg(
+            F.first("soc").alias("soc_start"),
+            F.last("soc").alias("soc_end")
+        ).withColumn("soc_diff", F.col("soc_start") - F.col("soc_end"))
+
+
         results = results.join(soc_diff_df, on=["vin", "in_charge_idx"], how="left")
         print("soc diff merge done")
         

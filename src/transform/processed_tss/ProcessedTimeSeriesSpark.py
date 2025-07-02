@@ -58,6 +58,8 @@ class ProcessedTimeSeries(CachedETLSpark):
         self.id_col = id_col
         self.max_td = max_td
         self.spark = spark
+        # self.spark.conf.set("spark.sql.shuffle.partitions", "50") # Conf adapté au volume de données
+
         super().__init__(
             S3_PROCESSED_TSS_KEY_FORMAT.format(make=make),
             "s3",
@@ -76,7 +78,7 @@ class ProcessedTimeSeries(CachedETLSpark):
         tss = tss.orderBy(["vin", "date"])
         tss = self.compute_date_vars(tss)
         tss = self.compute_charge_n_discharge_vars(tss)
-        tss = tss.join(self.spark.createDataFrame(fleet_info), "vin", "left")
+        tss = tss.repartition("vin").join(self.spark.createDataFrame(fleet_info), "vin", "left")
         tss = tss.sort("vin", ascending=True)
         return tss.cache()
 
@@ -131,7 +133,7 @@ class ProcessedTimeSeries(CachedETLSpark):
             df[cum_var_col] = cum
             return df
 
-        return tss.groupBy(self.id_col).apply(integrate_trapezoid)
+        return tss.repartition("vin").groupBy(self.id_col).apply(integrate_trapezoid)
 
     def compute_date_vars(self, tss: DF) -> DF:
         # Créer une fenêtre par vin, ordonnée par date
@@ -413,6 +415,7 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             )
             .withColumn("prev_trend", lag("trend", 1).over(vin_window))
             .withColumn("prev_prev_trend", lag("trend", 2).over(vin_window))
+            .withColumn("prev_prev_prev_trend", lag("trend", 3).over(vin_window))
             .withColumn("prev_date", lag("date", 1).over(vin_window))
             .withColumn(
                 "time_diff_min",
@@ -423,8 +426,9 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
                 "trend_change",
                 when(
                     (
-                        (col("trend") != col("prev_trend"))
-                        & (col("prev_trend") == col("prev_prev_trend"))
+                        (col("trend") == col("prev_trend"))
+                        & (col("prev_trend") != col("prev_prev_trend"))
+                        & (col("prev_prev_trend") == col("prev_prev_prev_trend"))
                     )
                     | col("time_gap"),
                     lit(1),
@@ -449,7 +453,7 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         )
 
         # 6. Join avec le DataFrame original
-        tss = tss.join(
+        tss = tss.repartition("vin").join(
             tss_na.select("vin", "date", "soc", "soc_diff", "in_charge_idx"),
             on=["vin", "date", "soc"],
             how="left",
