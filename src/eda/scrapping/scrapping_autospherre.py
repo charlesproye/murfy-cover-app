@@ -17,10 +17,10 @@ from core.gsheet_utils import *
 from transform.insights_results.config_trendlines import TYPE_MAPPING
 
 BASE_URL = "https://www.autosphere.fr"
-SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Fiat&fuel_type=Electrique&from={}"#"https://www.autosphere.fr/recherche?fuel_type=Electrique&from={}"
+SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Mercedes,Bmw,Nissan,Mini,Volkswagen,Volvo,Ford,Ds,Opel,Audi,Kia,Toyota,Peugeot,Dacia,Renault,Hyundai,Lexus,Seat,Mitsubishi,Mg&fuel_type=Electrique&from={}"
 STEP = 23
 START_OFFSET = 0
-STOP_OFFSET = 20
+STOP_OFFSET = 10000
 
 
 def get_all_vehicle_links():
@@ -93,7 +93,7 @@ def extract_aviloo_data_from_pdf(pdf_path):
         lines = full_text.splitlines()
 
         for line in lines:
-            print(line)
+            line_lower = line.lower()
             if result["SoH"] is None and ("soh" in line_lower or "état de santé" in line_lower):
                 match = re.search(r"(\d{1,3}[.,]?\d{0,2})\s*%", line)
                 if match:
@@ -140,8 +140,6 @@ def extract_vehicle_info(link, car_nbr):
             if re.search(battery_pattern, text) and not battery_capacity:
                 battery_capacity = re.search(battery_pattern, text).group(0)
             
-
-            
         try:
             aviloo_link_elem = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[href*='certs.aviloo.com/pdf']")))
             pdf_url = aviloo_link_elem.get_attribute("href")
@@ -180,7 +178,7 @@ def extract_vehicle_info(link, car_nbr):
         infos["Type"] = version_complete
         infos["Modèle"] = modele
         infos['Année'] = int(annee) if annee else None
-        infos['battery_capacity'] = battery_capacity else None
+        infos['battery_capacity'] = battery_capacity if battery_capacity else None
     finally:    
         driver.quit()
     return infos
@@ -188,9 +186,15 @@ def extract_vehicle_info(link, car_nbr):
 
 def main():
     all_links = get_all_vehicle_links()
+    print(len(all_links))
+    data_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
+    df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
+
+    links_not_fetch = set(all_links) - set(df_sheet['lien'])
+    print(len(links_not_fetch))
     all_infos = {}
 
-    for i, link in enumerate(all_links, start=1):
+    for i, link in enumerate(links_not_fetch, start=1):
         print(f"[{i}] Récupération des infos depuis : {link}")
         try:
             info = extract_vehicle_info(link, i)
@@ -200,14 +204,11 @@ def main():
         time.sleep(1)
     # Bien ordonner les colonnes par rapoort à la gsheet
 
-    infos_clean = pd.DataFrame(all_infos).T.dropna(subset='SoH')[["OEM","Modèle","Type","Année","Odomètre (km)","SoH", "lien"]]
-    data_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
-    df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
+    infos_clean = pd.DataFrame(all_infos).T.dropna(subset='SoH')[["OEM","Modèle","Type","Année","Odomètre (km)","SoH", "lien", "battery_capacity"]]
+    
+    print(infos_clean)
     print(infos_clean.shape)
-    df_filtré = infos_clean[~infos_clean['lien'].isin(df_sheet['lien'])]
-    df_filtré['Type'] =  df_filtré['Type'].map(TYPE_MAPPING)
-    print(df_filtré.shape) 
-    export_to_excel(df_filtré, "202505 - Courbes SoH", "Courbes OS")
+    export_to_excel(infos_clean, "202505 - Courbes SoH", "Courbes OS")
 
 
 if __name__ == "__main__":
