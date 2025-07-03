@@ -3,15 +3,15 @@ from core.sql_utils import *
 
 
 
-def find_db_type(row, db_df):
-    """_summary_
+def uniform_vehicules_type(row, db_df):
+    """Permet d'uniformiser les types de véhicules avec ceux présent dans la db 
 
     Args:
         row (pd.Series): 
         db_df (pd.DataFrame): dataframe avec les colonnes model_name, id, type, oem_name, capacity
 
     Returns:
-        uuid.UUID: id du modèle
+        str: type du modèle présent sur dbeaver
     """
 
 #__________ Faire tourner cette requête en dehors pour récupérer les infos nécessaires sur la db_________
@@ -48,15 +48,15 @@ def find_db_type(row, db_df):
             # Si +sieurs batterie -> type le plus ressemblant
             match_type = process.extractOne(version_target, closest_rows['type'], scorer=fuzz.token_sort_ratio)
             match_model_type, score, index = match_type
-            return closest_rows.loc[index, "id"]
+            return closest_rows.loc[index, "type"]
 
-        else:  
-            if subset['type'] is None:
-                 return None
-            
-            # type le plus ressemblant
-            match_type = process.extractOne(version_target, subset['type'], scorer=fuzz.token_sort_ratio)
-            match_model_type, score, index = match_type
-            return subset.loc[index, "id"]
+        # si on a pas de type dans dbeaver après le masking
+        if subset['type'] is None:
+            return None
+        
+        # type le plus ressemblant sans batterie 
+        match_type = process.extractOne(version_target, subset['type'], scorer=fuzz.token_sort_ratio)
+        match_model_type, score, index = match_type
+        return subset.loc[index, "type"]
 
         
