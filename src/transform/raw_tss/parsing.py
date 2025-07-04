@@ -2,8 +2,10 @@ from pyspark.sql import SparkSession
 from core.pandas_utils import DF
 from core.pandas_utils import parse_unstructured_json
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, BooleanType, LongType
+from core.time_utils import get_next_scheduled_timestamp
 
 LIST_COL_TO_DROP = ["model"]
+
 
 
 def parse_high_mobility(response, spark, vin: str):
@@ -18,7 +20,7 @@ def parse_high_mobility(response, spark, vin: str):
     Returns:
         spark.DataFrame: Data with every columns
     """
-    
+
     flattened_response = {}
 
     for capability, variables in response.items():
@@ -30,11 +32,15 @@ def parse_high_mobility(response, spark, vin: str):
                 variable_name = capability + "." + variable
 
                 if isinstance(element["data"], dict):
-                    if not "value" in element["data"]:
-                        continue
-                    value = element["data"]["value"]
-                    if "unit" in element:
-                        variable_name += "." + element["unit"]
+                    if "value" in element["data"] or "time" in element['data']:
+                        if "value" in element['data']:
+                            value = element["data"]["value"]
+                        else:
+                            value = get_next_scheduled_timestamp(element['timestamp'], element['data'])
+                        if "unit" in element:
+                            variable_name += "." + element["unit"]
+                    else:
+                        continue            
                 else:
                     value = element["data"]
 
@@ -156,7 +162,6 @@ def parse_mobilisight(response: dict, spark: SparkSession):
         .rename(columns={"datetime": "readable_date"})
     )
 
-    print(df.shape)
 
     return spark.createDataFrame(df)
 
