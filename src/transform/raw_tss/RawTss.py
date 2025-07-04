@@ -6,18 +6,19 @@ from pyspark.sql.functions import col, to_timestamp, expr, collect_list
 from pyspark.sql import DataFrame, SparkSession
 from functools import reduce
 from rich.progress import track
-from core.s3_utils import S3_Bucket
+from core.s3.s3_utils import S3Service
 from core.env_utils import get_env_var
 from core.spark_utils import *
 from core.caching_utils import CachedETLSpark, cache_result_spark
 from core.console_utils import main_decorator
 from core.pandas_utils import DF
+from core.s3.settings import S3Settings
+from dotenv import load_dotenv
 from transform.raw_tss.config import (
     GET_PARSING_FUNCTIONS,
     S3_RAW_TSS_KEY_FORMAT,
     ALL_MAKES,
 )
-
 
 #### A SUPPRIMER
 
@@ -47,12 +48,12 @@ class RawTss(CachedETLSpark):
 
         Args:
             make: Marque du véhicule
-            bucket: Instance S3_Bucket pour l'accès aux données
+            bucket: Instance S3Service pour l'accès aux données
             spark: Session Spark pour le traitement des données
         """
         self.spark = spark
         self.make = make
-        self.bucket = S3_Bucket()
+        self.bucket = S3Service()
         self.base_s3_path = f"s3a://{get_env_var('S3_BUCKET')}"
         super().__init__(
             S3_RAW_TSS_KEY_FORMAT.format(brand=make),
@@ -94,7 +95,7 @@ class RawTss(CachedETLSpark):
             keys = self.get_response_keys_to_parse()
             logger.info("keys loaded")
             # Correction: passer self.spark au lieu de spark
-            new_raw_tss = self.get_raw_tss_from_keys_spark(keys, 50)
+            new_raw_tss = self.get_raw_tss_from_keys_spark(keys)
             logger.info("new_raw_tss loaded")
             return new_raw_tss
 
@@ -302,8 +303,6 @@ class RawTss(CachedETLSpark):
                                 batch_data.append(rows)
                         except Exception as e:
                             logger.error(f"Error parsing response: {e}")
-                    print("batch_data ", len(batch_data))
-                    print("batch_data ", batch_data[0].columns)
                     # Union des données du batch
                     if batch_data:
                         batch_df = reduce(
@@ -371,15 +370,16 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     try:
+
+        load_dotenv()
+
         # Initialisation
-        bucket = S3_Bucket()
+        bucket = S3Service()
+        settings = S3Settings()
         # Correction: passer la marque en paramètre
 
         # Création de la session Spark
-        creds = bucket.get_creds_from_dot_env()
-        spark_session = create_spark_session(
-            creds["aws_access_key_id"], creds["aws_secret_access_key"]
-        )
+        spark_session = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
 
         logger.info("Spark session launched")
 
