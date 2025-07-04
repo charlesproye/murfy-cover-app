@@ -7,7 +7,7 @@ def uniform_vehicules_type(row, db_df):
     """Permet d'uniformiser les types de véhicules avec ceux présent dans la db 
 
     Args:
-        row (pd.Series): 
+        row (pd.Series): avec les infos du vin min required column: oem, Modèle, Type 
         db_df (pd.DataFrame): dataframe avec les colonnes model_name, id, type, oem_name, capacity
 
     Returns:
@@ -24,9 +24,9 @@ def uniform_vehicules_type(row, db_df):
 #                                   join OEM o on vm.oem_id=o.id
 #                                   join battery b on b.id=vm.battery_id;"""), con)
 #___________________________________________________________________________________________________________
+
     
-    
-    #On récupère les infos 
+    #On récupère les infos
     oem = row['OEM'].lower()
     model_target = row['Modèle'].lower()
     version_target = row['Type'].lower()
@@ -39,7 +39,7 @@ def uniform_vehicules_type(row, db_df):
         match_model_name, score, index = match_model
         # filtre sur le nom du modèle
         subset = subset[subset['model_name']==match_model_name]
-        # on cherche la batetrie qui avec la capacité la + proche
+        # on cherche la batetrie avec la capacité la + proche
         if row['battery_capacity'] != 'unknown':
             battery_target = float(row['battery_capacity'].replace('kWh', '').replace('kwh', '').strip())
             subset["distance"] = (subset["capacity"] - battery_target).abs()
