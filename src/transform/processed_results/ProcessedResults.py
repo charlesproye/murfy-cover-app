@@ -122,8 +122,7 @@ class ProcessedResults():
     def update_vehicle_data_table(cls, spark):
         processed_results = []
         logger.info("Updating 'vehicle_data' table.")
-        # for make in GET_RESULTS_FUNCS.keys():
-        for make in ["tesla-fleet-telemetry"]:
+        for make in GET_RESULTS_FUNCS.keys():
             if make == "tesla-fleet-telemetry":
                 cls = ProcessedResults
                 processed_result = cls(make=make, spark=spark).run()

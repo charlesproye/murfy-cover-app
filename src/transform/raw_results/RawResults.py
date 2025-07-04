@@ -95,11 +95,12 @@ class RawResult(CachedETLSpark):
         Returns:
             DataFrame: df avec soc_diff ajouté
         """
-        soc_diff_df = df.groupBy("vin", "in_charge_idx").agg(
-            F.first("soc").alias("soc_start"),
-            F.last("soc").alias("soc_end")
-        ).withColumn("soc_diff", F.col("soc_start") - F.col("soc_end"))
 
+
+        soc_diff_df = df.groupBy("vin", "in_charge_idx").agg(
+            F.first(F.when(F.col("soc").isNotNull(), F.col("soc")), ignorenulls=True).alias("soc_start"),
+            F.last(F.when(F.col("soc").isNotNull(), F.col("soc")), ignorenulls=True).alias("soc_end")
+        ).withColumn("soc_diff", F.col("soc_end") - F.col("soc_start"))
 
         results = results.join(soc_diff_df, on=["vin", "in_charge_idx"], how="left")
         print("soc diff merge done")

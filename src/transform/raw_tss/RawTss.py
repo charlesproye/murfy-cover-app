@@ -1,5 +1,6 @@
 from typing import Optional, List
 import logging
+from datetime import datetime
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType
 from pyspark.sql.functions import col, to_timestamp, expr, collect_list
 from pyspark.sql import DataFrame, SparkSession
@@ -17,6 +18,13 @@ from transform.raw_tss.config import (
     ALL_MAKES,
 )
 
+
+#### A SUPPRIMER
+
+# Désactiver seulement les warnings de connection pool
+urllib3_logger = logging.getLogger("urllib3.connectionpool")
+urllib3_logger.setLevel(logging.ERROR)
+####
 
 # Configuration du logger
 logger = logging.getLogger(__name__)
@@ -86,7 +94,7 @@ class RawTss(CachedETLSpark):
             keys = self.get_response_keys_to_parse()
             logger.info("keys loaded")
             # Correction: passer self.spark au lieu de spark
-            new_raw_tss = self.get_raw_tss_from_keys_spark(keys)
+            new_raw_tss = self.get_raw_tss_from_keys_spark(keys, 50)
             logger.info("new_raw_tss loaded")
             return new_raw_tss
 
@@ -253,7 +261,7 @@ class RawTss(CachedETLSpark):
             all_data = []
 
             # Traitement par batch
-            batch_size = 200  # Ajustable
+            batch_size = 100  # Ajustable
             all_keys_to_process = []
             vin_key_mapping = {}
 
@@ -267,10 +275,12 @@ class RawTss(CachedETLSpark):
 
             logger.info(f"Total keys to process: {len(all_keys_to_process)}")
 
+
             if not all_keys_to_process:
                 df.unpersist()
                 return self._create_empty_raw_tss_schema()
 
+        
             # Traitement par batch des fichiers S3
             for i in track(
                 range(0, len(all_keys_to_process), batch_size),
@@ -279,20 +289,23 @@ class RawTss(CachedETLSpark):
                 batch_keys = all_keys_to_process[i : i + batch_size]
 
                 try:
+
                     responses = self.bucket.read_multiple_json_files(
                         batch_keys, max_workers=128
                     )  # Est ce qu'on ne peut pas agréger les json auparavant pour limiter les partitions ?
                     batch_data = []
-                    for response in responses:
+                    for path, response in zip(batch_keys, responses):
                         try:
+                            vin = path.split('/')[-2] # Nécessaire pour parsing HM
                             rows = self._parse_response(
-                                response=response, spark=self.spark
+                                response=response, spark=self.spark, vin=vin
                             )
                             if rows is not None and rows.count() > 0:
                                 batch_data.append(rows)
                         except Exception as e:
                             logger.error(f"Error parsing response: {e}")
-
+                    print('batch_data ', len(batch_data))
+                    print('batch_data ', batch_data[0].columns)
                     # Union des données du batch
                     if batch_data:
                         batch_df = reduce(
@@ -335,6 +348,8 @@ class RawTss(CachedETLSpark):
                 "spark.sql.adaptive.shuffle.targetPostShuffleInputSize", "64MB"
             )
             self.spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
+            self.spark.conf.set("spark.sql.adaptive.advisoryPartitionSizeInBytes", "128m")
+            self.spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
             logger.info("Optimisations Spark configurées")
         except Exception as e:
             logger.error(
@@ -344,8 +359,8 @@ class RawTss(CachedETLSpark):
     @classmethod
     def update_all_tss(cls, spark, **kwargs):
         for make in ALL_MAKES:
-            cls = RawTss
-            cls(make, force_update=True, spark=spark, **kwargs)
+                cls = RawTss
+                cls(make, force_update=True, spark=spark, **kwargs)
 
 
 @main_decorator
