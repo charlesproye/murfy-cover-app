@@ -52,6 +52,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     # Mercedes
     "charging.max_range": "max_range",
     "charging.charging_rate": "charging_rate",
+    "charging.fully_charged_end_times": "fully_charged_end_times",
     # BMW
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
@@ -310,7 +311,7 @@ CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
     "kia",
-    "renault",
+    "renault"
 ]
 MAX_TD = TD(hours=1, minutes=30)
 
