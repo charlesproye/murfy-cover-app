@@ -5,7 +5,7 @@ import pandas as pd
 
 from sqlalchemy import text
 
-from transform.insights_results.trendlines import get_trendlines
+from load.trendline.trendlines import get_trendlines
 from core.stats_utils import log_function
 from core.sql_utils import engine
 from core.gsheet_utils import *
