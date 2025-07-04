@@ -29,7 +29,7 @@ def uniform_vehicules_type(row, db_df):
     #On récupère les infos
     oem = row['OEM'].lower()
     model_target = row['Modèle'].lower()
-    version_target = row['Type'].lower()
+    type_target = row['Type'].lower()
     # filtre sur l'oem 
     subset = db_df[db_df['oem_name'] == oem].copy()
     
@@ -46,7 +46,7 @@ def uniform_vehicules_type(row, db_df):
             min_distance = subset["distance"].min()
             closest_rows = subset[subset["distance"] == min_distance]
             # Si +sieurs batterie -> type le plus ressemblant
-            match_type = process.extractOne(version_target, closest_rows['type'], scorer=fuzz.token_sort_ratio)
+            match_type = process.extractOne(type_target, closest_rows['type'], scorer=fuzz.token_sort_ratio)
             match_model_type, score, index = match_type
             return closest_rows.loc[index, "type"]
 
@@ -55,7 +55,7 @@ def uniform_vehicules_type(row, db_df):
             return None
         
         # type le plus ressemblant sans batterie 
-        match_type = process.extractOne(version_target, subset['type'], scorer=fuzz.token_sort_ratio)
+        match_type = process.extractOne(type_target, subset['type'], scorer=fuzz.token_sort_ratio)
         match_model_type, score, index = match_type
         return subset.loc[index, "type"]
 
