@@ -134,8 +134,6 @@ def left_merge_rdb_table_spark(
     
     return result
 
-def truncate_rdb_table_and_insert_df(df: DF, table_name: str, src_dest_cols: dict[str, str]|list[str], logger:Logger=logger) -> DF:
-=======
 def truncate_rdb_table_and_insert_df(
         df: DF, 
         table_name: str, 
@@ -143,7 +141,6 @@ def truncate_rdb_table_and_insert_df(
         is_prod: bool = False,
         logger: Logger=logger
     ) -> DF:
->>>>>>> dev
     """
     Warp around `DataFram.to_sql`.    
     Instead of appending on the table or deleting it and creating a new one with the same name, we simply empty the table and fill it with the DF.
@@ -180,7 +177,8 @@ def truncate_rdb_table_and_insert_df_spark(
     df, 
     table_name: str, 
     src_dest_cols: dict[str, str]|list[str], 
-    logger: Logger=logger
+    logger: Logger=logger,
+    is_prod: bool = False,
 ):
     """
     Version Spark de truncate_rdb_table_and_insert_df
@@ -199,7 +197,7 @@ def truncate_rdb_table_and_insert_df_spark(
     df = df.select(list(src_dest_cols.values()))
     
     # Check for a required not null "id" column in the table
-    inspector = inspect(engine)
+    inspector = inspect(get_sqlalchemy_engine(is_prod))
     table_columns_info = inspector.get_columns(table_name)
     notna_cols = [col['name'] for col in table_columns_info if not col['nullable']]
     
@@ -223,7 +221,7 @@ def truncate_rdb_table_and_insert_df_spark(
     df_pandas = df.toPandas()
     
     # Update the table
-    with engine.begin() as conn:  
+    with get_sqlalchemy_engine(is_prod).begin() as conn:  
         conn.execute(text(f"DELETE FROM {table_name}"))  # Delete all rows
         df_pandas.to_sql(table_name, conn, if_exists="append", index=False)
     
