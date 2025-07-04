@@ -13,11 +13,12 @@ from ..services.activation_service import VehicleActivationService
 from core.sql_utils import get_connection
 
 class VehicleProcessor:
-    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, renault_api: callable, df: pd.DataFrame):
+    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, tesla_particulier_api: callable, renault_api: callable, df: pd.DataFrame):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
         self.tesla_api = tesla_api
+        self.tesla_particulier_api = tesla_particulier_api
         self.renault_api = renault_api
         self.df = df
     
@@ -57,7 +58,7 @@ class VehicleProcessor:
             return cursor.fetchone()[0]
         return result[0]
 
-    async def _get_fleet_id(self, cursor, owner: str) -> Optional[str]:
+    async def  _get_fleet_id(self, cursor, owner: str) -> Optional[str]:
         """Get Fleet ID by owner name."""
         cursor.execute(
             "SELECT id FROM fleet WHERE LOWER(fleet_name) = LOWER(%s)",
@@ -194,13 +195,13 @@ class VehicleProcessor:
                                 
                                 # Insert new vehicle
                                 vehicle_id = str(uuid.uuid4())
-                                cursor.execute("INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, end_of_contract_date, start_date, activation_status, is_displayed) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (vehicle_id, vin, fleet_id, region_id, model_id, vehicle['licence_plate'], vehicle['end_of_contract'], start_date, vehicle['real_activation'], vehicle['EValue']))
+                                cursor.execute("INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, end_of_contract_date, start_date, activation_status, is_displayed,is_eligible) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (vehicle_id, vin, fleet_id, region_id, model_id, vehicle['licence_plate'], vehicle['end_of_contract'], start_date, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility']))
                                 logging.info(f"New Tesla vehicle inserted in DB VIN: {vin}")
                             else:
                                 # CASE 2: Vehicle exists
                                 vehicle_id = result[0]
                                 model_id = result[1]
-                                cursor.execute("UPDATE vehicle SET activation_status = %s, is_displayed = %s WHERE id = %s", (vehicle['real_activation'], vehicle['EValue'], vehicle_id))
+                                cursor.execute("UPDATE vehicle SET activation_status = %s, is_displayed = %s, is_eligible = %s WHERE id = %s", (vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vehicle_id))
                                 logging.info(f"Updated Tesla vehicle in DB VIN: {vin}")
                                 # Check current model version
                                 cursor.execute("SELECT version FROM vehicle_model WHERE id = %s", (model_id,))
@@ -234,6 +235,95 @@ class VehicleProcessor:
         except Exception as e:
             logging.error(f"Error in Tesla processing: {str(e)}")
             raise
+    
+    async def process_tesla_particulier(self) -> None:
+        """Process Tesla particulier vehicles."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                with get_connection() as con:
+                    cursor = con.cursor()
+                    cursor.execute("SELECT vin FROM tesla.user")
+                    vins = cursor.fetchall()
+                    for vin in vins:
+                        try:
+                            vin = vin[0]
+                            model_code = vin[3]
+                            model_name = TESLA_MODEL_MAPPING.get(model_code, 'unknown')
+                            logging.info(f"Processing Tesla particulier vehicle {vin} with model {model_name}")
+                            cursor.execute("SELECT full_name FROM tesla.user WHERE vin = %s", (vin,))
+                            user_info = cursor.fetchone()
+                            owner = user_info[0]
+                            fleet_id = await self._get_fleet_id(cursor, owner)
+                            region_id = await self._get_or_create_region(cursor, 'France')
+                            
+                            # Check if vehicle exists
+                            cursor.execute("SELECT id, vehicle_model_id FROM vehicle WHERE vin = %s", (vin,))
+                            result = cursor.fetchone()
+
+                            if not result:
+                                # CASE 1: Vehicle doesn't exist
+                                cursor.execute("SELECT access_token FROM tesla.user WHERE vin = %s", (vin,))
+                                access_token = cursor.fetchone()[0]
+                                version, type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
+                                warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
+                                
+                                # Create/get model and related records
+                                model_id = await self._get_or_create_tesla_model(cursor, model_name, type, version, 'tesla', 'tesla', warranty_km, warranty_date)
+                                
+                                # Insert new vehicle
+                                vehicle_id = str(uuid.uuid4())
+                                cursor.execute("""
+                                    INSERT INTO vehicle (
+                                        id, vin, fleet_id, region_id, vehicle_model_id,
+                                        licence_plate, end_of_contract_date, start_date,
+                                        activation_status, is_displayed
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """, (
+                                    vehicle_id, vin, fleet_id, region_id, model_id,
+                                    None, None, start_date, True, True
+                                ))
+                                logging.info(f"New Tesla particulier vehicle inserted in DB VIN: {vin}")
+                            else:
+                                # CASE 2: Vehicle exists
+                                vehicle_id = result[0]
+                                model_id = result[1]
+                                
+                                # Check current model version
+                                cursor.execute("SELECT version FROM vehicle_model WHERE id = %s", (model_id,))
+                                current_version = cursor.fetchone()[0]
+                                
+                                if current_version == 'MTU':
+                                    # CASE 2.2: Current version is unknown, check API
+                                    cursor.execute("SELECT access_token FROM tesla.user_tokens JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id WHERE vin = %s", (vin,))
+                                    access_token = cursor.fetchone()[0]
+                                    api_version, type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
+                                    
+                                    if api_version != 'MTU':
+                                        # Only update if API returns a known version
+                                        warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
+                                        new_model_id = await self._get_or_create_tesla_model(cursor, model_name, type, api_version, 'tesla', 'tesla', warranty_km, warranty_date)
+                                        
+                                        # Update vehicle with new model
+                                        cursor.execute("UPDATE vehicle SET vehicle_model_id = %s WHERE id = %s", (new_model_id, vehicle_id))
+                                else:
+                                    cursor.execute("SELECT access_token FROM tesla.user_tokens JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id WHERE vin = %s", (vin,))
+                                    access_token = cursor.fetchone()[0]
+                                    warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
+                                    cursor.execute("""
+                                        UPDATE vehicle_model 
+                                        SET warranty_km = COALESCE(warranty_km, %s),
+                                            warranty_date = COALESCE(warranty_date, %s)
+                                        WHERE id = %s
+                                    """, (warranty_km, warranty_date, model_id))
+
+                            con.commit()
+                        except Exception as e:
+                            logging.error(f"Error processing Tesla particulier vehicle {vin}: {str(e)}")
+                            con.rollback()
+                            continue
+        except Exception as e:
+            logging.error(f"Error in Tesla particulier processing: {str(e)}")
+            raise
 
     async def process_renault(self) -> None:
         """Process Renault vehicles."""
@@ -252,9 +342,8 @@ class VehicleProcessor:
                             vehicle_exists = cursor.fetchone()
                             vehicle_exists = vehicle_exists[0] if vehicle_exists else None
                             
-                            
                             if not vehicle_exists:
-                                #Since each api call to get static infromatino is billed. We are limiting the call only to vehicles that are not in the db
+                                #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
                                 model_name, type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
                                 logging.info(f"Processing Renault vehicle {vin} | {model_name} | {type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
                                 model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, type, version, vehicle['make'], vehicle['oem'])
@@ -288,11 +377,65 @@ class VehicleProcessor:
         except Exception as e:
             logging.error(f"Error in Renault processing: {str(e)}")
             raise
+    async def process_bmw(self) -> None:
+        """Process BMW vehicles."""
+        try:
+            bmw_df = self.df[(self.df['oem'] == 'bmw') & (self.df['real_activation'] == True)]
+            async with aiohttp.ClientSession() as session:
+                with get_connection() as con:
+                    cursor = con.cursor()
+                    for _, vehicle in bmw_df.iterrows():
+                        try:
+                            vin = vehicle['vin']
+                            fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+                            region_id = await self._get_or_create_region(cursor, vehicle['country'])
+                            #Check if vehicle exists
+                            cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
+                            vehicle_exists = cursor.fetchone()
+                            vehicle_exists = vehicle_exists[0] if vehicle_exists else None
+
+                            if not vehicle_exists:
+                                #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
+                                model_name, model_type = await self.bmw_api.get_data(session, vin)
+                                print(model_name, model_type)
+                                logging.info(f"Processing BMW vehicle {vin} | {model_name} | {model_type}")
+                                model_id = await self._get_or_create_other_model(cursor, model_name, model_type, 'unknown', vehicle['make'], vehicle['oem'])
+                                vehicle_id = str(uuid.uuid4())
+                                insert_query = """
+                                    INSERT INTO vehicle (
+                                        id, vin, fleet_id, region_id, vehicle_model_id,
+                                        licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """
+                                cursor.execute(
+                                    insert_query,
+                                    (
+                                        vehicle_id, vin, fleet_id, region_id, model_id,
+                                        vehicle['licence_plate'], vehicle['end_of_contract'], vehicle['start_date'], vehicle['real_activation'], vehicle['EValue'], 
+                                        vehicle['eligibility']
+                                    )
+                                )
+                                logging.info(f"New BMW vehicle inserted in DB VIN: {vehicle['vin']}")
+                            else:
+                                cursor.execute(
+                                    "UPDATE vehicle SET activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                    (vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vin)
+                                )
+                            con.commit()
+                        except Exception as e:
+                            logging.error(f"Error processing BMW vehicle {vehicle['vin']}: {str(e)}")
+                            con.rollback()
+                            continue
+        except Exception as e:
+            logging.error(f"Error in BMW processing: {str(e)}")
+            raise
+                            
+                            
 
     async def process_other_vehicles(self) -> None:
         """Process other vehicles."""
         try:
-            other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['oem'] != 'renault') & (self.df['oem'].notna()) & (self.df['oem'] != '') & (self.df['real_activation'] == True)]
+            other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['oem'] != 'renault') & (self.df['oem'] != 'bmw') & (self.df['oem'].notna()) & (self.df['oem'] != '') & (self.df['real_activation'] == True)]
             with get_connection() as con:
                 cursor = con.cursor()
                 for _, vehicle in other_df.iterrows():

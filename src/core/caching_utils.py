@@ -8,11 +8,17 @@ import logging
 import pandas as pd
 from pandas import DataFrame as DF
 
+<<<<<<< HEAD
 from core.s3_utils import S3_Bucket
 from core.singleton_s3_bucket import bucket
 from core.spark_utils import create_spark_session
 from core.config import *
 from pyspark.sql import SparkSession
+=======
+from .s3.s3_utils import S3Service
+from .singleton_s3_bucket import S3
+from .config import *
+>>>>>>> dev
 
 
 R = TypeVar("R")

@@ -5,9 +5,11 @@ import json
 import time
 import aiohttp
 import asyncio
+import logging
 from typing import Dict, Optional, Tuple
 from pathlib import Path
 from enum import Enum
+from core.env_utils import get_env_var
 
 class RenaultAPIError(Exception):
     """Base exception for Renault API errors"""
@@ -187,7 +189,7 @@ class RenaultApi:
             Returns default values ("renault model unknown", "renault version unknown", "renault type unknown", None) if API call fails
         """
         try:
-            url = f"{os.getenv('RENAULT_API_URL')}/vehicle-information/v1/vehicles/{vin}"
+            url = f"{get_env_var('RENAULT_API_URL')}/vehicle-information/v1/vehicles/{vin}"
             max_retries = 3
             retry_count = 0
             
@@ -197,7 +199,7 @@ class RenaultApi:
                     headers = {
                         "Authorization": f"Bearer {access_token}",
                         "accept": "application/json",
-                        "apiKey": f"{os.getenv('RENAULT_API_KEY')}"
+                        "apiKey": f"{get_env_var('RENAULT_API_KEY')}"
                     }
                     
                     async with session.get(url, headers=headers) as response:
@@ -287,7 +289,7 @@ class RenaultApi:
             Returns 0 if API call fails
         """
         try:
-            url = f"{os.getenv('RENAULT_API_URL')}/import-vehicle-info/v1/wltp/vin?vin={vin}"
+            url = f"{get_env_var('RENAULT_API_URL')}/import-vehicle-info/v1/wltp/vin?vin={vin}"
             max_retries = 3
             retry_count = 0
             
@@ -297,7 +299,7 @@ class RenaultApi:
                     headers = {
                         "Authorization": f"Bearer {access_token}",
                         "accept": "application/json",
-                        "apiKey": os.getenv("RENAULT_API_KEY")
+                        "apiKey": get_env_var("RENAULT_API_KEY")
                     }
                     
                     async with session.get(url, headers=headers) as response:

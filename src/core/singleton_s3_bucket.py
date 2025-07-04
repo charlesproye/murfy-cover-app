@@ -1,3 +1,3 @@
-from core.s3_utils import S3_Bucket
+from .s3.s3_utils import S3Service
 
-bucket = S3_Bucket()
+S3 = S3Service()

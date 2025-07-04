@@ -1,4 +1,4 @@
-from core.s3_utils import S3_Bucket
+from .s3.s3_utils import S3Service
 import logging
 
 def main():
@@ -7,7 +7,7 @@ def main():
     logger = logging.getLogger(__name__)
     
     # Initialize S3 bucket connection
-    s3 = S3_Bucket()
+    s3 = S3Service()
     
     # Define the folder to delete
     cache_folder = "raw_tss/tesla/parsed_responses_cache/"

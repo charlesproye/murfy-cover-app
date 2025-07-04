@@ -7,9 +7,9 @@ import numpy as np
 
 from rich.progress import track
 
-from transform.raw_tss.config import *
+from .config import *
 from core.pandas_utils import concat, explode_data
-from core.s3_utils import S3_Bucket
+from core.s3.s3_utils import S3Service
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
 from core.logging_utils import set_level_of_loggers_with_prefix
@@ -24,7 +24,7 @@ def main():
     # print(sanity_check(get_raw_tss(force_update=True)))
 
 @cache_result(FLEET_TELEMETRY_RAW_TSS_KEY, on="s3")
-def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
+def get_raw_tss(bucket: S3Service = S3Service()) -> DF:
     logger.debug("Getting raw tss from responses provided by tesla fleet telemetry.")
     keys = get_response_keys_to_parse(bucket)
     if bucket.check_file_exists(FLEET_TELEMETRY_RAW_TSS_KEY):
@@ -36,7 +36,7 @@ def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
         new_raw_tss = get_raw_tss_from_keys(keys, bucket)
         return new_raw_tss
 
-def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
+def get_response_keys_to_parse(bucket:S3Service) -> DF:
     if bucket.check_file_exists(FLEET_TELEMETRY_RAW_TSS_KEY):
         raw_tss_subset, _ = bucket.read_parquet_df(FLEET_TELEMETRY_RAW_TSS_KEY, columns=["vin", "readable_date"])
     else:
@@ -58,41 +58,8 @@ def parse_and_explode(response):
     df = DF.from_records(response)
     return explode_data(df)
 
-# def get_raw_tss_from_keys(keys: DF, bucket: S3_Bucket, batch_size: int = 500) -> DF:
-#     raw_tss = []
 
-#     # Trier les clés pour un traitement reproductible
-#     keys = keys.sort_values("date")
-
-#     # Découpage en batches fixes
-#     key_batches = np.array_split(keys, len(keys) // batch_size + 1)
-
-#     for i, batch_keys in track(enumerate(key_batches), total=len(key_batches), description="Processing batches"):
-#         batch_date_range = f"{batch_keys['date'].min().date()} → {batch_keys['date'].max().date()}"
-#         logger.debug(f"[Batch {i+1}/{len(key_batches)}] Parsing {len(batch_keys)} responses:")
-#         logger.debug(f"- Vins: {batch_keys['vin'].nunique()}")
-#         logger.debug(f"- Date range: {batch_date_range}")
-#         logger.debug(f"- {round(len(batch_keys) / len(keys) * 100)}% of total keys")
-
-#         # Lecture + parsing combinée
-#         def load_and_parse(key):
-#             try:
-#                 response = bucket.read_json(key)
-#                 return explode_data(DF.from_records(response))
-#             except Exception as e:
-#                 logger.warning(f"Failed to process key {key}: {e}")
-#                 return pd.DataFrame()  # Skip on failure
-
-#         with ProcessPoolExecutor(max_workers=64) as executor:
-#             batch_dfs = list(executor.map(load_and_parse, batch_keys["key"].tolist()))
-
-#         batch_raw_tss = pd.concat(batch_dfs, ignore_index=True)
-#         raw_tss.append(batch_raw_tss)
-#         logger.debug(f"- Batch parsed and concatenated\n")
-
-#     return concat(raw_tss, ignore_index=True)
-
-def get_raw_tss_from_keys(keys:DF, bucket:S3_Bucket) -> DF:
+def get_raw_tss_from_keys(keys:DF, bucket:S3Service) -> DF:
     raw_tss = []
     grouped = keys.groupby(pd.Grouper(key='date', freq='W-MON'))
     grouped_items = list(grouped)

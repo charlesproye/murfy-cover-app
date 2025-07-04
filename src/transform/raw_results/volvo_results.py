@@ -20,6 +20,7 @@ def main():
         .agg({
             "soh": "median",
             "odometer": "last",
+            "consumption": "mean",
         })
         .reset_index()
     )

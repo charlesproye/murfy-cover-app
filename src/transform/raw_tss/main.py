@@ -3,7 +3,7 @@ import inspect
 
 from pandas import DataFrame as DF
 
-from core.s3_utils import S3_Bucket
+from core.s3.s3_utils import S3Service
 from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
 from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
@@ -13,7 +13,7 @@ from transform.raw_tss.mobilisight_raw_tss import get_raw_tss as mobilisight_get
 from transform.raw_tss.fleet_telemetry_raw_tss import get_raw_tss as fleet_telemetry_raw_tss
 from transform.raw_tss.spark_raw_tss import get_raw_tss as get_raw_tss_spark
 
-GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3_Bucket], DF]] = {
+GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3Service], DF]] = {
     # Stellantis
     "stellantis":       mobilisight_get_raw_tss,
     # BMW
