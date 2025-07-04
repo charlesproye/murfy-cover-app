@@ -275,12 +275,10 @@ class RawTss(CachedETLSpark):
 
             logger.info(f"Total keys to process: {len(all_keys_to_process)}")
 
-
             if not all_keys_to_process:
                 df.unpersist()
                 return self._create_empty_raw_tss_schema()
 
-        
             # Traitement par batch des fichiers S3
             for i in track(
                 range(0, len(all_keys_to_process), batch_size),
@@ -296,7 +294,7 @@ class RawTss(CachedETLSpark):
                     batch_data = []
                     for path, response in zip(batch_keys, responses):
                         try:
-                            vin = path.split('/')[-2] # Nécessaire pour parsing HM
+                            vin = path.split("/")[-2]  # Nécessaire pour parsing HM
                             rows = self._parse_response(
                                 response=response, spark=self.spark, vin=vin
                             )
@@ -304,8 +302,8 @@ class RawTss(CachedETLSpark):
                                 batch_data.append(rows)
                         except Exception as e:
                             logger.error(f"Error parsing response: {e}")
-                    print('batch_data ', len(batch_data))
-                    print('batch_data ', batch_data[0].columns)
+                    print("batch_data ", len(batch_data))
+                    print("batch_data ", batch_data[0].columns)
                     # Union des données du batch
                     if batch_data:
                         batch_df = reduce(
@@ -348,7 +346,9 @@ class RawTss(CachedETLSpark):
                 "spark.sql.adaptive.shuffle.targetPostShuffleInputSize", "64MB"
             )
             self.spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
-            self.spark.conf.set("spark.sql.adaptive.advisoryPartitionSizeInBytes", "128m")
+            self.spark.conf.set(
+                "spark.sql.adaptive.advisoryPartitionSizeInBytes", "128m"
+            )
             self.spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
             logger.info("Optimisations Spark configurées")
         except Exception as e:
@@ -358,9 +358,10 @@ class RawTss(CachedETLSpark):
 
     @classmethod
     def update_all_tss(cls, spark, **kwargs):
-        for make in ALL_MAKES:
-                cls = RawTss
-                cls(make, force_update=True, spark=spark, **kwargs)
+        # for make in ALL_MAKES:
+        for make in ["mercedes-benz"]:
+            cls = RawTss
+            cls(make, force_update=True, spark=spark, **kwargs)
 
 
 @main_decorator
