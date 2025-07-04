@@ -2,7 +2,7 @@ from pyspark.sql import SparkSession
 from core.pandas_utils import DF
 from core.pandas_utils import parse_unstructured_json
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, BooleanType, LongType
-from core.time_utils import get_next_scheduled_timestamp
+from utils import get_next_scheduled_timestamp
 
 LIST_COL_TO_DROP = ["model"]
 
@@ -46,16 +46,19 @@ def parse_high_mobility(response, spark, vin: str):
 
                 if isinstance(value, (int, float)):
                     value = float(value)
-
+                variable_name = variable_name.replace(".", "_")
                 flattened_response[timestamp] = flattened_response.get(
                     timestamp, {}
                 ) | {variable_name: value}
 
+
+
     data_list = []
     for timestamp, variables in flattened_response.items():
-        row = {"timestamp": timestamp, "vin": vin}
+        row = {"readable_date": timestamp, "vin": vin}
         row.update(variables)
         data_list.append(row)
+
 
     raw_ts = spark.createDataFrame(data_list)
     return raw_ts
@@ -130,7 +133,7 @@ def parse_bmw(response: dict, spark):
             value = key_value["value"]
             
             if date not in date_groups:
-                date_groups[date] = {"vin": vin, "date_of_value": date}
+                date_groups[date] = {"vin": vin, "readable_date": date}
             
             date_groups[date][key] = value
         
