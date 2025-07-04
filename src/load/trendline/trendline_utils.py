@@ -1,7 +1,7 @@
 
 import numpy as np
 import json
-from core.sql_utils import get_sqlalchemy_engine()
+from core.sql_utils import get_sqlalchemy_engine
 from scipy.optimize import curve_fit
 from sqlalchemy.sql import text
 from core.stats_utils import log_function
@@ -15,7 +15,7 @@ def compute_trendline_bounds(true, fit, window_size=50):
     smooth = np.linspace(local_std[0], local_std[-1], len(local_std))
     return fit - smooth, fit + smooth
 
-def generate_trendline_functions(x_sorted, y_lower, y_upper, coef_min=None, coef_max=None):
+def get_bound_coef(x_sorted, y_lower, y_upper, coef_min=None, coef_max=None):
     def log_func_min(x, a, b): return coef_max + a * np.log1p(x / b) if coef_min is not None else y_lower.max() + a * np.log1p(x / b)
     def log_func_max(x, a, b): return coef_min + a * np.log1p(x / b) if coef_max is not None else y_upper.max() + a * np.log1p(x / b)
     coef_lower, _ = curve_fit(log_func_min, x_sorted, y_lower, maxfev=10000)
@@ -66,7 +66,7 @@ def clean_battery_data(df, soh_colum, odometer_column):
         DataFrame nettoyé
     """
     df_clean = df.copy()
-    df_clean = df_clean.raname(columns={odometer_column: 'odometer', soh_colum:'soh'})
+    df_clean = df_clean.rename(columns={odometer_column: 'odometer', soh_colum:'soh'})
     df_clean = df_clean.drop(df_clean[(df_clean['odometer'] < 20000) & (df_clean['soh'] < .95)].index)
     df_clean = df_clean.drop(df_clean[(df_clean['soh'] < .8)].index)
     df_clean = df.dropna(subset=["soh", "odometer"])
@@ -135,7 +135,7 @@ def compute_main_trendline(x_sorted, y_sorted):
                            bounds=([.97, -np.inf, -np.inf], [1.03, np.inf, np.inf]))
     y_fit = log_function(x_sorted, *coef_mean)
     y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
-    coef_lower, coef_upper = generate_trendline_functions(coef_mean[0], x_sorted, y_lower, y_upper)
+    coef_lower, coef_upper = get_bound_coef(coef_mean[0], x_sorted, y_lower, y_upper)
     mean, upper, lower = build_trendline_expressions(coef_mean, coef_lower, coef_upper, y_lower, y_upper)
     return coef_mean, coef_lower, coef_upper,  mean, upper, lower
 
@@ -167,7 +167,7 @@ def compute_upper_bound(df, trendline, coef_mean):
                                 bounds=([.97, -np.inf, -np.inf], [1.03, np.inf, np.inf]))
     y_fit = log_function(x_sorted, *coef_mean_upper)
     y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
-    coef_lower_borne_sup, coef_upper_borne_sup = generate_trendline_functions(coef_mean[0], x_sorted, y_lower, y_upper)
+    coef_lower_borne_sup, coef_upper_borne_sup = get_bound_coef(coef_mean[0], x_sorted, y_lower, y_upper)
     new_upper = build_trendline_expressions(coef_mean, coef_lower_borne_sup, coef_upper_borne_sup, y_lower, y_upper)
     upper_bound = new_upper[1]
     return upper_bound
@@ -201,7 +201,7 @@ def compute_lower_bound(df, trendlines, coef_mean):
                                 bounds=([.97, -np.inf, -np.inf], [1.03, np.inf, np.inf]))
     y_fit = log_function(x_sorted, *coef_mean_upper)
     y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
-    coef_lower_borne_sup, coef_upper_borne_sup = generate_trendline_functions(coef_mean[0], x_sorted, y_lower, y_upper)
+    coef_lower_borne_sup, coef_upper_borne_sup = get_bound_coef(coef_mean[0], x_sorted, y_lower, y_upper)
     new_upper = build_trendline_expressions(coef_mean, coef_lower_borne_sup, coef_upper_borne_sup, y_lower, y_upper)
     upper_bound = new_upper[1]
     return upper_bound
