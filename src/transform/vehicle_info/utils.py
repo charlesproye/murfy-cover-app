@@ -36,8 +36,8 @@ def uniform_vehicules_type(type_car, oem_name, model_name, db_df, battery_capaci
     # filtre sur l'oem 
     subset = db_df[db_df['oem_name'] == oem_name].copy()
     # Trouver la meilleure correspondance
-    # Retourne le modèle le plus proche score_cutoff fixé a 0 pour le moment pour être sur d'avoir un retour
-    match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio)
+    # Retourne le modèle le plus proche score_cutoff fixé a 0.1 pour le moment pour être presque sur d'avoir un retour 
+    match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio, score_cutoff=.1)
     if match_model :
         match_model_name, score, index = match_model
         # filtre sur le nom du modèle
