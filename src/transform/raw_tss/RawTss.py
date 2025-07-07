@@ -357,8 +357,8 @@ class RawTss(CachedETLSpark):
 
     @classmethod
     def update_all_tss(cls, spark, **kwargs):
-        # for make in ALL_MAKES:
-        for make in ["mercedes-benz"]:
+        for make in ALL_MAKES:
+        # for make in ["mercedes-benz"]:
             cls = RawTss
             cls(make, force_update=True, spark=spark, **kwargs)
 
