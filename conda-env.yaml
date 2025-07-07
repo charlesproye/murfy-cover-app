@@ -52,4 +52,6 @@ dependencies:
       - pydantic>=1.10.13
       - sqlmodel==0.0.24
       - pydantic-settings==2.2.1
+      - beautifulsoup4=4.13.4
+      - selenium=4.33.0
 
