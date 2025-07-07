@@ -28,32 +28,35 @@ def uniform_vehicules_type(type_car, oem_name, model_name, db_df, battery_capaci
 #                                   join battery b on b.id=vm.battery_id;"""), con)
 #___________________________________________________________________________________________________________
 
-    
-    #On récupère les infos
+    #On met tout en minuscule les infos
     oem_name = oem_name.lower()
     model_name = model_name.lower()
     type_car = type_car.lower()
-    # filtre sur l'oem 
+    
+    # filtre sur l'oem
     subset = db_df[db_df['oem_name'] == oem_name].copy()
+    
     # Trouver la meilleure correspondance
-    # Retourne le modèle le plus proche score_cutoff fixé a 0.1 pour le moment pour être presque sur d'avoir un retour 
+    # Retourne le modèle le plus proche score_cutoff fixé à 0.1 pour le moment pour être presque sur d'avoir un retour
     match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio, score_cutoff=.1)
+
     if match_model :
         match_model_name, score, index = match_model
         # filtre sur le nom du modèle
         subset = subset[subset['model_name']==match_model_name]
+
         # on cherche la batetrie avec la capacité la + proche
         try:
             battery_target = float(battery_capacity.replace('kWh', '').replace('kwh', '').strip())
             subset["distance"] = (subset["capacity"] - battery_target).abs()
             min_distance = subset["distance"].min()
             closest_rows = subset[subset["distance"] == min_distance]
-            # Si +sieurs batterie -> type le plus ressemblant
+            # Si +sieurs batteries -> type le plus ressemblant
             match_type = process.extractOne(type_car, closest_rows['type'], scorer=fuzz.token_sort_ratio)
             match_model_type, score, index = match_type
             return closest_rows.loc[index, "type"]
-        
-        # type le plus ressemblant sans batterie 
+
+        # type le plus ressemblant sans batterie
         except:
             match_type = process.extractOne(type_car, subset['type'], scorer=fuzz.token_sort_ratio)
             match_model_type, score, index = match_type
