@@ -8,17 +8,14 @@ import logging
 import pandas as pd
 from pandas import DataFrame as DF
 
-<<<<<<< HEAD
-from core.s3_utils import S3_Bucket
-from core.singleton_s3_bucket import bucket
-from core.spark_utils import create_spark_session
-from core.config import *
+
+from .spark_utils import create_spark_session
 from pyspark.sql import SparkSession
-=======
+
 from .s3.s3_utils import S3Service
 from .singleton_s3_bucket import S3
 from .config import *
->>>>>>> dev
+from .s3.settings import S3Settings
 
 
 R = TypeVar("R")
@@ -33,7 +30,8 @@ class CachedETL(DF, ABC):
         path: str,
         on: str,
         force_update: bool = False,
-        bucket: S3_Bucket = bucket,
+        bucket: S3Service = S3,
+        settings: S3Settings = S3Settings(),
         **kwargs,
     ):
         """
@@ -46,7 +44,7 @@ class CachedETL(DF, ABC):
         - path (str): Path for the cache file.
         - on (str): Either 's3' or 'local_storage', specifying the type of caching.
         - force_update (bool): If True, regenerate and cache the result even if it exists.
-        - bucket_instance (S3_Bucket): S3 bucket instance, defaults to the global bucket.
+        - bucket_instance (S3Service): S3 bucket instance, defaults to the global bucket.
         """
         assert on in [
             "s3",
@@ -73,6 +71,8 @@ class CachedETL(DF, ABC):
 
         super().__init__(data)
 
+        self.settings = settings
+
     @abstractmethod
     def run(self) -> DF:
         """Abstract method to be implemented by subclasses to generate the DataFrame."""
@@ -85,7 +85,8 @@ class CachedETLSpark(ABC):
         path: str,
         on: str,
         force_update: bool = False,
-        bucket: S3_Bucket = bucket,
+        bucket: S3Service = S3,
+        settings: S3Settings = S3Settings(),
         spark: SparkSession = None,
         **kwargs,
     ):
@@ -99,13 +100,13 @@ class CachedETLSpark(ABC):
         - path (str): Path for the cache file.
         - on (str): Either 's3' or 'local_storage', specifying the type of caching.
         - force_update (bool): If True, regenerate and cache the result even if it exists.
-        - bucket_instance (S3_Bucket): S3 bucket instance, defaults to the global bucket.
+        - bucket_instance (S3Service): S3 bucket instance, defaults to the global bucket.
         """
 
         if spark is None:
             spark = create_spark_session(
-                S3_Bucket.get_creds_from_dot_env()["aws_access_key_id"],
-                S3_Bucket.get_creds_from_dot_env()["aws_secret_access_key"],
+                settings.S3_KEY,
+                settings.S3_SECRET
             )
         self._spark = spark
         assert on in [
@@ -130,6 +131,7 @@ class CachedETLSpark(ABC):
                 self.data = bucket.read_parquet_df_spark(spark, path, **kwargs)
             elif on == "local_storage":
                 self.data = spark.read.parquet(path, **kwargs)
+        self.settings = settings
 
     @abstractmethod
     def run(self) -> DF:
@@ -259,7 +261,7 @@ def cache_result_spark(path_template: str, on: str, path_params: List[str] = [])
 
 def get_bucket_from_func_args(
     func: Callable, *args, **kwargs
-) -> tuple[S3_Bucket, bool]:
+) -> tuple[S3Service, bool]:
     signature = inspect.signature(func)  # Get the function's signature
     bound_args = signature.bind_partial(
         *args, **kwargs

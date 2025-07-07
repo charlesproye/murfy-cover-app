@@ -6,7 +6,7 @@ from pyspark.sql.functions import col, to_timestamp, expr, collect_list
 from pyspark.sql import DataFrame, SparkSession
 from functools import reduce
 from rich.progress import track
-from core.s3_utils import S3_Bucket
+from core.s3.s3_utils import S3Service
 from core.env_utils import get_env_var
 from core.spark_utils import *
 from core.caching_utils import CachedETLSpark, cache_result_spark
@@ -17,6 +17,7 @@ from transform.raw_tss.config import (
     S3_RAW_TSS_KEY_FORMAT,
     ALL_MAKES,
 )
+from core.s3.settings import S3Settings
 
 
 #### A SUPPRIMER
@@ -52,7 +53,7 @@ class RawTss(CachedETLSpark):
         """
         self.spark = spark
         self.make = make
-        self.bucket = S3_Bucket()
+        self.bucket = S3Service()
         self.base_s3_path = f"s3a://{get_env_var('S3_BUCKET')}"
         super().__init__(
             S3_RAW_TSS_KEY_FORMAT.format(brand=make),
@@ -372,13 +373,14 @@ def main():
 
     try:
         # Initialisation
-        bucket = S3_Bucket()
+        bucket = S3Service()
+
+        settings = S3Settings()
         # Correction: passer la marque en paramètre
 
-        # Création de la session Spark
-        creds = bucket.get_creds_from_dot_env()
         spark_session = create_spark_session(
-            creds["aws_access_key_id"], creds["aws_secret_access_key"]
+            settings.S3_KEY,
+            settings.S3_SECRET
         )
 
         logger.info("Spark session launched")

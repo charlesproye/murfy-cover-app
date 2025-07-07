@@ -3,7 +3,7 @@ from pyspark.sql.types import FloatType, TimestampType, StringType, BooleanType
 from pandas import Timedelta as TD
 import pandas as pd
 
-S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss_spark.parquet'
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss_spark_v2.parquet'
 
 ODOMETER_MILES_TO_KM = {
     "tesla": 1.60934,
