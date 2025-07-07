@@ -3,15 +3,18 @@ from core.sql_utils import *
 
 
 
-def uniform_vehicules_type(row, db_df):
-    """Permet d'uniformiser les types de véhicules avec ceux présent dans la db 
+def uniform_vehicules_type(type_car, oem_name, model_name, db_df, battery_capacity=None):
+    """_summary_
 
     Args:
-        row (pd.Series): avec les infos du vin min required column: oem, Modèle, Type 
-        db_df (pd.DataFrame): dataframe avec les colonnes model_name, id, type, oem_name, capacity
+        type_car (str): type car to find match
+        oem_name (str): oem car
+        model_name (str): model car
+        db_df (pd.DataFrame): db with all the model in dbeaver
+        battery_capacity (str, optional): capacity car battery. Defaults to None.
 
     Returns:
-        str: type du modèle présent sur dbeaver
+        str: type le plus proche présent dans la db de vehicle_model
     """
 
 #__________ Faire tourner cette requête en dehors pour récupérer les infos nécessaires sur la db_________
@@ -27,36 +30,36 @@ def uniform_vehicules_type(row, db_df):
 
     
     #On récupère les infos
-    oem = row['OEM'].lower()
-    model_target = row['Modèle'].lower()
-    type_target = row['Type'].lower()
+    oem_name = oem_name.lower()
+    model_name = model_name.lower()
+    type_car = type_car.lower()
     # filtre sur l'oem 
-    subset = db_df[db_df['oem_name'] == oem].copy()
-    
+    subset = db_df[db_df['oem_name'] == oem_name].copy()
     # Trouver la meilleure correspondance
-    match_model = process.extractOne(model_target, subset['model_name'], scorer=fuzz.token_sort_ratio)
+    # Retourne le modèle le plus proche score_cutoff fixé a 0 pour le moment pour être sur d'avoir un retour
+    match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio)
     if match_model :
         match_model_name, score, index = match_model
         # filtre sur le nom du modèle
         subset = subset[subset['model_name']==match_model_name]
         # on cherche la batetrie avec la capacité la + proche
-        if row['battery_capacity'] != 'unknown':
-            battery_target = float(row['battery_capacity'].replace('kWh', '').replace('kwh', '').strip())
+        try:
+            battery_target = float(battery_capacity.replace('kWh', '').replace('kwh', '').strip())
             subset["distance"] = (subset["capacity"] - battery_target).abs()
             min_distance = subset["distance"].min()
             closest_rows = subset[subset["distance"] == min_distance]
             # Si +sieurs batterie -> type le plus ressemblant
-            match_type = process.extractOne(type_target, closest_rows['type'], scorer=fuzz.token_sort_ratio)
+            match_type = process.extractOne(type_car, closest_rows['type'], scorer=fuzz.token_sort_ratio)
             match_model_type, score, index = match_type
             return closest_rows.loc[index, "type"]
-
-        # si on a pas de type dans dbeaver après le masking
-        if subset['type'] is None:
-            return None
         
         # type le plus ressemblant sans batterie 
-        match_type = process.extractOne(type_target, subset['type'], scorer=fuzz.token_sort_ratio)
-        match_model_type, score, index = match_type
-        return subset.loc[index, "type"]
+        except:
+            match_type = process.extractOne(type_car, subset['type'], scorer=fuzz.token_sort_ratio)
+            match_model_type, score, index = match_type
+            return subset.loc[index, "type"]
+        
+    else:
+        return None
 
         
