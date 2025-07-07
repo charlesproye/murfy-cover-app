@@ -45,7 +45,7 @@ def uniform_vehicules_type(type_car, oem_name, model_name, db_df, battery_capaci
         # filtre sur le nom du modèle
         subset = subset[subset['model_name']==match_model_name]
 
-        # on cherche la batetrie avec la capacité la + proche
+        # on cherche la batterie avec la capacité la + proche
         try:
             battery_target = float(battery_capacity.replace('kWh', '').replace('kwh', '').strip())
             subset["distance"] = (subset["capacity"] - battery_target).abs()
