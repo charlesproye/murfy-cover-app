@@ -5,7 +5,6 @@ import aioboto3
 from botocore.exceptions import ClientError
 from fastapi import Depends
 from .settings import S3Settings
-import logging
 
 class AsyncS3:
     def __init__(self, settings: S3Settings | None = None, max_concurrency: int = 200):
@@ -19,7 +18,6 @@ class AsyncS3:
         self.bucket = settings.S3_BUCKET
         self.max_concurrency = max_concurrency
         self._sem = asyncio.Semaphore(max_concurrency)
-        self.logger = logging.getLogger("AsyncS3")
 
     @asynccontextmanager
     async def _client(self):
@@ -68,11 +66,9 @@ class AsyncS3:
         batch_size:int = self.max_concurrency
         results: dict[str, bytes] = {}
         for batch_index in range(0,len(paths_list), batch_size):
-            self.logger.debug(f"({batch_index}-{batch_index+batch_size}):Started")
             print(f"({batch_index}-{batch_index+batch_size}):Started")
             batch = paths_list[batch_index:batch_index+batch_size]
             results.update(await self._get_files_no_limit(batch))
-            self.logger.debug(f"({batch_index}-{batch_index+batch_size}):Finished")
             print(f"({batch_index}-{batch_index+batch_size}):Finished")
         return results
     
