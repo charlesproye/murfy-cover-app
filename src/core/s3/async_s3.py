@@ -7,7 +7,7 @@ from .settings import S3Settings
 
 
 class AsyncS3:
-    def __init__(self, settings: S3Settings | None = None, max_concurrency: int = 100):
+    def __init__(self, settings: S3Settings | None = None, max_concurrency: int = 1000):
         settings = settings or S3Settings()
         self._settings = settings
         self.session = aioboto3.Session(
