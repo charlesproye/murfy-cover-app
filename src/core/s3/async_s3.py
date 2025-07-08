@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
+import logging
 from typing import Annotated, Iterable
 import aioboto3
 from botocore.exceptions import ClientError
@@ -18,6 +19,7 @@ class AsyncS3:
         self.bucket = settings.S3_BUCKET
         self.max_concurrency = max_concurrency
         self._sem = asyncio.Semaphore(max_concurrency)
+        self.logger = logging.getLogger("AsyncS3")
 
     @asynccontextmanager
     async def _client(self):
@@ -62,14 +64,14 @@ class AsyncS3:
 
     async def get_files(self, paths:Iterable[str]) ->dict[str,bytes]:
         paths_list = list(paths)
-        print(f"GETTING FILES for path {paths_list[:5]}")
+        self.logger.info(f"GETTING FILES for path {paths_list[:5]}")
         batch_size:int = self.max_concurrency
         results: dict[str, bytes] = {}
         for batch_index in range(0,len(paths_list), batch_size):
-            print(f"({batch_index}-{batch_index+batch_size}):Started")
+            self.logger.info(f"({batch_index}-{batch_index+batch_size}):Started")
             batch = paths_list[batch_index:batch_index+batch_size]
             results.update(await self._get_files_no_limit(batch))
-            print(f"({batch_index}-{batch_index+batch_size}):Finished")
+            self.logger.info(f"({batch_index}-{batch_index+batch_size}):Finished")
         return results
     
     async def _get_files_no_limit(self, paths: Iterable[str]) -> dict[str,bytes]:
@@ -100,7 +102,7 @@ class AsyncS3:
 
     async def download_folder(self, folder_path: str) -> dict[str, bytes]:
         _, files = await self.list_content(folder_path)
-        print(f"{len(files) = }: {files[:10] = }")
+        self.logger.info(f"{len(files) = }: {files[:10] = }")
         return await self.get_files(files)
         
     async def delete_folder(self, prefix: str) -> int:
