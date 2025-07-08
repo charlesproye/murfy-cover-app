@@ -20,6 +20,7 @@ class BMWCompressor(Compressor):
 
 
 async def compress():
+    asyncio.get_event_loop().set_debug(False)
     compressor = BMWCompressor()
     await compressor.run()
 
