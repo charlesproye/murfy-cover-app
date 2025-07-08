@@ -31,23 +31,27 @@ def build_trendline_expressions(coef_mean, coef_lower, coef_upper, y_lower, y_up
     )
 
 
-def update_database_trendlines(table, identifier_field, identifier, trendline_data):
+def update_database_trendlines(model_car, type_car, mean_trendline, upper_trendline, lower_trendline, trendline_bib=True):
     sql_request = text(f"""
-        UPDATE {table}
+        UPDATE vehicle_model
         SET trendline = :trendline_json,
             trendline_min = :trendline_min_json,
-            trendline_max = :trendline_max_json
-        WHERE {identifier_field} = :identifier
+            trendline_max = :trendline_max_json,
+            trendline_bib = :trendline_bib
+        WHERE model_name = :model 
+        AND type = :type
     """)
-    with get_sqlalchemy_engine().connect() as conn:
+    with get_sqlalchemy_engine().begin() as conn:
         conn.execute(sql_request, {
-            "trendline_json": json.dumps(trendline_data[0]),
-            "trendline_min_json": json.dumps(trendline_data[2]),
-            "trendline_max_json": json.dumps(trendline_data[1]),
-            "identifier": identifier
+            "trendline_json": json.dumps({"trendline" : mean_trendline}),
+            "trendline_min_json": json.dumps({"trendline" : upper_trendline}),
+            "trendline_max_json": json.dumps({"trendline" : lower_trendline}),
+            "model": model_car,
+            "type": type_car,
+            "trendline_bib": trendline_bib
         })
     
-def clean_battery_data(df, soh_colum, odometer_column):
+def clean_battery_data(df, odometer_column, soh_colum):
     """
     Nettoie les données de batterie en supprimant les valeurs aberrantes.
     
@@ -69,7 +73,7 @@ def clean_battery_data(df, soh_colum, odometer_column):
     df_clean = df_clean.rename(columns={odometer_column: 'odometer', soh_colum:'soh'})
     df_clean = df_clean.drop(df_clean[(df_clean['odometer'] < 20000) & (df_clean['soh'] < .95)].index)
     df_clean = df_clean.drop(df_clean[(df_clean['soh'] < .8)].index)
-    df_clean = df.dropna(subset=["soh", "odometer"])
+    df_clean = df_clean.dropna(subset=["soh", "odometer"])
     return df_clean
 
 
@@ -135,7 +139,7 @@ def compute_main_trendline(x_sorted, y_sorted):
                            bounds=([.97, -np.inf, -np.inf], [1.03, np.inf, np.inf]))
     y_fit = log_function(x_sorted, *coef_mean)
     y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
-    coef_lower, coef_upper = get_bound_coef(coef_mean[0], x_sorted, y_lower, y_upper)
+    coef_lower, coef_upper = get_bound_coef(x_sorted, y_lower, y_upper)
     mean, upper, lower = build_trendline_expressions(coef_mean, coef_lower, coef_upper, y_lower, y_upper)
     return coef_mean, coef_lower, coef_upper,  mean, upper, lower
 
@@ -158,7 +162,6 @@ def compute_upper_bound(df, trendline, coef_mean):
     dict or None
         Borne supérieure calculée ou None
     """
-    print(trendline)
     mask = eval(trendline['trendline'], {"np": np, "x": df["odometer"]})
     test = df[df['soh'] > mask]
     x_sorted, y_sorted = prepare_data_for_fitting(test)
