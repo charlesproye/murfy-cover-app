@@ -76,6 +76,7 @@ class ProcessedTimeSeries(CachedETLSpark):
         tss = RawTss(self.make, spark=self.spark).data
         tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
         tss = safe_astype_spark_with_error_handling(tss)
+        tss = tss.select(*NECESSARY_COLS[self.make])
         tss = self.normalize_units_to_metric(tss)
         tss = tss.orderBy(["vin", "date"])
         tss = self.compute_date_vars(tss)
