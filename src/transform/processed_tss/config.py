@@ -1,8 +1,9 @@
 from pandas.api.types import CategoricalDtype
+from pyspark.sql.types import FloatType, TimestampType, StringType, BooleanType
 from pandas import Timedelta as TD
 import pandas as pd
 
-S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss.parquet'
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss_spark.parquet'
 
 ODOMETER_MILES_TO_KM = {
     "tesla": 1.60934,
@@ -52,6 +53,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     # Mercedes
     "charging.max_range": "max_range",
     "charging.charging_rate": "charging_rate",
+    "charging.fully_charged_end_times": "fully_charged_end_times",
     # BMW
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
@@ -119,7 +121,28 @@ RENAME_COLS_DICT:dict[str, str] = {
     # 'FastChargerType_fastChargerValue': 'fast_charger_type',
     # 'ChargerPhases_stringValue': 'charger_phases',
     # 'BatteryHeaterOn_stringValue': 'battery_heater'
-    }
+    
+    ########## Spark  
+    "readable_date": "date",
+    "Odometer" : "odometer",
+    "ACChargingEnergyIn": "ac_charge_energy_added",
+    "Soc": "soc",
+    "CarType": 'model',
+    "DCChargingEnergyIn": "dc_charge_energy_added",
+    "BatteryLevel": "battery_level",
+    "ACChargingPower": "ac_charging_power",
+    "DCChargingPower": "dc_charging_power",
+    "DetailedChargeState": "charging_status",
+}
+
+COL_TO_SELECT = [
+    'vin', 'date', 'odometer', 'soc', 
+    "battery_level",
+    "ac_charge_energy_added",
+    "dc_charge_energy_added",
+    "ac_charging_power",
+    "dc_charging_power",
+    "charging_status"]
 
 # The keys will be used to determine what columns to keep.
 COL_DTYPES = {
@@ -185,6 +208,41 @@ COL_DTYPES = {
     "dc_charging_power": 'float32',
 }
 
+
+COL_DTYPES_SPARK = {
+    
+        "date": TimestampType(), 
+        "soc": FloatType(), 
+        "odometer": FloatType(), 
+        "battery_level": FloatType(), 
+        "ac_charge_energy_added": FloatType(), 
+        "dc_charge_energy_added": FloatType(), 
+        "ac_charging_power": FloatType(), 
+        "dc_charging_power": FloatType(), 
+        "charging_status": StringType(), 
+        "prev_date": TimestampType(), 
+        "sec_time_diff": FloatType(), 
+        "in_charge": BooleanType(), 
+        "in_discharge": BooleanType(), 
+        "charge_energy_added": FloatType(), 
+        "soc_diff": FloatType(), 
+        "in_charge_idx": FloatType(), 
+        "end_of_contract_date": TimestampType(), 
+        "fleet_name": StringType(), 
+        "start_date": TimestampType(), 
+        "model": StringType(), 
+        "version": StringType(), 
+        "capacity": FloatType(), 
+        "net_capacity": FloatType(), 
+        "range": FloatType(), 
+        "tesla_code": StringType(), 
+        "make": StringType(),
+        "region_name": StringType(),
+        "activation_status": BooleanType(),
+        "vin": StringType()
+    }
+
+
 DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
 COLS_TO_FILL = [
     "charging_status",
@@ -219,7 +277,6 @@ IN_DISCHARGE_CHARGING_STATUS_VALS = [
     "detailedchargestatenopower",
     "detailedchargestatestopped",
     "detailedchargestatecomplete",
-  
 ]
 
 CHARGING_STATUS_VAL_TO_MASK = {
@@ -229,7 +286,6 @@ CHARGING_STATUS_VAL_TO_MASK = {
     "fast_charging": True,
     "charging_complete": False,
     "Charging": True,
-
     "charging_error": False,
     # Tesla
     "<NA>": False,
@@ -247,7 +303,7 @@ CHARGING_STATUS_VAL_TO_MASK = {
 }
 
 CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
-    # "tesla",
+    "tesla",
     "bmw",
     "mercedes-benz",
     "ford",
@@ -258,7 +314,7 @@ CHARGE_MASK_WITH_CHARGING_STATUS_MAKES = [
 
 CHARGE_MASK_WITH_SOC_DIFFS_MAKES = [
     "kia",
-    "renault",
+    "renault"
 ]
 MAX_TD = TD(hours=1, minutes=30)
 
