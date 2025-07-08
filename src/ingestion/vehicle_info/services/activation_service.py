@@ -5,16 +5,16 @@ from typing import Tuple, Optional
 import pandas as pd
 import requests
 import uuid
-from core.sql_utils import get_connection
+from src.core.sql_utils import get_connection
 
-from ingestion.vehicle_info.api.bmw_client import BMWApi
-from ingestion.vehicle_info.api.hm_client import HMApi
-from ingestion.vehicle_info.api.stellantis_client import StellantisApi
-from ingestion.vehicle_info.api.tesla_client import TeslaApi
-from ingestion.vehicle_info.api.renault_client import RenaultApi
-from ingestion.vehicle_info.api.tesla_particulier import TeslaParticulierApi
-from ingestion.vehicle_info.config.settings import ACTIVATION_TIMEOUT
-from ingestion.vehicle_info.services.google_sheet_service import update_vehicle_activation_data
+from ..api.bmw_client import BMWApi
+from ..api.hm_client import HMApi
+from ..api.stellantis_client import StellantisApi
+from ..api.tesla_client import TeslaApi
+from ..api.renault_client import RenaultApi
+from ..api.tesla_particulier import TeslaParticulierApi
+from ..config.settings import ACTIVATION_TIMEOUT
+from ..services.google_sheet_service import update_vehicle_activation_data
 
 class VehicleActivationService:
 
@@ -423,7 +423,7 @@ class VehicleActivationService:
 
     async def activation_hm(self):
         """Process High Mobility vehicle activation/deactivation."""
-        df_hm = self.fleet_info_df[self.fleet_info_df['oem'].isin(['ford', 'mercedes', 'kia','renault'])]
+        df_hm = self.fleet_info_df[self.fleet_info_df['oem'].isin(['renault'])]    #(['ford', 'mercedes', 'kia','renault'])]
         status_data = []
         async with aiohttp.ClientSession() as session:
             for _, row in df_hm.iterrows():
@@ -449,7 +449,6 @@ class VehicleActivationService:
                     elif desired_state:
                         try:
                             activation_success = await self.hm_api.create_clearance(vin,make,session)
-
                             if activation_success:
                                 logging.info(f"High Mobility vehicle {vin} activated successfully")
                                 vehicle_data = {
