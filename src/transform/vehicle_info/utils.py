@@ -3,7 +3,7 @@ from core.sql_utils import *
 
 
 
-def uniform_vehicules_type(type_car, oem_name, model_name, db_df, battery_capacity=None):
+def uniform_vehicles_type(type_car, oem_name, model_name, db_df, battery_capacity=None):
     """_summary_
 
     Args:
