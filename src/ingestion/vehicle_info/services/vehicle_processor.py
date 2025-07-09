@@ -10,7 +10,7 @@ from ..config.mappings import MAKE_MAPPING, OEM_MAPPING, COUNTRY_MAPPING, TESLA_
 from ..utils.validation import validate_vehicle_data
 from ..utils.date_utils import convert_date_format
 from ..services.activation_service import VehicleActivationService
-from core.sql_utils import get_connection
+from src.core.sql_utils import get_connection
 
 class VehicleProcessor:
     def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, tesla_particulier_api: callable, renault_api: callable, df: pd.DataFrame):

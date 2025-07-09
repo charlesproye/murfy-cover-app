@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from core.env_utils import get_env_var
+from src.core.env_utils import get_env_var
 
 load_dotenv()
 

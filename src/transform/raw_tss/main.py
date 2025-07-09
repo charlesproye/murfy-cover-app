@@ -11,6 +11,7 @@ from transform.raw_tss.bmw_raw_tss import get_raw_tss as bmw_get_raw_tss
 from transform.raw_tss.tesla_raw_tss import get_raw_tss as tesla_get_raw_tss
 from transform.raw_tss.mobilisight_raw_tss import get_raw_tss as mobilisight_get_raw_tss
 from transform.raw_tss.fleet_telemetry_raw_tss import get_raw_tss as fleet_telemetry_raw_tss
+from transform.raw_tss.spark_raw_tss import get_raw_tss as get_raw_tss_spark
 
 GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3Service], DF]] = {
     # Stellantis
@@ -30,7 +31,7 @@ GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3Service], DF]] = {
     # Volvo
     "volvo-cars":       hm_get_raw_tss,
     # fleet-telemetry
-    "tesla-fleet-telemetry":  fleet_telemetry_raw_tss,
+    "tesla-fleet-telemetry":  get_raw_tss_spark,
     
 }
 

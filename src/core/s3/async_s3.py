@@ -1,13 +1,14 @@
 import asyncio
-from typing import Iterable
+from contextlib import asynccontextmanager
+import logging
+from typing import Annotated, Iterable
 import aioboto3
 from botocore.exceptions import ClientError
-from core.typing_utils import remove_none
+from fastapi import Depends
 from .settings import S3Settings
 
-
 class AsyncS3:
-    def __init__(self, settings: S3Settings | None = None, max_concurrency: int = 100):
+    def __init__(self, settings: S3Settings | None = None, max_concurrency: int = 200):
         settings = settings or S3Settings()
         self._settings = settings
         self.session = aioboto3.Session(
@@ -16,24 +17,27 @@ class AsyncS3:
             region_name=settings.S3_REGION,
         )
         self.bucket = settings.S3_BUCKET
+        self.max_concurrency = max_concurrency
         self._sem = asyncio.Semaphore(max_concurrency)
+        self.logger = logging.getLogger("AsyncS3")
 
-    @property
-    def _client(self):
-        return self.session.client(
+    @asynccontextmanager
+    async def _client(self):
+        async with self.session.client(
             "s3",
             region_name=self._settings.S3_REGION,
             endpoint_url=self._settings.S3_ENDPOINT,
             aws_access_key_id=self._settings.S3_KEY,
             aws_secret_access_key=self._settings.S3_SECRET,
-        )
+        ) as client:
+            yield client 
 
     async def list_content(self, path: str = "") -> tuple[list[str], list[str]]:
         """Returns (folders, files)"""
         folders = set()
         files = []
         async with self._sem:
-            async with self._client as client:  # type: ignore
+            async with self._client() as client:  # type: ignore
                 paginator = client.get_paginator("list_objects_v2")
                 async for page in paginator.paginate(
                     Bucket=self.bucket, Prefix=path, Delimiter="/"
@@ -44,12 +48,11 @@ class AsyncS3:
                         key = content["Key"]
                         if key != path:
                             files.append(key)
-
         return sorted(folders), sorted(files)
 
     async def get_file(self, path: str) -> bytes | None:
         async with self._sem:
-            async with self._client as client:  # type: ignore
+            async with self._client() as client:  # type: ignore
                 try:
                     response = await client.get_object(Bucket=self.bucket, Key=path)
                     async with response["Body"] as stream:
@@ -59,7 +62,19 @@ class AsyncS3:
                         return None
                     raise
 
-    async def get_files(self, paths: Iterable[str]) -> dict[str,bytes]:
+    async def get_files(self, paths:Iterable[str]) ->dict[str,bytes]:
+        paths_list = list(paths)
+        self.logger.info(f"GETTING FILES for path {paths_list[:5]}")
+        batch_size:int = self.max_concurrency
+        results: dict[str, bytes] = {}
+        for batch_index in range(0,len(paths_list), batch_size):
+            self.logger.info(f"({batch_index}-{batch_index+batch_size}):Started")
+            batch = paths_list[batch_index:batch_index+batch_size]
+            results.update(await self._get_files_no_limit(batch))
+            self.logger.info(f"({batch_index}-{batch_index+batch_size}):Finished")
+        return results
+    
+    async def _get_files_no_limit(self, paths: Iterable[str]) -> dict[str,bytes]:
         results: dict[str, bytes] = {}
 
         async def download(key: str):
@@ -67,17 +82,16 @@ class AsyncS3:
                 data = await self.get_file(key)
                 if data is not None:
                     results[key] = data
-        
         await asyncio.gather(*(download(f) for f in paths))
         return results
 
     async def upload_file(self, path: str, file: bytes) -> None:
-        async with self._client as client:  # type: ignore
+        async with self._client() as client:  # type: ignore
             await client.put_object(Bucket=self.bucket, Key=path, Body=file)
 
     async def delete_file(self, path: str) -> bool:
         async with self._sem:
-            async with self._client as client:  # type: ignore
+            async with self._client() as client:  # type: ignore
                 try:
                     await client.delete_object(Bucket=self.bucket, Key=path)
                     return True
@@ -88,12 +102,13 @@ class AsyncS3:
 
     async def download_folder(self, folder_path: str) -> dict[str, bytes]:
         _, files = await self.list_content(folder_path)
+        self.logger.info(f"{len(files) = }: {files[:10] = }")
         return await self.get_files(files)
         
     async def delete_folder(self, prefix: str) -> int:
         deleted_count = 0
         async with self._sem:
-            async with self._client as client:  # type: ignore
+            async with self._client() as client:  # type: ignore
                 paginator = client.get_paginator("list_objects_v2")
                 async for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
                     contents = page.get("Contents", [])
@@ -112,3 +127,8 @@ class AsyncS3:
 
             return deleted_count
 
+
+def get_async_s3() -> AsyncS3:
+    return AsyncS3()
+
+AsyncS3Dep = Annotated[AsyncS3,Depends(get_async_s3)]
