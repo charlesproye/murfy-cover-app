@@ -243,6 +243,18 @@ COL_DTYPES_SPARK = {
     }
 
 
+NECESSARY_COLS = {
+    'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added', 'ac_charging_power', 'dc_charging_power'],
+    'renault': ['vin', 'date', 'odometer', 'soc'],
+    'kia': ['vin', 'date', 'odometer', 'soc'],
+    'bmw': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'mercedes-benz': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added', 'ac_charging_power', 'dc_charging_power']
+}
+
 DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
 COLS_TO_FILL = [
     "charging_status",
