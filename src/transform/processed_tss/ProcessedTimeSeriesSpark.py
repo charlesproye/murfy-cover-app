@@ -569,7 +569,7 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         df = df.withColumn("charging_status_change", 
             F.when(F.col("charging_status") != F.lag("charging_status").over(w), 1).otherwise(0))
 
-        df = df.withColumn("chargin_status_idx", 
+        df = df.withColumn("charging_status_idx", 
             F.sum("charging_status_change").over(w.rowsBetween(Window.unboundedPreceding, 0)))
 
         return df
