@@ -1,6 +1,7 @@
 from logging import getLogger
 import argparse
 import logging
+from turtle import st
 
 from pyspark.sql import DataFrame as DF, Window
 from pyspark.sql.functions import (
@@ -13,6 +14,7 @@ from pyspark.sql.functions import (
     first,
     expr,
     coalesce,
+    hash as spark_hash,
     sum as spark_sum,
     pandas_udf,
 )
@@ -35,6 +37,9 @@ from transform.raw_tss.RawTss import RawTss
 from core.s3.s3_utils import S3Service
 from pyspark.sql import functions as F
 from core.s3.settings import S3Settings
+import time
+from pyspark.storagelevel import StorageLevel
+
 
 
 # Here we have implemented the ETL as a class as most raw time series go through the same processing step.
@@ -73,17 +78,70 @@ class ProcessedTimeSeries(CachedETLSpark):
     # No need to call run, it will be called in CachedETL init.
     def run(self):
         # self.logger.info(f"{'Processing ' + self.make + ' raw tss.':=^{50}}")
+
+        start = time.time()
         tss = RawTss(self.make, spark=self.spark).data
+        end = time.time()
+        print(f"Temps écoulé pour charger les données: {end - start:.2f} secondes")
+
+        start = time.time()
+        tss = tss.withColumn("vin_bucket", (spark_hash(col("vin")) % 32).cast("int"))
+        end = time.time()
+        print(f"Temps écoulé pour calculer le hash: {end - start:.2f} secondes")
+
+
+        start = time.time()
         tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
+        end = time.time()
+        print(f"Temps écoulé pour renommer les colonnes: {end - start:.2f} secondes")
+
+        start = time.time()
+        tss = tss.repartition("vin_bucket")
+        end = time.time()
+        print(f"Temps écoulé pour repartitionner les données: {end - start:.2f} secondes")
+
+
+        start = time.time()
         tss = safe_astype_spark_with_error_handling(tss)
+        end = time.time()
+        print(f"Temps écoulé pour convertir les types: {end - start:.2f} secondes")
+
+        start = time.time()
         tss = tss.select(*NECESSARY_COLS[self.make])
+        end = time.time()
+        print(f"Temps écoulé pour sélectionner les colonnes: {end - start:.2f} secondes")
+
+
+        start = time.time()
         tss = self.normalize_units_to_metric(tss)
+        end = time.time()
+        print(f"Temps écoulé pour normaliser les unités: {end - start:.2f} secondes")
+        start = time.time()
         tss = tss.orderBy(["vin", "date"])
+        end = time.time()
+        print(f"Temps écoulé pour trier les données: {end - start:.2f} secondes")
+        start = time.time()
         tss = self.compute_date_vars(tss)
+        end = time.time()
+        print(f"Temps écoulé pour calculer les variables de charge et décharge: {end - start:.2f} secondes")
         tss = self.compute_charge_n_discharge_vars(tss)
-        tss = tss.repartition("vin").join(self.spark.createDataFrame(fleet_info), "vin", "left")
+        tss = tss.cache()
+
+        start = time.time()
+        tss.count()
+        end = time.time()
+        print(f"Temps écoulé pour compter les données: {end - start:.2f} secondes")
+
+        start = time.time()
+        tss = tss.join(self.spark.createDataFrame(fleet_info), "vin", "left")
+        end = time.time()
+        print(f"Temps écoulé pour joindre les données de la flotte: {end - start:.2f} secondes")
+        start = time.time()
         tss = tss.sort("vin", ascending=True)
-        return tss.cache()
+        end = time.time()
+        print(f"Temps écoulé pour trier les données: {end - start:.2f} secondes")
+
+        return tss
 
     def compute_charge_n_discharge_vars(self, tss):
         tss = self.compute_charge_n_discharge_masks(
@@ -136,7 +194,7 @@ class ProcessedTimeSeries(CachedETLSpark):
             df[cum_var_col] = cum
             return df
 
-        return tss.repartition("vin").groupBy(self.id_col).apply(integrate_trapezoid)
+        return tss.groupBy(self.id_col).apply(integrate_trapezoid)
 
     def compute_date_vars(self, tss: DF) -> DF:
         # Créer une fenêtre par vin, ordonnée par date
@@ -500,7 +558,7 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         df = df.withColumn("prev_phase", F.lag("direction").over(w)).withColumn("next_phase", F.lead("direction").over(w))
 
         df = df.withColumn(
-            "phase",
+            "charging_status",
             F.when(F.col("total_soc_diff") > 0.5, "charging")
             .when(F.col("total_soc_diff") < -0.5, "discharging")
             .when((F.col("prev_phase") == F.col("next_phase")) & (F.col("prev_phase") >= 0), "charging")
@@ -508,11 +566,11 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
             .otherwise("idle")  
         )
         # Étape 3: Recréer le phase_id basé sur les changements de phase
-        df = df.withColumn("phase_change", 
-            F.when(F.col("phase") != F.lag("phase").over(w), 1).otherwise(0))
+        df = df.withColumn("charging_status_change", 
+            F.when(F.col("charging_status") != F.lag("charging_status").over(w), 1).otherwise(0))
 
-        df = df.withColumn("phase_id", 
-            F.sum("phase_change").over(w.rowsBetween(Window.unboundedPreceding, 0)))
+        df = df.withColumn("chargin_status_idx", 
+            F.sum("charging_status_change").over(w.rowsBetween(Window.unboundedPreceding, 0)))
 
         return df
 
