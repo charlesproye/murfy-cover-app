@@ -346,3 +346,51 @@ def align_dataframes_for_union(df1, df2, strategy="intersection"):
 
     return df1_aligned, df2_aligned
 
+
+def get_ideal_nb_partitions(file_size_bytes: float, nb_vin: int) -> int:
+    """
+    Calcule le nombre idéal de partitions Spark basé sur la taille du fichier et le nombre de VINs.
+    
+    Cette fonction détermine le nombre optimal de partitions pour optimiser les performances
+    Spark en fonction de la taille moyenne par VIN et de la recommandation de 128MB par partition.
+    
+    Args:
+        file_size_bytes (float): Taille totale du fichier en octets
+        nb_vin (int): Nombre de VINs (véhicules) dans le fichier
+    
+    Returns:
+        int: Nombre idéal de partitions Spark
+        
+    Raises:
+        ValueError: Si file_size_bytes ou nb_vin sont négatifs ou nuls
+    """
+    # Validation des paramètres
+    if file_size_bytes <= 0 or nb_vin <= 0:
+        raise ValueError("file_size_bytes et nb_vin doivent être positifs")
+    
+    # Calcul de la taille moyenne par VIN
+    size_file_mb = file_size_bytes / (1024 * 1024)
+    print(f"Taille du fichier: {size_file_mb:.2f} MB")
+    
+    avg_size_file_vin_mb = size_file_mb / nb_vin
+    print(f"Taille moyenne par VIN: {avg_size_file_vin_mb:.2f} MB")
+    
+    # Calcul du nombre idéal de VINs par partition (basé sur 128MB recommandé)
+    nb_vin_ideal_size = 128 / avg_size_file_vin_mb
+    print(f"Nombre idéal de VINs par partition: {nb_vin_ideal_size:.2f}")
+
+    # Logique de décision
+    if nb_vin_ideal_size < 0.5:
+        print("⚠️  Taille moyenne par VIN > 256 MB, partitionnement par VIN non recommandé")
+        return nb_vin
+    elif nb_vin_ideal_size < 1:
+        print("ℹ️  Taille par VIN optimale, utilisation du nombre de VINs")
+        return nb_vin
+    else:
+        optimal_partitions = int(nb_vin / nb_vin_ideal_size)
+        if optimal_partitions % 2 == 0:
+            pass
+        else:
+            optimal_partitions += 1
+        print(f"✅ Partitionnement optimisé: {optimal_partitions} partitions") 
+        return optimal_partitions
