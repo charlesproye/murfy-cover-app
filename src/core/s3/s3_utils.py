@@ -359,6 +359,38 @@ class S3Service():
             Key=filename,
         )
 
+    def get_object_size(self, prefix):
+        """
+        Calcule la taille totale et le nombre d'objets dans un path S3.
+        
+        Cette méthode parcourt récursivement tous les objets dans le bucket S3
+        qui correspondent au préfixe donné et retourne la somme de leurs tailles
+        ainsi que leur nombre total.
+        
+        Args:
+            prefix (str): Le path S3 (chemin) pour lequel calculer la taille.
+                        Par exemple: 'response/tesla/' ou 'data/2024/01/'
+        
+        Returns:
+            tuple: Un tuple contenant (taille_totale, nombre_objets) où :
+                - taille_totale (int): La somme des tailles de tous les objets en octets
+                - nombre_objets (int): Le nombre total d'objets trouvés
+        """
+
+        try:
+            objects = []
+            paginator = self._s3_client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+            for pages in pages:
+                for obj in pages["Contents"]:
+                    objects.append(obj['Size'])
+            return (sum(objects), len(objects))
+        except Exception as e:
+            if e.response["Error"]["Code"] == "404":
+                return False
+            else:
+                raise e
+
 @lru_cache
 def get_s3():
     return S3Service()
