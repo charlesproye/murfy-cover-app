@@ -13,8 +13,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from core.gsheet_utils import *
-from transform.insights_results.config_trendlines import TYPE_MAPPING
+from src.core.gsheet_utils import *
+from src.results.trendlines_results.config import TYPE_MAPPING
 
 BASE_URL = "https://www.autosphere.fr"
 SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Mercedes,Bmw,Nissan,Mini,Volkswagen,Volvo,Ford,Ds,Opel,Audi,Kia,Toyota,Peugeot,Dacia,Renault,Hyundai,Lexus,Seat,Mitsubishi,Mg&fuel_type=Electrique&from={}"
