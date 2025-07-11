@@ -83,7 +83,7 @@ class VehicleProcessor:
             return cursor.fetchone()[0]
         return result[0]
     
-    async def _get_or_create_tesla_model(self, cursor, model_name: str, type: str, version: str, make: str, oem: str, warranty_km: int, warranty_date: str) -> str:
+    async def _get_or_create_tesla_model(self, cursor, model_name: str, model_type: str, version: str, make: str, oem: str, warranty_km: int, warranty_date: str) -> str:
         """Get a Tesla model if it exists then update it, or create it if it doesn't exist."""
         cursor.execute(
             "SELECT id FROM vehicle_model WHERE LOWER(version) = %s",(version.lower(),))
@@ -106,14 +106,14 @@ class VehicleProcessor:
                 INSERT INTO vehicle_model (
                     id, model_name, type, version, make_id, oem_id, warranty_km, warranty_date
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (model_id, model_name, type, version, make_id, oem_id, warranty_km, warranty_date))
+            """, (model_id, model_name, model_type, version, make_id, oem_id, warranty_km, warranty_date))
             logging.info(f"Created new Tesla model with version {version}")
             
         return model_id
 
-    async def _get_or_create_renault_model(self, session: aiohttp.ClientSession, cursor, vin: str, model_name: str, type: str, version: str, make: str, oem: str) -> str:
+    async def _get_or_create_renault_model(self, session: aiohttp.ClientSession, cursor, vin: str, model_name: str, model_type: str, version: str, make: str, oem: str) -> str:
         """Get a model if it exists then update it, or create it if it doesn't exist."""
-        cursor.execute("SELECT id,autonomy FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), type.lower(), version.lower()))
+        cursor.execute("SELECT id,autonomy FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), model_type.lower(), version.lower()))
         result = cursor.fetchone()
         model_exists = result[0] if result else None
         autonomy = result[1] if result else None
@@ -124,7 +124,7 @@ class VehicleProcessor:
             if autonomy is None:
                 wltp_range = await self.renault_api.get_vehicle_wltp_range(session, vin)
                 cursor.execute("UPDATE vehicle_model SET autonomy = %s WHERE id = %s", (wltp_range, model_exists))
-                logging.info(f"Updated model with name {model_name} and type {type} and version {version} and autonomy {wltp_range}")
+                logging.info(f"Updated model with name {model_name} and type {model_type} and version {version} and autonomy {wltp_range}")
             return model_exists
         else:
             model_id = str(uuid.uuid4())
@@ -133,13 +133,13 @@ class VehicleProcessor:
                 INSERT INTO vehicle_model (
                     id, model_name, type, version, autonomy,make_id, oem_id
                 ) VALUES (%s, %s, %s, %s, %s, %s,%s)
-            """, (model_id, model_name, type, version, wltp_range, make_id, oem_id))
-            logging.info(f"Created new model with name {model_name} and type {type} and version {version} and autonomy {wltp_range}")
+            """, (model_id, model_name, model_type, version, wltp_range, make_id, oem_id))
+            logging.info(f"Created new model with name {model_name} and type {model_type} and version {version} and autonomy {wltp_range}")
         return model_id
     
-    async def _get_or_create_other_model(self, cursor, model_name: str, type: str, version: str, make: str, oem: str) -> str:
+    async def _get_or_create_other_model(self, cursor, model_name: str, model_type: str, version: str, make: str, oem: str) -> str:
         """Get a model if it exists then update it, or create it if it doesn't exist."""
-        cursor.execute("SELECT id FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), type.lower(), version.lower()))
+        cursor.execute("SELECT id FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), model_type.lower(), version.lower()))
         result = cursor.fetchone()
         model_exists = result[0]
         oem_id = await self._get_oem(cursor, oem)
@@ -152,8 +152,8 @@ class VehicleProcessor:
                 INSERT INTO vehicle_model (
                     id, model_name, type, version, make_id, oem_id
                 ) VALUES (%s, %s, %s, %s, %s, %s)
-            """, (model_id, model_name, type, version, make_id, oem_id))
-            logging.info(f"Created new model with name {model_name} and type {type} and version {version}")
+            """, (model_id, model_name, model_type, version, make_id, oem_id))
+            logging.info(f"Created new model with name {model_name} and type {model_type} and version {version}")
             
         return model_id
     
@@ -179,11 +179,11 @@ class VehicleProcessor:
                             if not result:
                                 # CASE 1: Vehicle doesn't exist
                                 # Get model info from API
-                                version, type = await self.tesla_api.get_vehicle_options(session, vin, model_name)
+                                version, model_type = await self.tesla_api.get_vehicle_options(session, vin, model_name)
                                 warranty_km, warranty_date, start_date = await self.tesla_api.get_warranty_info(session, vin)
                                 
                                 # Create/get model and related records
-                                model_id = await self._get_or_create_tesla_model(cursor, model_name, type, version, vehicle['make'], vehicle['oem'], warranty_km, warranty_date)
+                                model_id = await self._get_or_create_tesla_model(cursor, model_name, model_type, version, vehicle['make'], vehicle['oem'], warranty_km, warranty_date)
                                 
                                 # Insert new vehicle
                                 vehicle_id = str(uuid.uuid4())
@@ -201,12 +201,12 @@ class VehicleProcessor:
                                 
                                 if current_version == 'MTU':
                                     # CASE 2.2: Current version is unknown, check API
-                                    api_version, type = await self.tesla_api.get_vehicle_options(session, vehicle['vin'], model_name)
+                                    api_version, model_type = await self.tesla_api.get_vehicle_options(session, vehicle['vin'], model_name)
                                     
                                     if api_version != 'MTU':
                                         # Only update if API returns a known version
                                         warranty_km, warranty_date, start_date = await self.tesla_api.get_warranty_info(session, vehicle['vin'])
-                                        new_model_id = await self._get_or_create_tesla_model(cursor, model_name, type, api_version, vehicle['make'], vehicle['oem'], warranty_km, warranty_date)
+                                        new_model_id = await self._get_or_create_tesla_model(cursor, model_name, model_type, api_version, vehicle['make'], vehicle['oem'], warranty_km, warranty_date)
                                         
                                         # Update vehicle with new model
                                         cursor.execute("UPDATE vehicle SET vehicle_model_id = %s WHERE id = %s", (new_model_id, vehicle_id))
@@ -256,11 +256,11 @@ class VehicleProcessor:
                                 # CASE 1: Vehicle doesn't exist
                                 cursor.execute("SELECT access_token FROM tesla.user WHERE vin = %s", (vin,))
                                 access_token = cursor.fetchone()[0]
-                                version, type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
+                                version, model_type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
                                 warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
                                 
                                 # Create/get model and related records
-                                model_id = await self._get_or_create_tesla_model(cursor, model_name, type, version, 'tesla', 'tesla', warranty_km, warranty_date)
+                                model_id = await self._get_or_create_tesla_model(cursor, model_name, model_type, version, 'tesla', 'tesla', warranty_km, warranty_date)
                                 
                                 # Insert new vehicle
                                 vehicle_id = str(uuid.uuid4())
@@ -288,12 +288,12 @@ class VehicleProcessor:
                                     # CASE 2.2: Current version is unknown, check API
                                     cursor.execute("SELECT access_token FROM tesla.user_tokens JOIN tesla.user ON tesla.user.id = tesla.user_tokens.user_id WHERE vin = %s", (vin,))
                                     access_token = cursor.fetchone()[0]
-                                    api_version, type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
+                                    api_version, model_type = await self.tesla_particulier_api.get_options_particulier(vin, access_token)
                                     
                                     if api_version != 'MTU':
                                         # Only update if API returns a known version
                                         warranty_km, warranty_date, start_date = await self.tesla_particulier_api.get_warranty_particulier(vin, access_token)
-                                        new_model_id = await self._get_or_create_tesla_model(cursor, model_name, type, api_version, 'tesla', 'tesla', warranty_km, warranty_date)
+                                        new_model_id = await self._get_or_create_tesla_model(cursor, model_name, model_type, api_version, 'tesla', 'tesla', warranty_km, warranty_date)
                                         
                                         # Update vehicle with new model
                                         cursor.execute("UPDATE vehicle SET vehicle_model_id = %s WHERE id = %s", (new_model_id, vehicle_id))
@@ -336,9 +336,9 @@ class VehicleProcessor:
                             
                             if not vehicle_exists:
                                 #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
-                                model_name, type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
-                                logging.info(f"Processing Renault vehicle {vin} | {model_name} | {type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
-                                model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, type, version, vehicle['make'], vehicle['oem'])
+                                model_name, model_type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
+                                logging.info(f"Processing Renault vehicle {vin} | {model_name} | {model_type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
+                                model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, model_type, version, vehicle['make'], vehicle['oem'])
 
                                 vehicle_id = str(uuid.uuid4())
                                 insert_query = """
@@ -437,10 +437,10 @@ class VehicleProcessor:
                         fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
                         region_id = await self._get_or_create_region(cursor, vehicle['country'])
                         model_name = vehicle['model'] if vehicle['model'] is not None else 'unknown'
-                        type = vehicle['type'] if vehicle['type'] is not None else 'unknown'
+                        model_type = vehicle['type'] if vehicle['type'] is not None else 'unknown'
                         version = 'unknown'
-                        logging.info(f"Processing vehicle {vehicle['vin']} | {model_name} | {type} | {version}")
-                        model_id = await self._get_or_create_other_model(cursor, model_name, type, version, vehicle['make'], vehicle['oem'])
+                        logging.info(f"Processing vehicle {vehicle['vin']} | {model_name} | {model_type} | {version}")
+                        model_id = await self._get_or_create_other_model(cursor, model_name, model_type, version, vehicle['make'], vehicle['oem'])
                         if not vehicle_exists:
                             vehicle_id = str(uuid.uuid4())
                             insert_query = """
