@@ -88,10 +88,10 @@ def get_or_create_battery(cursor, vehicle: Dict[str, Any]) -> str:
     
     return battery_id
 
-def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, oem_id: str, battery_id: str) -> None:
+def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, battery_id: str) -> None:
     """Get or create a Vehicle Model record."""
     vehicle_model = vehicle.get("Vehicle_Model", "unknown")
-    type = vehicle.get("Vehicle_Model_Version") or "unknown"
+    type_car = vehicle.get("Vehicle_Model_Version") or "unknown"
     version = "unknown"
 
     if vehicle_model.lower() == "zoe":
@@ -101,32 +101,32 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, o
         # Check if any of the patterns exist in the type string
         found_type = None
         for pattern in type_patterns:
-            if pattern.lower() in type.lower():
+            if pattern.lower() in type_car.lower():
                 found_type = pattern.lower()
                 break
         
         if found_type:
             # Extract the found pattern as type and the rest as version
-            type_parts = type.strip().split()
+            type_parts = type_car.strip().split()
             # Remove the found pattern from type_parts and join the rest as version
             remaining_parts = [part for part in type_parts if found_type not in part.lower()]
-            type = found_type
+            type_car = found_type
             version = " ".join(remaining_parts) if remaining_parts else "unknown"
         else:
             # Fallback to original logic if no pattern is found
-            type_parts = type.strip().split()
-            type = type_parts[0] if type_parts else "unknown"
+            type_parts = type_car.strip().split()
+            type_car = type_parts[0] if type_parts else "unknown"
             version = " ".join(type_parts[1:]) if len(type_parts) > 1 else "unknown"
         
         cursor.execute(
             "SELECT id FROM vehicle_model WHERE model_name = LOWER(%s) AND LOWER(type) = LOWER(%s) AND version = LOWER(%s)",
-            (vehicle_model, type, version)
+            (vehicle_model, type_car, version)
         )
         model_result = cursor.fetchone()
     else:
         cursor.execute(
             "SELECT id FROM vehicle_model WHERE model_name = LOWER(%s) AND LOWER(type) = LOWER(%s)",
-            (vehicle_model, type)
+            (vehicle_model, type_car)
         )
         model_result = cursor.fetchone()
     
@@ -139,7 +139,7 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, o
         """, (
             model_id,
             vehicle_model,
-            type,
+            type_car,
             version,
             make_id,
             get_oem(cursor, make_id),
@@ -149,7 +149,7 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, o
             vehicle.get("EVDB_Detail_URL"),
             battery_id
         ))
-        print(f"Created new vehicle model: {vehicle_model} {type} {version}")
+        print(f"Created new vehicle model: {vehicle_model} {type_car} {version}")
     else:
         cursor.execute("""
             UPDATE vehicle_model 
@@ -161,7 +161,7 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, o
         """, (vehicle.get("Range_WLTP"), vehicle.get("Battery_Warranty_Period"), 
               vehicle.get("Battery_Warranty_Mileage"), vehicle.get("EVDB_Detail_URL"), 
               model_result[0]))
-        print(f"Updated existing vehicle model: {vehicle_model} {type} {version}")
+        print(f"Updated existing vehicle model: {vehicle_model} {type_car} {version}")
 
 def process_vehicle(cursor, vehicle: Dict[str, Any]) -> None:
     """Process a single vehicle record."""
