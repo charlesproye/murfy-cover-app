@@ -347,7 +347,7 @@ def align_dataframes_for_union(df1, df2, strategy="intersection"):
     return df1_aligned, df2_aligned
 
 
-def get_ideal_nb_partitions(file_size_bytes: float, nb_vin: int) -> int:
+def get_optimal_nb_partitions(file_size_bytes: float, nb_vin: int) -> int:
     """
     Calcule le nombre idéal de partitions Spark basé sur la taille du fichier et le nombre de VINs.
     
