@@ -62,50 +62,50 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             pwd=RENAULT_PWD
         )
         # Get initial fleet info
-        # df = await fleet_info(owner_filter=owner_filter)
-        # # Initialize activation service
-        # activation_service = VehicleActivationService(
-        #     bmw_api=bmw_api,
-        #     hm_api=hm_api,
-        #     stellantis_api=stellantis_api,
-        #     tesla_api=tesla_api,
-        #     tesla_particulier_api=tesla_particulier_api,
-        #     renault_api=renault_api,
-        #     fleet_info_df=df
-        # )
+        df = await fleet_info(owner_filter=owner_filter)
+        # Initialize activation service
+        activation_service = VehicleActivationService(
+            bmw_api=bmw_api,
+            hm_api=hm_api,
+            stellantis_api=stellantis_api,
+            tesla_api=tesla_api,
+            tesla_particulier_api=tesla_particulier_api,
+            renault_api=renault_api,
+            fleet_info_df=df
+        )
 
         # Process all brands in parallel
-        # await asyncio.gather(
+        await asyncio.gather(
             #activation_service.activation_tesla(),
             # activation_service.activation_bmw(),
             # activation_service.activation_hm(),
             #activation_service.activation_stellantis(),
             #activation_service.activation_tesla_particulier()
-        #)
+        )
 
         # Get updated fleet info after activation"""
         # logging.info('-------------------------------Activation completed-------------------------------')
         # df = await fleet_info(owner_filter=owner_filter)
         
         # # # Process vehicles with updated info
-        # vehicle_processor = VehicleProcessor(
-        #     bmw_api=bmw_api,
-        #     hm_api=hm_api,
-        #     stellantis_api=stellantis_api,
-        #     tesla_api=tesla_api,
-        #     tesla_particulier_api=tesla_particulier_api,
-        #     renault_api=renault_api,
-        #     df=df
-        # )
-        # await asyncio.gather(
+        vehicle_processor = VehicleProcessor(
+            bmw_api=bmw_api,
+            hm_api=hm_api,
+            stellantis_api=stellantis_api,
+            tesla_api=tesla_api,
+            tesla_particulier_api=tesla_particulier_api,
+            renault_api=renault_api,
+            df=df
+        )
+        await asyncio.gather(
             #vehicle_processor.process_other_vehicles())#,
             #vehicle_processor.process_tesla(),
-            # vehicle_processor.process_renault())#,
+            vehicle_processor.process_renault())
             #vehicle_processor.process_deactivated_vehicles(),
             #vehicle_processor.process_bmw()
             #vehicle_processor.process_tesla_particulier())
-        #)
-        #await vehicle_processor.delete_unused_models()
+        
+        await vehicle_processor.delete_unused_models()
         #await vehicle_processor.generate_vehicle_summary()
 
     except Exception as e:

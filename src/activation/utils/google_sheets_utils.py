@@ -19,7 +19,7 @@ def get_google_client() -> Any:
         creds_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             'config',
-            'credential.json'
+            'config.json'
         )
         
         scopes = [
