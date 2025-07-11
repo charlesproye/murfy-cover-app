@@ -21,7 +21,7 @@ class ResponseToRaw(ABC):
     async def convert(self):
         ts = await self._get_ts()
         if len(ts) == 0:
-            ts_last_date = datetime(year=0,month=0,day=0)
+            ts_last_date = datetime(year=1970,month=1,day=1)
         else:
             ts_last_date: datetime = ts["date"].max().to_pydatetime()
         new_files = await self._get_files_to_add(ts_last_date)
@@ -57,7 +57,7 @@ class ResponseToRaw(ABC):
         new_datas = await self._s3.get_files(sorted_path)
         json_data:list[dict] = []
         for path, data in new_datas.items():
-            values = self.build_dict_value_from_path_data(  path,data)
+            values = self.build_dict_value_from_path_data(path,data)
             json_data.extend(values)
         return json_data
     

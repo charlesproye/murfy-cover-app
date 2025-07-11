@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 class BaseModelWithVin(BaseModel):
     vin: str | None = None
+    received_date: datetime = Field(default_factory=datetime.now)
 
 
 class Trip(BaseModelWithVin):
