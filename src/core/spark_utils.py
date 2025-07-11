@@ -15,54 +15,60 @@ from pyspark.sql.types import (
 
 LIST_COL_TO_DROP = ["model"]
 
-
 def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
     """
     Create a session spark with a connexion to scaleway
-
     """
     os.environ["PYSPARK_SUBMIT_ARGS"] = (
-        "--packages org.apache.hadoop:hadoop-aws:3.3.4 pyspark-shell"
+        "--packages org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0 pyspark-shell"
     )
 
     g1gc_options = (
-        "-XX:+UseG1GC "  # Activer G1GC
-        "-XX:MaxGCPauseMillis=100 "  # Pause GC max de 100ms
-        "-XX:G1HeapRegionSize=32m "  # Taille des régions G1
-        "-XX:+UseStringDeduplication "  # Déduplication des chaînes
-        "-XX:+UnlockExperimentalVMOptions "  # Débloquer les options expérimentales
-        "-XX:+UseZGC "  # ZGC pour les gros heaps (Java 11+)
-        "-XX:+DisableExplicitGC "  # Désactiver System.gc()
-        "-XX:+UseGCOverheadLimit "  # Activer la limite de surcharge GC
-        "-XX:GCTimeRatio=9 "  # Ratio temps GC vs temps application
-        "-XX:+PrintGCDetails "  # Logs détaillés du GC (optionnel)
-        "-XX:+PrintGCTimeStamps "  # Timestamps dans les logs GC
-        "-Xloggc:/tmp/spark-gc.log"  # Fichier de log GC
+        "-XX:+UseG1GC "
+        "-XX:MaxGCPauseMillis=100 "
+        "-XX:G1HeapRegionSize=32m "
+        "-XX:+UseStringDeduplication "
+        "-XX:+UnlockExperimentalVMOptions "
+        "-XX:+UseZGC "
+        "-XX:+DisableExplicitGC "
+        "-XX:+UseGCOverheadLimit "
+        "-XX:GCTimeRatio=9 "
+        "-XX:+PrintGCDetails "
+        "-XX:+PrintGCTimeStamps "
+        "-Xloggc:/tmp/spark-gc.log"
     )
+    
     spark = (
         SparkSession.builder.appName("Scaleway S3 Read JSON")
-        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4")
+        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0")
         .config("spark.hadoop.fs.s3a.endpoint", "https://s3.fr-par.scw.cloud")
         .config("spark.hadoop.fs.s3a.access.key", access_key)
         .config("spark.hadoop.fs.s3a.secret.key", secret_key)
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .config("spark.driver.host", "localhost")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("spark.executor.memory", "10g")  # Garder une mémoire suffisante
-        .config("spark.driver.memory", "10g")  # Garder une mémoire suffisante
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
+        # Nouvelles configurations pour résoudre le ClassNotFoundException
+        .config("spark.hadoop.fs.s3a.experimental.input.fadvise", "normal")
+        .config("spark.hadoop.fs.s3a.connection.maximum", "1000")
+        .config("spark.hadoop.fs.s3a.threads.max", "20")
+        .config("spark.hadoop.fs.s3a.threads.core", "10")
+        .config("spark.hadoop.fs.s3a.buffer.dir", "/tmp")
+        .config("spark.hadoop.fs.s3a.block.size", "134217728")  # 128MB
+        .config("spark.hadoop.fs.s3a.multipart.size", "134217728")  # 128MB
+        .config("spark.hadoop.fs.s3a.multipart.threshold", "134217728")  # 128MB
+        # Configuration pour éviter les problèmes de commit protocol
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "64MB")
+        .config("spark.sql.shuffle.partitions", "200")
+        .config("spark.default.parallelism", "200")
+        .config("spark.executor.memory", "10g")
+        .config("spark.driver.memory", "10g")
         .config("spark.driver.maxResultSize", "4g")
-        # Configuration G1GC pour les executors
         .config("spark.executor.extraJavaOptions", g1gc_options)
-        # Configuration G1GC pour le driver
         .config("spark.driver.extraJavaOptions", g1gc_options)
         .getOrCreate()
     )
-    # .config("spark.sql.debug.maxToStringFields", "0") \
-    # .config("spark.sql.adaptive.logLevel", "WARN") \
 
     return spark
 
