@@ -23,26 +23,32 @@ def fetch_api_data(url: str) -> Optional[list]:
 
 def get_oem(cursor, vehicle_make: str) -> str:
     """Get an OEM record and return its ID."""
-    cursor.execute(
-        "SELECT oem_id FROM make WHERE LOWER(oem_name) = LOWER(%s)",
+    if type(vehicle_make)==str:
+        cursor.execute(
+        "SELECT oem_id FROM make join oem on oem.id=make.oem_id WHERE oem_name = lower(%s)",
         (vehicle_make,))
-    oem_result = cursor.fetchone()
-    
-    return oem_result
+        oem_id = cursor.fetchone()
+        return oem_id
+    else:
+        cursor.execute(
+            "SELECT oem_id FROM make join oem on oem.id=make.oem_id WHERE make.id = %s",
+            (vehicle_make,))
+        oem_id = cursor.fetchone()
+        return oem_id
 
-def get_or_create_make(cursor, vehicle_make: str, oem_id: str) -> str:
+
+def get_or_create_make(cursor, vehicle_make: str, oem_id) -> str:
     """Get or create a Make record and return its ID."""
     cursor.execute(
         "SELECT id FROM make WHERE LOWER(make_name) = LOWER(%s)",
         (vehicle_make,)
     )
     make_result = cursor.fetchone()
-    
     if not make_result:
         make_id = str(uuid.uuid4())
         cursor.execute(
-            "INSERT INTO make (id, make_name) VALUES (%s, LOWER(%s)) RETURNING id",
-            (make_id, vehicle_make)
+            "INSERT INTO make (id, make_name, oem_id) VALUES (%s, LOWER(%s), %s) RETURNING id",
+            (make_id, vehicle_make, oem_id)
         )
         make_id = cursor.fetchone()[0]
     else:
@@ -129,7 +135,6 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, b
             (vehicle_model, type_car)
         )
         model_result = cursor.fetchone()
-    
     if not model_result:
         model_id = str(uuid.uuid4())
         cursor.execute("""
@@ -151,6 +156,7 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, b
         ))
         print(f"Created new vehicle model: {vehicle_model} {type_car} {version}")
     else:
+        print("ici")
         cursor.execute("""
             UPDATE vehicle_model 
             SET autonomy = COALESCE(%s, autonomy),
@@ -169,7 +175,6 @@ def process_vehicle(cursor, vehicle: Dict[str, Any]) -> None:
         if vehicle.get("Vehicle_Make", "").lower() == "tesla":
             print(f"Skipping Tesla model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
             return
-
         oem_id = get_oem(cursor, vehicle.get("Vehicle_Make", ""))
         make_id = get_or_create_make(cursor, vehicle.get("Vehicle_Make", ""), oem_id)
         battery_id = get_or_create_battery(cursor, vehicle)

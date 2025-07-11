@@ -11,7 +11,7 @@ from ..utils.validation import validate_vehicle_data
 from ..utils.date_utils import convert_date_format
 from ..services.activation_service import VehicleActivationService
 from src.core.sql_utils import get_connection
-
+from src.transform.activation.utils import *
 class VehicleProcessor:
     def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, tesla_particulier_api: callable, renault_api: callable, df: pd.DataFrame):
         self.bmw_api = bmw_api
@@ -113,14 +113,18 @@ class VehicleProcessor:
 
     async def _get_or_create_renault_model(self, session: aiohttp.ClientSession, cursor, vin: str, model_name: str, model_type: str, version: str, make: str, oem: str) -> str:
         """Get a model if it exists then update it, or create it if it doesn't exist."""
-        cursor.execute("SELECT id,autonomy FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), model_type.lower(), version.lower()))
+        cursor.execute("SELECT id, autonomy FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), model_type.lower(), version.lower()))
         result = cursor.fetchone()
         model_exists = result[0] if result else None
+        print(model_exists)
         autonomy = result[1] if result else None
         oem_id = await self._get_oem(cursor, oem)
+        print(oem_id)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
-
+        print(make_id)
+        
         if model_exists:
+            print('ici')
             if autonomy is None:
                 wltp_range = await self.renault_api.get_vehicle_wltp_range(session, vin)
                 cursor.execute("UPDATE vehicle_model SET autonomy = %s WHERE id = %s", (wltp_range, model_exists))
@@ -184,7 +188,6 @@ class VehicleProcessor:
                                 
                                 # Create/get model and related records
                                 model_id = await self._get_or_create_tesla_model(cursor, model_name, model_type, version, vehicle['make'], vehicle['oem'], warranty_km, warranty_date)
-                                
                                 # Insert new vehicle
                                 vehicle_id = str(uuid.uuid4())
                                 cursor.execute("INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, end_of_contract_date, start_date, activation_status, is_displayed,is_eligible) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (vehicle_id, vin, fleet_id, region_id, model_id, vehicle['licence_plate'], vehicle['end_of_contract'], start_date, vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility']))
@@ -324,6 +327,12 @@ class VehicleProcessor:
             async with aiohttp.ClientSession() as session:
                 with get_connection() as con:
                     cursor = con.cursor()
+                    cursor.execute("""SELECT vm.model_name, vm.id, vm.type, o.oem_name, b.capacity FROM vehicle_model vm
+                                                                join OEM o on vm.oem_id=o.id
+                                                                join battery b on b.id=vm.battery_id
+                                                                where oem_name='renault';""")
+                    model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type", "oem_name", "capacity"])
+                    
                     for _, vehicle in renault_df.iterrows():
                         try:
                             vin = vehicle['vin']
@@ -338,7 +347,9 @@ class VehicleProcessor:
                                 #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
                                 model_name, model_type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
                                 logging.info(f"Processing Renault vehicle {vin} | {model_name} | {model_type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
-                                model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, model_type, version, vehicle['make'], vehicle['oem'])
+                                model_id = uniform_vehicles_type(model_type, "renault", model_name, model_existing)
+
+                                #model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, model_type, version, vehicle['make'], vehicle['oem'])
 
                                 vehicle_id = str(uuid.uuid4())
                                 insert_query = """

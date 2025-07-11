@@ -205,6 +205,7 @@ class RenaultApi:
                     async with session.get(url, headers=headers) as response:
                         if response.status == 200:
                             data = await response.json()
+                            print(data)
                             model = data.get("model", "renault model unknown").lower()
                             type_and_version = data.get("version").lower()
                             
