@@ -5,10 +5,10 @@ import pandas as pd
 
 from sqlalchemy import text
 
-from transform.insights_results.trendlines import get_trendlines
-from core.stats_utils import log_function
-from core.sql_utils import engine
-from core.gsheet_utils import *
+from src.results.trendlines_results.trendlines import get_trendlines
+from src.core.stats_utils import log_function
+from src.core.sql_utils import get_sqlalchemy_engine
+from src.core.gsheet_utils import *
 
 
 def process_model_trendline(model, df_sheet, client):
