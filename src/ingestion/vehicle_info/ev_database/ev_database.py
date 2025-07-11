@@ -21,24 +21,14 @@ def fetch_api_data(url: str) -> Optional[list]:
         print(f"Error decoding JSON: {e}")
         return None
 
-def get_or_create_oem(cursor, vehicle_make: str) -> str:
-    """Get or create an OEM record and return its ID."""
+def get_oem(cursor, vehicle_make: str) -> str:
+    """Get an OEM record and return its ID."""
     cursor.execute(
-        "SELECT id FROM oem WHERE LOWER(oem_name) = LOWER(%s)",
+        "SELECT oem_id FROM make WHERE LOWER(oem_name) = LOWER(%s)",
         (vehicle_make,))
     oem_result = cursor.fetchone()
     
-    if not oem_result:
-        oem_id = str(uuid.uuid4())
-        cursor.execute(
-            "INSERT INTO oem (id, oem_name) VALUES (%s, LOWER(%s)) RETURNING id",
-            (oem_id, vehicle_make)
-        )
-        oem_id = cursor.fetchone()[0]
-    else:
-        oem_id = oem_result[0]
-    
-    return oem_id
+    return oem_result
 
 def get_or_create_make(cursor, vehicle_make: str, oem_id: str) -> str:
     """Get or create a Make record and return its ID."""
@@ -51,8 +41,8 @@ def get_or_create_make(cursor, vehicle_make: str, oem_id: str) -> str:
     if not make_result:
         make_id = str(uuid.uuid4())
         cursor.execute(
-            "INSERT INTO make (id, make_name, oem_id) VALUES (%s, LOWER(%s), %s) RETURNING id",
-            (make_id, vehicle_make, oem_id)
+            "INSERT INTO make (id, make_name) VALUES (%s, LOWER(%s)) RETURNING id",
+            (make_id, vehicle_make)
         )
         make_id = cursor.fetchone()[0]
     else:
@@ -152,7 +142,7 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, o
             type,
             version,
             make_id,
-            oem_id,
+            get_oem(cursor, make_id),
             vehicle.get("Range_WLTP"),
             vehicle.get("Battery_Warranty_Period"),
             vehicle.get("Battery_Warranty_Mileage"),
@@ -180,10 +170,10 @@ def process_vehicle(cursor, vehicle: Dict[str, Any]) -> None:
             print(f"Skipping Tesla model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}")
             return
 
-        oem_id = get_or_create_oem(cursor, vehicle.get("Vehicle_Make", ""))
+        oem_id = get_oem(cursor, vehicle.get("Vehicle_Make", ""))
         make_id = get_or_create_make(cursor, vehicle.get("Vehicle_Make", ""), oem_id)
         battery_id = get_or_create_battery(cursor, vehicle)
-        get_or_create_vehicle_model(cursor, vehicle, make_id, oem_id, battery_id)
+        get_or_create_vehicle_model(cursor, vehicle, make_id, battery_id)
         
     except Exception as e:
         print(f"Error processing vehicle {vehicle.get('Vehicle_Model')}: {str(e)}")
