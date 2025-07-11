@@ -22,21 +22,13 @@ class VehicleProcessor:
         self.renault_api = renault_api
         self.df = df
     
-    async def _get_or_create_oem(self, cursor, oem_raw: str) -> str:
+    async def _get_oem(self, cursor, oem_raw: str) -> str:
         """Get or create OEM record."""
         oem_lower = OEM_MAPPING.get(oem_raw, oem_raw.lower())
         
         cursor.execute(
             "SELECT id FROM oem WHERE LOWER(oem_name) = %s",(oem_lower,))
         result = cursor.fetchone()
-        
-        if not result:
-            oem_id = str(uuid.uuid4())
-            cursor.execute(
-                "INSERT INTO oem (id, oem_name) VALUES (%s, %s) RETURNING id",
-                (oem_id, oem_lower)
-            )
-            return cursor.fetchone()[0]
         return result[0]
 
     async def _get_or_create_make(self, cursor, make_raw: str, oem_id: str) -> str:
@@ -96,7 +88,7 @@ class VehicleProcessor:
         cursor.execute(
             "SELECT id FROM vehicle_model WHERE LOWER(version) = %s",(version.lower(),))
         result = cursor.fetchone()
-        oem_id = await self._get_or_create_oem(cursor, oem)
+        oem_id = await self._get_oem(cursor, oem)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
         if result:
             model_id = result[0]
@@ -125,7 +117,7 @@ class VehicleProcessor:
         result = cursor.fetchone()
         model_exists = result[0] if result else None
         autonomy = result[1] if result else None
-        oem_id = await self._get_or_create_oem(cursor, oem)
+        oem_id = await self._get_oem(cursor, oem)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
 
         if model_exists:
@@ -150,7 +142,7 @@ class VehicleProcessor:
         cursor.execute("SELECT id FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), type.lower(), version.lower()))
         result = cursor.fetchone()
         model_exists = result[0]
-        oem_id = await self._get_or_create_oem(cursor, oem)
+        oem_id = await self._get_oem(cursor, oem)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
         if model_exists:
             return model_exists
