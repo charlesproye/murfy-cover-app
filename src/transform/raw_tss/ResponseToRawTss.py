@@ -1,5 +1,6 @@
 import re
 import time
+import random
 from abc import abstractmethod
 from datetime import datetime
 from itertools import islice
@@ -181,7 +182,7 @@ class ResponseToRawTss(CachedETLSpark):
             batch = dict(islice(dictionary.items(), i, i + batch_size))
             yield batch
 
-    def _get_keys_to_download(self) -> dict[str, list[str]]:
+    def _get_keys_to_download(self) -> (dict[str, list[str]], list):
         """
         Récupère les clés S3 des fichiers à télécharger en filtrant par date de dernière analyse.
 
@@ -203,13 +204,13 @@ class ResponseToRawTss(CachedETLSpark):
 
         if self.bucket.check_spark_file_exists(self.raw_tss_path):
             raw_tss = self.bucket.read_parquet_df_spark(self.spark, self.raw_tss_path)
-            if "date" in raw_tss.columns and raw_tss:
+            if "readable_date" in raw_tss.columns and raw_tss:
                 # Lecture optimisée
                 last_dates_df = (
-                    raw_tss.select("vin", "date")
+                    raw_tss.select("vin", "readable_date")
                     .groupBy("vin")
-                    .agg({"date": "max"})
-                    .withColumnRenamed("max(date)", "last_parsed_date")
+                    .agg({"readable_date": "max"})
+                    .withColumnRenamed("max(readable_date)", "last_parsed_date")
                 )
 
                 last_parsed_date_dict = (
@@ -251,7 +252,11 @@ class ResponseToRawTss(CachedETLSpark):
 
         vins_paths_grouped = {k: v for k, v in vins_paths_grouped.items() if v}
 
-        return vins_paths_grouped, paths_to_exclude
+        # Shuffle the vins to avoid
+        vins_paths_grouped = dict(random.sample(list(vins_paths_grouped.items()), k=len(vins_paths_grouped)))
+
+
+        return (vins_paths_grouped, paths_to_exclude)
 
     def _download_keys(self, batch: dict[str, list[str]]) -> DataFrame:
         """

@@ -2,7 +2,7 @@ from pyspark.sql import SparkSession
 from core.pandas_utils import DF
 from core.pandas_utils import parse_unstructured_json
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, BooleanType, LongType
-from utils import get_next_scheduled_timestamp
+from .utils import get_next_scheduled_timestamp
 
 LIST_COL_TO_DROP = ["model"]
 
