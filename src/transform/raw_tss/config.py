@@ -217,9 +217,348 @@ SCHEMAS = {
                         ]))
                     ])
                 ), True)
+            ]),
+    "kia": StructType([
+            StructField("diagnostics", StructType([
+                StructField("battery_level", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", DoubleType())
+                ]))),
+                StructField("odometer", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", StructType([
+                        StructField("unit", StringType()),
+                        StructField("value", DoubleType())
+                    ]))
+                ]))),
+                StructField("estimated_range", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", StructType([
+                        StructField("unit", StringType()),
+                        StructField("value", DoubleType())
+                    ]))
+                ]))),
+                StructField("estimated_mixed_powertrain_range", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", StructType([
+                        StructField("unit", StringType()),
+                        StructField("value", DoubleType())
+                    ]))
+                ])))
+            ])),
+            StructField("charging", StructType([
+                StructField("battery_level", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", DoubleType())
+                ]))),
+                StructField("charge_port_state", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", StringType())
+                ]))),
+                StructField("estimated_range", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", StructType([
+                        StructField("unit", StringType()),
+                        StructField("value", DoubleType())
+                    ]))
+                ]))),
+                StructField("plugged_in", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", StringType())
+                ]))),
+                StructField("preconditioning_immediate_status", ArrayType(StructType([
+                    StructField("timestamp", TimestampType()),
+                    StructField("failure", StringType()),
+                    StructField("data", StringType())
+                ])))
+            ]))
+        ]),
+    "ford": StructType([
+                StructField("diagnostics", StructType([
+                    StructField("odometer", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", StructType([
+                            StructField("unit", StringType()),
+                            StructField("value", DoubleType())
+                        ]))
+                    ])))
+                ])),
+                StructField("charging", StructType([
+                    StructField("battery_energy", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", StructType([
+                            StructField("unit", StringType()),
+                            StructField("value", DoubleType())
+                        ]))
+                    ]))),
+                    StructField("battery_level", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", DoubleType())
+                    ]))),
+                    StructField("charge_limit", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", DoubleType())
+                    ]))),
+                    StructField("charger_voltage", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", StructType([
+                            StructField("unit", StringType()),
+                            StructField("value", DoubleType())
+                        ]))
+                    ]))),
+                    StructField("time_to_complete_charge", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", StructType([
+                            StructField("unit", StringType()),
+                            StructField("value", DoubleType())
+                        ]))
+                    ]))),
+                    StructField("status", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", StringType())
+                    ]))),
+                    StructField("battery_performance_status", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", StringType())
+                    ])))
+                ])),
+                StructField("usage", StructType([
+                    StructField("last_trip_battery_regenerated", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", StructType([
+                            StructField("unit", StringType()),
+                            StructField("value", DoubleType())
+                        ]))
+                    ]))),
+                    StructField("electric_distance_last_trip", ArrayType(StructType([
+                        StructField("timestamp", TimestampType()),
+                        StructField("failure", StringType()),
+                        StructField("data", StructType([
+                            StructField("unit", StringType()),
+                            StructField("value", DoubleType())
+                        ]))
+                    ])))
+                ]))
+            ]),
+        "renault": StructType([
+                        StructField("diagnostics", StructType([
+                            StructField("odometer", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StructType([
+                                    StructField("unit", StringType()),
+                                    StructField("value", DoubleType())
+                                ]))
+                            ]))),
+                            StructField("estimated_range", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StructType([
+                                    StructField("unit", StringType()),
+                                    StructField("value", DoubleType())
+                                ]))
+                            ]))),
+                            StructField("speed", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", DoubleType())
+                            ])))
+                        ])),
+                        StructField("charging", StructType([
+                            StructField("battery_energy", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StructType([
+                                    StructField("unit", StringType()),
+                                    StructField("value", DoubleType())
+                                ]))
+                            ]))),
+                            StructField("battery_level", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", DoubleType())
+                            ]))),
+                            StructField("charging_rate", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StructType([
+                                    StructField("unit", StringType()),
+                                    StructField("value", DoubleType())
+                                ]))
+                            ]))),
+                            StructField("distance_to_complete_charge", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StructType([
+                                    StructField("unit", StringType()),
+                                    StructField("value", DoubleType())
+                                ]))
+                            ]))),
+                            StructField("driving_mode_phev", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StringType())
+                            ]))),
+                            StructField("estimated_range", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StructType([
+                                    StructField("unit", StringType()),
+                                    StructField("value", DoubleType())
+                                ]))
+                            ]))),
+                            StructField("plugged_in", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StringType())
+                            ]))),
+                            StructField("battery_charge_type", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StringType())
+                            ]))),
+                            StructField("status", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StringType())
+                            ])))
+                        ])),
+                        StructField("climate", StructType([
+                            StructField("outside_temperature", ArrayType(StructType([
+                                StructField("timestamp", TimestampType()),
+                                StructField("failure", StringType()),
+                                StructField("data", StructType([
+                                    StructField("unit", StringType()),
+                                    StructField("value", DoubleType())
+                                ]))
+                            ])))
+                        ]))
+                    ]),
+    "volvo-cars": StructType([
+                    StructField("diagnostics", StructType([
+                        StructField("odometer", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ]))),
+                        StructField("distance_since_reset", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ]))),
+                        StructField("estimated_range", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ]))),
+                        StructField("fuel_volume", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ])))
+                    ])),
+                    StructField("charging", StructType([
+                        StructField("status", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StringType())
+                        ]))),
+                        StructField("estimated_range", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ]))),
+                        StructField("time_to_complete_charge", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ]))),
+                        StructField("battery_level", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", DoubleType())
+                        ]))),
+                        StructField("plugged_in", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StringType())
+                        ])))
+                    ])),
+                    StructField("usage", StructType([
+                        StructField("average_speed", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ]))),
+                        StructField("average_fuel_consumption", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ]))),
+                        StructField("electric_consumption_average", ArrayType(StructType([
+                            StructField("timestamp", TimestampType()),
+                            StructField("failure", StringType()),
+                            StructField("data", StructType([
+                                StructField("unit", StringType()),
+                                StructField("value", DoubleType())
+                            ]))
+                        ])))
+                    ]))
+                ]),
+    "bmw": StructType([
+                StructField("vin", StringType(), True),
+                StructField("pushKeyValues", ArrayType(
+                    StructType([
+                        StructField("key", StringType(), True),
+                        StructField("value", StringType(), True),  # ou DoubleType() si tu veux caster ensuite
+                        StructField("unit", StringType(), True),
+                        StructField("info", StringType(), True),
+                        StructField("date_of_value", TimestampType(), True)  # à condition que tu passes le format ISO-8601
+                    ])
+                ), True)
             ])
 }
-
 
 
 

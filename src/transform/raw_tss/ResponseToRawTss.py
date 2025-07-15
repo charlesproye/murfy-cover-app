@@ -223,6 +223,7 @@ class ResponseToRawTss(CachedETLSpark):
                 self.logger.info(f"Colonne 'date' non trouvée dans le dataset présent.")
 
         vins_paths = self.bucket.list_files(f"response/{self.make}/", type_file=".json")
+
         vins_paths_grouped = self._group_paths_by_vin(vins_paths)
 
         paths_to_exclude = []
@@ -272,6 +273,8 @@ class ResponseToRawTss(CachedETLSpark):
 
         return (
             self.spark.read.option("multiline", "true")
+            .option("badRecordsPath", f"s3a://{self.settings.S3_BUCKET}/response/{self.make}/corrupted_responses/")
+            .option("mode", "PERMISSIVE")
             .schema(schema)
             .json(keys_to_download_str)
         )

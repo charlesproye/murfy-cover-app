@@ -394,7 +394,9 @@ def get_optimal_nb_partitions(file_size_bytes: float, nb_vin: int) -> int:
         return nb_vin
     else:
         optimal_partitions = int(nb_vin / nb_vin_ideal_size)
-        if optimal_partitions % 2 == 0:
+        if int(optimal_partitions) == 0:
+            return 1
+        elif optimal_partitions % 2 == 0:
             pass
         else:
             optimal_partitions += 1

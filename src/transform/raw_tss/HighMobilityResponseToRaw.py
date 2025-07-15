@@ -160,8 +160,10 @@ def main():
     settings = S3Settings()
     spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
 
+    make = 'volvo-cars' # TMP
+    
     HighMobilityResponseToRaw(
-        make="mercedes-benz", force_update=True, spark=spark, logger=logger
+        make=make, force_update=True, spark=spark, logger=logger
     )
 
 
