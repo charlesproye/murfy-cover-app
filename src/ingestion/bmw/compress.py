@@ -9,7 +9,7 @@ class BMWCompressor(Compressor):
     def brand_prefix(self) -> str:
         return "bmw"
 
-    def temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
+    def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
         data = []
         for file in new_files.values():
             decoded = msgspec.json.decode(file)

@@ -25,25 +25,25 @@ class Compressor(ABC):
         print(f"{vins_folders = }")
         print(f"{vins_with_temps = }")
         for vin_path in vins_with_temps:
-            await self.compress_temp_vin_data(vin_path)
+            await self._compress_temp_vin_data(vin_path)
 
-    async def compress_temp_vin_data(self, vin_folder_path: str):
+    async def _compress_temp_vin_data(self, vin_folder_path: str):
         print(f"DOWNLOAD VIN: {vin_folder_path}")
         new_files = await self._s3.download_folder(f"{vin_folder_path}temp/")
         print(f"{vin_folder_path}: {len(new_files) = }")
         if len(new_files) == 0:
             return
-        encoded_data = self.temp_data_to_daily_file(new_files)
+        encoded_data = self._temp_data_to_daily_file(new_files)
         await self._s3.upload_file(
-            path=f"{vin_folder_path}{self.filename()}", file=encoded_data
+            path=f"{vin_folder_path}{self._filename()}", file=encoded_data
         )
         await self._s3.delete_folder(f"{vin_folder_path}temp/")
     
     @abstractmethod
-    def temp_data_to_daily_file(self, new_files:dict[str,bytes])->bytes:
+    def _temp_data_to_daily_file(self, new_files:dict[str,bytes])->bytes:
         pass
 
 
-    def filename(self):
+    def _filename(self):
         return f"{datetime.now().strftime('%Y-%m-%d')}.json"
 
