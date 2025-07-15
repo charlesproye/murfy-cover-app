@@ -1,5 +1,6 @@
 from pandas import DataFrame as DF
 from transform.raw_tss.parsing import parse_bmw, parse_mobilisight, parse_high_mobility, parse_fleet_telemetry
+from pyspark.sql.types import *
 
 S3_RAW_TSS_KEY_FORMAT = "raw_ts/{brand}/time_series/raw_ts_spark.parquet"
 TESLA_RAW_TSS_KEY = S3_RAW_TSS_KEY_FORMAT.format(brand="tesla")
@@ -218,6 +219,9 @@ SCHEMAS = {
                 ), True)
             ])
 }
+
+
+
 
 ALL_MAKES = [
     "tesla-fleet-telemetry",

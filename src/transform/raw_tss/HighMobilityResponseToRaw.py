@@ -1,30 +1,38 @@
-from pyspark.sql.functions import col, explode, expr, udf
-from pyspark.sql.types import *
-from pyspark.sql.types import (ArrayType, BooleanType, DateType, DoubleType,
-                               IntegerType, LongType, StringType, StructField,
-                               StructType, TimestampType)
-from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
-from typing import Optional
-from pyspark.sql import SparkSession
-from logging import Logger
 import logging
-from dotenv import load_dotenv
+import sys
+from functools import reduce
+from logging import Logger
+from typing import Optional
+
+from config import SCHEMAS
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql.functions import (
+    col,
+    explode,
+    expr,
+    input_file_name,
+    lit,
+    regexp_extract,
+    size,
+)
+from pyspark.sql.types import *
+from pyspark.sql.types import ArrayType, StringType, StructType
+
+from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
-from core.console_utils import main_decorator
-import sys
-from pyspark.sql import DataFrame
+from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
 
 
 class HighMobilityResponseToRaw(ResponseToRawTss):
     """
-    Classe pour traiter les données renvoyées par les API Tesla Fleet Telemetry 
+    Classe pour traiter les données renvoyées par les API Tesla Fleet Telemetry
     stockées dans /response sur Scaleway
     """
 
     def __init__(
         self,
-        make: str = "high-mobility",
+        make: str = "",
         force_update: bool = False,
         writing_mode: Optional[str] = "append",
         spark: SparkSession = None,
@@ -41,6 +49,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
             **kwargs,
         )
 
+    def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         """
         Parse dict from High Mobility api response
 
@@ -53,68 +62,109 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
             spark.DataFrame: Data with every columns
         """
 
-        breakpoint()
+        df = df.coalesce(optimal_partitions_nb)
+        df = df.withColumn("filepath", input_file_name())
+        df = df.withColumn(
+            "vin", regexp_extract("filepath", r"/([^/]+)/\d{4}-\d{2}-\d{2}\.json$", 1)
+        )
+        df = df.withColumn("vin", col("vin").cast(StringType())).drop("filepath")
+        df = df.repartition("vin").coalesce(optimal_partitions_nb)
 
-        # flattened_response = {}
+        def infer_data_path(array_field: ArrayType):
+            """
+            Détermine si le champ `data` est un struct contenant un champ `value`, ou un scalaire.
+            """
+            if isinstance(array_field.elementType, StructType):
+                for f in array_field.elementType.fields:
+                    if f.name == "data":
+                        data_field = f.dataType
+                        if isinstance(data_field, StructType):
+                            # On regarde s’il contient un champ "value"
+                            if "value" in [sub.name for sub in data_field.fields]:
+                                return "data.value"
+                            else:
+                                return "custom"  # ex: time.hour/minute
+                        else:
+                            return "data"
+            return "unknown"
 
-        # for capability, variables in response.items():
-        #     if not isinstance(variables, dict):
-        #         continue
-        #     for variable, elements in variables.items():
-        #         for element in elements:
-        #             timestamp = element["timestamp"]
-        #             variable_name = capability + "." + variable
+        signals = []
 
-        #             if isinstance(element["data"], dict):
-        #                 if "value" in element["data"] or "time" in element['data']:
-        #                     if "value" in element['data']:
-        #                         value = element["data"]["value"]
-        #                     else:
-        #                         value = get_next_scheduled_timestamp(element['timestamp'], element['data'])
-        #                     if "unit" in element:
-        #                         variable_name += "." + element["unit"]
-        #                 else:
-        #                     continue            
-        #             else:
-        #                 value = element["data"]
+        full_schema = SCHEMAS[self.make]
 
-        #             if isinstance(value, (int, float)):
-        #                 value = float(value)
-        #             variable_name = variable_name.replace(".", "_")
-        #             flattened_response[timestamp] = flattened_response.get(
-        #                 timestamp, {}
-        #             ) | {variable_name: value}
+        for top_field in full_schema.fields:
+            domain = top_field.name
+            if isinstance(top_field.dataType, StructType):
+                for signal_field in top_field.dataType.fields:
+                    signal_name = signal_field.name
+                    signal_type = signal_field.dataType
 
+                    if isinstance(signal_type, ArrayType):
+                        data_path = infer_data_path(signal_type)
+                        if data_path != "custom":  ##### TEMPORAIRE
+                            signals.append((domain, signal_name, data_path))
 
+        df.cache()
 
-        # data_list = []
-        # for timestamp, variables in flattened_response.items():
-        #     row = {"readable_date": timestamp, "vin": vin}
-        #     row.update(variables)
-        #     data_list.append(row)
+        dfs = []
 
+        for parent_col, signal_name, value_path in signals:
+            nested_col = col(f"{parent_col}.{signal_name}")
 
-        # raw_ts = spark.createDataFrame(data_list)
-        # return raw_ts
+            print(f"{parent_col}.{signal_name}")
+
+            col_path = f"{parent_col}.{signal_name}"
+            # On vérifie que la colonne existe et contient au moins une entrée non vide
+            if (
+                df.select(size(col(col_path)).alias("size"))
+                .filter("size > 0")
+                .limit(1)
+                .count()
+                > 0
+            ):
+                exploded = (
+                    df.filter(col(parent_col).isNotNull())
+                    .select("vin", explode(nested_col).alias("entry"))
+                    .select(
+                        col("vin"),
+                        col("entry.timestamp").alias("date"),
+                        lit(signal_name).alias("signal"),
+                        col(f"entry.{value_path}").alias("value"),
+                    )
+                )
+                dfs.append(exploded)
+        # Union de tous les signaux
+        parsed_df = reduce(lambda a, b: a.unionByName(b), dfs)
+
+        pivoted = (
+            parsed_df.repartition("vin")
+            .groupBy("vin", "date")
+            .pivot("signal")
+            .agg(expr("first(value)"))
+            .coalesce(optimal_partitions_nb)
+        )
+
+        return pivoted
 
 
 @main_decorator
 def main():
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        stream=sys.stdout
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=sys.stdout,
     )
 
-    logger = logging.getLogger('Logger RawTss')
+    logger = logging.getLogger("Logger RawTss")
 
     settings = S3Settings()
     spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
 
-    HighMobilityResponseToRaw(make='mercedes-benz', force_update=True, spark=spark, logger=logger)
+    HighMobilityResponseToRaw(
+        make="mercedes-benz", force_update=True, spark=spark, logger=logger
+    )
 
 
 if __name__ == "__main__":
     main()
-
 

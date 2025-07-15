@@ -15,7 +15,7 @@ from core.s3.settings import S3Settings
 from core.spark_utils import get_optimal_nb_partitions
 from transform.raw_tss.config import (
     GET_PARSING_FUNCTIONS,
-    MAKES,
+    ALL_MAKES,
     S3_RAW_TSS_KEY_FORMAT,
     SCHEMAS,
 )
@@ -204,13 +204,13 @@ class ResponseToRawTss(CachedETLSpark):
 
         if self.bucket.check_spark_file_exists(self.raw_tss_path):
             raw_tss = self.bucket.read_parquet_df_spark(self.spark, self.raw_tss_path)
-            if "readable_date" in raw_tss.columns and raw_tss:
+            if "date" in raw_tss.columns and raw_tss:
                 # Lecture optimisée
                 last_dates_df = (
-                    raw_tss.select("vin", "readable_date")
+                    raw_tss.select("vin", "date")
                     .groupBy("vin")
-                    .agg({"readable_date": "max"})
-                    .withColumnRenamed("max(readable_date)", "last_parsed_date")
+                    .agg({"date": "max"})
+                    .withColumnRenamed("max(date)", "last_parsed_date")
                 )
 
                 last_parsed_date_dict = (
@@ -234,18 +234,14 @@ class ResponseToRawTss(CachedETLSpark):
                         path
                         for path in paths
                         if datetime.strptime(path.split("/")[-1], "%Y-%m-%d.json")
-                        > datetime.strptime(
-                            last_parsed_date_dict[vin], "%Y-%m-%d %H:%M:%S"
-                        )
+                        > datetime.strptime(str(last_parsed_date_dict[vin]).split()[0], "%Y-%m-%d")
                     ]
 
                     paths_to_exclude.extend([
                         path
                         for path in paths
                         if datetime.strptime(path.split("/")[-1], "%Y-%m-%d.json")
-                        <= datetime.strptime(
-                            last_parsed_date_dict[vin], "%Y-%m-%d %H:%M:%S"
-                        )
+                        <= datetime.strptime(str(last_parsed_date_dict[vin]).split()[0], "%Y-%m-%d")
                     ])
 
 
