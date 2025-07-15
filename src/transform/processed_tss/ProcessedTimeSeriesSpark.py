@@ -84,6 +84,13 @@ class ProcessedTimeSeries(CachedETLSpark):
         end = time.time()
         print(f"Temps écoulé pour charger les données: {end - start:.2f} secondes")
 
+
+        #### TEMPORAIRE
+        start = time.time()
+        tss = tss.withColumn("readable_date", coalesce(col("readable_date"), col("date"))).drop("date")
+        end = time.time()
+        print(f"Temps écoulé pour remplir les readable_date nulles: {end - start:.2f} secondes")
+
         start = time.time()
         tss = tss.withColumn("vin_bucket", (spark_hash(col("vin")) % 32).cast("int"))
         end = time.time()
