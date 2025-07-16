@@ -65,7 +65,7 @@ def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity
     raise Exception("unknown model")
 
 def generate_trendline_functions(df, odometer_column, soh_column):
-    """_summary_
+    """
 
     Parameters:
     -----------
