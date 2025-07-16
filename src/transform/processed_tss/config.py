@@ -24,7 +24,7 @@ NECESSARY_COLS = {
     'renault': ['vin', 'date', 'odometer', 'soc'],
     'kia': ['vin', 'date', 'odometer', 'soc'],
     'bmw': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'mercedes-benz': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'mercedes-benz': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'total_charging_duration', 'start_time', 'end_time', 'energy_charged', 'displayed_state_of_charge', 'displayed_start_state_of_charge', 'charging_rate'],
     'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
