@@ -547,23 +547,20 @@ SCHEMAS = {
                     ]))
                 ]),
     "bmw": StructType([
-                StructField("data", StructType([
-                    StructField("vin", StringType(), True),
-                    StructField("pushKeyValues", ArrayType(
-                        StructType([
+                StructField("data", ArrayType(
+                    StructType([
+                        StructField("vin", StringType(), True),
+                        StructField("pushKeyValues", ArrayType(StructType([
                             StructField("key", StringType(), True),
-                            StructField("value", StringType(), True),  # ou DoubleType() si tu veux caster ensuite
+                            StructField("value", StringType(), True),
                             StructField("unit", StringType(), True),
                             StructField("info", StringType(), True),
-                            StructField("date_of_value", TimestampType(), True)  # à condition que tu passes le format ISO-8601
-                        ])
-                    ), True)
-                ])
-                )
+                            StructField("date_of_value", StringType(), True),
+                        ])), True)
+                    ])
+                ))
             ])
 }
-
-
 
 ALL_MAKES = [
     "tesla-fleet-telemetry",
