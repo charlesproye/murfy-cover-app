@@ -225,8 +225,7 @@ TESLA_MODEL_MAPPING = {
 }
 
 def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity=None):
-    """_summary_
-
+    """Map a given vehicle to the closest model identifier in the database.
     Args:
         type_car (str): type car to find match
         oem_name (str): oem car
@@ -253,8 +252,6 @@ def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity
    
     oem_name = oem_name.lower()
     type_car = type_car.lower()
-    # filtre sur l'oem
-    subset = db_df[db_df['oem_name'] == oem_name].copy()
     try:
         if len(model_name) > 4:
             d = re.findall('\d*', model_name)
@@ -262,30 +259,36 @@ def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity
             model_name = d[-1]
     except:
         model_name = model_name.lower()
+        
+    # filtre sur l'oem
+    subset = db_df[db_df['oem_name'] == oem_name].copy()
 
     # Trouver la meilleure correspondance
     # Retourne le modèle le plus proche score_cutoff fixé à 0.1 pour le moment pour être presque sur d'avoir un retour
     match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio, score_cutoff=.1)
     if match_model :
-        match_model_name, score, index = match_model
+        match_model_name, _, _ = match_model
         # filtre sur le nom du modèle
         subset = subset[subset['model_name']==match_model_name]
         # on cherche la batterie avec la capacité la + proche
         try:
-            battery_target = float(battery_capacity.replace('kWh', '').replace('kwh', '').strip())
-            subset["distance"] = (subset["capacity"] - battery_target).abs()
-            min_distance = subset["distance"].min()
-            closest_rows = subset[subset["distance"] == min_distance]
-            # Si +sieurs batteries -> type le plus ressemblant
+            if battery_capacity:
+                battery_target = float(battery_capacity.lower().replace('kwh', '').strip())
+                subset["distance"] = (subset["capacity"] - battery_target).abs()
+                closest_rows = subset[subset["distance"] == subset["distance"].min()]
+            else:
+                closest_rows = subset
+
+            # Correspondance floue sur le type
             match_type = process.extractOne(type_car, closest_rows['type'], scorer=fuzz.token_sort_ratio)
-            match_model_type, score, index = match_type
-            return closest_rows.loc[index, "id"]
+            if match_type:
+                _, _, index = match_type
+                return closest_rows.iloc[index]["id"]
 
         # type le plus ressemblant sans batterie
         except:
             match_type = process.extractOne(type_car, subset['type'], scorer=fuzz.token_sort_ratio)
-            match_model_type, score, index = match_type
-            print(match_type)
+            _, _, index = match_type
             return subset.loc[index, "id"]
         
-    raise "unkown model"
+    raise Exception("unknown model")
