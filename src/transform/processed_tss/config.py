@@ -19,21 +19,35 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "range",
 ]
 
+NECESSARY_COLS = {
+    'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
+    'renault': ['vin', 'date', 'odometer', 'soc'],
+    'kia': ['vin', 'date', 'odometer', 'soc'],
+    'bmw': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'mercedes-benz': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added']
+}
+
 RENAME_COLS_DICT:dict[str, str] = {
     # High mobility
     "date_of_value": "date",
-    "diagnostics.odometer": "odometer",
-    "odometer.value": "odometer",
+    "diagnostics_odometer": "odometer",
+    "odometer_value": "odometer",
     "mileage_km": "odometer",
     "mileage": "odometer",
-    "charging.battery_energy": "battery_energy",
-    "charging.estimated_range": "estimated_range",
-    "charging.battery_level": "soc",
+    "charging_battery_energy": "battery_energy",
+    "charging_estimated_range": "estimated_range",
+    "charging_battery_level": "soc",
+    "battery_level": "soc",
     "soc_hv_header": "soc",
-    "climate.outside_temperature": "outside_temp",
-    "charging.status": "charging_status",
-    "charging.battery_charge_type": "charging_method",
-    "usage.electric_consumption_average": 'consumption',
+    "climate_outside_temperature": "outside_temp",
+    "charging_status": "charging_status",
+    "status": "charging_status",
+    "charging_battery_charge_type": "charging_method",
+    "usage_electric_consumption_average": 'consumption',
     # Mobilisight
     "datetime": "date",
     "engine.oilTemperature": "oil_temp",
@@ -51,9 +65,9 @@ RENAME_COLS_DICT:dict[str, str] = {
     "electricity.engineSpeed": "engine_speed",
     "electricity.battery.stateOfHealth.percentage": "soh_oem",
     # Mercedes
-    "charging.max_range": "max_range",
-    "charging.charging_rate": "charging_rate",
-    "charging.fully_charged_end_times": "fully_charged_end_times",
+    "charging_max_range": "max_range",
+    "charging_charging_rate": "charging_rate",
+    "charging_fully_charged_end_times": "fully_charged_end_times",
     # BMW
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
@@ -242,18 +256,6 @@ COL_DTYPES_SPARK = {
         "vin": StringType()
     }
 
-
-NECESSARY_COLS = {
-    'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added', 'ac_charging_power', 'dc_charging_power'],
-    'renault': ['vin', 'date', 'odometer', 'soc'],
-    'kia': ['vin', 'date', 'odometer', 'soc'],
-    'bmw': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'mercedes-benz': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added', 'ac_charging_power', 'dc_charging_power']
-}
 
 DISCHARGE_VARS_TO_MEASURE = ["soc", "odometer", "estimated_range"]
 COLS_TO_FILL = [
