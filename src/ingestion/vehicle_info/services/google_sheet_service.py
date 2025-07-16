@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
-from ingestion.vehicle_info.config.credentials import SPREADSHEET_ID
-from ingestion.vehicle_info.utils.google_sheets_utils import get_google_client
+from ..config.credentials import SPREADSHEET_ID
+from ..utils.google_sheets_utils import get_google_client
 import pandas as pd
 
 async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
@@ -67,7 +67,7 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
                 })
                 updates.append({
                     'range': f'R{row_idx}C{error_col}',
-                    'values': [[row['Activation_Error']]]
+                    'values': [[row['Activation_Error'] if row['Activation_Error'] is not None else '']]
                 })
                 updates.append({
                     'range': f'R{row_idx}C{account_owner_col}',

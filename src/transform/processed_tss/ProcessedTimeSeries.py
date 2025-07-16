@@ -1,7 +1,10 @@
 import argparse
 from logging import getLogger
+import os
+import shutil
 
 from scipy.integrate import cumulative_trapezoid
+import pandas as pd
 from core.constants import *
 
 from core.pandas_utils import *
@@ -27,14 +30,14 @@ class ProcessedTimeSeries(CachedETL):
         self.id_col = id_col
         self.max_td = max_td
         super().__init__(S3_PROCESSED_TSS_KEY_FORMAT.format(make=make), "s3", force_update=force_update, **kwargs)
-
+    
     # No need to call run, it will be called in CachedETL init.
     def run(self) -> DF:
         self.logger.info(f"{'Processing ' + self.make + ' raw tss.':=^{50}}")
         tss = get_raw_tss(self.make)
-        tss = tss.rename(columns=RENAME_COLS_DICT, errors="ignore")
+        tss = tss.rename(columns=RENAME_COLS_DICT)
         tss = tss.pipe(safe_locate, col_loc=list(COL_DTYPES.keys()), logger=self.logger)
-        tss = tss.pipe(safe_astype, COL_DTYPES, logger=self.logger)
+        tss = tss.pipe(safe_astype, COL_DTYPES, logger=self.logger, dask=True)
         tss = tss.pipe(self.normalize_units_to_metric)
         tss = tss.sort_values(by=["vin", "date"])
         tss = tss.pipe(str_lower_columns, COLS_TO_STR_LOWER)
@@ -89,9 +92,18 @@ class ProcessedTimeSeries(CachedETL):
         return tss
 
     def compute_date_vars(self, tss:DF) -> DF:
+        
         self.logger.debug(f"Computing time_diff and sec_time_diff.")
+        tss["date"] = tss["date"].map_partitions(pd.to_datetime, meta=("date", "datetime64[ns]"))
+
+        # Sort values to ensure correct diff
+        tss = tss.sort_values(self.id_col)
+
+        # Compute time differences per vehicle/group
         tss["time_diff"] = tss.groupby(self.id_col, observed=False)["date"].diff()
         tss["sec_time_diff"] = tss["time_diff"].dt.total_seconds()
+       # tss["time_diff"] = tss.groupby(self.id_col, observed=False)["date"].diff()
+        #tss["sec_time_diff"] = tss["time_diff"].dt.total_seconds()
         return tss
 
     def compute_charge_n_discharge_masks(self, tss:DF, in_charge_vals:list, in_discharge_vals:list) -> DF:
@@ -173,7 +185,7 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         self.logger = getLogger(make)
         set_level_of_loggers_with_prefix(log_level, make)
         super().__init__(make, id_col, log_level, max_td, force_update, **kwargs)
-
+        
     def compute_charge_n_discharge_vars(self, tss:DF) -> DF:
         return (
             tss

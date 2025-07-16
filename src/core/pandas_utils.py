@@ -6,9 +6,6 @@ import logging
 import pandas as pd
 from pandas import DataFrame as DF
 from pandas import Series
-from pandas import Index as Idx
-from pandas import MultiIndex as MultiIdx
-from pandas import Timedelta as TD
 import numpy as np
 
 
@@ -164,7 +161,7 @@ def src_dest_for_left_merge(lhs:DF, rhs:DF, left_on:list[str], right_on:list[str
         raise ValueError(f"src_dest_cols must be None, list, or dict, received: {type(src_dest_cols)}")
     return src_cols, dest_cols
 
-def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
+def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger, dask=False) -> DF:
     """
     Warp around pd.astype to ignore errors.
     Removes keys from col_dtypes that are not in df.columns.
@@ -176,9 +173,13 @@ def safe_astype(df:DF, col_dtypes:dict, logger:Logger=logger) -> DF:
     col_dtypes = {col:dtype for col, dtype in col_dtypes.items() if not "datetime" in str(dtype)}
     logger.debug(f"dtypes:\n{col_dtypes}")
     logger.debug(f"datetime_cols:{datetime_cols}")
-    df = df.astype(col_dtypes, errors="ignore")
-    for col in datetime_cols:
-        df[col] = pd.to_datetime(df[col], format='mixed').dt.as_unit("s")
+    df = df.astype(col_dtypes)
+    if dask is True:
+        for col in datetime_cols:
+            df[col] = pd.to_datetime(df[col])
+    else:
+        for col in datetime_cols:
+            df[col] = pd.to_datetime(df[col], format='mixed').floor("s")
     return df
 
 def sanity_check(df:DF) -> DF:
@@ -270,3 +271,6 @@ def explode_data(df: pd.DataFrame) -> pd.DataFrame:
     else:
         return df
     return df_merge
+
+def to_datetime_floor_s(series):
+    return pd.to_datetime(series, format='mixed').dt.floor("s")

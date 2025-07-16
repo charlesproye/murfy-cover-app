@@ -20,6 +20,7 @@ async def get_session() -> AsyncSession:
         await session.close()
 
 async def ingest_demo():
+    print("Ingestion des données demo en cours...")
     async for session in get_session():
         try:
             # Récupérer les IDs des modèles Tisla

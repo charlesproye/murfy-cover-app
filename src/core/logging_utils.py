@@ -1,5 +1,7 @@
 import logging
 import logging.config
+from typing import Annotated
+from fastapi import Depends
 from rich.logging import RichHandler
 
 RICH_HANDLER = RichHandler()

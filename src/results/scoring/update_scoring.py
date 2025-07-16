@@ -1,6 +1,6 @@
 from sqlalchemy.exc import OperationalError
 
-from core.sql_utils import get_connection
+from src.core.sql_utils import get_connection
 from sqlalchemy import text
 
 class FrontUtils:
@@ -123,12 +123,22 @@ class FrontUtils:
                                                         CASE
                                                             -- Si dégradation plus rapide que la moyenne
                                                             WHEN tu.vehicle_degradation > tu.degradation_rate THEN
-                                                                -2 * (tu.vehicle_degradation - tu.degradation_rate) 
-                                                                / NULLIF(tu.degradation_rate, 0)
+                                                                GREATEST(
+                                                                    LEAST(
+                                                                        -2 * (tu.vehicle_degradation - tu.degradation_rate) / NULLIF(tu.degradation_rate, 0),
+                                                                        99.999
+                                                                    ),
+                                                                    -99.999
+                                                                )
                                                             -- Si dégradation plus lente que la moyenne
                                                             ELSE
-                                                                3 * (tu.degradation_rate - tu.vehicle_degradation) 
-                                                                / NULLIF(tu.degradation_rate, 0)
+                                                                GREATEST(
+                                                                    LEAST(
+                                                                        3 * (tu.degradation_rate - tu.vehicle_degradation) / NULLIF(tu.degradation_rate, 0),
+                                                                        99.999
+                                                                    ),
+                                                                    -99.999
+                                                                )
                                                         END
                                                     )
                                                 )

@@ -5,7 +5,7 @@ from logging import getLogger
 from rich.progress import track
 
 from core.pandas_utils import *
-from core.s3_utils import S3_Bucket
+from core.s3.s3_utils import S3Service
 from transform.raw_tss.config import *
 from core.caching_utils import cache_result
 from core.console_utils import main_decorator
@@ -20,7 +20,7 @@ def main():
     # print(sanity_check(get_raw_tss(force_update=True)))
 
 @cache_result(TESLA_RAW_TSS_KEY, on="s3")
-def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
+def get_raw_tss(bucket: S3Service = S3Service()) -> DF:
     logger.debug("Getting raw tss from responses provided by tesla.")
     keys = get_response_keys_to_parse(bucket)
     new_raw_tss = get_raw_tss_from_keys(keys, bucket)
@@ -29,7 +29,7 @@ def get_raw_tss(bucket: S3_Bucket = S3_Bucket()) -> DF:
     else:
         return new_raw_tss
 
-def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
+def get_response_keys_to_parse(bucket:S3Service) -> DF:
     if bucket.check_file_exists(TESLA_RAW_TSS_KEY):
         raw_tss_subset = bucket.read_parquet_df(TESLA_RAW_TSS_KEY, columns=["vin", "readable_date"])
     else:
@@ -47,7 +47,7 @@ def get_response_keys_to_parse(bucket:S3_Bucket) -> DF:
         .query("last_parsed_date.isna() | date > last_parsed_date") 
     )
 
-def get_raw_tss_from_keys(keys:DF, bucket:S3_Bucket) -> DF:
+def get_raw_tss_from_keys(keys:DF, bucket:S3Service) -> DF:
     raw_tss = []
     for week, week_keys in track(keys.groupby(pd.Grouper(key='date', freq='W-MON'))):
         week_date = week.date().strftime('%Y-%m-%d')

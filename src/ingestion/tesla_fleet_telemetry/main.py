@@ -21,12 +21,13 @@ warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<
 # Fix relative imports to use absolute paths
 from src.ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
 from src.ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
-from src.ingestion.tesla_fleet_telemetry.core.s3_handler import compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients, sync_time_with_aws, force_time_sync
-from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
 from src.ingestion.tesla_fleet_telemetry.core.s3_handler import (
-    compress_data_non_blocking, compress_specific_vehicle,
-    deep_compress_all_temp_files, deep_compress_temp_files_non_blocking
+    compress_data, save_data_to_s3, cleanup_old_data, cleanup_clients,
+    sync_time_with_aws, force_time_sync, compress_data_non_blocking,
+    compress_specific_vehicle, deep_compress_all_temp_files,
+    deep_compress_temp_files_non_blocking, compress_vehicle_data_for_date
 )
+from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
 
 # Logging configuration
 logging.basicConfig(
@@ -433,9 +434,12 @@ async def compress_worker(vehicles: List[str], date: datetime):
                 logger.error(f"Error closing S3 client: {str(e)}")
 
 async def is_midnight() -> bool:
-    """Check if it's midnight UTC."""
+    """Check if current time is within the first minute of the day (00:00-00:01)."""
     now = datetime.now()
-    return now.hour ==0 and now.minute == 0
+    is_compression_time = now.hour == 00 and now.minute == 00
+    if is_compression_time:
+        logger.info(f"Compression time detected: {now}")
+    return is_compression_time
 
 async def compress_previous_day_data(blocking=False, batch_size: int = 10):
     """
@@ -454,242 +458,110 @@ async def compress_previous_day_data(blocking=False, batch_size: int = 10):
         # Calculate yesterday's date
         yesterday = datetime.now() - timedelta(days=1)
         yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        logger.info(f"Compressing data for {yesterday}")
         
-        # Get list of vehicles with temporary data
-        settings = get_settings()
-
-        print("yesterday", yesterday)
-        session = aioboto3.Session()
-        
-        # Use the same config as in s3_handler
-        boto_config = Config(
-            signature_version='s3v4',
-            s3={
-                'addressing_style': 'path',
-                'payload_signing_enabled': False,
-                'use_accelerate_endpoint': False,
-                'checksum_validation': False,  # Disable checksum validation properly
-                'use_dualstack_endpoint': False
-            },
-            connect_timeout=5,
-            read_timeout=60,
-            retries={'max_attempts': 3, 'mode': 'standard'},
-            parameter_validation=True
-        )
-        
-        s3_client = await session.client(
-            's3',
-            region_name=settings.s3_region,
-            endpoint_url=settings.s3_endpoint,
-            aws_access_key_id=settings.s3_key,
-            aws_secret_access_key=settings.s3_secret,
-            config=boto_config,
-            verify=False  # Disable SSL verification if using a self-signed cert
-        ).__aenter__()
-        
-        vehicles = []
-        
-        try:
-            # Get list of vehicles
-            response = await s3_client.list_objects_v2(
-                Bucket=settings.s3_bucket,
-                Prefix=f"{settings.base_s3_path}/temp/",
-                Delimiter="/"
-            )
-            
-            for prefix in response.get('CommonPrefixes', []):
-                vehicle_prefix = prefix.get('Prefix', '')
-                if vehicle_prefix:
-                    vin = vehicle_prefix.split('/')[-2]
-                    vehicles.append(vin)
-        finally:
-            # Ensure client is properly closed
-            try:
-                await s3_client.__aexit__(None, None, None)
-            except Exception as e:
-                logger.error(f"Error closing S3 client: {str(e)}")
-        
-        if not vehicles:
-            logger.info("No vehicles found to compress")
-            return True if blocking else None
-            
-        # Create vehicle pools
-        vehicle_pools = await create_vehicle_worker_pools(vehicles)
-        
-        # Define the compression function
-        async def do_compression():
-            try:
-                # Split vehicle pools into smaller batches to avoid time skew issues
-                all_worker_tasks = []
-                
-                for pool in vehicle_pools:
-                    # Process pools in smaller sub-batches
-                    for i in range(0, len(pool), batch_size):
-                        sub_batch = pool[i:i+batch_size]
-                        if sub_batch:
-                            task = asyncio.create_task(compress_worker(sub_batch, yesterday))
-                            all_worker_tasks.append(task)
-                            
-                            # Brief pause between creating tasks to prevent initial time skew
-                            await asyncio.sleep(0.1)
-                
-                # Create a semaphore to limit concurrent task execution
-                semaphore = asyncio.Semaphore(batch_size)
-                
-                async def process_with_semaphore(task):
-                    async with semaphore:
-                        return await task
-                
-                # Wait for all workers to complete, but limit concurrency
-                results = await asyncio.gather(
-                    *[process_with_semaphore(task) for task in all_worker_tasks],
-                    return_exceptions=True
-                )
-                
-                # Check for errors
-                error_count = sum(1 for r in results if isinstance(r, Exception))
-                if error_count > 0:
-                    logger.warning(f"Daily compression completed with {error_count} errors")
-                    for i, result in enumerate(results):
-                        if isinstance(result, Exception):
-                            logger.error(f"Worker error: {str(result)}")
-                
-                logger.info(f"Compression of data for {yesterday.date()} completed")
-                
-                # Clean up yesterday's temporary files
-                await cleanup_old_data(yesterday)
-                
-                return error_count == 0
-            except Exception as e:
-                logger.error(f"Error in compression task: {str(e)}")
-                return False
-        
+        # Use deep_compress_all_temp_files directly as it's more reliable
         if blocking:
-            # Execute compression synchronously
-            return await do_compression()
+            return await deep_compress_all_temp_files(batch_size=batch_size)
         else:
-            # Execute compression as a background task
-            task = asyncio.create_task(do_compression())
-            
-            def log_completion(future):
-                try:
-                    result = future.result()
-                    logger.info(f"Background daily compression completed: {result}")
-                except Exception as e:
-                    logger.error(f"Background daily compression failed: {str(e)}")
-            
-            task.add_done_callback(log_completion)
+            task = asyncio.create_task(deep_compress_all_temp_files(batch_size=batch_size))
+            task.add_done_callback(lambda future: logger.info(
+                f"Background daily compression completed: {future.result()}"
+            ))
             return task
-        
+            
     except Exception as e:
         logger.error(f"Error during daily compression: {str(e)}")
         return False if blocking else None
 
 async def consume_kafka_data(topic: str, group_id: str, bootstrap_servers: str, 
-                            auto_offset_reset: str = "latest", buffer_flush_interval: int = 30,
-                            buffer_size: int = 3000):
-    """
-    Consume Kafka data with midnight daily compression.
-    """
-    global MAX_BUFFER_SIZE, FLUSH_INTERVAL_SECONDS, running
+                        auto_offset_reset: str = "latest", buffer_flush_interval: int = 30,
+                        buffer_size: int = 3000):
+    """Consume data from Kafka topic and process it."""
+    global running, messages_processed
     
-    MAX_BUFFER_SIZE = buffer_size
-    FLUSH_INTERVAL_SECONDS = buffer_flush_interval
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
+    logger.info(f"Starting Kafka consumer for topic {topic}")
     consumer = KafkaConsumer(
         topic=topic,
         group_id=group_id,
         bootstrap_servers=bootstrap_servers,
-        auto_offset_reset=auto_offset_reset,
-        enable_auto_commit=True,
-        auto_commit_interval_ms=5000,
-        max_poll_interval_ms=300000,
-        session_timeout_ms=60000,
-        request_timeout_ms=30000,
-        message_retention_hours=48  # Configurer explicitement la rétention à 48 heures
+        auto_offset_reset=auto_offset_reset
     )
     
-    logger.info(f"Starting Kafka consumer: {topic}, {group_id}, {bootstrap_servers}")
-    logger.info(f"Configuration: buffer={MAX_BUFFER_SIZE}, flush_interval={FLUSH_INTERVAL_SECONDS}s, message_retention=48h")
-    
-    last_midnight_check = datetime.now() - timedelta(days=1)
-    timeout_task = None
-    
-    try:
-        async def check_timeouts():
-            nonlocal last_midnight_check
-            while not shutdown_event.is_set():
-                try:
-                    await check_buffer_timeouts()
-                    # Check if it's midnight
-                    now = datetime.now()
-                    if now.date() > last_midnight_check.date():
-                        if await is_midnight():
-                            print("is_midnight ok")
-                            logger.info("Midnight UTC detected, starting daily compression")
-                            # Use non-blocking compression for daily tasks with a reasonable batch size
-                            await compress_previous_day_data(blocking=False, batch_size=10)
-                            logger.info("Daily compression task started in background")
-                            last_midnight_check = now
-                            
-                except Exception as e:
-                    logger.error(f"Error checking timeouts: {str(e)}")
+    async def check_timeouts():
+        while running:
+            await check_buffer_timeouts()
+            await asyncio.sleep(1)
+            
+            # Check if it's midnight and trigger compression
+            if await is_midnight():
+                logger.info("Midnight detected - Starting compression")
+                
+                # Pause Kafka consumption
+                logger.info("Pausing Kafka consumption for compression")
+                await consumer.pause()
                 
                 try:
-                    # Use wait_for with timeout to periodically check shutdown_event
-                    await asyncio.wait_for(shutdown_event.wait(), timeout=1.0) # check fait toutes les 30 secondes
-                    break
-                except asyncio.TimeoutError:
-                    continue
-        
-        timeout_task = asyncio.create_task(check_timeouts())
-        
-        while not shutdown_event.is_set():
-            try:
-                async for message in consumer.consume():
-                    if shutdown_event.is_set():
-                        break
+                    # Flush all buffers before compression
+                    logger.info("Flushing all buffers")
+                    await flush_all_buffers()
+                    
+                    # Run compression
+                    logger.info("Starting compression process")
+                    compression_result = await compress_previous_day_data(blocking=True)
+                    
+                    if compression_result:
+                        logger.info("Compression completed successfully")
+                    else:
+                        logger.error("Compression failed")
                         
-                    try:
-                        processed_message = await process_message(message)
-                        if processed_message:
-                            await add_to_buffer(processed_message)
-                            
-                    except Exception as e:
-                        logger.error(f"Error processing messages: {str(e)}")
-                        if not shutdown_event.is_set():
-                            await asyncio.sleep(1)
-                            
-            except Exception as e:
-                if not shutdown_event.is_set():
-                    logger.error(f"Error in Kafka consumption loop: {str(e)}")
-                    await asyncio.sleep(1)
-                else:
-                    break
+                except Exception as e:
+                    logger.error(f"Error during compression process: {str(e)}")
+                    
+                finally:
+                    # Only resume if we're still running
+                    if running:
+                        logger.info("Resuming Kafka consumption")
+                        await consumer.resume()
+                        logger.info("Kafka consumption resumed")
+                
+                # Sleep for a minute to avoid multiple triggers
+                await asyncio.sleep(60)
     
-    except Exception as e:
-        logger.error(f"Error in main loop: {str(e)}")
-    finally:
-        logger.info("Final cleanup...")
-        
-        # Cancel timeout checking task
-        if timeout_task:
-            timeout_task.cancel()
+    # Start timeout checker in background
+    timeout_task = asyncio.create_task(check_timeouts())
+    
+    try:
+        async for message in consumer.consume():
+            if not running:
+                break
+                
             try:
-                await timeout_task
-            except asyncio.CancelledError:
-                pass
+                processed_data = await process_message(message)
+                if processed_data:
+                    await add_to_buffer(processed_data)
+                    messages_processed += 1
+                    
+                    if messages_processed % 1000 == 0:
+                        logger.info(f"Processed {messages_processed} messages")
+                        
+            except Exception as e:
+                logger.error(f"Error processing message: {str(e)}", exc_info=True)
+                
+    except Exception as e:
+        logger.error(f"Error in Kafka consumer: {str(e)}", exc_info=True)
         
-        # Graceful shutdown
-        await graceful_shutdown()
-        
-        # Close Kafka consumer
+    finally:
+        # Cancel timeout checker
+        timeout_task.cancel()
+        try:
+            await timeout_task
+        except asyncio.CancelledError:
+            pass
+            
+        # Close consumer
         await consumer.close()
-        
-        logger.info("Cleanup completed")
+        logger.info("Kafka consumer closed")
 
 async def run_deep_compress(specific_vin: str = None, batch_size: int = 5):
     """
@@ -730,7 +602,10 @@ async def run_compress_now(specific_vin: str = None, batch_size: int = 10, deep:
     try:
         if specific_vin:
             logger.info(f"Starting compression for vehicle {specific_vin}")
-            await compress_specific_vehicle(specific_vin, deep=deep)
+            if deep:
+                await deep_compress_all_temp_files(specific_vin=specific_vin, batch_size=batch_size)
+            else:
+                await compress_specific_vehicle(specific_vin)
             logger.info(f"Completed compression for vehicle {specific_vin}")
         else:
             # Since deep compression is now the default behavior, we always do deep compression

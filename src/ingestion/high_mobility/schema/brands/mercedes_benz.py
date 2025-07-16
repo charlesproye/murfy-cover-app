@@ -43,12 +43,20 @@ class MercedesBenzUsage(msgspec.Struct):
     electric_duration_last_trip: Optional[HMApiValue[DataWithUnit[int]]] = None
     electric_duration_since_reset: Optional[HMApiValue[DataWithUnit[int]]] = None
 
+class MercedesBenzChargingSession(msgspec.Struct):
+    start_time: Optional[HMApiValue[str]] = None  # Changed from Time to str
+    displayed_start_state_of_charge: Optional[HMApiValue[float]] = None
+    end_time: Optional[HMApiValue[str]] = None  # Changed from Time to str
+    displayed_state_of_charge: Optional[HMApiValue[float]] = None
+    energy_charged: Optional[HMApiValue[DataWithUnit[float]]] = None
+    total_charging_duration: Optional[HMApiValue[DataWithUnit[float]]] = None
+
 @register_brand(rate_limit=36)
 class MercedesBenzInfo(HMApiResponse):
     diagnostics: Optional[MercedesBenzDiagnostics] = None
     charging: Optional[MercedesBenzCharging] = None
     usage: Optional[MercedesBenzUsage] = None
-
+    charging_session: Optional[MercedesBenzChargingSession] = None  # Changed from list to single object
 
 class MergedMercedesBenzDiagnostics(msgspec.Struct):
     odometer: list[HMApiValue[DataWithUnit[float]]] = []
@@ -70,7 +78,6 @@ class MergedMercedesBenzDiagnostics(msgspec.Struct):
     def merge(self, other: Optional[MercedesBenzDiagnostics]):
         if other is not None and is_new_value(self.odometer, other.odometer):
             self.odometer.append(cast(HMApiValue[DataWithUnit[float]], other.odometer))
-
 
 class MergedMercedesBenzCharging(msgspec.Struct):
     battery_level: list[HMApiValue[float]] = []
@@ -279,15 +286,74 @@ class MergedMercedesBenzUsage(msgspec.Struct):
                 self.electric_duration_since_reset.append(
                     cast(HMApiValue[DataWithUnit[int]], other.electric_duration_since_reset)
                 )
+
+class MergedMercedesBenzChargingSession(msgspec.Struct):
+    start_time: list[HMApiValue[str]] = []  # Changed from Time to str
+    displayed_start_state_of_charge: list[HMApiValue[float]] = []
+    end_time: list[HMApiValue[str]] = []  # Changed from Time to str
+    displayed_state_of_charge: list[HMApiValue[float]] = []
+    energy_charged: list[HMApiValue[DataWithUnit[float]]] = []
+    total_charging_duration: list[HMApiValue[DataWithUnit[float]]] = []  # Changed from int to float
+
+    @classmethod
+    def from_initial(cls, initial: Optional[MercedesBenzChargingSession]) -> Self:
+        ret = cls()
+        if initial is not None:
+            ret.start_time = [initial.start_time] if initial.start_time is not None else []
+            ret.displayed_start_state_of_charge = (
+                [initial.displayed_start_state_of_charge] 
+                if initial.displayed_start_state_of_charge is not None 
+                else []
+            )
+            ret.end_time = [initial.end_time] if initial.end_time is not None else []
+            ret.displayed_state_of_charge = (
+                [initial.displayed_state_of_charge] 
+                if initial.displayed_state_of_charge is not None 
+                else []
+            )
+            ret.energy_charged = (
+                [initial.energy_charged] if initial.energy_charged is not None else []
+            )
+            ret.total_charging_duration = (
+                [initial.total_charging_duration] 
+                if initial.total_charging_duration is not None 
+                else []
+            )
+        return ret
+
+    def merge(self, other: Optional[MercedesBenzChargingSession]):
+        if other is not None:
+            if is_new_value(self.start_time, other.start_time):
+                self.start_time.append(cast(HMApiValue[str], other.start_time))
+            if is_new_value(self.displayed_start_state_of_charge, other.displayed_start_state_of_charge):
+                self.displayed_start_state_of_charge.append(
+                    cast(HMApiValue[float], other.displayed_start_state_of_charge)
+                )
+            if is_new_value(self.end_time, other.end_time):
+                self.end_time.append(cast(HMApiValue[str], other.end_time))
+            if is_new_value(self.displayed_state_of_charge, other.displayed_state_of_charge):
+                self.displayed_state_of_charge.append(
+                    cast(HMApiValue[float], other.displayed_state_of_charge)
+                )
+            if is_new_value(self.energy_charged, other.energy_charged):
+                self.energy_charged.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.energy_charged)
+                )
+            if is_new_value(self.total_charging_duration, other.total_charging_duration):
+                self.total_charging_duration.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.total_charging_duration)
+                )
+
 @register_merged
 class MergedMercedesBenzInfo(msgspec.Struct):
     diagnostics: MergedMercedesBenzDiagnostics
     charging: MergedMercedesBenzCharging
     usage: MergedMercedesBenzUsage
+    charging_session: MergedMercedesBenzChargingSession  # Changed from list to single object
 
     @classmethod
     def new(cls) -> Self:
-        return cls(MergedMercedesBenzDiagnostics(), MergedMercedesBenzCharging(), MergedMercedesBenzUsage())
+        return cls(MergedMercedesBenzDiagnostics(), MergedMercedesBenzCharging(), MergedMercedesBenzUsage(), MergedMercedesBenzChargingSession())
 
     @classmethod
     def from_initial(cls, initial: MercedesBenzInfo) -> Self:
@@ -295,9 +361,11 @@ class MergedMercedesBenzInfo(msgspec.Struct):
             MergedMercedesBenzDiagnostics.from_initial(initial.diagnostics),
             MergedMercedesBenzCharging.from_initial(initial.charging),
             MergedMercedesBenzUsage.from_initial(initial.usage),
+            MergedMercedesBenzChargingSession.from_initial(initial.charging_session),
         )
 
     def merge(self, other: MercedesBenzInfo):
         self.diagnostics.merge(other.diagnostics)
         self.charging.merge(other.charging)
         self.usage.merge(other.usage)
+        self.charging_session.merge(other.charging_session)
