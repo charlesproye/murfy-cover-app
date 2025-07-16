@@ -236,19 +236,6 @@ def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity
     Returns:
         str: type le plus proche présent dans la db de vehicle_model
     """
-
-#__________ Faire tourner cette requête en dehors pour récupérer les infos nécessaires sur la db_________
-# from core.sql_utils import *
-# engine = get_sqlalchemy_engine()
-# con = engine.connect()
-
-# with engine.connect() as connection:
-#     dbeaver_df = pd.read_sql(text("""SELECT vm.model_name, vm.id, vm.type, o.oem_name, b.capacity FROM vehicle_model vm
-#                                   join OEM o on vm.oem_id=o.id
-#                                   join battery b on b.id=vm.battery_id;"""), con)
-#___________________________________________________________________________________________________________
-
-    #On met tout en minuscule les infos
    
     oem_name = oem_name.lower()
     type_car = type_car.lower()
