@@ -256,22 +256,20 @@ def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity
     # filtre sur l'oem
     subset = db_df[db_df['oem_name'] == oem_name].copy()
     try:
-        d = re.findall('\d*', model_name)
-        d.sort()
-        model_name = d[-1]
-        print(model_name)
+        if len(model_name) > 4:
+            d = re.findall('\d*', model_name)
+            d.sort()
+            model_name = d[-1]
     except:
         model_name = model_name.lower()
 
     # Trouver la meilleure correspondance
     # Retourne le modèle le plus proche score_cutoff fixé à 0.1 pour le moment pour être presque sur d'avoir un retour
     match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio, score_cutoff=.1)
-    print(match_model)
     if match_model :
         match_model_name, score, index = match_model
         # filtre sur le nom du modèle
         subset = subset[subset['model_name']==match_model_name]
-        print(subset.shape)
         # on cherche la batterie avec la capacité la + proche
         try:
             battery_target = float(battery_capacity.replace('kWh', '').replace('kwh', '').strip())
@@ -281,13 +279,13 @@ def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity
             # Si +sieurs batteries -> type le plus ressemblant
             match_type = process.extractOne(type_car, closest_rows['type'], scorer=fuzz.token_sort_ratio)
             match_model_type, score, index = match_type
-            return closest_rows.loc[index, "type"]
+            return closest_rows.loc[index, "id"]
 
         # type le plus ressemblant sans batterie
         except:
             match_type = process.extractOne(type_car, subset['type'], scorer=fuzz.token_sort_ratio)
             match_model_type, score, index = match_type
             print(match_type)
-            return subset.loc[index, "type"]
+            return subset.loc[index, "id"]
         
-    return "unknown"
+    raise "unkown model"
