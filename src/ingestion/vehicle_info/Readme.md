@@ -24,9 +24,9 @@ The following environment variables need to be set:
 ### Basic Usage
 ```python
 # Run the ingestion for all vehicles
-python main.py
+python3 -m src.ingestion.vehicle_info.main
 
-# Run the ingestion for a specific owner
+# Run the ingestion for a specific owner [to be checked]
 python main.py --owner "Ayvens"
 ```
 

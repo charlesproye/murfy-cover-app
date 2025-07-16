@@ -63,7 +63,6 @@ def left_merge_rdb_table(
     rhs = pd.read_sql_table(rhs, engine)
     return left_merge(lhs, rhs, left_on, right_on, src_dest_cols, logger)
 
-<<<<<<< HEAD
 
 def left_merge_rdb_table_spark(
         lhs,
