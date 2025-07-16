@@ -4,7 +4,6 @@ import uuid
 from core.sql_utils import get_connection
 import os
 from typing import Optional, Dict, Any
-import re
 
 def fetch_api_data(url: str) -> Optional[list]:
     """Fetch data from the EV database API."""
