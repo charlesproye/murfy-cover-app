@@ -5,16 +5,16 @@ from typing import Tuple, Optional
 import pandas as pd
 import requests
 import uuid
-from src.core.sql_utils import get_connection
+from core.sql_utils import get_connection
 
-from ..api.bmw_client import BMWApi
-from ..api.hm_client import HMApi
-from ..api.stellantis_client import StellantisApi
-from ..api.tesla_client import TeslaApi
-from ..api.renault_client import RenaultApi
-from ..api.tesla_particulier import TeslaParticulierApi
-from ..config.settings import ACTIVATION_TIMEOUT
-from ..services.google_sheet_service import update_vehicle_activation_data
+from activation.api.bmw_client import BMWApi
+from activation.api.hm_client import HMApi
+from activation.api.stellantis_client import StellantisApi
+from activation.api.tesla_client import TeslaApi
+from activation.api.renault_client import RenaultApi
+from activation.api.tesla_particulier import TeslaParticulierApi
+from activation.config.settings import ACTIVATION_TIMEOUT
+from activation.services.google_sheet_service import update_vehicle_activation_data
 
 class VehicleActivationService:
 

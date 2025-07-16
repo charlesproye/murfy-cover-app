@@ -5,14 +5,14 @@ import pandas as pd
 import uuid
 from typing import Optional, Dict, Any
 
-from ..config.settings import API_TIMEOUT
-from ..config.mappings import MAKE_MAPPING, OEM_MAPPING, COUNTRY_MAPPING, TESLA_MODEL_MAPPING
-from ..utils.validation import validate_vehicle_data
-from ..utils.date_utils import convert_date_format
-from ..services.activation_service import VehicleActivationService
-from src.core.sql_utils import get_connection
-from src.activation.utils import *
-from src.transform.fleet_info
+from activation.config.settings import API_TIMEOUT
+from activation.config.mappings import MAKE_MAPPING, OEM_MAPPING, COUNTRY_MAPPING, TESLA_MODEL_MAPPING, mapping_vehicle_type
+from activation.utils.validation import validate_vehicle_data
+from activation.utils.date_utils import convert_date_format
+from activation.services.activation_service import VehicleActivationService
+from core.sql_utils import get_connection
+from activation.utils import *
+
 class VehicleProcessor:
     def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, tesla_particulier_api: callable, renault_api: callable, df: pd.DataFrame):
         self.bmw_api = bmw_api
@@ -117,15 +117,10 @@ class VehicleProcessor:
         cursor.execute("SELECT id, autonomy FROM vehicle_model WHERE LOWER(model_name) = %s AND LOWER(type) = %s AND LOWER(version) = %s", (model_name.lower(), model_type.lower(), version.lower()))
         result = cursor.fetchone()
         model_exists = result[0] if result else None
-        print(model_exists)
         autonomy = result[1] if result else None
         oem_id = await self._get_oem(cursor, oem)
-        print(oem_id)
         make_id = await self._get_or_create_make(cursor, make, oem_id)
-        print(make_id)
-        
         if model_exists:
-            print('ici')
             if autonomy is None:
                 wltp_range = await self.renault_api.get_vehicle_wltp_range(session, vin)
                 cursor.execute("UPDATE vehicle_model SET autonomy = %s WHERE id = %s", (wltp_range, model_exists))
@@ -348,8 +343,8 @@ class VehicleProcessor:
                                 #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
                                 model_name, model_type, version, start_date = await self.renault_api.get_vehicle_info(session, vin)
                                 logging.info(f"Processing Renault vehicle {vin} | {model_name} | {model_type} | {version} | {start_date} -> {vehicle['end_of_contract']}")
-                                model_id = uniform_vehicles_type(model_type, "renault", model_name, model_existing)
-
+                                model_id = mapping_vehicle_type(model_type, "renault", model_name, model_existing)
+                                
                                 #model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, model_type, version, vehicle['make'], vehicle['oem'])
 
                                 vehicle_id = str(uuid.uuid4())
@@ -388,6 +383,11 @@ class VehicleProcessor:
             async with aiohttp.ClientSession() as session:
                 with get_connection() as con:
                     cursor = con.cursor()
+                    cursor.execute("""SELECT vm.model_name, vm.id, vm.type, o.oem_name, b.capacity FROM vehicle_model vm
+                                                                join OEM o on vm.oem_id=o.id
+                                                                join battery b on b.id=vm.battery_id
+                                                                where oem_name='bmw';""")
+                    model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type", "oem_name", "capacity"])
                     for _, vehicle in bmw_df.iterrows():
                         try:
                             vin = vehicle['vin']
@@ -401,9 +401,9 @@ class VehicleProcessor:
                             if not vehicle_exists:
                                 #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
                                 model_name, model_type = await self.bmw_api.get_data(session, vin)
-                                print(model_name, model_type)
                                 logging.info(f"Processing BMW vehicle {vin} | {model_name} | {model_type}")
-                                model_id = await self._get_or_create_other_model(cursor, model_name, model_type, 'unknown', vehicle['make'], vehicle['oem'])
+                                model_id = mapping_vehicle_type(model_type, "bmw", model_name, model_existing)
+                               #model_id = await self._get_or_create_other_model(cursor, model_name, model_type, 'unknown', vehicle['make'], vehicle['oem'])
                                 vehicle_id = str(uuid.uuid4())
                                 insert_query = """
                                     INSERT INTO vehicle (
@@ -442,6 +442,11 @@ class VehicleProcessor:
             other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['oem'] != 'renault') & (self.df['oem'] != 'bmw') & (self.df['oem'].notna()) & (self.df['oem'] != '') & (self.df['real_activation'] == True)]
             with get_connection() as con:
                 cursor = con.cursor()
+                cursor.execute("""SELECT vm.model_name, vm.id, vm.type, o.oem_name, b.capacity FROM vehicle_model vm
+                                                                join OEM o on vm.oem_id=o.id
+                                                                join battery b on b.id=vm.battery_id;""")
+                model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type", "oem_name", "capacity"])
+
                 for _, vehicle in other_df.iterrows():
                     try:
                         cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
@@ -452,8 +457,8 @@ class VehicleProcessor:
                         model_type = vehicle['type'] if vehicle['type'] is not None else 'unknown'
                         version = 'unknown'
                         logging.info(f"Processing vehicle {vehicle['vin']} | {model_name} | {model_type} | {version}")
-                        model_id = await self._get_or_create_other_model(cursor, model_name, model_type, version, vehicle['make'], vehicle['oem'])
                         if not vehicle_exists:
+                            model_id = mapping_vehicle_type(model_type, vehicle['oem'], model_name, model_existing)
                             vehicle_id = str(uuid.uuid4())
                             insert_query = """
                                 INSERT INTO vehicle (

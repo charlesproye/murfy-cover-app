@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
-from ..config.credentials import SPREADSHEET_ID
-from ..utils.google_sheets_utils import get_google_client
+from activation.config.credentials import SPREADSHEET_ID
+from activation.utils.google_sheets_utils import get_google_client
 import pandas as pd
 
 async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
