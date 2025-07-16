@@ -1,5 +1,4 @@
 from pandas import DataFrame as DF
-from transform.raw_tss.parsing import parse_bmw, parse_mobilisight, parse_high_mobility, parse_fleet_telemetry
 from pyspark.sql.types import *
 
 S3_RAW_TSS_KEY_FORMAT = "raw_ts/{brand}/time_series/raw_ts_spark.parquet"
@@ -559,7 +558,68 @@ SCHEMAS = {
                         ])), True)
                     ])
                 ))
-            ])
+            ]),
+    "stellantis": StructType([
+                    StructField("vin", StringType()),
+                    StructField("odometer", ArrayType(StructType([
+                        StructField("datetime", TimestampType()),
+                        StructField("value", DoubleType()),
+                        StructField("unit", StringType())
+                    ]))),
+                    StructField("engine", StructType([
+                        StructField("oilTemperature", ArrayType(StructType([
+                            StructField("datetime", TimestampType()),
+                            StructField("value", DoubleType()),
+                            StructField("unit", StringType())
+                        ]))),
+                        StructField("coolantTemperature", ArrayType(StructType([
+                            StructField("datetime", TimestampType()),
+                            StructField("value", DoubleType()),
+                            StructField("unit", StringType())
+                        ]))
+                    )])),
+                    StructField("electricity", StructType([
+                        StructField("level", ArrayType(StructType([
+                            StructField("datetime", TimestampType()),
+                            StructField("percentage", DoubleType())
+                        ]))),
+                        StructField("residualAutonomy", ArrayType(StructType([
+                            StructField("datetime", TimestampType()),
+                            StructField("value", DoubleType()),
+                            StructField("unit", StringType())
+                        ]))),
+                        StructField("batteryCapacity", ArrayType(StructType([
+                            StructField("datetime", TimestampType()),
+                            StructField("value", DoubleType()),
+                            StructField("unit", StringType())
+                        ]))),
+                        StructField("charging", ArrayType(StructType([
+                            StructField("datetime", TimestampType()),
+                            StructField("plugged", BooleanType()),
+                            StructField("status", StringType()),
+                            StructField("remainingTime", IntegerType()),
+                            StructField("mode", StringType()),
+                            StructField("planned", TimestampType()),
+                            StructField("rate", DoubleType())
+                        ]))),
+                        StructField("engineSpeed", ArrayType(StructType([
+                            StructField("datetime", TimestampType()),
+                            StructField("value", DoubleType()),
+                            StructField("unit", StringType())
+                        ]))),
+                        StructField("battery", StructType([
+                            StructField("stateOfHealth", ArrayType(StructType([
+                                StructField("datetime", TimestampType()),
+                                StructField("percentage", DoubleType())
+                            ])))
+                        ]))
+                    ])),
+                    StructField("externalTemperature", ArrayType(StructType([
+                        StructField("datetime", TimestampType()),
+                        StructField("value", DoubleType()),
+                        StructField("unit", StringType())
+                    ])))
+                ])
 }
 
 ALL_MAKES = [
@@ -572,25 +632,3 @@ ALL_MAKES = [
     "kia",
     "renault",
 ]
-
-GET_PARSING_FUNCTIONS = {
-    # Stellantis
-    "stellantis": parse_mobilisight,
-    # BMW
-    "bmw": parse_bmw,
-    # Tesla
-    # "tesla": tesla_get_raw_tss,
-    # Kia
-    "kia": parse_high_mobility,
-    # Mercedes-Benz
-    "mercedes-benz": parse_high_mobility,
-    # Ford
-    "ford": parse_high_mobility,
-    # Renault
-    "renault": parse_high_mobility,
-    # Volvo
-    "volvo-cars": parse_high_mobility,
-    # fleet-telemetry
-    "tesla-fleet-telemetry": parse_fleet_telemetry,
-}
-
