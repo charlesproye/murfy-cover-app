@@ -14,7 +14,6 @@ from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from core.spark_utils import get_optimal_nb_partitions
 from transform.raw_tss.config import (
-    GET_PARSING_FUNCTIONS,
     ALL_MAKES,
     S3_RAW_TSS_KEY_FORMAT,
     SCHEMAS,
