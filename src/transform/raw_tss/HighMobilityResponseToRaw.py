@@ -22,6 +22,7 @@ from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
 from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
+from transform.raw_tss.utils import get_next_scheduled_timestamp
 
 
 class HighMobilityResponseToRaw(ResponseToRawTss):
@@ -101,8 +102,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
 
                     if isinstance(signal_type, ArrayType):
                         data_path = infer_data_path(signal_type)
-                        if data_path != "custom":  ##### TEMPORAIRE
-                            signals.append((domain, signal_name, data_path))
+                        signals.append((domain, signal_name, data_path))
 
         df.cache()
 
@@ -110,8 +110,6 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
 
         for parent_col, signal_name, value_path in signals:
             nested_col = col(f"{parent_col}.{signal_name}")
-
-            print(f"{parent_col}.{signal_name}")
 
             col_path = f"{parent_col}.{signal_name}"
             # On vérifie que la colonne existe et contient au moins une entrée non vide
@@ -122,16 +120,31 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
                 .count()
                 > 0
             ):
-                exploded = (
-                    df.filter(col(parent_col).isNotNull())
-                    .select("vin", explode(nested_col).alias("entry"))
-                    .select(
-                        col("vin"),
-                        col("entry.timestamp").alias("date"),
-                        lit(signal_name).alias("signal"),
-                        col(f"entry.{value_path}").alias("value"),
+                if value_path == "custom":
+                    # ✅ Logique pour les timestamps avec get_next_scheduled_timestamp
+                    exploded = (
+                        df.filter(col(parent_col).isNotNull())
+                        .select("vin", explode(nested_col).alias("entry"))
+                        .select(
+                            col("vin"),
+                            col("entry.timestamp").alias("date"),
+                            lit(signal_name).alias("signal"),
+                            # Utiliser get_next_scheduled_timestamp pour les données custom
+                            expr("get_next_scheduled_timestamp(entry.timestamp, entry.data)").alias("value"),
+                        )
                     )
-                )
+                else:
+                    # Logique normale pour data.value
+                    exploded = (
+                        df.filter(col(parent_col).isNotNull())
+                        .select("vin", explode(nested_col).alias("entry"))
+                        .select(
+                            col("vin"),
+                            col("entry.timestamp").alias("date"),
+                            lit(signal_name).alias("signal"),
+                            col(f"entry.{value_path}").alias("value"),
+                        )
+                    )
                 dfs.append(exploded)
         # Union de tous les signaux
         parsed_df = reduce(lambda a, b: a.unionByName(b), dfs)
