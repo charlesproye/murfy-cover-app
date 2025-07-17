@@ -72,9 +72,9 @@ class ResponseToRawTss:
                 f"Temps écoulé pour déterminer les paramètres Spark: {end - start:.2f} secondes"
             )
 
-            print("Nb de vins", len(list(keys_to_download_per_vin.keys())))
-            print(
-                "Nb de batches",
+            self.logger.info("Nombre de vins", len(list(keys_to_download_per_vin.keys())))
+            self.logger.info(
+                "Nombre de batchs",
                 len(list(self._batch_dict_items(keys_to_download_per_vin, batch_size))),
             )
 
