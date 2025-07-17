@@ -8,7 +8,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql.types import ArrayType, StructType
 
-from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
+from transform.raw_tss.base.response_to_raw import ResponseToRawTss
 
 
 class MobilisightResponseToRaw(ResponseToRawTss):

@@ -9,10 +9,10 @@ from pyspark.sql.functions import (col, explode, expr, input_file_name, lit,
                                    regexp_extract, size, udf)
 from pyspark.sql.types import ArrayType, StringType, StructType, TimestampType
 
-from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
+from transform.raw_tss.base.response_to_raw import ResponseToRawTss
 
 
-def get_next_scheduled_timestamp(self, reference_ts_str, data):
+def get_next_scheduled_timestamp(reference_ts_str, data):
     """
     Get the next scheduled timestamp for a given reference timestamp and data.
     Args:

@@ -5,7 +5,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, explode, first, to_timestamp
 from pyspark.sql.types import *
 
-from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
+from transform.raw_tss.base.response_to_raw import ResponseToRawTss
 
 
 class BMWResponseToRaw(ResponseToRawTss):
