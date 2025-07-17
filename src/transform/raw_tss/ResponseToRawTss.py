@@ -6,6 +6,8 @@ from datetime import datetime
 from itertools import islice
 from logging import Logger
 from typing import Optional
+from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.sql import Row
 
 from pyspark.sql import DataFrame, SparkSession
 
@@ -20,7 +22,7 @@ from transform.raw_tss.config import (
 )
 
 
-class ResponseToRawTss(CachedETLSpark):
+class ResponseToRawTss():
     """
     Classe pour traiter les données renvoyées par les API stockées dans /response sur Scaleway
     """
@@ -51,14 +53,11 @@ class ResponseToRawTss(CachedETLSpark):
         self.settings = S3Settings()
         self.base_s3_path = f"s3a://{self.settings.S3_BUCKET}"
         self.raw_tss_path = S3_RAW_TSS_KEY_FORMAT.format(brand=self.make)
-        super().__init__(
-            S3_RAW_TSS_KEY_FORMAT.format(brand=self.make),
-            "s3",
-            force_update=force_update,
-            **kwargs,
-        )
 
     def run(self):
+
+        self.logger.info(f"Traitement débuté pour {self.make}")
+        
         start = time.time()
         keys_to_download_per_vin, paths_to_exclude = (
             self._get_keys_to_download()
@@ -68,17 +67,16 @@ class ResponseToRawTss(CachedETLSpark):
             f"Temps écoulé pour récupérer les clés à télécharger: {end - start:.2f} secondes"
         )
 
+
         start = time.time()
         optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
             keys_to_download_per_vin, paths_to_exclude
         )
-        print(optimal_partitions_nb, batch_size)
         end = time.time()
         self.logger.info(
             f"Temps écoulé pour déterminer les paramètres Spark: {end - start:.2f} secondes"
         )
 
-        print("Batch size", batch_size)
         print("Nb de vins", len(list(keys_to_download_per_vin.keys())))
         print(
             "Nb de batches",
@@ -112,6 +110,14 @@ class ResponseToRawTss(CachedETLSpark):
             end = time.time()
             self.logger.info(
                 f"Temps écoulé pour écrire les données dans le bucket {batch_num}: {end - start:.2f} secondes"
+            )
+
+
+            start = time.time()
+            self._update_last_parsed_date(keys_to_download_per_vin)
+            end = time.time()
+            self.logger.info(
+                f"Temps écoulé pour actualiser la date de dernière analyse {batch_num}: {end - start:.2f} secondes"
             )
 
             raw_tss_parsed.unpersist()
@@ -149,10 +155,8 @@ class ResponseToRawTss(CachedETLSpark):
             return 1
 
         optimal_partitions = get_optimal_nb_partitions(file_size, nb_vins)
-        self.logger.info(f"Nombre optimal de partitions: {optimal_partitions}")
 
         vin_per_batch = max(1, int((nb_vins / optimal_partitions) * nb_cores * 4))
-        self.logger.info(f"Vin par batch: {vin_per_batch}")
 
         return (4 * nb_cores, vin_per_batch)
 
@@ -201,25 +205,9 @@ class ResponseToRawTss(CachedETLSpark):
 
         last_parsed_date_dict = None
 
-        if self.bucket.check_spark_file_exists(self.raw_tss_path):
-            raw_tss = self.bucket.read_parquet_df_spark(self.spark, self.raw_tss_path)
-            if "date" in raw_tss.columns and raw_tss:
-                # Lecture optimisée
-                last_dates_df = (
-                    raw_tss.select("vin", "date")
-                    .groupBy("vin")
-                    .agg({"date": "max"})
-                    .withColumnRenamed("max(date)", "last_parsed_date")
-                )
-
-                last_parsed_date_dict = (
-                    last_dates_df.toPandas()
-                    .set_index("vin")["last_parsed_date"]
-                    .to_dict()
-                )
-
-            else:
-                self.logger.info(f"Colonne 'date' non trouvée dans le dataset présent.")
+        if self.bucket.check_spark_file_exists('raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet'):
+            last_parsed_date_df = self.bucket.read_parquet_df_spark(self.spark, 'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
+            last_parsed_date_dict = dict(last_parsed_date_df.select("vin", "last_parsed_file_date").collect())
 
         vins_paths = self.bucket.list_files(f"response/{self.make}/", type_file=".json")
 
@@ -245,12 +233,11 @@ class ResponseToRawTss(CachedETLSpark):
                     ])
 
 
-
         vins_paths_grouped = {k: v for k, v in vins_paths_grouped.items() if v}
+        vins_paths_grouped = {k: v for k, v in vins_paths_grouped.items() if len(v) > 0}
 
-        # Shuffle the vins to avoid
+        # Shuffle the vins to avoid skewness
         vins_paths_grouped = dict(random.sample(list(vins_paths_grouped.items()), k=len(vins_paths_grouped)))
-
 
         return (vins_paths_grouped, paths_to_exclude)
 
@@ -278,7 +265,48 @@ class ResponseToRawTss(CachedETLSpark):
             .json(keys_to_download_str)
         )
 
-    @abstractmethod
+
+    def _update_last_parsed_date(self, keys_to_download_per_vin: dict):
+        """
+        Met à jour la date de dernière date analyse pour les VINs présents dans le DataFrame.
+        """
+
+        def extract_date_from_path(path):
+            match = re.search(r"(\d{4}-\d{2}-\d{2})\.json$", path)
+            return match.group(1) if match else None
+
+        rows = []
+        for vin, paths in keys_to_download_per_vin.items():
+            dates = [extract_date_from_path(p) for p in paths if extract_date_from_path(p)]
+            if dates:
+                dates = [date for date in dates if date] # Get rid of None
+                max_date_str = max(dates)
+                rows.append(Row(
+                    vin=vin,
+                    last_parsed_file_date=max_date_str
+                ))
+
+        schema = StructType([
+            StructField("vin", StringType(), False),
+            StructField("last_parsed_file_date", StringType(), False)
+        ])
+
+        progress_df = self.spark.createDataFrame(rows, schema=schema)
+
+        vins_to_update = list(keys_to_download_per_vin.keys())
+
+        # Lire l'existant
+        if self.bucket.check_spark_file_exists(f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet'):
+            existing_df = self.bucket.read_parquet_df_spark(self.spark, f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
+            filtered_df = existing_df.filter(~existing_df.vin.isin(vins_to_update))
+            final_df = filtered_df.union(progress_df)
+        else:
+            final_df = progress_df
+
+        final_df.write.mode("overwrite").parquet(f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
+
+        return final_df
+                
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         pass
 

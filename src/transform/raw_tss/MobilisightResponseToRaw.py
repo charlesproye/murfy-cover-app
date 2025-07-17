@@ -173,7 +173,7 @@ def main():
     spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
     
     MobilisightResponseToRaw(
-        make='stellantis', force_update=True, spark=spark, logger=logger
+        make='stellantis', spark=spark, logger=logger
     )
 
 

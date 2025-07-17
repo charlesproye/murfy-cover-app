@@ -91,7 +91,7 @@ def main():
     settings = S3Settings()
     spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
 
-    BMWResponseToRaw(make="bmw", force_update=True, spark=spark, logger=logger)
+    BMWResponseToRaw(make="bmw", spark=spark, logger=logger)
 
 
 if __name__ == "__main__":
