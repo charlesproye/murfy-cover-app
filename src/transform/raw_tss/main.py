@@ -11,12 +11,12 @@ from transform.raw_tss.providers.tesla_fleet_telemetry import TeslaFTResponseToR
 
 ORCHESTRATED_MAKES = {
     "bmw": (False, BMWResponseToRaw),
-    "mercedes-benz": (True, HighMobilityResponseToRaw),
+    "mercedes-benz": (False, HighMobilityResponseToRaw),
     "renault": (False, HighMobilityResponseToRaw),
     "volvo-cars": (False, HighMobilityResponseToRaw),
     "stellantis": (False, MobilisightResponseToRaw),
     "kia": (False, HighMobilityResponseToRaw),
-    "ford": (False, HighMobilityResponseToRaw),
+    "ford": (True, HighMobilityResponseToRaw),
     "tesla-fleet-telemetry": (False, TeslaFTResponseToRawTss),
 }
 
