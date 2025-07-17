@@ -11,14 +11,14 @@ from transform.raw_tss.MobilisightResponseToRaw import MobilisightResponseToRaw
 
 
 ORCHESTRATED_MAKES = {
-    'bmw': (False, BMWResponseToRaw),
-    'mercedes-benz': (False, HighMobilityResponseToRaw),
-    'renault': (False, HighMobilityResponseToRaw),
+    'bmw': (True, BMWResponseToRaw),
+    'mercedes-benz': (True, HighMobilityResponseToRaw),
+    'renault': (True, HighMobilityResponseToRaw),
     'volvo-cars': (False, HighMobilityResponseToRaw),
     'stellantis': (False, MobilisightResponseToRaw),
-    'kia': (True, HighMobilityResponseToRaw),
+    'kia': (False, HighMobilityResponseToRaw),
     'ford': (False, HighMobilityResponseToRaw),
-    'tesla-fleet-telemetry': (False, TeslaFTResponseToRawTss),
+    'tesla-fleet-telemetry': (True, TeslaFTResponseToRawTss),
     }
 
 

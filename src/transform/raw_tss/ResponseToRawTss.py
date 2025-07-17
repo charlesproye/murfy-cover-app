@@ -67,63 +67,65 @@ class ResponseToRawTss():
             f"Temps écoulé pour récupérer les clés à télécharger: {end - start:.2f} secondes"
         )
 
-
-        start = time.time()
-        optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
-            keys_to_download_per_vin, paths_to_exclude
-        )
-        end = time.time()
-        self.logger.info(
-            f"Temps écoulé pour déterminer les paramètres Spark: {end - start:.2f} secondes"
-        )
-
-        print("Nb de vins", len(list(keys_to_download_per_vin.keys())))
-        print(
-            "Nb de batches",
-            len(list(self._batch_dict_items(keys_to_download_per_vin, batch_size))),
-        )
-
-        for batch_num, batch in enumerate(
-            self._batch_dict_items(keys_to_download_per_vin, batch_size), 1
-        ):  # Boucle pour faire des batchs d'écriture et ne pas saturer la mémoire
-            self.logger.info(f"Batch {batch_num}:")
-
+        if len(keys_to_download_per_vin) == 0:
+            self.logger.info(f"Aucun VIN à traiter pour {self.make}")
+        else:
             start = time.time()
-            # Extract
-            raw_tss_unparsed = self._download_keys(batch)
+            optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
+                keys_to_download_per_vin, paths_to_exclude
+            )
             end = time.time()
             self.logger.info(
-                f"Temps écoulé pour télécharger les json en spark {batch_num}: {end - start:.2f} secondes"
+                f"Temps écoulé pour déterminer les paramètres Spark: {end - start:.2f} secondes"
             )
 
-            start = time.time()
-            # Transform
-            raw_tss_parsed = self.parse_data(raw_tss_unparsed, optimal_partitions_nb)
-            end = time.time()
-            self.logger.info(
-                f"Temps écoulé pour transformer les données du batch {batch_num}: {end - start:.2f} secondes"
+            print("Nb de vins", len(list(keys_to_download_per_vin.keys())))
+            print(
+                "Nb de batches",
+                len(list(self._batch_dict_items(keys_to_download_per_vin, batch_size))),
             )
 
-            start = time.time()
-            # Load
-            self.bucket.append_spark_df_to_parquet(raw_tss_parsed, self.raw_tss_path)
-            end = time.time()
-            self.logger.info(
-                f"Temps écoulé pour écrire les données dans le bucket {batch_num}: {end - start:.2f} secondes"
-            )
+            for batch_num, batch in enumerate(
+                self._batch_dict_items(keys_to_download_per_vin, batch_size), 1
+            ):  # Boucle pour faire des batchs d'écriture et ne pas saturer la mémoire
+                self.logger.info(f"Batch {batch_num}:")
+
+                start = time.time()
+                # Extract
+                raw_tss_unparsed = self._download_keys(batch)
+                end = time.time()
+                self.logger.info(
+                    f"Temps écoulé pour télécharger les json en spark {batch_num}: {end - start:.2f} secondes"
+                )
+
+                start = time.time()
+                # Transform
+                raw_tss_parsed = self.parse_data(raw_tss_unparsed, optimal_partitions_nb)
+                end = time.time()
+                self.logger.info(
+                    f"Temps écoulé pour transformer les données du batch {batch_num}: {end - start:.2f} secondes"
+                )
+
+                start = time.time()
+                # Load
+                self.bucket.append_spark_df_to_parquet(raw_tss_parsed, self.raw_tss_path)
+                end = time.time()
+                self.logger.info(
+                    f"Temps écoulé pour écrire les données dans le bucket {batch_num}: {end - start:.2f} secondes"
+                )
 
 
-            start = time.time()
-            self._update_last_parsed_date(keys_to_download_per_vin)
-            end = time.time()
-            self.logger.info(
-                f"Temps écoulé pour actualiser la date de dernière analyse {batch_num}: {end - start:.2f} secondes"
-            )
+                start = time.time()
+                self._update_last_parsed_date(keys_to_download_per_vin)
+                end = time.time()
+                self.logger.info(
+                    f"Temps écoulé pour actualiser la date de dernière analyse {batch_num}: {end - start:.2f} secondes"
+                )
 
-            raw_tss_parsed.unpersist()
-            del raw_tss_parsed
+                raw_tss_parsed.unpersist()
+                del raw_tss_parsed
 
-        self.logger.info(f"Traitement terminé pour {self.make}")
+            self.logger.info(f"Traitement terminé pour {self.make}")
 
     def _set_optimal_spark_parameters(
         self, keys_to_download_per_vin: dict, paths_to_exclude: list[str], nb_cores: int = 8
@@ -205,8 +207,8 @@ class ResponseToRawTss():
 
         last_parsed_date_dict = None
 
-        if self.bucket.check_spark_file_exists('raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet'):
-            last_parsed_date_df = self.bucket.read_parquet_df_spark(self.spark, 'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
+        if self.bucket.check_spark_file_exists(f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet'):
+            last_parsed_date_df = self.bucket.read_parquet_df_spark(self.spark, f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
             last_parsed_date_dict = dict(last_parsed_date_df.select("vin", "last_parsed_file_date").collect())
 
         vins_paths = self.bucket.list_files(f"response/{self.make}/", type_file=".json")
@@ -303,9 +305,9 @@ class ResponseToRawTss():
         else:
             final_df = progress_df
 
-        final_df.write.mode("overwrite").parquet(f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
+        final_df.coalesce(1).write.mode("overwrite").parquet(f's3a://{self.settings.S3_BUCKET}/raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
 
-        return final_df
+        pass
                 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         pass
