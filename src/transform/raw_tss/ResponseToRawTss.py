@@ -301,7 +301,11 @@ class ResponseToRawTss():
         if self.bucket.check_spark_file_exists(f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet'):
             existing_df = self.bucket.read_parquet_df_spark(self.spark, f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
             filtered_df = existing_df.filter(~existing_df.vin.isin(vins_to_update))
-            final_df = filtered_df.union(progress_df)
+            if filtered_df.count() > 0:
+                final_df = filtered_df.unionByName(progress_df)
+                final_df.cache().count()
+            else:
+                final_df = progress_df
         else:
             final_df = progress_df
 
