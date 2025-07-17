@@ -1,5 +1,3 @@
-import logging
-import sys
 from logging import Logger
 from typing import Optional
 
@@ -7,9 +5,6 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, explode, first, to_timestamp
 from pyspark.sql.types import *
 
-from core.console_utils import main_decorator
-from core.s3.settings import S3Settings
-from core.spark_utils import create_spark_session
 from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
 
 
@@ -77,23 +72,4 @@ class BMWResponseToRaw(ResponseToRawTss):
         )
 
         return pivoted
-
-
-@main_decorator
-def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
-    )
-
-    logger = logging.getLogger("Logger RawTss")
-    settings = S3Settings()
-    spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
-
-    BMWResponseToRaw(make="bmw", spark=spark, logger=logger)
-
-
-if __name__ == "__main__":
-    main()
 

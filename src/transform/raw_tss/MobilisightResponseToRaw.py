@@ -1,20 +1,14 @@
-import logging
-import sys
 from functools import reduce
 from logging import Logger
-from typing import Optional
+from typing import Dict, Optional
 
 from config import SCHEMAS
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql.types import ArrayType, StructType
 
-from core.console_utils import main_decorator
-from core.s3.settings import S3Settings
-from core.spark_utils import create_spark_session
 from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
-from pyspark.sql import functions as F
-from typing import Dict
 
 
 class MobilisightResponseToRaw(ResponseToRawTss):
@@ -43,10 +37,7 @@ class MobilisightResponseToRaw(ResponseToRawTss):
         )
 
     def _build_fields_from_schema(
-        self,
-        schema: StructType,
-        prefix: str = "",
-        naming_sep: str = "."
+        self, schema: StructType, prefix: str = "", naming_sep: str = "."
     ) -> Dict[str, Dict]:
         """
         Génère un dictionnaire 'fields' pour l'extraction à plat à partir d'un schema StructType,
@@ -61,7 +52,9 @@ class MobilisightResponseToRaw(ResponseToRawTss):
             field_name = field.name
             full_path = f"{prefix}.{field_name}" if prefix else field_name
 
-            if isinstance(field.dataType, ArrayType) and isinstance(field.dataType.elementType, StructType):
+            if isinstance(field.dataType, ArrayType) and isinstance(
+                field.dataType.elementType, StructType
+            ):
                 struct = field.dataType.elementType
                 has_datetime = any(f.name == "datetime" for f in struct.fields)
 
@@ -78,26 +71,27 @@ class MobilisightResponseToRaw(ResponseToRawTss):
                             col_name = f"{full_path.replace('.', naming_sep)}{naming_sep}{f.name}"
                         field_map[f.name] = col_name
 
-                    result[full_path] = {
-                        "path": full_path,
-                        "fields": field_map
-                    }
+                    result[full_path] = {"path": full_path, "fields": field_map}
 
                 else:
                     # Recurse dans des structs imbriqués
-                    result.update(self._build_fields_from_schema(struct, full_path, naming_sep))
+                    result.update(
+                        self._build_fields_from_schema(struct, full_path, naming_sep)
+                    )
 
             elif isinstance(field.dataType, StructType):
                 # Struct simple (non-array), on descend
-                result.update(self._build_fields_from_schema(field.dataType, full_path, naming_sep))
+                result.update(
+                    self._build_fields_from_schema(
+                        field.dataType, full_path, naming_sep
+                    )
+                )
 
             else:
                 # Champ non-struct, non-array, on ignore
                 continue
 
         return result
-
-
 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         """
@@ -121,30 +115,28 @@ class MobilisightResponseToRaw(ResponseToRawTss):
         for key, params in fields.items():
             path = params["path"]
             field_mapping = params["fields"]
-            
-            exploded = df.select(
-                "vin",
-                F.explode_outer(path).alias("exploded_struct")
-            )
+
+            exploded = df.select("vin", F.explode_outer(path).alias("exploded_struct"))
 
             exploded = exploded.cache()
-            
+
             # Créer une ligne pour chaque champ (sauf datetime et unit)
             for field_in_struct, alias in field_mapping.items():
                 long_df = exploded.select(
                     "vin",
                     F.col("exploded_struct.datetime").alias("date"),
                     F.lit(alias).alias("key"),  # Nom de la colonne
-                    F.col(f"exploded_struct.{field_in_struct}").cast("string").alias("value") 
+                    F.col(f"exploded_struct.{field_in_struct}")
+                    .cast("string")
+                    .alias("value"),
                 ).dropna()
-                
+
                 long_dfs.append(long_df)
         exploded.unpersist()
 
-
         df_parsed = reduce(lambda a, b: a.unionByName(b), long_dfs)
 
-        df_parsed = df_parsed.cache() 
+        df_parsed = df_parsed.cache()
         # Forcer le cache
         df_parsed.count()
 
@@ -152,31 +144,14 @@ class MobilisightResponseToRaw(ResponseToRawTss):
         df_parsed = df_parsed.repartition("vin").coalesce(optimal_partitions_nb)
 
         # Pivoter pour avoir une colonne par clé
-        pivoted = df_parsed.groupBy("vin", "date").pivot("key").agg(F.first("value")).coalesce(optimal_partitions_nb)
+        pivoted = (
+            df_parsed.groupBy("vin", "date")
+            .pivot("key")
+            .agg(F.first("value"))
+            .coalesce(optimal_partitions_nb)
+        )
 
         df_parsed.unpersist()
 
         return pivoted
-
-
-@main_decorator
-def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
-    )
-
-    logger = logging.getLogger("Logger RawTss")
-
-    settings = S3Settings()
-    spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
-    
-    MobilisightResponseToRaw(
-        make='stellantis', spark=spark, logger=logger
-    )
-
-
-if __name__ == "__main__":
-    main()
 

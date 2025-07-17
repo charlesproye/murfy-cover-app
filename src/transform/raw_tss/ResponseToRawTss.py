@@ -1,28 +1,21 @@
+import random
 import re
 import time
-import random
-from abc import abstractmethod
 from datetime import datetime
 from itertools import islice
 from logging import Logger
 from typing import Optional
-from pyspark.sql.types import StructType, StructField, StringType
-from pyspark.sql import Row
 
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import DataFrame, Row, SparkSession
+from pyspark.sql.types import StringType, StructField, StructType
 
-from core.caching_utils import CachedETLSpark
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from core.spark_utils import get_optimal_nb_partitions
-from transform.raw_tss.config import (
-    ALL_MAKES,
-    S3_RAW_TSS_KEY_FORMAT,
-    SCHEMAS,
-)
+from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, SCHEMAS
 
 
-class ResponseToRawTss():
+class ResponseToRawTss:
     """
     Classe pour traiter les données renvoyées par les API stockées dans /response sur Scaleway
     """
@@ -57,7 +50,7 @@ class ResponseToRawTss():
     def run(self):
 
         self.logger.info(f"Traitement débuté pour {self.make}")
-        
+
         start = time.time()
         keys_to_download_per_vin, paths_to_exclude = (
             self._get_keys_to_download()
@@ -100,7 +93,9 @@ class ResponseToRawTss():
 
                 start = time.time()
                 # Transform
-                raw_tss_parsed = self.parse_data(raw_tss_unparsed, optimal_partitions_nb)
+                raw_tss_parsed = self.parse_data(
+                    raw_tss_unparsed, optimal_partitions_nb
+                )
                 end = time.time()
                 self.logger.info(
                     f"Temps écoulé pour transformer les données du batch {batch_num}: {end - start:.2f} secondes"
@@ -108,12 +103,13 @@ class ResponseToRawTss():
 
                 start = time.time()
                 # Load
-                self.bucket.append_spark_df_to_parquet(raw_tss_parsed, self.raw_tss_path)
+                self.bucket.append_spark_df_to_parquet(
+                    raw_tss_parsed, self.raw_tss_path
+                )
                 end = time.time()
                 self.logger.info(
                     f"Temps écoulé pour écrire les données dans le bucket {batch_num}: {end - start:.2f} secondes"
                 )
-
 
                 start = time.time()
                 self._update_last_parsed_date(keys_to_download_per_vin)
@@ -128,7 +124,10 @@ class ResponseToRawTss():
             self.logger.info(f"Traitement terminé pour {self.make}")
 
     def _set_optimal_spark_parameters(
-        self, keys_to_download_per_vin: dict, paths_to_exclude: list[str], nb_cores: int = 8
+        self,
+        keys_to_download_per_vin: dict,
+        paths_to_exclude: list[str],
+        nb_cores: int = 8,
     ) -> tuple[int, int]:
         """
         Calcule la taille optimale des batches pour le traitement parallèle des VINs.
@@ -148,7 +147,9 @@ class ResponseToRawTss():
         if nb_cores <= 0:
             raise ValueError("Nombre de cœurs doit être un entier positif")
 
-        file_size, _ = self.bucket.get_object_size(f"response/{self.make}/", prefix_to_exclude=paths_to_exclude)
+        file_size, _ = self.bucket.get_object_size(
+            f"response/{self.make}/", prefix_to_exclude=paths_to_exclude
+        )
 
         nb_vins = len(list(keys_to_download_per_vin.keys()))
 
@@ -207,9 +208,16 @@ class ResponseToRawTss():
 
         last_parsed_date_dict = None
 
-        if self.bucket.check_spark_file_exists(f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet'):
-            last_parsed_date_df = self.bucket.read_parquet_df_spark(self.spark, f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
-            last_parsed_date_dict = dict(last_parsed_date_df.select("vin", "last_parsed_file_date").collect())
+        if self.bucket.check_spark_file_exists(
+            f"raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet"
+        ):
+            last_parsed_date_df = self.bucket.read_parquet_df_spark(
+                self.spark,
+                f"raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet",
+            )
+            last_parsed_date_dict = dict(
+                last_parsed_date_df.select("vin", "last_parsed_file_date").collect()
+            )
 
         vins_paths = self.bucket.list_files(f"response/{self.make}/", type_file=".json")
 
@@ -224,22 +232,29 @@ class ResponseToRawTss():
                         path
                         for path in paths
                         if datetime.strptime(path.split("/")[-1], "%Y-%m-%d.json")
-                        > datetime.strptime(str(last_parsed_date_dict[vin]).split()[0], "%Y-%m-%d")
+                        > datetime.strptime(
+                            str(last_parsed_date_dict[vin]).split()[0], "%Y-%m-%d"
+                        )
                     ]
 
-                    paths_to_exclude.extend([
-                        path
-                        for path in paths
-                        if datetime.strptime(path.split("/")[-1], "%Y-%m-%d.json")
-                        <= datetime.strptime(str(last_parsed_date_dict[vin]).split()[0], "%Y-%m-%d")
-                    ])
-
+                    paths_to_exclude.extend(
+                        [
+                            path
+                            for path in paths
+                            if datetime.strptime(path.split("/")[-1], "%Y-%m-%d.json")
+                            <= datetime.strptime(
+                                str(last_parsed_date_dict[vin]).split()[0], "%Y-%m-%d"
+                            )
+                        ]
+                    )
 
         vins_paths_grouped = {k: v for k, v in vins_paths_grouped.items() if v}
         vins_paths_grouped = {k: v for k, v in vins_paths_grouped.items() if len(v) > 0}
 
         # Shuffle the vins to avoid skewness
-        vins_paths_grouped = dict(random.sample(list(vins_paths_grouped.items()), k=len(vins_paths_grouped)))
+        vins_paths_grouped = dict(
+            random.sample(list(vins_paths_grouped.items()), k=len(vins_paths_grouped))
+        )
 
         return (vins_paths_grouped, paths_to_exclude)
 
@@ -261,12 +276,14 @@ class ResponseToRawTss():
 
         return (
             self.spark.read.option("multiline", "true")
-            .option("badRecordsPath", f"s3a://{self.settings.S3_BUCKET}/response/{self.make}/corrupted_responses/")
+            .option(
+                "badRecordsPath",
+                f"s3a://{self.settings.S3_BUCKET}/response/{self.make}/corrupted_responses/",
+            )
             .option("mode", "PERMISSIVE")
             .schema(schema)
             .json(keys_to_download_str)
         )
-
 
     def _update_last_parsed_date(self, keys_to_download_per_vin: dict):
         """
@@ -279,27 +296,33 @@ class ResponseToRawTss():
 
         rows = []
         for vin, paths in keys_to_download_per_vin.items():
-            dates = [extract_date_from_path(p) for p in paths if extract_date_from_path(p)]
+            dates = [
+                extract_date_from_path(p) for p in paths if extract_date_from_path(p)
+            ]
             if dates:
-                dates = [date for date in dates if date] # Get rid of None
+                dates = [date for date in dates if date]  # Get rid of None
                 max_date_str = max(dates)
-                rows.append(Row(
-                    vin=vin,
-                    last_parsed_file_date=max_date_str
-                ))
+                rows.append(Row(vin=vin, last_parsed_file_date=max_date_str))
 
-        schema = StructType([
-            StructField("vin", StringType(), False),
-            StructField("last_parsed_file_date", StringType(), False)
-        ])
+        schema = StructType(
+            [
+                StructField("vin", StringType(), False),
+                StructField("last_parsed_file_date", StringType(), False),
+            ]
+        )
 
         progress_df = self.spark.createDataFrame(rows, schema=schema)
 
         vins_to_update = list(keys_to_download_per_vin.keys())
 
         # Lire l'existant
-        if self.bucket.check_spark_file_exists(f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet'):
-            existing_df = self.bucket.read_parquet_df_spark(self.spark, f'raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
+        if self.bucket.check_spark_file_exists(
+            f"raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet"
+        ):
+            existing_df = self.bucket.read_parquet_df_spark(
+                self.spark,
+                f"raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet",
+            )
             filtered_df = existing_df.filter(~existing_df.vin.isin(vins_to_update))
             if filtered_df.count() > 0:
                 final_df = filtered_df.unionByName(progress_df)
@@ -309,10 +332,12 @@ class ResponseToRawTss():
         else:
             final_df = progress_df
 
-        final_df.coalesce(1).write.mode("overwrite").parquet(f's3a://{self.settings.S3_BUCKET}/raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet')
+        final_df.coalesce(1).write.mode("overwrite").parquet(
+            f"s3a://{self.settings.S3_BUCKET}/raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet"
+        )
 
         pass
-                
+
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         pass
 

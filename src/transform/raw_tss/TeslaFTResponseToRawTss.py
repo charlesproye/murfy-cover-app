@@ -1,24 +1,16 @@
+from logging import Logger
+from typing import Optional
+
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, explode, expr, udf
 from pyspark.sql.types import *
-from pyspark.sql.types import (ArrayType, BooleanType, DateType, DoubleType,
-                               IntegerType, LongType, StringType, StructField,
-                               StructType, TimestampType)
+
 from transform.raw_tss.ResponseToRawTss import ResponseToRawTss
-from typing import Optional
-from pyspark.sql import SparkSession
-from logging import Logger
-import logging
-from dotenv import load_dotenv
-from core.s3.settings import S3Settings
-from core.spark_utils import create_spark_session
-from core.console_utils import main_decorator
-import sys
-from pyspark.sql import DataFrame
 
 
 class TeslaFTResponseToRawTss(ResponseToRawTss):
     """
-    Classe pour traiter les données renvoyées par les API Tesla Fleet Telemetry 
+    Classe pour traiter les données renvoyées par les API Tesla Fleet Telemetry
     stockées dans /response sur Scaleway
     """
 
@@ -147,25 +139,4 @@ class TeslaFTResponseToRawTss(ResponseToRawTss):
         )
 
         return pivoted
-
-
-@main_decorator
-def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        stream=sys.stdout
-    )
-
-    logger = logging.getLogger('Logger RawTss')
-
-    settings = S3Settings()
-    spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
-
-    TeslaFTResponseToRawTss(make='tesla-fleet-telemetry', spark=spark, logger=logger)
-
-
-if __name__ == "__main__":
-    main()
-
 
