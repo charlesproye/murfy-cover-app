@@ -75,7 +75,7 @@ main() {
     msg "Exec: $cmd"
     
     # Display memory usage before starting
-    free -m
+#free -m
     msg "Starting High Mobility ingestion process"
     
     # Execute the command

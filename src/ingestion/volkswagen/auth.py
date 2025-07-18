@@ -54,7 +54,7 @@ class VolksWagenAuth:
                 self.post_organization_sub_id()["id"]
             )
         else:
-            self._org_sub_id_value = ensure_exists(data[0]["id"])
+            self._org_sub_id_value = ensure_exists(data[-1]["id"])
         return self._org_sub_id_value
 
     def get_organization_sub_ids(self) -> list[dict]:

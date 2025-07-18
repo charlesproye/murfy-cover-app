@@ -78,6 +78,7 @@ class HMApi:
         """
         retry_count = 0
         while retry_count < 2:
+            await asyncio.sleep(1)
             try:
                 url = f"{self.base_url}/v1/fleets/vehicles/{vin}"
                 headers = await self._get_headers(session)
@@ -85,7 +86,6 @@ class HMApi:
                 if response.status == 401:
                     self._access_token = None
                     retry_count += 1
-                    await asyncio.sleep(1)
                     continue
 
                 elif response.status == 200:
@@ -154,6 +154,7 @@ class HMApi:
                     continue
 
                 elif response.ok:
+                    print("La réponse est ok")
                     return await self.get_status(vin,session)
                 else:
                     return False

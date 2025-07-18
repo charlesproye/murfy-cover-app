@@ -8,10 +8,10 @@ import pprint
 
 from scipy.optimize import curve_fit
 from sqlalchemy.sql import text
-from core.sql_utils import engine
-from core.stats_utils import log_function
-from core.gsheet_utils import *
-from transform.insights_results.config_trendlines import TRENDLINE_MODEL as existing_config
+from src.core.sql_utils import get_sqlalchemy_engine
+from src.core.stats_utils import log_function
+from src.core.gsheet_utils import *
+from src.results.trendlines_results.config import TRENDLINE_MODEL as existing_config
 
 logging.basicConfig(level=logging.INFO)
 

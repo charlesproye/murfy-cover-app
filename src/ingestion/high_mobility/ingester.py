@@ -340,8 +340,8 @@ class HMIngester:
 
 
     def run(self):
-            if os.getenv("COMPRESS_ONLY") and os.getenv("COMPRESS_ONLY") == "1":
-                self.__ingester_logger.info("COMPRESS_ONLY flag set. Running compression first.")
+            if os.getenv("HM_COMPRESS") and os.getenv("HM_COMPRESS") == "1":
+                self.__ingester_logger.info("HM_COMPRESS flag set. Running compression first.")
                 self.__is_compressing = True
                 try:
                     self.__compress()

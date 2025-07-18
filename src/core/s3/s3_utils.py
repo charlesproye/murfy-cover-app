@@ -1,7 +1,7 @@
 from functools import lru_cache
 import json
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 from datetime import datetime
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
@@ -110,7 +110,17 @@ class S3Service():
                 raise e
 
         # Écriture optimisée
-        df_write.coalesce(20).write.mode("overwrite").option("parquet.compression", "snappy").option(
+        df_write.coalesce(1).write.mode("overwrite").option("parquet.compression", "snappy").option(
+            "parquet.block.size", 67108864
+        ).partitionBy("vin").parquet(s3_path)
+
+    def append_spark_df_to_parquet(self, df: DF, key: str, repartition: Optional[str] = None):
+        s3_path = f"s3a://{self.bucket_name}/{key}"
+
+        if repartition:
+            df = df.repartition(repartition)
+
+        df.write.mode("append").option("parquet.compression", "snappy").option(
             "parquet.block.size", 67108864
         ).partitionBy("vin").parquet(s3_path)
 
@@ -358,6 +368,48 @@ class S3Service():
             Bucket=self.bucket_name,
             Key=filename,
         )
+
+    def get_object_size(self, prefix, prefix_to_exclude: Optional[list[str]] = [], exclude_temp: bool = True):
+        """
+        Calcule la taille totale et le nombre d'objets dans un path S3.
+        
+        Cette méthode parcourt récursivement tous les objets dans le bucket S3
+        qui correspondent au préfixe donné et retourne la somme de leurs tailles
+        ainsi que leur nombre total.
+        
+        Args:
+            prefix (str): Le path S3 (chemin) pour lequel calculer la taille.
+                        Par exemple: 'response/tesla/' ou 'data/2024/01/'
+        
+        Returns:
+            tuple: Un tuple contenant (taille_totale, nombre_objets) où :
+                - taille_totale (int): La somme des tailles de tous les objets en octets
+                - nombre_objets (int): Le nombre total d'objets trouvés
+        """
+
+        # try:
+        objects = []
+        paginator = self._s3_client.get_paginator('list_objects_v2')
+        if not prefix.endswith("/"):
+            prefix += "/"
+        pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+        for pages in pages:
+            for obj in pages["Contents"]:
+                if obj['Key'] in prefix_to_exclude or (exclude_temp and "/temp/" in obj['Key']):
+                    continue
+                objects.append(obj['Size'])
+        return (sum(objects), len(objects))
+
+
+    def list_files(self, path: str = "", type_file:str = ""):
+        files = []
+        paginator = self._s3_client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self.bucket_name, Prefix=path):
+            for content in page.get("Contents", []):
+                key = content["Key"]
+                if key.endswith(type_file):
+                    files.append(key)
+        return sorted(files)
 
 @lru_cache
 def get_s3():
