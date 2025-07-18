@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from functools import reduce
 from logging import Logger
 from typing import Optional
@@ -9,14 +8,14 @@ from pyspark.sql.functions import (col, explode, expr, input_file_name, lit,
                                    regexp_extract, size, udf)
 from pyspark.sql.types import ArrayType, StringType, StructType, TimestampType
 
-from transform.raw_tss.base.response_to_raw import ResponseToRawTss
+from transform.raw_tss.response_to_raw import ResponseToRawTss
 from transform.raw_tss.providers.utils import get_next_scheduled_timestamp
 
 
 class HighMobilityResponseToRaw(ResponseToRawTss):
     """
-    Classe pour traiter les données renvoyées par les API Tesla Fleet Telemetry
-    stockées dans /response sur Scaleway
+    Class for processing data returned by Tesla Fleet Telemetry APIs
+    stored in /response on Scaleway
     """
 
     def __init__(
@@ -40,15 +39,15 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         """
-        Parse dict from High Mobility api response
+        Parse dict from High Mobility API response
 
         Args:
             response (dict): Contains data to parse
-            spark (SparkSession): spark session active
+            spark (SparkSession): active Spark session
             vin (str): Vehicle identification number
 
         Returns:
-            spark.DataFrame: Data with every columns
+            spark.DataFrame: Data with all columns
         """
 
         get_next_scheduled_timestamp_udf = udf(
@@ -65,18 +64,18 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
 
         def infer_data_path(array_field: ArrayType):
             """
-            Détermine si le champ `data` est un struct contenant un champ `value`, ou un scalaire.
+            Determines whether the `data` field is a struct containing a `value` field, or a scalar.
             """
             if isinstance(array_field.elementType, StructType):
                 for f in array_field.elementType.fields:
                     if f.name == "data":
                         data_field = f.dataType
                         if isinstance(data_field, StructType):
-                            # On regarde s’il contient un champ "value"
+                            # Check if it contains a "value" field
                             if "value" in [sub.name for sub in data_field.fields]:
                                 return "data.value"
                             else:
-                                return "custom"  # ex: time.hour/minute
+                                return "custom"  # e.g.: time.hour/minute
                         else:
                             return "data"
             return "unknown"
@@ -104,7 +103,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
             nested_col = col(f"{parent_col}.{signal_name}")
 
             col_path = f"{parent_col}.{signal_name}"
-            # On vérifie que la colonne existe et contient au moins une entrée non vide
+            # Check that the column exists and contains at least one non-empty entry
             if (
                 df.select(size(col(col_path)).alias("size"))
                 .filter("size > 0")
@@ -113,7 +112,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
                 > 0
             ):
                 if value_path == "custom":
-                    # ✅ Logique pour les timestamps avec get_next_scheduled_timestamp
+                    # Logic for timestamps with get_next_scheduled_timestamp
                     exploded = (
                         df.filter(col(parent_col).isNotNull())
                         .select("vin", explode(nested_col).alias("entry"))
@@ -121,14 +120,14 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
                             col("vin"),
                             col("entry.timestamp").alias("date"),
                             lit(signal_name).alias("signal"),
-                            # Utiliser get_next_scheduled_timestamp pour les données custom
+                            # Use get_next_scheduled_timestamp for custom data
                             get_next_scheduled_timestamp_udf(
                                 col("entry.timestamp"), col("entry.data")
                             ).alias("value"),
                         )
                     )
                 else:
-                    # Logique normale pour data.value
+                    # Normal logic for data.value
                     exploded = (
                         df.filter(col(parent_col).isNotNull())
                         .select("vin", explode(nested_col).alias("entry"))
@@ -140,7 +139,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
                         )
                     )
                 dfs.append(exploded)
-        # Union de tous les signaux
+        # Union of all signals
         parsed_df = reduce(lambda a, b: a.unionByName(b), dfs)
 
         pivoted = (

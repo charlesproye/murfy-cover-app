@@ -5,13 +5,13 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, explode, expr, udf
 from pyspark.sql.types import *
 
-from transform.raw_tss.base.response_to_raw import ResponseToRawTss
+from transform.raw_tss.response_to_raw import ResponseToRawTss
 
 
 class TeslaFTResponseToRawTss(ResponseToRawTss):
     """
-    Classe pour traiter les données renvoyées par les API Tesla Fleet Telemetry
-    stockées dans /response sur Scaleway
+    Class to process data returned by the Tesla Fleet Telemetry APIs
+    stored in /response on Scaleway
     """
 
     def __init__(
@@ -55,36 +55,36 @@ class TeslaFTResponseToRawTss(ResponseToRawTss):
             if value_struct is None:
                 return None
 
-            # Essayer stringValue
+            # Try stringValue
             if (
                 hasattr(value_struct, "stringValue")
                 and value_struct.stringValue is not None
             ):
                 return str(value_struct.stringValue)
-            # Essayer doubleValue
+            # Try doubleValue
             elif (
                 hasattr(value_struct, "doubleValue")
                 and value_struct.doubleValue is not None
             ):
                 return str(value_struct.doubleValue)
-            # Essayer intValue
+            # Try intValue
             elif (
                 hasattr(value_struct, "intValue") and value_struct.intValue is not None
             ):
                 return str(value_struct.intValue)
-            # Essayer booleanValue
+            # Try booleanValue
             elif (
                 hasattr(value_struct, "booleanValue")
                 and value_struct.booleanValue is not None
             ):
                 return str(value_struct.booleanValue)
-            # Essayer detailedChargeStateValue
+            # Try detailedChargeStateValue
             elif (
                 hasattr(value_struct, "detailedChargeStateValue")
                 and value_struct.detailedChargeStateValue is not None
             ):
                 return str(value_struct.detailedChargeStateValue)
-            # Essayer les autres types si nécessaire
+            # Try other types if necessary
             elif (
                 hasattr(value_struct, "cableTypeValue")
                 and value_struct.cableTypeValue is not None

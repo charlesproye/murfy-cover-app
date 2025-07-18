@@ -379,17 +379,14 @@ def get_optimal_nb_partitions(file_size_bytes: float, nb_vin: int) -> int:
     print(f"📁 Taille du fichier: {size_file_mb:.2f} MB")
     
     avg_size_file_vin_mb = size_file_mb / nb_vin
-    print(f"🚗 Taille moyenne par VIN: {avg_size_file_vin_mb:.2f} MB")
     
     # Calcul du nombre idéal de VINs par partition (basé sur 128MB recommandé)
     nb_vin_ideal_size = 128 / avg_size_file_vin_mb
 
     # Logique de décision
     if nb_vin_ideal_size < 0.5:
-        print("⚠️  Taille moyenne par VIN > 256 MB, partitionnement par VIN non recommandé")
         return nb_vin
     elif nb_vin_ideal_size < 1:
-        print("ℹ️  Taille par VIN optimale, utilisation du nombre de VINs")
         return nb_vin
     else:
         optimal_partitions = int(nb_vin / nb_vin_ideal_size)
@@ -399,5 +396,4 @@ def get_optimal_nb_partitions(file_size_bytes: float, nb_vin: int) -> int:
             pass
         else:
             optimal_partitions += 1
-        print(f"✅ Partitionnement optimisé: {optimal_partitions} partitions") 
         return optimal_partitions

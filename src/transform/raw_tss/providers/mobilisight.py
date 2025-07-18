@@ -8,13 +8,13 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql.types import ArrayType, StructType
 
-from transform.raw_tss.base.response_to_raw import ResponseToRawTss
+from transform.raw_tss.response_to_raw import ResponseToRawTss
 
 
 class MobilisightResponseToRaw(ResponseToRawTss):
     """
-    Classe pour traiter les données émises par les API Mobilisight
-    stockées dans '/response/bmw/' sur Scaleway
+    Class for processing data emitted by Mobilisight APIs
+    stored in '/response/bmw/' on Scaleway
     """
 
     def __init__(
@@ -40,11 +40,11 @@ class MobilisightResponseToRaw(ResponseToRawTss):
         self, schema: StructType, prefix: str = "", naming_sep: str = "."
     ) -> Dict[str, Dict]:
         """
-        Génère un dictionnaire 'fields' pour l'extraction à plat à partir d'un schema StructType,
-        en ciblant les ArrayType de StructType contenant un champ 'datetime'.
+        Generates a 'fields' dictionary for flattening extraction from a StructType schema,
+        targeting ArrayType of StructType that contains a 'datetime' field.
 
-        - Ignore les champs 'unit'
-        - Garde 'value' sans suffixe (ex: 'odometer.value' → 'odometer')
+        - Ignores fields named 'unit'
+        - Keeps 'value' without suffix (e.g., 'odometer.value' → 'odometer')
         """
         result = {}
 
@@ -64,23 +64,23 @@ class MobilisightResponseToRaw(ResponseToRawTss):
                         if f.name in ("datetime", "unit"):
                             continue
                         if f.name == "value":
-                            # Exemple: electricity.level.value → electricity_level
+                            # Example: electricity.level.value → electricity_level
                             col_name = full_path.replace(".", naming_sep)
                         else:
-                            # Exemple: electricity.level.percentage → electricity_level_percentage
+                            # Example: electricity.level.percentage → electricity_level_percentage
                             col_name = f"{full_path.replace('.', naming_sep)}{naming_sep}{f.name}"
                         field_map[f.name] = col_name
 
                     result[full_path] = {"path": full_path, "fields": field_map}
 
                 else:
-                    # Recurse dans des structs imbriqués
+                    # Recurse into nested structs
                     result.update(
                         self._build_fields_from_schema(struct, full_path, naming_sep)
                     )
 
             elif isinstance(field.dataType, StructType):
-                # Struct simple (non-array), on descend
+                # Simple (non-array) struct, go deeper
                 result.update(
                     self._build_fields_from_schema(
                         field.dataType, full_path, naming_sep
@@ -88,29 +88,29 @@ class MobilisightResponseToRaw(ResponseToRawTss):
                 )
 
             else:
-                # Champ non-struct, non-array, on ignore
+                # Non-struct, non-array field — ignore
                 continue
 
         return result
 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         """
-        Parse dict from BMW api response
+        Parse dict from BMW API response
 
         Args:
             response (dict): Contains data to parse
-            spark (SparkSession): spark session active
+            spark (SparkSession): active Spark session
             vin (str): Vehicle identification number
 
         Returns:
-            spark.DataFrame: Data with every columns
+            spark.DataFrame: Data with all columns
         """
 
         df = df.coalesce(32)
 
         fields = self._build_fields_from_schema(SCHEMAS[self.make])
 
-        # Liste pour stocker tous les DataFrames en format long
+        # List to store all DataFrames in long format
         long_dfs = []
         for key, params in fields.items():
             path = params["path"]
@@ -120,12 +120,12 @@ class MobilisightResponseToRaw(ResponseToRawTss):
 
             exploded = exploded.cache()
 
-            # Créer une ligne pour chaque champ (sauf datetime et unit)
+            # Create one row per field (excluding datetime and unit)
             for field_in_struct, alias in field_mapping.items():
                 long_df = exploded.select(
                     "vin",
                     F.col("exploded_struct.datetime").alias("date"),
-                    F.lit(alias).alias("key"),  # Nom de la colonne
+                    F.lit(alias).alias("key"),  # Column name
                     F.col(f"exploded_struct.{field_in_struct}")
                     .cast("string")
                     .alias("value"),
@@ -137,13 +137,13 @@ class MobilisightResponseToRaw(ResponseToRawTss):
         df_parsed = reduce(lambda a, b: a.unionByName(b), long_dfs)
 
         df_parsed = df_parsed.cache()
-        # Forcer le cache
+        # Force cache
         df_parsed.count()
 
-        # Repartitionner pour optimiser le pivot
+        # Repartition to optimize pivot
         df_parsed = df_parsed.repartition("vin").coalesce(optimal_partitions_nb)
 
-        # Pivoter pour avoir une colonne par clé
+        # Pivot to get one column per key
         pivoted = (
             df_parsed.groupBy("vin", "date")
             .pivot("key")

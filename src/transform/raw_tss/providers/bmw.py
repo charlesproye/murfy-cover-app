@@ -5,13 +5,13 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, explode, first, to_timestamp
 from pyspark.sql.types import *
 
-from transform.raw_tss.base.response_to_raw import ResponseToRawTss
+from transform.raw_tss.response_to_raw import ResponseToRawTss
 
 
 class BMWResponseToRaw(ResponseToRawTss):
     """
-    Classe pour traiter les données émises par les API BMW
-    stockées dans '/response/bmw/' sur Scaleway
+    Class for processing data emitted by BMW APIs
+    stored in '/response/bmw/' on Scaleway
     """
 
     def __init__(
@@ -35,15 +35,15 @@ class BMWResponseToRaw(ResponseToRawTss):
 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         """
-        Parse dict from BMW api response
+        Parse dict from BMW API response
 
         Args:
             response (dict): Contains data to parse
-            spark (SparkSession): spark session active
-            vin (str): Vehicle identification number
+            spark (SparkSession): active Spark session
+            vin (str): Vehicle Identification Number
 
         Returns:
-            spark.DataFrame: Data with every columns
+            spark.DataFrame: Data with all columns
         """
 
         df = df.coalesce(optimal_partitions_nb)

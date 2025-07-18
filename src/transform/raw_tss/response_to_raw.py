@@ -12,7 +12,7 @@ from pyspark.sql.types import StringType, StructField, StructType
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from core.spark_utils import get_optimal_nb_partitions
-from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, SCHEMAS
+from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, SCHEMAS, NB_CORES_CLUSTER
 
 
 class ResponseToRawTss:
@@ -43,81 +43,50 @@ class ResponseToRawTss:
         self.make = make
         self.bucket = S3Service()
         self.settings = S3Settings()
-        self.base_s3_path = f"s3a://{self.settings.S3_BUCKET}"
+        self.base_s3_path = self.settings.S3_BASE_PATH
         self.raw_tss_path = S3_RAW_TSS_KEY_FORMAT.format(brand=self.make)
 
     def run(self):
 
         self.logger.info(f"Traitement débuté pour {self.make}")
-        start = time.time()
+
         keys_to_download_per_vin, paths_to_exclude = (
             self._get_keys_to_download()
         ) 
-        end = time.time()
-        self.logger.info(
-            f"Time elapsed to retrieve keys to download: {end - start:.2f} seconds"
-        )
+
 
         if len(keys_to_download_per_vin) == 0:
             self.logger.info(f"No VIN to process for {self.make}")
         else:
-            start = time.time()
             optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
-                keys_to_download_per_vin, paths_to_exclude
+                keys_to_download_per_vin, paths_to_exclude, NB_CORES_CLUSTER
             )
-            end = time.time()
-            self.logger.info(
-                f"Temps écoulé pour déterminer les paramètres Spark: {end - start:.2f} secondes"
-            )
-
-            self.logger.info(f"Number of VINs: {len(list(keys_to_download_per_vin.keys()))}")
-            self.logger.info(f"Number of batches: {len(list(self._batch_dict_items(keys_to_download_per_vin, batch_size)))}")
 
             for batch_num, batch in enumerate(
                 self._batch_dict_items(keys_to_download_per_vin, batch_size), 1
             ): 
                 self.logger.info(f"Batch {batch_num}:")
 
-                start = time.time()
                 # Extract
                 raw_tss_unparsed = self._download_keys(batch)
-                end = time.time()
-                self.logger.info(
-                    f"Time elapsed to download JSON files in Spark {batch_num}: {end - start:.2f} seconds"
-                )
-
-                start = time.time()
+                
                 # Transform
                 raw_tss_parsed = self.parse_data(
                     raw_tss_unparsed, optimal_partitions_nb
                 )
-                end = time.time()
-                self.logger.info(
-                    f"Time elapsed to transform batch {batch_num} data: {end - start:.2f} seconds"
-                )
 
-                start = time.time()
                 # Load
                 self.bucket.append_spark_df_to_parquet(
                     raw_tss_parsed, self.raw_tss_path
                 )
-                end = time.time()
-                self.logger.info(
-                    f"Time elapsed to write data to bucket {batch_num}: {end - start:.2f} seconds"
-                )
 
-
-                start = time.time()
                 self._update_last_parsed_date(batch)
                 end = time.time()
-                self.logger.info(
-                    f"Temps écoulé pour actualiser la date de dernière analyse {batch_num}: {end - start:.2f} secondes"
-                )
 
                 raw_tss_parsed.unpersist()
                 del raw_tss_parsed
 
-            self.logger.info(f"Traitement terminé pour {self.make}")
+        self.logger.info(f"Processing completed for {self.make}")
 
     def _set_optimal_spark_parameters(
         self,
@@ -126,22 +95,22 @@ class ResponseToRawTss:
         nb_cores: int = 8,
     ) -> tuple[int, int]:
         """
-        Calcule la taille optimale des batches pour le traitement parallèle des VINs.
+        Calculates the optimal batch size for parallel processing of VINs.
 
-        Cette méthode détermine le nombre optimal de VINs à traiter par batch en fonction
-        de la taille des données, du nombre de VINs et des ressources système disponibles.
-        L'optimisation vise à équilibrer la charge de travail entre les cœurs CPU tout
-        en maximisant l'utilisation des ressources Spark.
+        This method determines the optimal number of VINs to process per batch based on
+        data size, number of VINs, and available system resources.
+        The goal is to balance the workload across CPU cores while
+        maximizing Spark resource utilization.
 
         Args:
-            nb_cores (int, optional): Nombre de cœurs CPU disponibles pour le traitement.
-                                    Défaut: 4
+            nb_cores (int, optional): Number of CPU cores available for processing.
+                                      Default: 4
 
         Returns:
-            int: Nombre optimal de VINs à traiter par batch
+            int: Optimal number of VINs to process per batch
         """
         if nb_cores <= 0:
-            raise ValueError("Nombre de cœurs doit être un entier positif")
+            raise ValueError("Number of cores must be a positive integer")
 
         file_size, _ = self.bucket.get_object_size(
             f"response/{self.make}/", prefix_to_exclude=paths_to_exclude
@@ -150,7 +119,7 @@ class ResponseToRawTss:
         nb_vins = len(list(keys_to_download_per_vin.keys()))
 
         if nb_vins == 0:
-            self.logger.warning("Aucun VIN à traiter, retour de batch_size = 1")
+            self.logger.warning("No VINs to process, returning batch_size = 1")
             return 1
 
         optimal_partitions = get_optimal_nb_partitions(file_size, nb_vins)
@@ -166,9 +135,9 @@ class ResponseToRawTss:
             if "/temp/" not in path:
                 parts = path.strip("/").split("/")
                 if len(parts) < 2:
-                    continue  # ignorer les paths invalides
+                    continue  # skip invalid paths
                 vin = parts[-2]
-                # Initialise la liste si vin pas encore vu
+                # Initialize list if vin not seen yet
                 if vin not in grouped:
                     grouped[vin] = []
 
@@ -177,7 +146,7 @@ class ResponseToRawTss:
         return grouped
 
     def _batch_dict_items(self, dictionary: dict, batch_size: int):
-        """Générateur pour traiter un dictionnaire par lots"""
+        """Generator to process a dictionary in batches"""
         total_items = len(dictionary)
 
         for i in range(0, total_items, batch_size):
@@ -186,20 +155,20 @@ class ResponseToRawTss:
 
     def _get_keys_to_download(self) -> (dict[str, list[str]], list):
         """
-        Récupère les clés S3 des fichiers à télécharger en filtrant par date de dernière analyse.
+        Retrieves the S3 keys of the files to download by filtering based on the last analysis date.
 
-        Cette méthode compare les dates des fichiers de réponse disponibles avec la date
-        de dernière analyse stockée dans les données raw TSS pour déterminer quels fichiers
-        doivent être téléchargés et traités.
+        This method compares the dates of the available response files with the last
+        analysis date stored in the raw TSS data to determine which files
+        need to be downloaded and processed.
 
         Returns:
-            dict[str, list[str]]: Dictionnaire où les clés sont les VINs et les valeurs sont
-                                les listes des chemins S3 des fichiers à télécharger.
-                                Format: {'VIN123': ['response/brand/VIN123/2024-01-01.json', ...]}
+            dict[str, list[str]]: Dictionary where keys are VINs and values are
+                                  lists of S3 paths of files to download.
+                                  Format: {'VIN123': ['response/brand/VIN123/2024-01-01.json', ...]}
 
         Raises:
-            Exception: Si une erreur survient lors de la lecture des données Parquet ou
-                    de la liste des fichiers S3
+            Exception: If an error occurs while reading the Parquet data or
+                       listing S3 files
         """
 
         last_parsed_date_dict = None
@@ -260,7 +229,7 @@ class ResponseToRawTss:
 
     def _download_keys(self, batch: dict[str, list[str]]) -> DataFrame:
         """
-        Télécharge les json et retourne un DataFrame Spark
+        Downloads JSON files and returns a Spark DataFrame
         """
 
         keys_to_download = []
@@ -271,14 +240,14 @@ class ResponseToRawTss:
         schema = SCHEMAS[self.make]
 
         keys_to_download_str = [
-            f"s3a://{self.settings.S3_BUCKET}/{key}" for key in keys_to_download
+            f"{self.settings.S3_BASE_PATH}/{key}" for key in keys_to_download
         ]
 
         return (
             self.spark.read.option("multiline", "true")
             .option(
                 "badRecordsPath",
-                f"s3a://{self.settings.S3_BUCKET}/response/{self.make}/corrupted_responses/",
+                f"{self.settings.S3_BASE_PATH}/response/{self.make}/corrupted_responses/",
             )
             .option("mode", "PERMISSIVE")
             .schema(schema)
@@ -287,7 +256,7 @@ class ResponseToRawTss:
 
     def _update_last_parsed_date(self, keys_to_download_per_vin: dict):
         """
-        Met à jour la date de dernière date analyse pour les VINs présents dans le DataFrame.
+        Updates the last parsed date for the VINs present in the DataFrame.
         """
 
         def extract_date_from_path(path):
@@ -300,7 +269,7 @@ class ResponseToRawTss:
                 extract_date_from_path(p) for p in paths if extract_date_from_path(p)
             ]
             if dates:
-                dates = [date for date in dates if date]  # Get rid of None
+                dates = [date for date in dates if date]  # Remove None
                 max_date_str = max(dates)
                 rows.append(Row(vin=vin, last_parsed_file_date=max_date_str))
 
@@ -315,7 +284,6 @@ class ResponseToRawTss:
 
         vins_to_update = list(keys_to_download_per_vin.keys())
 
-        # Lire l'existant
         if self.bucket.check_spark_file_exists(
             f"raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet"
         ):
@@ -333,11 +301,10 @@ class ResponseToRawTss:
             final_df = progress_df
 
         final_df.coalesce(1).write.mode("overwrite").parquet(
-            f"s3a://{self.settings.S3_BUCKET}/raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet"
+            f"{self.settings.S3_BASE_PATH}/raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet"
         )
 
         pass
 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         pass
-
