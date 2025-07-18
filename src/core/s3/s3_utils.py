@@ -204,7 +204,7 @@ class S3Service():
 
     def read_parquet_df_spark(self, spark: SparkSession, key: str, **kwargs):
         s3_path = f"s3a://{self.bucket_name}/{key}"
-        return spark.read.parquet(s3_path, **kwargs)
+        return spark.read.option("mergeSchema", "true").parquet(s3_path, **kwargs)
 
     def read_csv_df(self, key: str, **kwargs) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)

@@ -1,6 +1,7 @@
 from logging import getLogger
 import argparse
 import logging
+from turtle import st
 
 from pyspark.sql import DataFrame as DF, Window
 from pyspark.sql.functions import (
@@ -13,6 +14,7 @@ from pyspark.sql.functions import (
     first,
     expr,
     coalesce,
+    hash as spark_hash,
     sum as spark_sum,
     pandas_udf,
 )
@@ -32,7 +34,12 @@ from core.spark_utils import (
 from transform.fleet_info.main import fleet_info
 from transform.processed_tss.config import *
 from transform.raw_tss.RawTss import RawTss
-from core.s3_utils import S3_Bucket
+from core.s3.s3_utils import S3Service
+from pyspark.sql import functions as F
+from core.s3.settings import S3Settings
+import time
+from pyspark.storagelevel import StorageLevel
+
 
 
 # Here we have implemented the ETL as a class as most raw time series go through the same processing step.
@@ -71,16 +78,23 @@ class ProcessedTimeSeries(CachedETLSpark):
     # No need to call run, it will be called in CachedETL init.
     def run(self):
         # self.logger.info(f"{'Processing ' + self.make + ' raw tss.':=^{50}}")
+
         tss = RawTss(self.make, spark=self.spark).data
+        tss = tss.withColumn("vin_bucket", (spark_hash(col("vin")) % 32).cast("int"))
         tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
+        tss = tss.repartition("vin_bucket")
         tss = safe_astype_spark_with_error_handling(tss)
+        tss = tss.select(*NECESSARY_COLS[self.make])
         tss = self.normalize_units_to_metric(tss)
         tss = tss.orderBy(["vin", "date"])
         tss = self.compute_date_vars(tss)
         tss = self.compute_charge_n_discharge_vars(tss)
-        tss = tss.repartition("vin").join(self.spark.createDataFrame(fleet_info), "vin", "left")
+        tss = tss.cache()
+        tss.count()
+        tss = tss.join(self.spark.createDataFrame(fleet_info), "vin", "left")
         tss = tss.sort("vin", ascending=True)
-        return tss.cache()
+
+        return tss
 
     def compute_charge_n_discharge_vars(self, tss):
         tss = self.compute_charge_n_discharge_masks(
@@ -133,16 +147,13 @@ class ProcessedTimeSeries(CachedETLSpark):
             df[cum_var_col] = cum
             return df
 
-        return tss.repartition("vin").groupBy(self.id_col).apply(integrate_trapezoid)
+        return tss.groupBy(self.id_col).apply(integrate_trapezoid)
 
     def compute_date_vars(self, tss: DF) -> DF:
-        # Créer une fenêtre par vin, ordonnée par date
         window_spec = Window.partitionBy("vin").orderBy("date")
-
-        # Calculer le lag de date (valeur précédente)
         tss = tss.withColumn("prev_date", lag(col("date")).over(window_spec))
 
-        # Différence en secondes entre les deux timestamps
+
         tss = tss.withColumn(
             "sec_time_diff",
             (unix_timestamp(col("date")) - unix_timestamp(col("prev_date"))).cast(
@@ -394,89 +405,124 @@ class TeslaProcessedTimeSeries(ProcessedTimeSeries):
         )
         return tss
 
+    def _reassign_short_phases(self, df, min_duration_minutes=3):
+        """
+        Recalcule les phase_id en fusionnant les phases de moins de `min_duration_minutes`
+        avec la phase valide précédente.
+
+        Args:
+            df (DataFrame): DataFrame Spark avec les colonnes `phase_id`, `date`, `total_phase_time`
+            min_duration_minutes (float): Durée minimale pour conserver une phase (en minutes)
+
+        Returns:
+            DataFrame: DataFrame avec la colonne `phase_id` mise à jour
+        """
+
+        # 1. Marquer les phases valides
+        df = df.withColumn(
+            "is_valid_phase",
+            F.when(F.col("total_phase_time") >= min_duration_minutes, 1).otherwise(0)
+        )
+
+        # 2. Déterminer la dernière phase valide précédemment
+        w_time = Window.partitionBy("vin").orderBy("date").rowsBetween(Window.unboundedPreceding, 0)
+
+        df = df.withColumn(
+            "last_valid_phase_id",
+            F.last(
+                F.when(F.col("is_valid_phase") == 1, F.col("phase_id")),
+                ignorenulls=True
+            ).over(w_time)
+        )
+
+        # 3. Mettre à jour le phase_id
+        df = df.withColumn(
+            "phase_id_updated",
+            F.when(F.col("is_valid_phase") == 1, F.col("phase_id"))
+            .otherwise(F.col("last_valid_phase_id"))
+        )
+
+        # 4. Re-numérotation des phase_id pour compacter (optionnel mais propre)
+        df = df.withColumn(
+            "phase_id_final",
+            F.dense_rank().over(Window.partitionBy('vin').orderBy("phase_id_updated")) - 1
+        )
+
+        # 5. Nettoyage final
+        df = df.drop("phase_id", "last_valid_phase_id", "is_valid_phase", "phase_id_updated")
+        df = df.withColumnRenamed("phase_id_final", "phase_id")
+
+        return df
+
     def compute_charge_idx_bis(self, tss: DF) -> DF:
 
         tss = self.compute_energy_added(tss)
 
-        # 1. Filtrer les lignes où soc n'est pas null
-        tss_na = tss.filter(col("soc").isNotNull())
+        # Définir les fenêtres
+        w = Window.partitionBy("vin").orderBy("date")
 
-        # 2. Créer une fenêtre ordonnée par date par VIN
-        vin_window = Window.partitionBy("vin").orderBy("date")
+        # Calculer soc_diff en allant chercher la précédente valeur non nulle
+        tss = tss.withColumn("soc_diff", 
+            F.when(
+                F.col("soc").isNotNull(),
+                F.col("soc") - F.last("soc", ignorenulls=True).over(
+                    w.rowsBetween(Window.unboundedPreceding, -1)
+                )
+            ).otherwise(None)
+)
 
-        # 3. Calcul des différences
-        tss_na = (
-            tss_na.withColumn("soc_diff", col("soc") - lag("soc", 1).over(vin_window))
-            .withColumn(
-                "trend",
-                when(col("soc_diff") > 0, lit(1))
-                .when(col("soc_diff") < 0, lit(-1))
-                .otherwise(lit(0)),
-            )
-            .withColumn("prev_trend", lag("trend", 1).over(vin_window))
-            .withColumn("prev_prev_trend", lag("trend", 2).over(vin_window))
-            .withColumn("prev_prev_prev_trend", lag("trend", 3).over(vin_window))
-            .withColumn("prev_date", lag("date", 1).over(vin_window))
-            .withColumn(
-                "time_diff_min",
-                (unix_timestamp(col("date")) - unix_timestamp(col("prev_date"))) / 60,
-            )
-            .withColumn("time_gap", col("time_diff_min") > 60)
-            .withColumn(
-                "trend_change",
-                when(
-                    (
-                        (col("trend") == col("prev_trend"))
-                        & (col("prev_trend") != col("prev_prev_trend"))
-                        & (col("prev_prev_trend") == col("prev_prev_prev_trend"))
-                    )
-                    | col("time_gap"),
-                    lit(1),
-                ).otherwise(lit(0)),
-            )
+        # Calcul du gap en minutes
+        df = tss.withColumn("prev_date", lag("date").over(w))
+        df = df.withColumn("time_gap_minutes", 
+            (F.unix_timestamp("date") - F.unix_timestamp("prev_date")) / 60)
+
+        # Calcul de direction avec forward fill
+        df = df.withColumn("direction_raw", 
+            F.when(col("soc_diff").isNull(), None).otherwise(F.signum("soc_diff")))
+
+        # Forward fill de la direction
+        df = df.withColumn("direction", 
+            F.last("direction_raw", ignorenulls=True).over(w.partitionBy("vin").orderBy("date").rowsBetween(Window.unboundedPreceding, 0)))
+
+
+
+        # Détecter les changements de direction
+        df = df.withColumn("direction_change", 
+            F.when(F.col("direction") != F.lag("direction").over(w), 1).otherwise(0))
+
+        # Créer phase_id en cumulant les changements
+        df = df.withColumn("phase_id", 
+            F.sum("direction_change").over(w.rowsBetween(Window.unboundedPreceding, 0)))
+
+        w_phase = Window.partitionBy("vin", "phase_id")
+
+        df = df.withColumn("total_phase_time", F.sum("time_gap_minutes").over(w_phase))
+
+        df = self._reassign_short_phases(df)
+
+        w_phase = Window.partitionBy("vin", "phase_id")
+
+        df = df.withColumn("total_soc_diff", F.sum("soc_diff").over(w_phase))
+
+        df = df.withColumn("prev_phase", F.lag("direction").over(w)).withColumn("next_phase", F.lead("direction").over(w))
+
+        df = df.withColumn(
+            "charging_status",
+            F.when(F.col("total_soc_diff") > 0.5, "charging")
+            .when(F.col("total_soc_diff") < -0.5, "discharging")
+            .when((F.col("prev_phase") == F.col("next_phase")) & (F.col("prev_phase") >= 0), "charging")
+            .when((F.col("prev_phase") == F.col("next_phase")) & (F.col("prev_phase") <= 0), "discharging")
+            .otherwise("idle")  
         )
+        # Étape 3: Recréer le phase_id basé sur les changements de phase
+        df = df.withColumn("charging_status_change", 
+            F.when(F.col("charging_status") != F.lag("charging_status").over(w), 1).otherwise(0))
 
-        # 4. Initialiser les premières lignes à 0
-        tss_na = tss_na.withColumn(
-            "trend_change",
-            when(col("date") == lag("date", 1).over(vin_window), lit(0)).otherwise(
-                col("trend_change")
-            ),
-        )
+        df = df.withColumn("charging_status_idx", 
+            F.sum("charging_status_change").over(w.rowsBetween(Window.unboundedPreceding, 0)))
 
-        # 5. Cumulative sum (session index)
-        tss_na = tss_na.withColumn(
-            "in_charge_idx",
-            spark_sum("trend_change").over(
-                vin_window.rowsBetween(Window.unboundedPreceding, 0)
-            ),
-        )
+        return df
 
-        # 6. Join avec le DataFrame original
-        tss = tss.repartition("vin").join(
-            tss_na.select("vin", "date", "soc", "soc_diff", "in_charge_idx"),
-            on=["vin", "date", "soc"],
-            how="left",
-        )
-
-        # 7. Forward-fill `odometer` et `in_charge_idx` (non-natif en Spark, mais on peut approximer)
-        fill_window = (
-            Window.partitionBy("vin")
-            .orderBy("date")
-            .rowsBetween(Window.unboundedPreceding, 0)
-        )
-        tss = tss.withColumn(
-            "odometer",
-            coalesce(col("odometer"), expr("last(odometer, true)").over(fill_window)),
-        ).withColumn(
-            "in_charge_idx",
-            coalesce(
-                col("in_charge_idx"),
-                expr("last(in_charge_idx, true)").over(fill_window),
-            ),
-        )
-
-        return tss
 
 
 @main_decorator
@@ -492,13 +538,14 @@ def main():
 
     log_level = getattr(logging, args.log_level.upper(), logging.INFO)
 
-    # Initialisation
-    bucket = S3_Bucket()
+    settings = S3Settings()
 
-    # Création de la session Spark
-    creds = bucket.get_creds_from_dot_env()
+    # Initialisation
+    bucket = S3Service()
+
     spark_session = create_spark_session(
-        creds["aws_access_key_id"], creds["aws_secret_access_key"]
+        settings.S3_KEY,
+        settings.S3_SECRET
     )
 
     ProcessedTimeSeries.update_all_tss(log_level=log_level, spark=spark_session)
