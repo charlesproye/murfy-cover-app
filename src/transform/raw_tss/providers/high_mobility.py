@@ -123,7 +123,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
                             # Use get_next_scheduled_timestamp for custom data
                             get_next_scheduled_timestamp_udf(
                                 col("entry.timestamp"), col("entry.data")
-                            ).alias("value"),
+                            ).cast('string').alias("value"),
                         )
                     )
                 else:
@@ -135,7 +135,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
                             col("vin"),
                             col("entry.timestamp").alias("date"),
                             lit(signal_name).alias("signal"),
-                            col(f"entry.{value_path}").alias("value"),
+                            col(f"entry.{value_path}").cast('string').alias("value"),
                         )
                     )
                 dfs.append(exploded)
