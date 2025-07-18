@@ -79,74 +79,20 @@ class ProcessedTimeSeries(CachedETLSpark):
     def run(self):
         # self.logger.info(f"{'Processing ' + self.make + ' raw tss.':=^{50}}")
 
-        start = time.time()
         tss = RawTss(self.make, spark=self.spark).data
-        end = time.time()
-        print(f"Temps écoulé pour charger les données: {end - start:.2f} secondes")
-
-
-        # #### TEMPORAIRE
-        # start = time.time()
-        # tss = tss.withColumn("readable_date", coalesce(col("readable_date"), col("date"))).drop("date")
-        # end = time.time()
-        # print(f"Temps écoulé pour remplir les readable_date nulles: {end - start:.2f} secondes")
-
-        start = time.time()
         tss = tss.withColumn("vin_bucket", (spark_hash(col("vin")) % 32).cast("int"))
-        end = time.time()
-        print(f"Temps écoulé pour calculer le hash: {end - start:.2f} secondes")
-
-
-        start = time.time()
         tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
-        end = time.time()
-        print(f"Temps écoulé pour renommer les colonnes: {end - start:.2f} secondes")
-
-        start = time.time()
         tss = tss.repartition("vin_bucket")
-        end = time.time()
-        print(f"Temps écoulé pour repartitionner les données: {end - start:.2f} secondes")
-
-
-        start = time.time()
         tss = safe_astype_spark_with_error_handling(tss)
-        end = time.time()
-        print(f"Temps écoulé pour convertir les types: {end - start:.2f} secondes")
-
-        start = time.time()
         tss = tss.select(*NECESSARY_COLS[self.make])
-        end = time.time()
-        print(f"Temps écoulé pour sélectionner les colonnes: {end - start:.2f} secondes")
-
-
-        start = time.time()
         tss = self.normalize_units_to_metric(tss)
-        end = time.time()
-        print(f"Temps écoulé pour normaliser les unités: {end - start:.2f} secondes")
-        start = time.time()
         tss = tss.orderBy(["vin", "date"])
-        end = time.time()
-        print(f"Temps écoulé pour trier les données: {end - start:.2f} secondes")
-        start = time.time()
         tss = self.compute_date_vars(tss)
-        end = time.time()
-        print(f"Temps écoulé pour calculer les variables de charge et décharge: {end - start:.2f} secondes")
         tss = self.compute_charge_n_discharge_vars(tss)
         tss = tss.cache()
-
-        start = time.time()
         tss.count()
-        end = time.time()
-        print(f"Temps écoulé pour compter les données: {end - start:.2f} secondes")
-
-        start = time.time()
         tss = tss.join(self.spark.createDataFrame(fleet_info), "vin", "left")
-        end = time.time()
-        print(f"Temps écoulé pour joindre les données de la flotte: {end - start:.2f} secondes")
-        start = time.time()
         tss = tss.sort("vin", ascending=True)
-        end = time.time()
-        print(f"Temps écoulé pour trier les données: {end - start:.2f} secondes")
 
         return tss
 
@@ -204,13 +150,10 @@ class ProcessedTimeSeries(CachedETLSpark):
         return tss.groupBy(self.id_col).apply(integrate_trapezoid)
 
     def compute_date_vars(self, tss: DF) -> DF:
-        # Créer une fenêtre par vin, ordonnée par date
         window_spec = Window.partitionBy("vin").orderBy("date")
-
-        # Calculer le lag de date (valeur précédente)
         tss = tss.withColumn("prev_date", lag(col("date")).over(window_spec))
 
-        # Différence en secondes entre les deux timestamps
+
         tss = tss.withColumn(
             "sec_time_diff",
             (unix_timestamp(col("date")) - unix_timestamp(col("prev_date"))).cast(
