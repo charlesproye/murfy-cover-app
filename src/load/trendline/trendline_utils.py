@@ -53,21 +53,21 @@ def update_database_trendlines(model_car, type_car, mean_trendline, upper_trendl
     
 def clean_battery_data(df, odometer_column, soh_colum):
     """
-    Nettoie les données de batterie en supprimant les valeurs aberrantes.
+    Cleans battery data by removing outliers.
     
     Parameters:
     -----------
     df : pandas.DataFrame
-        DataFrame contenant les données de batterie avec des colonnes odometer et 'soh'
-    soh_column: str
-        Nom de la colonne qui contient les SoH
-    odometer_column: str
-        Nom de la colonne qui contient l'info sur l'odomètre
+        DataFrame containing battery data with 'odometer' and 'soh' columns.
+    soh_column : str
+        Name of the column that contains the State of Health (SoH).
+    odometer_column : str
+        Name of the column that contains the odometer information.
         
     Returns:
     --------
     pandas.DataFrame
-        DataFrame nettoyé
+        Cleaned DataFrame.
     """
     df_clean = df.copy()
     df_clean = df_clean.rename(columns={odometer_column: 'odometer', soh_colum:'soh'})
@@ -79,19 +79,19 @@ def clean_battery_data(df, odometer_column, soh_colum):
 
 def get_model_name(df, dbeaver_df):
     """
-    Récupère le nom du modèle à partir de l'ID du modèle.
+    Retrieves the model name from the model ID.
     
     Parameters:
     -----------
     df : pandas.DataFrame
-        DataFrame contenant la colonne 'model_id'
+        DataFrame containing the 'model_id' column.
     dbeaver_df : pandas.DataFrame
-        DataFrame de référence avec colonnes 'id', 'model_name', 'type'
+        Reference DataFrame with columns 'id', 'model_name', and 'type'.
         
     Returns:
     --------
     str
-        Nom complet du modèle
+        Full model name.
     """
     id = df['model_id'].unique()
     model = f"{dbeaver_df[dbeaver_df['id'].astype(str) == str(id[0])]['model_name'].values[0]} {dbeaver_df[dbeaver_df['id'].astype(str) == str(id[0])]['type'].values[0]}"
@@ -99,17 +99,17 @@ def get_model_name(df, dbeaver_df):
 
 def prepare_data_for_fitting(df):
     """
-    Prépare les données pour le fitting en ajoutant le point d'origine et en triant.
+    Prepares data for fitting by adding the origin point and sorting.
     
     Parameters:
     -----------
     df : pandas.DataFrame
-        DataFrame avec colonnes 'odometer' et 'soh'
+        DataFrame with 'odometer' and 'soh' columns.
         
     Returns:
     --------
     tuple
-        (x_sorted, y_sorted) - données triées prêtes pour le fitting
+        (x_sorted, y_sorted) - sorted data ready for fitting.
     """
     x_data, y_data = df["odometer"].values, df["soh"].values
     x_data = np.hstack((x_data, np.array([0])))
@@ -121,14 +121,14 @@ def prepare_data_for_fitting(df):
 
 def compute_main_trendline(x_sorted, y_sorted):
     """
-    Calcule la ligne de tendance principale et les bornes.
+    Computes the main trend line and the bounds.
     
     Parameters:
     -----------
     x_sorted : numpy.array
-        Données x triées
+        Sorted x data.
     y_sorted : numpy.array
-        Données y triées
+        Sorted y data.
         
     Returns:
     --------
@@ -146,21 +146,21 @@ def compute_main_trendline(x_sorted, y_sorted):
 
 def compute_upper_bound(df, trendline, coef_mean):
     """
-    Calcule la borne supérieure si nécessaire.
+    Computes the upper bound if necessary.
     
     Parameters:
     -----------
     df : pandas.DataFrame
-        DataFrame des données
+        DataFrame containing the data.
     trendline : str
-        Equation de la trendline moyenne
+        Equation of the mean trendline.
     coef_mean : numpy.array
-        Coefficients moyens
+        Mean coefficients.
         
     Returns:
     --------
     dict or None
-        Borne supérieure calculée ou None
+        Computed upper bound or None.
     """
     mask = eval(trendline['trendline'], {"np": np, "x": df["odometer"]})
     test = df[df['soh'] > mask]
@@ -179,23 +179,22 @@ def compute_upper_bound(df, trendline, coef_mean):
 
 def compute_lower_bound(df, trendlines, coef_mean):
     """
-    Calcule la borne inférieure si nécessaire.
+    Computes the lower bound if necessary.
     
     Parameters:
     -----------
     df : pandas.DataFrame
-        DataFrame des données nettoyées
+        Cleaned data DataFrame.
     coef_mean : numpy.array
-        Coefficients moyens
+        Mean coefficients.
     trendlines : list
-        Liste des lignes de tendance
+        List of trendlines.
         
     Returns:
     --------
     dict or None
-        Borne inférieure calculée ou None
+        Computed lower bound or None.
     """
-
     mask = eval(trendlines['trendline'], {"np": np, "x": df["odometer"]})
     test = df[df['soh'] < mask]
     x_sorted, y_sorted = prepare_data_for_fitting(test)
