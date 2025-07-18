@@ -7,6 +7,7 @@ import inspect
 import logging
 import pandas as pd
 from pandas import DataFrame as DF
+from typing import Optional
 
 
 from .s3.s3_utils import S3Service
@@ -84,6 +85,7 @@ class CachedETLSpark(ABC):
         force_update: bool = False,
         bucket: S3Service = S3,
         spark: SparkSession = None,
+        writing_mode: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -119,7 +121,10 @@ class CachedETLSpark(ABC):
         ):
             self.data = self.run()  # Call the abstract run method to generate data
             if on == "s3":
-                bucket.save_df_as_parquet_spark(self.data, path, self.spark)
+                if writing_mode == "append":
+                    bucket.append_spark_df_to_parquet(self.data, path, self.spark)
+                else:
+                    bucket.save_df_as_parquet_spark(self.data, path, self.spark)
             elif on == "local_storage":
                 self.data.write.parquet(path)
         else:
