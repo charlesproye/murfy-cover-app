@@ -331,8 +331,7 @@ class ProcessedTimeSeries(CachedETLSpark):
 
     @classmethod
     def update_all_tss(cls, spark, **kwargs):
-        # for make in ALL_MAKES:
-        for make in ["mercedes-benz"]:
+        for make in ALL_MAKES:
             if make in ["tesla", "tesla-fleet-telemetry"]:
                 cls = TeslaProcessedTimeSeries
             else:
