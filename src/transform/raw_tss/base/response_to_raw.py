@@ -17,26 +17,25 @@ from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, SCHEMAS
 
 class ResponseToRawTss:
     """
-    Classe pour traiter les données renvoyées par les API stockées dans /response sur Scaleway
+    Class to process data returned by APIs stored in /response on Scaleway
     """
 
     def __init__(
         self,
         make: str,
-        force_update: bool = False,
         writing_mode: Optional[str] = "append",
         spark: SparkSession = None,
         logger: Logger = None,
         **kwargs,
     ):
         """
-        Initialise le processeur de télémétrie
+        Initialize the telemetry processor
 
         Args:
-            make: Marque du véhicule
-            bucket: Instance S3Service pour l'accès aux données
-            spark: Session Spark pour le traitement des données
-            force_update: Si True, force la mise à jour des données dans CachedETLSpark
+            make: Vehicle brand
+            bucket: S3Service instance for data access
+            spark: Spark session for data processing
+            force_update: If True, forces data update in CachedETLSpark
         """
 
         self.logger = logger
@@ -50,18 +49,17 @@ class ResponseToRawTss:
     def run(self):
 
         self.logger.info(f"Traitement débuté pour {self.make}")
-
         start = time.time()
         keys_to_download_per_vin, paths_to_exclude = (
             self._get_keys_to_download()
-        )  # Clés à télécharger par vin
+        ) 
         end = time.time()
         self.logger.info(
-            f"Temps écoulé pour récupérer les clés à télécharger: {end - start:.2f} secondes"
+            f"Time elapsed to retrieve keys to download: {end - start:.2f} seconds"
         )
 
         if len(keys_to_download_per_vin) == 0:
-            self.logger.info(f"Aucun VIN à traiter pour {self.make}")
+            self.logger.info(f"No VIN to process for {self.make}")
         else:
             start = time.time()
             optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
@@ -72,12 +70,12 @@ class ResponseToRawTss:
                 f"Temps écoulé pour déterminer les paramètres Spark: {end - start:.2f} secondes"
             )
 
-            self.logger.info(f"Nombre de vins: {len(list(keys_to_download_per_vin.keys()))}")
-            self.logger.info(f"Nombre de batchs: {len(list(self._batch_dict_items(keys_to_download_per_vin, batch_size)))}")
+            self.logger.info(f"Number of VINs: {len(list(keys_to_download_per_vin.keys()))}")
+            self.logger.info(f"Number of batches: {len(list(self._batch_dict_items(keys_to_download_per_vin, batch_size)))}")
 
             for batch_num, batch in enumerate(
                 self._batch_dict_items(keys_to_download_per_vin, batch_size), 1
-            ):  # Boucle pour faire des batchs d'écriture et ne pas saturer la mémoire
+            ): 
                 self.logger.info(f"Batch {batch_num}:")
 
                 start = time.time()
@@ -85,7 +83,7 @@ class ResponseToRawTss:
                 raw_tss_unparsed = self._download_keys(batch)
                 end = time.time()
                 self.logger.info(
-                    f"Temps écoulé pour télécharger les json en spark {batch_num}: {end - start:.2f} secondes"
+                    f"Time elapsed to download JSON files in Spark {batch_num}: {end - start:.2f} seconds"
                 )
 
                 start = time.time()
@@ -95,7 +93,7 @@ class ResponseToRawTss:
                 )
                 end = time.time()
                 self.logger.info(
-                    f"Temps écoulé pour transformer les données du batch {batch_num}: {end - start:.2f} secondes"
+                    f"Time elapsed to transform batch {batch_num} data: {end - start:.2f} seconds"
                 )
 
                 start = time.time()
@@ -105,11 +103,12 @@ class ResponseToRawTss:
                 )
                 end = time.time()
                 self.logger.info(
-                    f"Temps écoulé pour écrire les données dans le bucket {batch_num}: {end - start:.2f} secondes"
+                    f"Time elapsed to write data to bucket {batch_num}: {end - start:.2f} seconds"
                 )
 
+
                 start = time.time()
-                self._update_last_parsed_date(keys_to_download_per_vin)
+                self._update_last_parsed_date(batch)
                 end = time.time()
                 self.logger.info(
                     f"Temps écoulé pour actualiser la date de dernière analyse {batch_num}: {end - start:.2f} secondes"
@@ -220,6 +219,7 @@ class ResponseToRawTss:
 
         vins_paths_grouped = self._group_paths_by_vin(vins_paths)
 
+
         paths_to_exclude = []
 
         if last_parsed_date_dict:
@@ -234,6 +234,7 @@ class ResponseToRawTss:
                         )
                     ]
 
+
                     paths_to_exclude.extend(
                         [
                             path
@@ -245,7 +246,9 @@ class ResponseToRawTss:
                         ]
                     )
 
+
         vins_paths_grouped = {k: v for k, v in vins_paths_grouped.items() if v}
+
         vins_paths_grouped = {k: v for k, v in vins_paths_grouped.items() if len(v) > 0}
 
         # Shuffle the vins to avoid skewness
