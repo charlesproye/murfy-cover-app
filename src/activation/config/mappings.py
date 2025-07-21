@@ -271,7 +271,7 @@ def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacit
             match_type = process.extractOne(type_car, closest_rows['type'], scorer=fuzz.token_sort_ratio)
             if match_type:
                 _, _, index = match_type
-                return closest_rows.iloc[index]["id"]
+                return closest_rows.loc[index]["id"]
 
         # fallback: find the closest type without battery
         except:
