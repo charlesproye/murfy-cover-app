@@ -13,7 +13,9 @@ from core.spark_utils import create_spark_session
 from pyspark.sql import SparkSession
 from .s3.s3_utils import S3Service
 from .singleton_s3_bucket import S3
+from .s3.settings import S3Settings
 from .config import *
+from typing import Optional
 
 R = TypeVar("R")
 P = ParamSpec("P")
@@ -27,7 +29,7 @@ class CachedETL(DF, ABC):
         path: str,
         on: str,
         force_update: bool = False,
-        bucket: S3_Bucket = bucket,
+        bucket: S3Service = S3,
         **kwargs,
     ):
         """
@@ -74,14 +76,14 @@ class CachedETL(DF, ABC):
         """Abstract method to be implemented by subclasses to generate the DataFrame."""
         pass
 
-
 class CachedETLSpark(ABC):
     def __init__(
         self,
         path: str,
         on: str,
         force_update: bool = False,
-        bucket: S3_Bucket = bucket,
+        bucket: S3Service = S3,
+        settings: S3Settings = S3Settings(),
         spark: SparkSession = None,
         writing_mode: Optional[str] = None,
         **kwargs,
@@ -101,8 +103,8 @@ class CachedETLSpark(ABC):
 
         if spark is None:
             spark = create_spark_session(
-                S3_Bucket.get_creds_from_dot_env()["aws_access_key_id"],
-                S3_Bucket.get_creds_from_dot_env()["aws_secret_access_key"],
+                settings.S3_KEY,
+                settings.S3_SECRET
             )
         self._spark = spark
         assert on in [
