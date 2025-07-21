@@ -224,11 +224,11 @@ TESLA_MODEL_MAPPING = {
     'C': 'cybertruck'
 }
 
-def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity=None):
+def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacity=None):
     """Map a given vehicle to the closest model identifier in the database.
     Args:
         type_car (str): type car to find match
-        oem_name (str): oem car
+        make_name (str): make car
         model_name (str): model car
         db_df (pd.DataFrame): db with all the model in dbeaver
         battery_capacity (str, optional): capacity car battery. Defaults to None.
@@ -237,7 +237,7 @@ def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity
         str: type le plus proche présent dans la db de vehicle_model
     """
    
-    oem_name = oem_name.lower()
+    make_name = make_name.lower()
     type_car = type_car.lower()
     try:
         if len(model_name) > 4:
@@ -248,7 +248,7 @@ def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity
         model_name = model_name.lower()
         
     # filter on OEM
-    subset = db_df[db_df['oem_name'] == oem_name].copy()
+    subset = db_df[db_df['make_name'] == make_name].copy()
 
     # Find the best match
 
