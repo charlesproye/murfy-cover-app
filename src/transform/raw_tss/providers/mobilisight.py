@@ -2,7 +2,7 @@ from functools import reduce
 from logging import Logger
 from typing import Dict, Optional
 
-from config import SCHEMAS
+from transform.raw_tss.config import SCHEMAS
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import *

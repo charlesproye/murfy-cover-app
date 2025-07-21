@@ -1,0 +1,613 @@
+from logging import getLogger
+import argparse
+import logging
+from turtle import st
+
+from pyspark.sql import DataFrame as DF, Window
+from pyspark.sql.functions import (
+    col,
+    lag,
+    unix_timestamp,
+    when,
+    lit,
+    last,
+    first,
+    hash as spark_hash,
+    sum as spark_sum,
+    pandas_udf,
+    count_distinct
+)
+from pyspark.sql.types import DoubleType
+from pyspark.sql import SparkSession
+from scipy.integrate import cumulative_trapezoid
+import pandas as pd
+from core.console_utils import main_decorator
+from core.constants import KJ_TO_KWH
+from core.caching_utils import CachedETLSpark
+from core.logging_utils import set_level_of_loggers_with_prefix
+from core.spark_utils import (
+    create_spark_session,
+    timedelta_to_interval,
+)
+from transform.fleet_info.main import fleet_info
+from transform.processed_tss.config import *
+from core.s3.s3_utils import S3Service
+from pyspark.sql import functions as F
+from core.s3.settings import S3Settings
+import time
+from pyspark.storagelevel import StorageLevel
+from transform.processed_tss.config import NB_CORES_CLUSTER
+from core.spark_utils import get_optimal_nb_partitions
+from transform.raw_tss.main import *
+
+
+
+class RawTsToProcessedTs(CachedETLSpark):
+
+    def __init__(
+        self,
+        make: str,
+        id_col: str = "vin",
+        log_level: str = "INFO",
+        max_td: TD = MAX_TD,
+        force_update: bool = False,
+        spark: SparkSession = None,
+        **kwargs,
+    ):
+        self.make = make
+        logger_name = f"transform.processed_tss.{make}"
+        self.logger = getLogger(logger_name)
+        set_level_of_loggers_with_prefix(log_level, logger_name)
+        self.id_col = id_col
+        self.max_td = max_td
+        self.spark = spark
+        self.bucket = S3Service()
+        self.settings = S3Settings()
+
+        super().__init__(
+            S3_PROCESSED_TSS_KEY_FORMAT.format(make=make),
+            "s3",
+            force_update=force_update,
+            spark=spark,
+            **kwargs,
+        )
+
+    def run(self):
+
+        print(f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet")
+        print(self.bucket.check_file_exists(f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet"))
+
+        if True:
+            tss = self.bucket.read_parquet_df_spark(
+                spark=self.spark, 
+                key=f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet",
+            )
+        else:
+            tss = ORCHESTRATED_MAKES[self.make][1](self.make, spark=self.spark).run()
+
+        tss = tss.repartition('vin')
+
+        optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
+                tss, NB_CORES_CLUSTER
+        )
+
+        print('Optimal partitions nb: ', optimal_partitions_nb)
+        print('Batch size: ', batch_size)
+        
+
+        # tss = tss.withColumn("vin_bucket", (spark_hash(col("vin")) % 32).cast("int"))
+        # tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
+        # tss = tss.repartition("vin_bucket")
+        # tss = safe_astype_spark_with_error_handling(tss)
+        # tss = tss.select(*NECESSARY_COLS[self.make])
+        # tss = self.normalize_units_to_metric(tss)
+        # tss = tss.orderBy(["vin", "date"])
+        # tss = self.compute_date_vars(tss)
+        # tss = self.compute_charge_n_discharge_vars(tss)
+        # tss = tss.cache()
+        # tss.count()
+        # tss = tss.join(self.spark.createDataFrame(fleet_info), "vin", "left")
+        # tss = tss.sort("vin", ascending=True)
+
+        return tss
+
+    def _set_optimal_spark_parameters(
+        self,
+        tss,
+        nb_cores: int = 8,
+    ) :
+        """
+        Calculates the optimal batch size for parallel processing of VINs.
+
+        This method determines the optimal number of VINs to process per batch based on
+        data size, number of VINs, and available system resources.
+        The goal is to balance the workload across CPU cores while
+        maximizing Spark resource utilization.
+
+        Args:
+            nb_cores (int, optional): Number of CPU cores available for processing.
+                                      Default: 4
+
+        Returns:
+            int: Optimal number of VINs to process per batch
+        """
+
+        if nb_cores <= 0:
+            raise ValueError("Number of cores must be a positive integer")
+
+        file_size, _ = self.bucket.get_object_size(
+            f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet"
+        )
+        
+        nb_vins = tss.select(count_distinct("vin")).collect()[0][0]
+
+        print(nb_vins)
+
+        if nb_vins == 0:
+            self.logger.warning("No VINs to process, returning batch_size = 1")
+            return (1, nb_vins)
+
+        optimal_partitions = get_optimal_nb_partitions(file_size, nb_vins)
+
+        vin_per_batch = max(1, int((nb_vins / optimal_partitions) * nb_cores * 4))
+
+        return (4 * nb_cores, vin_per_batch)
+
+    def compute_charge_n_discharge_vars(self, tss):
+        tss = self.compute_charge_n_discharge_masks(
+            tss, IN_CHARGE_CHARGING_STATUS_VALS, IN_DISCHARGE_CHARGING_STATUS_VALS
+        )
+        # Compute the correspding indices to perfrom split-apply-combine ops
+        tss = self.compute_idx_from_masks(tss, ["in_charge", "in_discharge"])
+        # We recompute the masks by trimming off the points that have the first and last soc values
+        # This is done to reduce the noise in the output due to measurments noise.
+        tss = self.trim_leading_n_trailing_soc_off_masks(
+            tss, ["in_charge", "in_discharge"]
+        )
+        tss = self.compute_idx_from_masks(
+            tss, ["trimmed_in_charge", "trimmed_in_discharge"]
+        )
+        tss = self.compute_cum_var(tss, "power", "cum_energy")
+        tss = self.compute_cum_var(tss, "charger_power", "cum_charge_energy_added")
+        tss = self.compute_status_col(tss)
+        return tss
+
+    def normalize_units_to_metric(self, tss):
+        tss = tss.withColumn("odometer", col("odometer") * 1.609)
+        return tss
+
+    def compute_cum_var(self, tss, var_col: str, cum_var_col: str):
+        if var_col not in tss.columns:
+            self.logger.debug(f"{var_col} not found, not computing {cum_var_col}.")
+            return tss
+
+        self.logger.debug(
+            f"Computing {cum_var_col} from {var_col} using Arrow + Pandas UDF."
+        )
+
+        # Schéma de retour attendu → adapte le type si nécessaire
+        schema = tss.schema.add(cum_var_col, DoubleType())
+
+        @pandas_udf(schema, functionType="grouped_map")
+        def integrate_trapezoid(df: pd.DataFrame) -> pd.DataFrame:
+
+            df = df.sort_values("date").copy()
+
+            x = df["date"].astype("int64") // 10**9  # Convertit ns → s
+            y = df[var_col].fillna(0).astype("float64")
+
+            cum = cumulative_trapezoid(y=y.values, x=x.values, initial=0) * KJ_TO_KWH
+
+            # Ajuste pour que ça commence à zéro
+            cum = cum - cum[0]
+
+            df[cum_var_col] = cum
+            return df
+
+        return tss.groupBy(self.id_col).apply(integrate_trapezoid)
+
+    def compute_date_vars(self, tss: DF) -> DF:
+        window_spec = Window.partitionBy("vin").orderBy("date")
+        tss = tss.withColumn("prev_date", lag(col("date")).over(window_spec))
+
+
+        tss = tss.withColumn(
+            "sec_time_diff",
+            (unix_timestamp(col("date")) - unix_timestamp(col("prev_date"))).cast(
+                "double"
+            ),
+        )
+
+        return tss
+
+    def compute_charge_n_discharge_masks(
+        self, tss: DF, in_charge_vals: list, in_discharge_vals: list
+    ) -> DF:
+        """Computes the `in_charge` and `in_discharge` masks either from the charging_status column or from the evolution of the soc over time."""
+        self.logger.debug("Computing charging and discharging masks.")
+        if self.make in CHARGE_MASK_WITH_CHARGING_STATUS_MAKES:
+            return self.charge_n_discharging_masks_from_charging_status(
+                tss, in_charge_vals, in_discharge_vals
+            )
+        if self.make in CHARGE_MASK_WITH_SOC_DIFFS_MAKES:
+            return self.charge_n_discharging_masks_from_soc_diff(tss)
+        raise ValueError(MAKE_NOT_SUPPORTED_ERROR.format(make=self.make))
+
+    def charge_n_discharging_masks_from_soc_diff(self, tss):
+        w = (
+            Window.partitionBy(self.id_col)
+            .orderBy("date")
+            .rowsBetween(Window.unboundedPreceding, 0)
+        )
+
+        # Forward fill soc
+        tss = tss.withColumn("soc_ffilled", last("soc", ignorenulls=True).over(w))
+
+        # Window for diff calculation
+        w_diff = Window.partitionBy(self.id_col).orderBy("date")
+
+        soc_prev = lag("soc_ffilled").over(w_diff)
+        soc_diff = col("soc_ffilled") - soc_prev
+
+        # Normalisation du signe → {-1, 0, 1}
+        soc_sign = when(soc_diff.isNull(), lit(0)).otherwise(soc_diff / abs(soc_diff))
+
+        tss = tss.withColumn("soc_diff", soc_sign)
+
+        # Forward fill and backward fill equivalents
+        tss = tss.withColumn(
+            "soc_diff_ffill", last("soc_diff", ignorenulls=True).over(w)
+        )
+        w_rev = (
+            Window.partitionBy(self.id_col)
+            .orderBy(col("date").desc())
+            .rowsBetween(Window.unboundedPreceding, 0)
+        )
+        tss = tss.withColumn(
+            "soc_diff_bfill", last("soc_diff", ignorenulls=True).over(w_rev)
+        )
+
+        # Définition des masques
+        tss = tss.withColumn(
+            "in_charge", (col("soc_diff_ffill") > 0) & (col("soc_diff_bfill") > 0)
+        )
+        tss = tss.withColumn(
+            "in_discharge", (col("soc_diff_ffill") < 0) & (col("soc_diff_bfill") < 0)
+        )
+
+        return tss
+
+    def charge_n_discharging_masks_from_charging_status(
+        self, tss: DF, in_charge_vals: list, in_discharge_vals: list
+    ) -> DF:
+        self.logger.debug(
+            f"Computing charging and discharging vars using charging status dictionary."
+        )
+        assert "charging_status" in tss.columns, NO_CHARGING_STATUS_COL_ERROR
+        return tss.withColumn(
+            "in_charge", col("charging_status").isin(in_charge_vals)
+        ).withColumn("in_discharge", col("charging_status").isin(in_discharge_vals))
+
+    def trim_leading_n_trailing_soc_off_masks(self, tss: DF, masks: list[str]) -> DF:
+        self.logger.debug(f"Computing trimmed masks of{masks}.")
+        for mask in masks:
+            # Créer une colonne temporaire contenant 'soc' uniquement lorsque le masque est vrai
+            tss = tss.withColumn("naned_soc", when(col(mask), col("soc")))
+            # Fenêtre pour grouper par 'vin' et l'index associé au masque
+            w = Window.partitionBy("vin", col(f"{mask}_idx")).orderBy(
+                "date"
+            )  # assuming you have a 'timestamp' for ordering
+            # Calcul des premières et dernières valeurs non nulles de 'naned_soc' dans chaque groupe
+            trailing_soc = first("naned_soc", ignorenulls=True).over(w)
+            leading_soc = last("naned_soc", ignorenulls=True).over(w)
+            # Ajouter ces colonnes
+            tss = (
+                tss.withColumn("trailing_soc", trailing_soc)
+                .withColumn("leading_soc", leading_soc)
+                .withColumn(
+                    f"trimmed_{mask}",
+                    (col(mask))
+                    & (col("soc") != col("trailing_soc"))
+                    & (col("soc") != col("leading_soc")),
+                )
+                .drop("naned_soc")
+            )
+
+        return tss
+
+    def compute_idx_from_masks(self, tss, masks: list[str]):
+        """
+        Spark version of compute_idx_from_masks.
+
+        Args:
+            tss (DataFrame): Spark DataFrame.
+            masks (list): List of boolean column names to compute idx on.
+
+        Returns:
+            DataFrame: Transformed Spark DataFrame.
+        """
+        self.logger.info(f"Computing {masks} idx from masks.")
+
+        for mask in masks:
+            idx_col_name = f"{mask}_idx"
+
+            w = Window.partitionBy(self.id_col).orderBy("date")
+
+            # Décalage de mask par groupe
+            shifted_mask = lag(col(mask), 1).over(w)
+
+            # new_period_start_mask = shifted_mask != mask
+            new_period_start_mask = shifted_mask.isNull() | (shifted_mask != col(mask))
+
+            # Si max_td est défini, on ajoute aussi condition sur time_diff
+            if self.max_td is not None:
+                new_period_start_mask = new_period_start_mask | (
+                    col("sec_time_diff") > lit(timedelta_to_interval(self.max_td))
+                )
+
+            # Génère l'index via cumul
+            tss = tss.withColumn(
+                "new_period_start_mask",
+                when(new_period_start_mask, lit(1)).otherwise(lit(0)),
+            )
+
+            tss = tss.withColumn(
+                idx_col_name, spark_sum("new_period_start_mask").over(w)
+            ).drop("new_period_start_mask")
+
+        return tss
+
+    def compute_status_col(self, tss):
+        self.logger.debug("Computing status column.")
+
+        # Fenêtre ordonnée par date pour chaque VIN
+        w = Window.partitionBy("vin").orderBy("date")
+
+        # Décalage pour calculer diff(odometer)
+        prev_odo = lag("odometer").over(w)
+        delta_odo = col("odometer") - prev_odo
+
+        # Première base de status
+        status = (
+            when(col("in_charge") == True, lit("charging"))
+            .when(col("in_charge") == False, lit("discharging"))
+            .otherwise(lit("unknown"))
+        )
+
+        # Raffinement → si in_charge == False → "moving" ou "idle_discharging"
+        status = (
+            when(col("in_charge") == True, lit("charging"))
+            .when(
+                col("in_charge") == False,
+                when(delta_odo > 0, lit("moving")).otherwise(lit("idle_discharging")),
+            )
+            .otherwise(lit("unknown"))
+        )
+
+        return tss.withColumn("status", status)
+
+    @classmethod
+    def update_all_tss(cls, spark, **kwargs):
+        for make in ['tesla-fleet-telemetry']:
+            if make in ["tesla", "tesla-fleet-telemetry"]:
+                cls = TeslaProcessedTimeSeries
+            else:
+                cls = RawTsToProcessedTs
+            cls(make, force_update=True, spark=spark, **kwargs)
+
+
+class TeslaProcessedTimeSeries(RawTsToProcessedTs):
+    def __init__(
+        self,
+        make: str = "tesla-fleet-telemery",
+        id_col: str = "vin",
+        log_level: str = "INFO",
+        max_td: TD = MAX_TD,
+        force_update: bool = False,
+        spark=None,
+        **kwargs,
+    ):
+        self.logger = getLogger(make)
+        set_level_of_loggers_with_prefix(log_level, make)
+        super().__init__(
+            make, id_col, log_level, max_td, force_update, spark=spark, **kwargs
+        )
+
+    def compute_charge_n_discharge_vars(self, tss: DF) -> DF:
+        tss = self.compute_charge_n_discharge_masks(
+            tss, IN_CHARGE_CHARGING_STATUS_VALS, IN_DISCHARGE_CHARGING_STATUS_VALS
+        )
+        tss = self.compute_charge_idx_bis(tss)
+        return tss
+
+    def compute_charge_n_discharge_masks(
+        self, tss: DF, in_charge_vals: list, in_discharge_vals: list
+    ) -> DF:
+        """Computes the `in_charge` and `in_discharge` masks either from the charging_status column or from the evolution of the soc over time."""
+        if self.make in CHARGE_MASK_WITH_CHARGING_STATUS_MAKES:
+            return self.charge_n_discharging_masks_from_charging_status(
+                tss, in_charge_vals, in_discharge_vals
+            )
+
+    def charge_n_discharging_masks_from_charging_status(
+        self, tss: DF, in_charge_vals: list, in_discharge_vals: list
+    ) -> DF:
+        assert "charging_status" in tss.columns, NO_CHARGING_STATUS_COL_ERROR
+
+        # Masques booléens Spark
+        tss = tss.withColumn(
+            "in_charge",
+            when(col("charging_status").isin(in_charge_vals), lit(True)).otherwise(
+                lit(False)
+            ),
+        )
+
+        tss = tss.withColumn(
+            "in_discharge",
+            when(col("charging_status").isin(in_discharge_vals), lit(True)).otherwise(
+                lit(False)
+            ),
+        )
+
+        return tss
+
+    def compute_energy_added(self, tss: DF) -> DF:
+        tss = tss.withColumn(
+            "charge_energy_added",
+            when(
+                col("dc_charge_energy_added").isNotNull()
+                & (col("dc_charge_energy_added") > 0),
+                col("dc_charge_energy_added"),
+            ).otherwise(col("ac_charge_energy_added")),
+        )
+        return tss
+
+    def _reassign_short_phases(self, df, min_duration_minutes=3):
+        """
+        Recalcule les phase_id en fusionnant les phases de moins de `min_duration_minutes`
+        avec la phase valide précédente.
+
+        Args:
+            df (DataFrame): DataFrame Spark avec les colonnes `phase_id`, `date`, `total_phase_time`
+            min_duration_minutes (float): Durée minimale pour conserver une phase (en minutes)
+
+        Returns:
+            DataFrame: DataFrame avec la colonne `phase_id` mise à jour
+        """
+
+        # 1. Marquer les phases valides
+        df = df.withColumn(
+            "is_valid_phase",
+            F.when(F.col("total_phase_time") >= min_duration_minutes, 1).otherwise(0)
+        )
+
+        # 2. Déterminer la dernière phase valide précédemment
+        w_time = Window.partitionBy("vin").orderBy("date").rowsBetween(Window.unboundedPreceding, 0)
+
+        df = df.withColumn(
+            "last_valid_phase_id",
+            F.last(
+                F.when(F.col("is_valid_phase") == 1, F.col("phase_id")),
+                ignorenulls=True
+            ).over(w_time)
+        )
+
+        # 3. Mettre à jour le phase_id
+        df = df.withColumn(
+            "phase_id_updated",
+            F.when(F.col("is_valid_phase") == 1, F.col("phase_id"))
+            .otherwise(F.col("last_valid_phase_id"))
+        )
+
+        # 4. Re-numérotation des phase_id pour compacter (optionnel mais propre)
+        df = df.withColumn(
+            "phase_id_final",
+            F.dense_rank().over(Window.partitionBy('vin').orderBy("phase_id_updated")) - 1
+        )
+
+        # 5. Nettoyage final
+        df = df.drop("phase_id", "last_valid_phase_id", "is_valid_phase", "phase_id_updated")
+        df = df.withColumnRenamed("phase_id_final", "phase_id")
+
+        return df
+
+    def compute_charge_idx_bis(self, tss: DF) -> DF:
+
+        tss = self.compute_energy_added(tss)
+
+        # Définir les fenêtres
+        w = Window.partitionBy("vin").orderBy("date")
+
+        # Calculer soc_diff en allant chercher la précédente valeur non nulle
+        tss = tss.withColumn("soc_diff", 
+            F.when(
+                F.col("soc").isNotNull(),
+                F.col("soc") - F.last("soc", ignorenulls=True).over(
+                    w.rowsBetween(Window.unboundedPreceding, -1)
+                )
+            ).otherwise(None)
+)
+
+        # Calcul du gap en minutes
+        df = tss.withColumn("prev_date", lag("date").over(w))
+        df = df.withColumn("time_gap_minutes", 
+            (F.unix_timestamp("date") - F.unix_timestamp("prev_date")) / 60)
+
+        # Calcul de direction avec forward fill
+        df = df.withColumn("direction_raw", 
+            F.when(col("soc_diff").isNull(), None).otherwise(F.signum("soc_diff")))
+
+        # Forward fill de la direction
+        df = df.withColumn("direction", 
+            F.last("direction_raw", ignorenulls=True).over(w.partitionBy("vin").orderBy("date").rowsBetween(Window.unboundedPreceding, 0)))
+
+
+
+        # Détecter les changements de direction
+        df = df.withColumn("direction_change", 
+            F.when(F.col("direction") != F.lag("direction").over(w), 1).otherwise(0))
+
+        # Créer phase_id en cumulant les changements
+        df = df.withColumn("phase_id", 
+            F.sum("direction_change").over(w.rowsBetween(Window.unboundedPreceding, 0)))
+
+        w_phase = Window.partitionBy("vin", "phase_id")
+
+        df = df.withColumn("total_phase_time", F.sum("time_gap_minutes").over(w_phase))
+
+        df = self._reassign_short_phases(df)
+
+        w_phase = Window.partitionBy("vin", "phase_id")
+
+        df = df.withColumn("total_soc_diff", F.sum("soc_diff").over(w_phase))
+
+        df = df.withColumn("prev_phase", F.lag("direction").over(w)).withColumn("next_phase", F.lead("direction").over(w))
+
+        df = df.withColumn(
+            "charging_status",
+            F.when(F.col("total_soc_diff") > 0.5, "charging")
+            .when(F.col("total_soc_diff") < -0.5, "discharging")
+            .when((F.col("prev_phase") == F.col("next_phase")) & (F.col("prev_phase") >= 0), "charging")
+            .when((F.col("prev_phase") == F.col("next_phase")) & (F.col("prev_phase") <= 0), "discharging")
+            .otherwise("idle")  
+        )
+        # Étape 3: Recréer le phase_id basé sur les changements de phase
+        df = df.withColumn("charging_status_change", 
+            F.when(F.col("charging_status") != F.lag("charging_status").over(w), 1).otherwise(0))
+
+        df = df.withColumn("charging_status_idx", 
+            F.sum("charging_status_change").over(w.rowsBetween(Window.unboundedPreceding, 0)))
+
+        return df
+
+
+
+@main_decorator
+def main():
+    parser = argparse.ArgumentParser(description="Process time series data.")
+    parser.add_argument(
+        "--log_level",
+        type=str,
+        default="INFO",
+        help="Set the logging level (default: INFO)",
+    )
+    args = parser.parse_args()
+
+    log_level = getattr(logging, args.log_level.upper(), logging.INFO)
+
+    settings = S3Settings()
+
+    # Initialisation
+    bucket = S3Service()
+
+    spark_session = create_spark_session(
+        settings.S3_KEY,
+        settings.S3_SECRET
+    )
+
+    RawTsToProcessedTs.update_all_tss(log_level=log_level, spark=spark_session)
+
+
+if __name__ == "__main__":
+    main()
+
