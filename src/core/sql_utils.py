@@ -63,6 +63,76 @@ def left_merge_rdb_table(
     rhs = pd.read_sql_table(rhs, engine)
     return left_merge(lhs, rhs, left_on, right_on, src_dest_cols, logger)
 
+
+def left_merge_rdb_table_spark(
+        lhs,
+        rhs: str,
+        left_on: str|list[str],
+        right_on: str|list[str],
+        src_dest_cols: list|dict|None=None,
+        logger: Logger=logger,
+    ):
+    """
+    Version Spark complète avec src_dest_cols
+    """
+    logger.info(f"Left merging Spark DataFrame with {rhs} on {left_on} and {right_on}")
+    
+    # Lire la table RDB en pandas
+    rhs_pandas = pd.read_sql_table(rhs, engine)
+    
+    # Convertir tous les types problématiques en string
+    for col in rhs_pandas.columns:
+        if rhs_pandas[col].dtype == 'object':
+            rhs_pandas[col] = rhs_pandas[col].astype(str)
+        elif 'datetime' in str(rhs_pandas[col].dtype):
+            rhs_pandas[col] = rhs_pandas[col].astype(str)
+    
+    # Convertir en DataFrame Spark
+    rhs_spark = lhs.sparkSession.createDataFrame(rhs_pandas)
+    
+    # Gérer src_dest_cols
+    if src_dest_cols:
+        if isinstance(src_dest_cols, list):
+            src_dest_cols = dict(zip(src_dest_cols, src_dest_cols))
+        
+        # Renommer les colonnes de rhs selon src_dest_cols
+        for old_name, new_name in src_dest_cols.items():
+            if old_name in rhs_spark.columns:
+                rhs_spark = rhs_spark.withColumnRenamed(old_name, new_name)
+    
+    # Effectuer le left join
+    if isinstance(left_on, str):
+        left_on = [left_on]
+    if isinstance(right_on, str):
+        right_on = [right_on]
+    
+    # Créer la condition de join
+    join_condition = " AND ".join([f"lhs.{left_col} = rhs.{right_col}" 
+                                  for left_col, right_col in zip(left_on, right_on)])
+    
+    # Effectuer le left join
+    result = lhs.alias("lhs").join(
+        rhs_spark.alias("rhs"),
+        F.expr(join_condition),
+        "left"
+    )
+    
+    # Sélectionner les colonnes selon src_dest_cols
+    if src_dest_cols:
+        select_cols = []
+        # Ajouter toutes les colonnes de lhs
+        for col_name in lhs.columns:
+            select_cols.append(f"lhs.{col_name}")
+        
+        # Ajouter les colonnes de rhs (sauf celles déjà présentes)
+        for col_name in rhs_spark.columns:
+            if col_name not in left_on:
+                select_cols.append(f"rhs.{col_name}")
+        
+        result = result.select(*select_cols)
+    
+    return result
+
 def truncate_rdb_table_and_insert_df(
         df: DF, 
         table_name: str, 

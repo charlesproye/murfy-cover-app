@@ -3,7 +3,7 @@ from pyspark.sql.types import FloatType, TimestampType, StringType, BooleanType
 from pandas import Timedelta as TD
 import pandas as pd
 
-S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_tss_spark.parquet'
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_ts_spark.parquet'
 
 ODOMETER_MILES_TO_KM = {
     "tesla": 1.60934,
@@ -19,6 +19,18 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "range",
 ]
 
+NECESSARY_COLS = {
+    'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
+    'renault': ['vin', 'date', 'odometer', 'soc'],
+    'kia': ['vin', 'date', 'odometer', 'soc'],
+    'bmw': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'mercedes-benz': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'total_charging_duration', 'start_time', 'end_time', 'energy_charged', 'displayed_state_of_charge', 'displayed_start_state_of_charge', 'charging_rate', 'estimated_range', 'fully_charged_end_times'],
+    'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added']
+}
+
 RENAME_COLS_DICT:dict[str, str] = {
     # High mobility
     "date_of_value": "date",
@@ -29,6 +41,11 @@ RENAME_COLS_DICT:dict[str, str] = {
     "charging_battery_energy": "battery_energy",
     "charging_estimated_range": "estimated_range",
     "charging_battery_level": "soc",
+    "battery_level": "soc",
+    "soc_hv_header": "soc",
+    "climate_outside_temperature": "outside_temp",
+    "charging_status": "charging_status",
+    "status": "charging_status",
     "soc_hv_header": "soc",
     "climate_outside_temperature": "outside_temp",
     "charging_status": "charging_status",

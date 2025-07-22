@@ -9,14 +9,11 @@ import pandas as pd
 from pandas import DataFrame as DF
 
 
+from core.spark_utils import create_spark_session
+from pyspark.sql import SparkSession
 from .s3.s3_utils import S3Service
 from .singleton_s3_bucket import S3
 from .config import *
-from .spark_utils import create_spark_session
-from pyspark.sql import SparkSession
-from .singleton_s3_bucket import S3
-from .s3.settings import S3Settings
-
 
 R = TypeVar("R")
 P = ParamSpec("P")
@@ -30,7 +27,7 @@ class CachedETL(DF, ABC):
         path: str,
         on: str,
         force_update: bool = False,
-        bucket: S3Service = S3,
+        bucket: S3_Bucket = bucket,
         **kwargs,
     ):
         """
@@ -43,7 +40,7 @@ class CachedETL(DF, ABC):
         - path (str): Path for the cache file.
         - on (str): Either 's3' or 'local_storage', specifying the type of caching.
         - force_update (bool): If True, regenerate and cache the result even if it exists.
-        - bucket_instance (S3_Bucket): S3 bucket instance, defaults to the global bucket.
+        - bucket_instance (S3Service): S3 bucket instance, defaults to the global bucket.
         """
         assert on in [
             "s3",
@@ -70,6 +67,8 @@ class CachedETL(DF, ABC):
 
         super().__init__(data)
 
+        self.settings = settings
+
     @abstractmethod
     def run(self) -> DF:
         """Abstract method to be implemented by subclasses to generate the DataFrame."""
@@ -82,8 +81,9 @@ class CachedETLSpark(ABC):
         path: str,
         on: str,
         force_update: bool = False,
-        bucket: S3Service = S3,
+        bucket: S3_Bucket = bucket,
         spark: SparkSession = None,
+        writing_mode: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -101,8 +101,8 @@ class CachedETLSpark(ABC):
 
         if spark is None:
             spark = create_spark_session(
-                S3Settings().S3_KEY,
-                S3Settings().S3_SECRET,
+                S3_Bucket.get_creds_from_dot_env()["aws_access_key_id"],
+                S3_Bucket.get_creds_from_dot_env()["aws_secret_access_key"],
             )
         self._spark = spark
         assert on in [
@@ -119,7 +119,10 @@ class CachedETLSpark(ABC):
         ):
             self.data = self.run()  # Call the abstract run method to generate data
             if on == "s3":
-                bucket.save_df_as_parquet_spark(self.data, path, self.spark)
+                if writing_mode == "append":
+                    bucket.append_spark_df_to_parquet(self.data, path, self.spark)
+                else:
+                    bucket.save_df_as_parquet_spark(self.data, path, self.spark)
             elif on == "local_storage":
                 self.data.write.parquet(path)
         else:
@@ -127,6 +130,7 @@ class CachedETLSpark(ABC):
                 self.data = bucket.read_parquet_df_spark(spark, path, **kwargs)
             elif on == "local_storage":
                 self.data = spark.read.parquet(path, **kwargs)
+        self.settings = settings
 
     @abstractmethod
     def run(self) -> DF:

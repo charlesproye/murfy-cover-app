@@ -4,6 +4,8 @@ from core.pandas_utils import *
 from core.sql_utils import *
 from transform.fleet_info.config import *
 
+con = get_sqlalchemy_engine()
+
 fleet_info:DF = (
     pd.read_sql_query(TABLE_QUERY, con)
     .rename(columns=COLS_NAME_MAPPING)
