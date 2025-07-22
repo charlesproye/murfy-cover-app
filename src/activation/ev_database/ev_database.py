@@ -4,6 +4,7 @@ import uuid
 from core.sql_utils import get_connection
 import os
 from typing import Optional, Dict, Any
+from datetime import datetime
 
 def fetch_api_data(url: str) -> Optional[list]:
     """Fetch data from the EV database API."""
@@ -34,7 +35,15 @@ def get_oem(cursor, vehicle_make: str) -> str:
             (vehicle_make,))
         oem_id = cursor.fetchone()
         return oem_id
-
+    
+def get_commissioning_date(vehicle):
+    "Get commissionning date and format it for the database"
+    start_date = datetime.strptime(vehicle.get("Availability_Date_From"), "%m-%Y").date()
+    try:
+        end_date = datetime.strptime(vehicle.get("Availability_Date_To"), "%m-%Y").date()
+    except:
+        end_date = vehicle.get("Availability_Date_To")
+    return start_date, end_date
 
 def get_or_create_make(cursor, vehicle_make: str, oem_id) -> str:
     """Get or create a Make record and return its ID."""
@@ -52,7 +61,7 @@ def get_or_create_make(cursor, vehicle_make: str, oem_id) -> str:
         make_id = cursor.fetchone()[0]
     else:
         make_id = make_result[0]
-    
+
     return make_id
 
 def standardize_battery_chemistry(battery_chemistry: str) -> str:
@@ -67,7 +76,7 @@ def get_or_create_battery(cursor, vehicle: Dict[str, Any]) -> str:
     """Get or create a Battery record and return its ID."""
     battery_chemistry = standardize_battery_chemistry(vehicle.get("Battery_Chemistry"))
     battery_manufacturer = vehicle.get("Battery_Manufacturer") or "unknown"
-    
+
     cursor.execute(
         "SELECT id FROM battery WHERE UPPER(battery_name) = UPPER(%s) AND UPPER(battery_chemistry) = UPPER(%s) AND UPPER(battery_oem) = UPPER(%s) AND capacity = %s AND net_capacity = %s",
         (vehicle.get("Vehicle_Model","unknown"), battery_chemistry.upper(), 
@@ -76,7 +85,7 @@ def get_or_create_battery(cursor, vehicle: Dict[str, Any]) -> str:
          vehicle.get("Battery_Capacity_Useable"))
     )
     battery_type_result = cursor.fetchone()
-    
+
     if not battery_type_result:
         battery_id = str(uuid.uuid4())
         cursor.execute(
@@ -109,7 +118,7 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, b
             if pattern.lower() in type_car.lower():
                 found_type = pattern.lower()
                 break
-        
+
         if found_type:
             # Extract the found pattern as type and the rest as version
             type_parts = type_car.strip().split()
@@ -134,12 +143,14 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, b
             (vehicle_model, type_car)
         )
         model_result = cursor.fetchone()
+    start_date, end_date = get_commissioning_date(vehicle)
+    print(start_date, end_date)
     if not model_result:
         model_id = str(uuid.uuid4())
         cursor.execute("""
             INSERT INTO vehicle_model (
-                id, model_name, type, version, make_id, oem_id, autonomy, warranty_date, warranty_km, source, battery_id
-            ) VALUES (%s, LOWER(%s), LOWER(%s), LOWER(%s), %s, %s, %s, %s, %s, %s, %s)
+                id, model_name, type, version, make_id, oem_id, autonomy, warranty_date, warranty_km, source, battery_id, commissioning_date, end_life_date
+            ) VALUES (%s, LOWER(%s), LOWER(%s), LOWER(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             model_id,
             vehicle_model,
@@ -151,21 +162,31 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, b
             vehicle.get("Battery_Warranty_Period"),
             vehicle.get("Battery_Warranty_Mileage"),
             vehicle.get("EVDB_Detail_URL"),
-            battery_id
+            battery_id,
+            start_date,
+            end_date,
         ))
         print(f"Created new vehicle model: {vehicle_model} {type_car} {version}")
     else:
-        print("ici")
         cursor.execute("""
             UPDATE vehicle_model 
             SET autonomy = COALESCE(%s, autonomy),
                 warranty_date = COALESCE(%s, warranty_date),
                 warranty_km = COALESCE(%s, warranty_km),
-                source = COALESCE(%s, source)
+                source = COALESCE(%s, source),
+                commissioning_date = COALESCE(%s, commissioning_date),
+                end_of_life_date = COALESCE(%s, end_of_life_date)
             WHERE id = %s
-        """, (vehicle.get("Range_WLTP"), vehicle.get("Battery_Warranty_Period"), 
-              vehicle.get("Battery_Warranty_Mileage"), vehicle.get("EVDB_Detail_URL"), 
-              model_result[0]))
+        """, (
+            vehicle.get("Range_WLTP"),
+            vehicle.get("Battery_Warranty_Period"),
+            vehicle.get("Battery_Warranty_Mileage"),
+            vehicle.get("EVDB_Detail_URL"),
+            start_date,
+            end_date,
+            model_result[0]
+        ))
+        
         print(f"Updated existing vehicle model: {vehicle_model} {type_car} {version}")
 
 def process_vehicle(cursor, vehicle: Dict[str, Any]) -> None:
