@@ -52,7 +52,9 @@ class S3Service():
         """
         try:
             # Attempt to retrieve metadata of the object
+            print('here 1')
             self._s3_client.head_object(Bucket=self.bucket_name, Key=key)
+            print('here 2')
             return True  # If no exception, the key exists
         except Exception as e:
             # Check if the error code is 404, which means the key does not exist
@@ -110,7 +112,7 @@ class S3Service():
                 raise e
 
         # Écriture optimisée
-        df_write.coalesce(1).write.mode("overwrite").option("parquet.compression", "snappy").option(
+        df_write.repartition("vin").coalesce(32).write.mode("overwrite").option("parquet.compression", "snappy").option(
             "parquet.block.size", 67108864
         ).partitionBy("vin").parquet(s3_path)
 

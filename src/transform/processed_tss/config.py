@@ -21,6 +21,17 @@ COLS_TO_CPY_FROM_FLEET_INFO = [
     "range",
 ]
 
+SCALE_SOC = {
+    'tesla-fleet-telemetry': 100,
+    'mercedes-benz': 1,
+    'volvo-cars': 1,
+    'kia': 1,
+    'renault': 1,
+    'ford': 1,
+    'stellantis': 1,
+    'bmw': 100
+}
+
 NECESSARY_COLS = {
     'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
     'renault': ['vin', 'date', 'odometer', 'soc'],
@@ -48,9 +59,6 @@ RENAME_COLS_DICT:dict[str, str] = {
     "climate_outside_temperature": "outside_temp",
     "charging_status": "charging_status",
     "status": "charging_status",
-    "soc_hv_header": "soc",
-    "climate_outside_temperature": "outside_temp",
-    "charging_status": "charging_status",
     "charging_battery_charge_type": "charging_method",
     "usage_electric_consumption_average": 'consumption',
     # Mobilisight
@@ -76,73 +84,42 @@ RENAME_COLS_DICT:dict[str, str] = {
     # BMW
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
-    "mileage": "odometer", # Yes, mileage is in km no need to convert it
-    "soc_hv_header": "soc",
+    # "mileage": "odometer", # SUPPRIMÉ - doublon avec ligne 40
+    # "soc_hv_header": "soc", # SUPPRIMÉ - doublon avec ligne 46
     "capacity": "capacity_according_to_data_provider",
     "model": "model_according_to_data_provider",
     "avg_electric_range_consumption": "consumption",
     # Tesla
-    #"battery_level": "soc",
     "readable_date": "date",
     "charging_state": "charging_status",
     "fast_charger_type": "charging_method",
     "charge_rate": "charging_rate",
     "charger_power": "charging_power",
     # fleet telemetry
-    'readable_date': 'date',
     'BatteryLevel_stringValue': 'battery_level',
     'Soc_stringValue': 'soc',
     'OutsideTemp_stringValue': 'outside_temp',
-    #'LifetimeEnergyUsed_stringValue': 'lifetime_energy_used',
-    #'DefrostMode_defrostModeValue': 'defrost_mode',
-    #'BrickVoltageMin_stringValue': 'brick_voltage_min',
     'Odometer_stringValue': 'odometer',
-    'RatedRange_stringValue': 'rated_range', # True battery range lower than battery range line 98
-    #'HvacAutoMode_hvacAutoModeValue': 'hvac_auto_mode',
+    'RatedRange_stringValue': 'rated_range',
     'ChargeCurrentRequest_stringValue': 'charge_current_request',
     'PackCurrent_stringValue': 'pack_current',
-    #'HvacACEnabled_booleanValue': 'hvac_ace_nabled',
     'ChargeRateMilePerHour_doubleValue': 'charge_rate_mileper_hour',
     'CarType_stringValue': 'model',
-    'EnergyRemaining_stringValue': 'energy_remaining', # energie en kWh
-    'DetailedChargeState_detailedChargeStateValue': 'charging_status', # Etat de charge détiallé mieux que charge_state
-    #'HvacPower_hvacPowerValue': 'hvac_power',
+    'EnergyRemaining_stringValue': 'energy_remaining',
+    'DetailedChargeState_detailedChargeStateValue': 'charging_status',
     'InsideTemp_stringValue': 'inside_temp',
-    #'EstBatteryRange_stringValue': 'est_battery_range',
-    #'ChargeCurrentRequestMax_stringValue': 'charge_current_request_max',
     'DCChargingPower_stringValue': 'dc_charging_power',
-    #'PackVoltage_stringValue': 'pack_voltage',
     'VehicleSpeed_stringValue': 'speed',
     'ChargeLimitSoc_stringValue': 'charge_limit_soc',
-    #'BMSState_stringValue': 'bms_state',
-    #'DCDCEnable_stringValue': 'dc_dc_enable',
-    'IdealBatteryRange_stringValue': 'battery_range', # Battery range classic
+    'IdealBatteryRange_stringValue': 'battery_range',
     'RearDefrostEnabled_booleanValue': 'rear_defrost_enabled',
     'ChargePort_stringValue': 'charge_port',
     'BmsFullchargecomplete_stringValue': 'bms_full_charge_complete',
     'ACChargingPower_stringValue': 'ac_charging_power',
     'ACChargingEnergyIn_stringValue': 'ac_charge_energy_added', 
     'FastChargerPresent_stringValue': 'fast_charger_present',
-    # 'ModuleTempMin_stringValue': 'module_temp_min',
     'DCChargingEnergyIn_stringValue': 'dc_charge_energy_added',
-    # 'ChargePortColdWeatherMode_stringValue': 'charge_port_cold_weather_mode',
-    # 'ChargeAmps_stringValue': 'charge_amps',
-    #'ChargeState_stringValue': 'charge_state',
-    # 'ModuleTempMax_stringValue': 'module_temp_max',
-    # 'EfficiencyPackage_stringValue': 'efficiency_package',
-    # 'ChargeEnableRequest_stringValue': 'charge_enable_request',
-    # 'BrickVoltageMax_stringValue': 'brick_voltage_max',
-    # 'PreconditioningEnabled_stringValue': 'precondition_ingenabled',
-    # 'DefrostForPreconditioning_booleanValue': 'defrost_for_preconditioning',
-    # 'ChargerVoltage_doubleValue': 'charger_voltage',
-    # 'ChargingCableType_cableTypeValue': 'charging_cable_type',
-    # 'EstimatedHoursToChargeTermination_doubleValue': 'estimated_hours_to_charge_termination',
-    # 'FastChargerType_fastChargerValue': 'fast_charger_type',
-    # 'ChargerPhases_stringValue': 'charger_phases',
-    # 'BatteryHeaterOn_stringValue': 'battery_heater'
-    
-    ########## Spark  
-    "readable_date": "date",
+    # Spark  
     "Odometer" : "odometer",
     "ACChargingEnergyIn": "ac_charge_energy_added",
     "Soc": "soc",
@@ -356,4 +333,6 @@ COLS_TO_STR_LOWER = [
 # Tesla specific vars:
 MIN_POWER_LOSS = -0.0005
 MAX_CHARGE_TD = TD(days=1)
+
+
 
