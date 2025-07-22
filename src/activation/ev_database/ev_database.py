@@ -144,7 +144,6 @@ def get_or_create_vehicle_model(cursor, vehicle: Dict[str, Any], make_id: str, b
         )
         model_result = cursor.fetchone()
     start_date, end_date = get_commissioning_date(vehicle)
-    print(start_date, end_date)
     if not model_result:
         model_id = str(uuid.uuid4())
         cursor.execute("""
