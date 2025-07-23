@@ -4,35 +4,40 @@ from typing import Any, List
 import gspread
 from google.oauth2.service_account import Credentials
 from logging import getLogger
+import json
+import base64
 
 logger = getLogger("ingestion.vehicle_info")
 
 SPREADSHEET_ID = "1zGwSY41eN00YQbaNf9HNk3g5g6KQaAD1FY7-XS8Uf9w"
 
+
 def get_google_client() -> Any:
     """Get authenticated Google Sheets client.
-    
+
     Returns:
         gspread.Client: Authenticated Google Sheets client
     """
     try:
-        creds_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            'config',
-            'credential.json'
-        )
-        
+        base64_creds = os.getenv("GOOGLE_PRIVATE_KEY")
+        if not base64_creds:
+            raise ValueError("GOOGLE_PRIVATE_KEY not found in environment variables")
+
+        # Décoder et parser les credentials
+        creds_dict = json.loads(base64.b64decode(base64_creds))
+
         scopes = [
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
-        
-        credentials = Credentials.from_service_account_file(
-            creds_path,
+
+        credentials = Credentials.from_service_account_info(
+            creds_dict,
             scopes=scopes
         )
-        
+
         return gspread.authorize(credentials)
+
         
     except Exception as e:
         logging.error(f"Failed to get Google Sheets client: {str(e)}")
