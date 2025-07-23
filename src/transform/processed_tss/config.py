@@ -7,17 +7,33 @@ S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/dev_processed_ts_
 
 NB_CORES_CLUSTER = 8
 
+
+# Coefficient to scale soc to 0-100%
 SCALE_SOC = {
-    'tesla-fleet-telemetry': 100,
-    'mercedes-benz': 1,
-    'volvo-cars': 1,
-    'kia': 1,
-    'renault': 1,
-    'ford': 1,
-    'stellantis': 1,
-    'bmw': 100
+    'tesla-fleet-telemetry': 1,
+    'mercedes-benz': 100,
+    'volvo-cars': 100,
+    'kia': 100,
+    'renault': 100,
+    'ford': 100,
+    'stellantis': 100,
+    'bmw': 1
 }
 
+
+# Minimum threshold to consider a charging or discharging phase
+SOC_DIFF_THRESHOLD = {
+    'tesla-fleet-telemetry': 0.05,
+    'mercedes-benz': 0.05,
+    'volvo-cars': 0.05,
+    'kia': 0.05,
+    'renault': 0.05,
+    'ford': 0.05,
+    'stellantis': 0.05,
+    'bmw': 0.05
+}
+
+# Columns to keep in order to run processed_ts + not used but necessary afterwards
 NECESSARY_COLS = {
     'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
     'renault': ['vin', 'date', 'odometer', 'soc'],
