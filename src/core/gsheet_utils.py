@@ -8,10 +8,6 @@ import logging
 from logging import getLogger
 from typing import Any, List
 
-def get_gspread_client():
-    base64_creds = os.getenv("GOOGLE_PRIVATE_KEY")
-    if not base64_creds:
-        raise ValueError("GOOGLE_PRIVATE_KEY not found in .env")
 
 logger = getLogger("ingestion.vehicle_info")
 
