@@ -6,8 +6,7 @@ import pandas as pd
 import numpy as np
 from urllib.parse import urljoin, urlparse
 from typing import List, Dict, Optional
-from src.core.gsheet_utils import get_google_client, load_excel_data, export_to_excel
-from src.results.trendlines_results.config import TYPE_MAPPING
+from core.gsheet_utils import get_google_client, load_excel_data, export_to_excel
 
 
 class AramisautoScraper:
