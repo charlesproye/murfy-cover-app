@@ -16,7 +16,7 @@ from core.config import *
 from activation.config.credentials import SPREADSHEET_ID 
 from activation.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
 from activation.config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
-from activation.utils.google_sheets_utils import get_google_client
+from src.core.gsheet_utils import get_google_client
 
 logger = getLogger("ingestion.vehicle_info")
  
