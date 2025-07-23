@@ -2,12 +2,17 @@ import os
 import gspread
 from google.oauth2.service_account import Credentials
 import numpy as np
-import pandas as pd
+import json 
+import base64
+
 def get_gspread_client():
-    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    cred_path = os.path.join(root_dir, "src", "ingestion", "vehicle_info", "config", "config.json")
-    creds = Credentials.from_service_account_file(
-        cred_path,
+    base64_creds = os.getenv("PRIVATE_KEY")
+    if not base64_creds:
+        raise ValueError("PRIVATE_KEY not found in .env")
+
+    creds_dict = json.loads(base64.b64decode(base64_creds))
+    creds = Credentials.from_service_account_info(
+        creds_dict,
         scopes=["https://www.googleapis.com/auth/spreadsheets", 
                 "https://www.googleapis.com/auth/drive"]
     )
