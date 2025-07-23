@@ -6,9 +6,9 @@ import json
 import base64
 
 def get_gspread_client():
-    base64_creds = os.getenv("PRIVATE_KEY")
+    base64_creds = os.getenv("GOOGLE_PRIVATE_KEY")
     if not base64_creds:
-        raise ValueError("PRIVATE_KEY not found in .env")
+        raise ValueError("GOOGLE_PRIVATE_KEY not found in .env")
 
     creds_dict = json.loads(base64.b64decode(base64_creds))
     creds = Credentials.from_service_account_info(
