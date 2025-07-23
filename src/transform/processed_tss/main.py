@@ -14,7 +14,7 @@ from transform.processed_tss.providers.tesla_fleet_telemetry import \
 
 ORCHESTRATED_MAKES = {
     "bmw": (False, BMWRawTsToProcessedTs),
-    "mercedes-benz": (True, HighMobilityRawTsToProcessedTs),
+    "mercedes-benz": (False, HighMobilityRawTsToProcessedTs),
     "renault": (False, HighMobilityRawTsToProcessedTs),
     "volvo-cars": (False, HighMobilityRawTsToProcessedTs),
     "stellantis": (False, MobilisightRawTsToProcessedTs),
