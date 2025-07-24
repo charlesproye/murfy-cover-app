@@ -1556,5 +1556,54 @@ SCHEMAS = {
             ),
         ]
     ),
+    'volkswagen': StructType([
+                    StructField("data", ArrayType(
+                        StructType([
+                            StructField("vin", StringType(), True),
+                            StructField("received_date", TimestampType(), True),
+                            StructField("event", StringType(), True),
+                            # Champs communs
+                            StructField("vehicleTimeUtc", TimestampType(), True),
+                            StructField("vehicleTimeLocal", TimestampType(), True),
+                            StructField("odometer", IntegerType(), True),
+                            # CRUISING_RANGE
+                            StructField("cruisingRangeId", StringType(), True),
+                            StructField("cruisingRangeTotal", IntegerType(), True),
+                            StructField("cruisingRangeAdblue", IntegerType(), True),
+                            StructField("cruisingRangePrimaryEngine", IntegerType(), True),
+                            StructField("cruisingRangeSecondaryEngine", IntegerType(), True),
+                            # ENERGY_LEVEL
+                            StructField("energyLevelId", StringType(), True),
+                            StructField("energyLevelPrimaryEngine", DoubleType(), True),
+                            StructField("energyLevelPrimaryEnginePercentage", IntegerType(), True),
+                            StructField("energyLevelSecondaryEngine", DoubleType(), True),
+                            StructField("energyLevelSecondaryEnginePercentage", IntegerType(), True),
+                            # MAINTENANCE
+                            StructField("maintenanceId", StringType(), True),
+                            StructField("nextOilChangeDistance", IntegerType(), True),
+                            StructField("nextOilChangeTime", IntegerType(), True),
+                            StructField("nextServiceDistance", IntegerType(), True),
+                            StructField("nextServiceTime", IntegerType(), True),
+                            # DASHBOARD_ERROR_WARNING
+                            StructField("dashboardErrorWarningId", StringType(), True),
+                            StructField("warningDescription", StringType(), True),
+                            StructField("warningId", StringType(), True),
+                            StructField("warningCategory", StringType(), True),
+                            # TRIP
+                            StructField("tripId", StringType(), True),
+                            StructField("drivenDistance", IntegerType(), True),
+                            StructField("duration", IntegerType(), True),
+                            StructField("startTimeUtc", TimestampType(), True),
+                            StructField("startTimeLocal", TimestampType(), True),
+                            StructField("endTimeUtc", TimestampType(), True),
+                            StructField("endTimeLocal", TimestampType(), True),
+                            StructField("endOdometer", IntegerType(), True),
+                            StructField("startLatitude", DoubleType(), True),
+                            StructField("startLongitude", DoubleType(), True),
+                            StructField("endLatitude", DoubleType(), True),
+                            StructField("endLongitude", DoubleType(), True),
+                        ])
+                    ), True)
+                ])
 }
 
