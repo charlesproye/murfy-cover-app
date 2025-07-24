@@ -13,8 +13,7 @@ class VolkswagenCompressor(Compressor):
         data = []
         for file in new_files.values():
             decoded = msgspec.json.decode(file)
-            json = msgspec.json.decode(decoded.encode())
-            data.append(json)
+            data.append(decoded)
         return msgspec.json.encode({"data": data})
 
 
