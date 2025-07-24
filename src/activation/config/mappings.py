@@ -2,6 +2,7 @@
 from rapidfuzz import process, fuzz
 from core.sql_utils import *
 import re
+from datetime import date
 
 MAKE_MAPPING = {
     'mercedes-benz': 'mercedes',
@@ -224,7 +225,7 @@ TESLA_MODEL_MAPPING = {
     'C': 'cybertruck'
 }
 
-def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacity=None):
+def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacity=None, sale_year=None):
     """Map a given vehicle to the closest model identifier in the database.
     Args:
         type_car (str): type car to find match
@@ -264,9 +265,16 @@ def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacit
                 battery_target = float(battery_capacity.lower().replace('kwh', '').strip())
                 subset["distance"] = (subset["capacity"] - battery_target).abs()
                 closest_rows = subset[subset["distance"] == subset["distance"].min()]
+            
+            if sale_year:
+                sale_year =  pd.to_datetime(sale_year)
+                today = pd.to_datetime(date.today())
+                subset[['commissioning_date', 'enf_of_life_date']].fillna(today)
+                subset = subset[(subset['commissioning_date'] <=sale_year) & (subset['enf_of_life_date'] >= sale_year)]
+                closest_rows = subset
+                
             else:
                 closest_rows = subset
-
             # match on type
             match_type = process.extractOne(type_car, closest_rows['type'], scorer=fuzz.token_sort_ratio)
             if match_type:
