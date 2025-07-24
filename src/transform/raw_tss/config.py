@@ -1562,22 +1562,21 @@ SCHEMAS = {
                             StructField("vin", StringType(), True),
                             StructField("received_date", TimestampType(), True),
                             StructField("event", StringType(), True),
-                            # Champs communs
                             StructField("vehicleTimeUtc", TimestampType(), True),
                             StructField("vehicleTimeLocal", TimestampType(), True),
                             StructField("odometer", IntegerType(), True),
-                            # CRUISING_RANGE
-                            StructField("cruisingRangeId", StringType(), True),
-                            StructField("cruisingRangeTotal", IntegerType(), True),
-                            StructField("cruisingRangeAdblue", IntegerType(), True),
-                            StructField("cruisingRangePrimaryEngine", IntegerType(), True),
-                            StructField("cruisingRangeSecondaryEngine", IntegerType(), True),
                             # ENERGY_LEVEL
                             StructField("energyLevelId", StringType(), True),
                             StructField("energyLevelPrimaryEngine", DoubleType(), True),
                             StructField("energyLevelPrimaryEnginePercentage", IntegerType(), True),
                             StructField("energyLevelSecondaryEngine", DoubleType(), True),
                             StructField("energyLevelSecondaryEnginePercentage", IntegerType(), True),
+                            # CRUISING_RANGE
+                            StructField("cruisingRangeId", StringType(), True),
+                            StructField("cruisingRangeTotal", IntegerType(), True),
+                            StructField("cruisingRangeAdblue", IntegerType(), True),
+                            StructField("cruisingRangePrimaryEngine", IntegerType(), True),
+                            StructField("cruisingRangeSecondaryEngine", IntegerType(), True),
                             # MAINTENANCE
                             StructField("maintenanceId", StringType(), True),
                             StructField("nextOilChangeDistance", IntegerType(), True),
@@ -1602,6 +1601,12 @@ SCHEMAS = {
                             StructField("startLongitude", DoubleType(), True),
                             StructField("endLatitude", DoubleType(), True),
                             StructField("endLongitude", DoubleType(), True),
+                            # CHARGING_STATE
+                            StructField("chargingStateId", StringType(), True),
+                            StructField("targetSoc", IntegerType(), True),
+                            # CHARGING_REMAINING_TIME
+                            StructField("chargingRemainingTimeId", StringType(), True),
+                            StructField("remainingTimeMinutes", IntegerType(), True),
                         ])
                     ), True)
                 ])
