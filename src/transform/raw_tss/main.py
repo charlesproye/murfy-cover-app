@@ -8,6 +8,7 @@ from transform.raw_tss.providers.bmw import BMWResponseToRaw
 from transform.raw_tss.providers.high_mobility import HighMobilityResponseToRaw
 from transform.raw_tss.providers.mobilisight import MobilisightResponseToRaw
 from transform.raw_tss.providers.tesla_fleet_telemetry import TeslaFTResponseToRawTss
+from transform.raw_tss.providers.volkswagen import VolkswagenResponseToRaw
 
 ORCHESTRATED_MAKES = {
     "bmw": (False, BMWResponseToRaw),
@@ -18,6 +19,7 @@ ORCHESTRATED_MAKES = {
     "kia": (False, HighMobilityResponseToRaw),
     "ford": (False, HighMobilityResponseToRaw),
     "tesla-fleet-telemetry": (False, TeslaFTResponseToRawTss),
+    "volkswagen": (False, VolkswagenResponseToRaw),
 }
 
 
