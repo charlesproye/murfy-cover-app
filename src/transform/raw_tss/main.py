@@ -17,7 +17,7 @@ ORCHESTRATED_MAKES = {
     "stellantis": (False, MobilisightResponseToRaw),
     "kia": (False, HighMobilityResponseToRaw),
     "ford": (False, HighMobilityResponseToRaw),
-    "tesla-fleet-telemetry": (False, TeslaFTResponseToRawTss),
+    "tesla-fleet-telemetry": (True, TeslaFTResponseToRawTss),
 }
 
 
