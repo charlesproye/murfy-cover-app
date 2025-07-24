@@ -323,11 +323,11 @@ class VehicleProcessor:
             async with aiohttp.ClientSession() as session:
                 with get_connection() as con:
                     cursor = con.cursor()
-                    cursor.execute("""SELECT vm.model_name, vm.id, vm.type, m.make_name, b.capacity FROM vehicle_model vm
+                    cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
                                                                 join make m on vm.make_id=m.id
                                                                 join battery b on b.id=vm.battery_id
                                                                 where make_name='renault';""")
-                    model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type", "oem_name", "capacity"])
+                    model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
                     
                     for _, vehicle in renault_df.iterrows():
                         try:
@@ -383,11 +383,12 @@ class VehicleProcessor:
             async with aiohttp.ClientSession() as session:
                 with get_connection() as con:
                     cursor = con.cursor()
-                    cursor.execute("""SELECT vm.model_name, vm.id, vm.type, m.make_name, b.capacity FROM vehicle_model vm
+                    cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
                                                                 join make m on vm.make_id=m.id
                                                                 join battery b on b.id=vm.battery_id
-                                                                where oem_name='bmw';""")
-                    model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type", "oem_name", "capacity"])
+                                                                where make_name='bmw';""")
+                    model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
+                    
                     for _, vehicle in bmw_df.iterrows():
                         try:
                             vin = vehicle['vin']
@@ -442,10 +443,10 @@ class VehicleProcessor:
             other_df = self.df[(self.df['oem'] != 'tesla') & (self.df['oem'] != 'renault') & (self.df['oem'] != 'bmw') & (self.df['oem'].notna()) & (self.df['oem'] != '') & (self.df['real_activation'] == True)]
             with get_connection() as con:
                 cursor = con.cursor()
-                cursor.execute("""SELECT vm.model_name, vm.id, vm.type, m.make_name, b.capacity FROM vehicle_model vm
-                                                                join make o on vm.make_id=m.id
-                                                                join battery b on b.id=vm.battery_id;""")
-                model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type", "oem_name", "capacity"])
+                cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
+                                                                join make m on vm.make_id=m.id
+                                                                join battery b on b.id=vm.battery_id""")
+                model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
 
                 for _, vehicle in other_df.iterrows():
                     try:
