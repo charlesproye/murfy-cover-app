@@ -15,4 +15,5 @@ dependencies:
     - -e .
     - redis
     - aioboto3
+    - RapidFuzz==3.13.0
 
