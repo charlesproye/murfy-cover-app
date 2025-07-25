@@ -1,13 +1,11 @@
 from pyspark.sql import DataFrame as DF
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when
-
 from transform.processed_tss.raw_ts_to_processed_ts import RawTsToProcessedTs
 
 
-class BMWRawTsToProcessedTs(RawTsToProcessedTs):
+class VolkswagenRawTsToProcessedTs(RawTsToProcessedTs):
     """
-    Compute the specific features for the BMW data.
+    Compute the specific features for the Volkswagen data.
     """
 
     def __init__(
