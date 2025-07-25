@@ -17,7 +17,8 @@ SCALE_SOC = {
     'renault': 100,
     'ford': 100,
     'stellantis': 100,
-    'bmw': 1
+    'bmw': 1,
+    'volkswagen': 1,
 }
 
 
@@ -30,7 +31,8 @@ SOC_DIFF_THRESHOLD = {
     'renault': 0.05,
     'ford': 0.05,
     'stellantis': 0.05,
-    'bmw': 0.05
+    'bmw': 0.05,
+    'volkswagen': 0.05,
 }
 
 # Columns to keep in order to run processed_ts + not used but necessary afterwards
@@ -43,7 +45,8 @@ NECESSARY_COLS = {
     'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added']
+    'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
+    'volkswagen': ['vin', 'date', 'odometer', 'soc']
 }
 
 RENAME_COLS_DICT:dict[str, str] = {
@@ -131,6 +134,8 @@ RENAME_COLS_DICT:dict[str, str] = {
     "ACChargingPower": "ac_charging_power",
     "DCChargingPower": "dc_charging_power",
     "DetailedChargeState": "charging_status",
+    # Volkswagen
+    "energyLevelPrimaryEnginePercentage": "soc"
 }
 
 

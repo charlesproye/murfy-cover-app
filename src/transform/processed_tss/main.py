@@ -11,6 +11,8 @@ from transform.processed_tss.providers.mobilisight import \
     MobilisightRawTsToProcessedTs
 from transform.processed_tss.providers.tesla_fleet_telemetry import \
     TeslaFTRawTsToProcessedTs
+from transform.processed_tss.providers.volkswagen import \
+    VolkswagenRawTsToProcessedTs
 
 ORCHESTRATED_MAKES = {
     "bmw": (False, BMWRawTsToProcessedTs),
@@ -21,6 +23,7 @@ ORCHESTRATED_MAKES = {
     "kia": (False, HighMobilityRawTsToProcessedTs),
     "ford": (False, HighMobilityRawTsToProcessedTs),
     "tesla-fleet-telemetry": (False, TeslaFTRawTsToProcessedTs),
+    "volkswagen": (True, VolkswagenRawTsToProcessedTs),
 }
 
 
