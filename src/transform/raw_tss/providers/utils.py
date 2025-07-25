@@ -1,41 +1,41 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-def get_next_scheduled_timestamp(reference_ts_str, data):
+def get_next_scheduled_timestamp(reference_ts, data):
     """
-    Get the next scheduled timestamp for a given reference timestamp and data.
+    Get the next scheduled timestamp for a given reference timestamp and Row data.
+    Returns a Python datetime.datetime object (NOT string).
     """
-    if not data or not isinstance(data, dict):
-        return reference_ts_str
-    
-    try:
-        # Parse the reference timestamp
-        reference_ts = datetime.fromisoformat(reference_ts_str.replace("Z", "+00:00"))
 
-        # Mapping of weekdays to integers
-        weekday_map = {
-            'monday': 0, 'tuesday': 1, 'wednesday': 2,
-            'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6
-        }
+    if not data or not hasattr(data, "weekday") or not hasattr(data, "time"):
+        return reference_ts
 
-        if 'weekday' not in data or 'time' not in data:
-            return reference_ts_str
+    if isinstance(reference_ts, str):
+        reference_ts = datetime.fromisoformat(reference_ts.replace("Z", "+00:00"))
 
-        target_weekday = weekday_map[data['weekday'].lower()]
-        target_hour = data['time']['hour']
-        target_minute = data['time']['minute']
+    if reference_ts.tzinfo is None:
+        reference_ts = reference_ts.replace(tzinfo=timezone.utc)
 
-        # Start with the current week's target day
-        days_ahead = (target_weekday - reference_ts.weekday()) % 7
-        candidate_day = reference_ts.date() + timedelta(days=days_ahead)
+    weekday_map = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2,
+        'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6
+    }
 
-        # Build the candidate datetime
-        candidate_ts = datetime.combine(candidate_day, datetime.min.time(), tzinfo=reference_ts.tzinfo)
-        candidate_ts = candidate_ts.replace(hour=target_hour, minute=target_minute)
+    target_weekday = weekday_map.get(data.weekday.lower())
+    if target_weekday is None:
+        return reference_ts
 
-        # If the candidate is not strictly after the reference, go to next week
-        if candidate_ts <= reference_ts:
-            candidate_ts += timedelta(days=7)
+    target_hour = getattr(data.time, "hour", None)
+    target_minute = getattr(data.time, "minute", None)
+    if target_hour is None or target_minute is None:
+        return reference_ts
 
-        return candidate_ts.isoformat()
-    except:
-        return reference_ts_str
+    days_ahead = (target_weekday - reference_ts.weekday()) % 7
+    candidate_day = reference_ts.date() + timedelta(days=days_ahead)
+
+    candidate_ts = datetime.combine(candidate_day, datetime.min.time(), tzinfo=reference_ts.tzinfo)
+    candidate_ts = candidate_ts.replace(hour=target_hour, minute=target_minute)
+
+    if candidate_ts + timedelta(hours=2) <= reference_ts:
+        candidate_ts += timedelta(days=7)
+
+    return candidate_ts
