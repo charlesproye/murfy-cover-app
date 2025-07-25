@@ -10,12 +10,12 @@ from transform.raw_tss.response_to_raw import ResponseToRawTss
 class VolkswagenResponseToRaw(ResponseToRawTss):
     """
     Class for processing data emitted by BMW APIs
-    stored in '/response/bmw/' on Scaleway
+    stored in '/response/volkswagen/' on Scaleway
     """
 
     def __init__(
         self,
-        make: str = "bmw",
+        make: str = "volkswagen",
         force_update: bool = False,
         writing_mode: Optional[str] = "append",
         spark: SparkSession = None,
