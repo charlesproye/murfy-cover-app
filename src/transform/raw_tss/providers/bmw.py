@@ -72,4 +72,23 @@ class BMWResponseToRaw(ResponseToRawTss):
         )
 
         return pivoted
+    
+    def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict):
+
+
+        pushKeyValues_struct = StructType([
+            StructField(name, parse_type_map[type_str], True)
+            for name, type_str in field_def.items()
+        ])
+
+        # Final nested StructType
+        return StructType([
+            StructField("data", ArrayType(
+                StructType([
+                    StructField("vin", StringType(), True),
+                    StructField("pushKeyValues", ArrayType(pushKeyValues_struct), True)
+                ])
+            ))
+        ])
+
 
