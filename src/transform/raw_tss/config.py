@@ -1604,6 +1604,12 @@ SCHEMAS = {
                             # CHARGING_STATE
                             StructField("chargingStateId", StringType(), True),
                             StructField("targetSoc", IntegerType(), True),
+                            StructField("chargeRate", IntegerType(), True),
+                            StructField("chargePower", IntegerType(), True),
+                            StructField("chargingMode", StringType(), True),
+                            StructField("chargingReason", StringType(), True),
+                            StructField("externalPowerSupplyState", StringType(), True),
+                            StructField("energyFlow", StringType(), True),
                             # CHARGING_REMAINING_TIME
                             StructField("chargingRemainingTimeId", StringType(), True),
                             StructField("remainingTimeMinutes", IntegerType(), True),
