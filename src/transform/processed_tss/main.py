@@ -15,7 +15,7 @@ from transform.processed_tss.providers.volkswagen import \
     VolkswagenRawTsToProcessedTs
 
 ORCHESTRATED_MAKES = {
-    "bmw": (False, BMWRawTsToProcessedTs),
+    "bmw": (True, BMWRawTsToProcessedTs),
     "mercedes-benz": (False, HighMobilityRawTsToProcessedTs),
     "renault": (False, HighMobilityRawTsToProcessedTs),
     "volvo-cars": (False, HighMobilityRawTsToProcessedTs),
@@ -23,7 +23,7 @@ ORCHESTRATED_MAKES = {
     "kia": (False, HighMobilityRawTsToProcessedTs),
     "ford": (False, HighMobilityRawTsToProcessedTs),
     "tesla-fleet-telemetry": (False, TeslaFTRawTsToProcessedTs),
-    "volkswagen": (True, VolkswagenRawTsToProcessedTs),
+    "volkswagen": (False, VolkswagenRawTsToProcessedTs),
 }
 
 
