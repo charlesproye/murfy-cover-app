@@ -52,9 +52,7 @@ class S3Service():
         """
         try:
             # Attempt to retrieve metadata of the object
-            print('here 1')
             self._s3_client.head_object(Bucket=self.bucket_name, Key=key)
-            print('here 2')
             return True  # If no exception, the key exists
         except Exception as e:
             # Check if the error code is 404, which means the key does not exist

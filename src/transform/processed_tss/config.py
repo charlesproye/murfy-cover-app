@@ -3,7 +3,7 @@ from pyspark.sql.types import FloatType, TimestampType, StringType, BooleanType
 from pandas import Timedelta as TD
 import pandas as pd
 
-S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/dev_processed_ts_spark.parquet'
+S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_ts_spark.parquet'
 
 NB_CORES_CLUSTER = 8
 
@@ -89,8 +89,6 @@ RENAME_COLS_DICT:dict[str, str] = {
     # BMW
     "charging_ac_ampere": "charging_ac_current",
     "kombi_remaining_electric_range": "estimated_range",
-    # "mileage": "odometer", # SUPPRIMÉ - doublon avec ligne 40
-    # "soc_hv_header": "soc", # SUPPRIMÉ - doublon avec ligne 46
     "capacity": "capacity_according_to_data_provider",
     "model": "model_according_to_data_provider",
     "avg_electric_range_consumption": "consumption",
@@ -124,7 +122,10 @@ RENAME_COLS_DICT:dict[str, str] = {
     'ACChargingEnergyIn_stringValue': 'ac_charge_energy_added', 
     'FastChargerPresent_stringValue': 'fast_charger_present',
     'DCChargingEnergyIn_stringValue': 'dc_charge_energy_added',
+    'EnergyRemaining_stringValue': 'energy_remaining', # energie en kWh
+    'DetailedChargeState_detailedChargeStateValue': 'charging_status', # Etat de charge détiallé mieux que charge_state
     # Spark  
+    "readable_date": "date",
     "Odometer" : "odometer",
     "ACChargingEnergyIn": "ac_charge_energy_added",
     "Soc": "soc",
