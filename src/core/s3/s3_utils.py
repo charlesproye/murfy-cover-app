@@ -20,6 +20,8 @@ import tempfile
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import regexp_extract, col
 from ..spark_utils import align_dataframes_for_union
+from botocore.exceptions import ClientError
+import yaml
 
 class S3Service():
     def __init__(self, settings:S3Settings|None = None):
@@ -410,6 +412,41 @@ class S3Service():
                 if key.endswith(type_file):
                     files.append(key)
         return sorted(files)
+
+    def get_file(self, path: str) -> bytes | None:
+        try:
+            response = self._s3_client.get_object(Bucket=self.bucket_name, Key=path)
+            with response["Body"] as stream:
+                return stream.read()
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchKey":
+                return None
+            raise
+
+    def read_yaml_file(self, path: str) -> dict[str, Any] | None:
+        """
+        Read and parse a YAML file from S3.
+        
+        Args:
+            path: S3 path to the YAML file
+            
+        Returns:
+            Parsed YAML content as dictionary, or None if file doesn't exist
+        """
+        file_content = self.get_file(path)
+        if file_content is None:
+            return None
+        
+        try:
+            # Decode bytes to string and parse YAML
+            yaml_content = file_content.decode('utf-8')
+            return yaml.safe_load(yaml_content)
+        except yaml.YAMLError as e:
+            self.logger.error(f"Error parsing YAML file {path}: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Error reading YAML file {path}: {e}")
+            raise
 
 @lru_cache
 def get_s3():
