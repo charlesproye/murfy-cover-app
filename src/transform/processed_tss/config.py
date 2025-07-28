@@ -40,7 +40,7 @@ NECESSARY_COLS = {
     'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
     'renault': ['vin', 'date', 'odometer', 'soc'],
     'kia': ['vin', 'date', 'odometer', 'soc'],
-    'bmw': ['vin', 'date', 'odometer', 'soc', 'charging_status',  'avg_electric_range_consumption', 'charging_ac_ampere', 'charging_ac_voltage', 'current_remaining_fuel_range', 'hv_state_of_health', 'kombi_remaining_electric_range', 'model', 'remaining_fuel'],
+    'bmw': ['vin', 'date', 'odometer', 'soc', 'charging_status',  'consumption', 'charging_ac_current', 'charging_ac_voltage', 'current_remaining_fuel_range', 'hv_state_of_health', 'estimated_range', 'model_according_to_data_provider', 'remaining_fuel'],
     'mercedes-benz': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'total_charging_duration', 'start_time', 'end_time', 'energy_charged', 'displayed_state_of_charge', 'displayed_start_state_of_charge', 'charging_rate', 'estimated_range', 'fully_charged_end_times'],
     'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
