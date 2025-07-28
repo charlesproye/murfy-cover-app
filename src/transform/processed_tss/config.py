@@ -46,7 +46,7 @@ NECESSARY_COLS = {
     'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
-    'volkswagen': ['vin', 'date', 'odometer', 'soc']
+    'volkswagen': ['vin', 'date', 'odometer', 'soc', 'chargeRate', 'chargePower', 'chargingMode', 'chargingReason', 'externalPowerSupplyState', 'energyFlow']
 }
 
 RENAME_COLS_DICT:dict[str, str] = {
