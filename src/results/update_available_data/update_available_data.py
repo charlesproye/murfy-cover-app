@@ -4,7 +4,7 @@ import pandas as pd
 from core.spark_utils import create_spark_session
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
-from config import MAKES, TABLE_QUERY
+from .config import MAKES, TABLE_QUERY
 from core.console_utils import main_decorator
 from sqlalchemy.engine import Engine
 from pyspark.sql import functions as F
@@ -62,6 +62,33 @@ def get_presence_per_type(tss: DF, fleet_info_spark: DF, con: Engine, column_to_
         connection.close()
 
     return query
+
+def check_columns_from_model(model_id, column_list, is_prod=False):
+    query_parts = []
+    params = {}
+
+    for i, col in enumerate(column_list):
+        col_param = f"model_id_{i}"
+        params[col_param] = model_id
+        part = f"""
+        SELECT '{col}' AS column_available
+        WHERE (
+          SELECT COUNT(vd.{col})
+          FROM vehicle v
+          JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
+          JOIN vehicle_data vd ON vd.vehicle_id = v.id
+          WHERE vm.id = :{col_param}
+        ) > 0
+        """
+        query_parts.append(part.strip())
+
+    full_query = "\nUNION ALL\n".join(query_parts)
+
+    engine = get_sqlalchemy_engine(is_prod)
+    with engine.begin() as conn:
+        result = conn.execute(text(full_query), params)
+        return [row[0] for row in result.fetchall()]
+
 
 @main_decorator
 def run(spark, s3: S3Service, con: Engine):
