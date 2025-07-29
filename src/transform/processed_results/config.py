@@ -11,6 +11,18 @@ from transform.raw_results.tesla_fleet_telemetry import get_results as get_tesla
 
 UPDATE_FREQUENCY = pd.Timedelta(days=7)
 
+MAKES = {
+    "tesla",
+    "mercedes-benz",
+    "bmw",
+    "kia",
+    "renault",
+    "volvo",
+    "stellantis",
+    "ford",
+    "tesla-fleet-telemetry"
+}
+
 VALID_SOH_POINTS_LINE_BOUNDS = DF({
   "odometer": [20_000, 200_000, 0, 200_000],
   "soh": [1.0, 0.95, 0.9, 0.5],

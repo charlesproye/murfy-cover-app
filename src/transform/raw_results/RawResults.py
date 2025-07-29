@@ -1,6 +1,7 @@
 from pyspark.sql import functions as F, Window, SparkSession
 from pyspark.sql import DataFrame
-from core.s3_utils import S3_Bucket
+from core.s3.s3_utils import S3Service
+from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session, safe_astype_spark_with_error_handling_results
 from transform.raw_results.config import *
 from core.caching_utils import CachedETLSpark
@@ -32,12 +33,12 @@ class RawResult(CachedETLSpark):
         Returns:
             DataFrame: DataFrame traité avec les métriques calculées
         """
-        window_spec = Window.partitionBy("vin", "in_charge_idx").orderBy("date")
+        window_spec = Window.partitionBy("vin", "charging_status_idx").orderBy("date")
 
         df = ProcessedTimeSeries(self.make, spark=self.spark).data
         # Agrégation des données
 
-        results = df.groupBy("vin", "in_charge_idx").agg(
+        results = df.groupBy("vin", "charging_status_idx").agg(
             F.min("ac_charge_energy_added").alias("ac_energy_added_min"),
             F.min("dc_charge_energy_added").alias("dc_energy_added_min"),
             F.last("ac_charge_energy_added", ignorenulls=True).alias("ac_energy_added_end"),
@@ -97,12 +98,12 @@ class RawResult(CachedETLSpark):
         """
 
 
-        soc_diff_df = df.groupBy("vin", "in_charge_idx").agg(
+        soc_diff_df = df.groupBy("vin", "charging_status_idx").agg(
             F.first(F.when(F.col("soc").isNotNull(), F.col("soc")), ignorenulls=True).alias("soc_start"),
             F.last(F.when(F.col("soc").isNotNull(), F.col("soc")), ignorenulls=True).alias("soc_end")
         ).withColumn("soc_diff", F.col("soc_end") - F.col("soc_start"))
 
-        results = results.join(soc_diff_df, on=["vin", "in_charge_idx"], how="left")
+        results = results.join(soc_diff_df, on=["vin", "charging_status_idx"], how="left")
         print("soc diff merge done")
         
         return results
@@ -191,12 +192,11 @@ class RawResult(CachedETLSpark):
 if __name__ == "__main__":
 
     # Initialisation
-    bucket = S3_Bucket()
+    settings = S3Settings()
 
-    # Création de la session Spark
-    creds = bucket.get_creds_from_dot_env()
     spark_session = create_spark_session(
-        creds["aws_access_key_id"], creds["aws_secret_access_key"]
+        settings.S3_KEY,
+        settings.S3_SECRET
     )
     
     RawResult.update_all_raw_results(spark=spark_session, force_update=True)
