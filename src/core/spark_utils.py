@@ -23,20 +23,6 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
         "--packages org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0 pyspark-shell"
     )
 
-    g1gc_options = (
-        "-XX:+UseG1GC "
-        "-XX:MaxGCPauseMillis=100 "
-        "-XX:G1HeapRegionSize=32m "
-        "-XX:+UseStringDeduplication "
-        "-XX:+UnlockExperimentalVMOptions "
-        "-XX:+UseZGC "
-        "-XX:+DisableExplicitGC "
-        "-XX:+UseGCOverheadLimit "
-        "-XX:GCTimeRatio=9 "
-        "-XX:+PrintGCDetails "
-        "-XX:+PrintGCTimeStamps "
-        "-Xloggc:/tmp/spark-gc.log"
-    )
     
     spark = (
         SparkSession.builder.appName("Scaleway S3 Read JSON")
@@ -65,8 +51,6 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
         .config("spark.executor.memory", "10g")
         .config("spark.driver.memory", "10g")
         .config("spark.driver.maxResultSize", "4g")
-        .config("spark.executor.extraJavaOptions", g1gc_options)
-        .config("spark.driver.extraJavaOptions", g1gc_options)
         .getOrCreate()
     )
 

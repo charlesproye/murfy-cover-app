@@ -112,7 +112,7 @@ class S3Service():
                 raise e
 
         # Écriture optimisée
-        df_write.coalesce(1).write.mode("overwrite").option("parquet.compression", "snappy").option(
+        df_write.repartition("vin").coalesce(32).write.mode("overwrite").option("parquet.compression", "snappy").option(
             "parquet.block.size", 67108864
         ).partitionBy("vin").parquet(s3_path)
 
