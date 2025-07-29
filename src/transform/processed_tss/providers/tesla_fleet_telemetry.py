@@ -40,34 +40,3 @@ class TeslaFTRawTsToProcessedTs(RawTsToProcessedTs):
         )
         return tss
 
-    # Pertinent pour Tesla
-    # def compute_cum_var(self, tss, var_col: str, cum_var_col: str):
-    #     if var_col not in tss.columns:
-    #         self.logger.debug(f"{var_col} not found, not computing {cum_var_col}.")
-    #         return tss
-
-    #     self.logger.debug(
-    #         f"Computing {cum_var_col} from {var_col} using Arrow + Pandas UDF."
-    #     )
-
-    #     # Schéma de retour attendu → adapte le type si nécessaire
-    #     schema = tss.schema.add(cum_var_col, DoubleType())
-
-    #     @pandas_udf(schema, functionType="grouped_map")
-    #     def integrate_trapezoid(df: pd.DataFrame) -> pd.DataFrame:
-
-    #         df = df.sort_values("date").copy()
-
-    #         x = df["date"].astype("int64") // 10**9  # Convertit ns → s
-    #         y = df[var_col].fillna(0).astype("float64")
-
-    #         cum = cumulative_trapezoid(y=y.values, x=x.values, initial=0) * KJ_TO_KWH
-
-    #         # Ajuste pour que ça commence à zéro
-    #         cum = cum - cum[0]
-
-    #         df[cum_var_col] = cum
-    #         return df
-
-    #     return tss.groupBy(self.id_col).apply(integrate_trapezoid)
-
