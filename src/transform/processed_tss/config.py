@@ -5,6 +5,12 @@ import pandas as pd
 
 S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_ts_spark.parquet'
 
+
+ODOMETER_MILES_TO_KM = {
+    "tesla": 1.60934,
+    "tesla-fleet-telemetry": 1.60934,
+}
+
 # Coefficient to scale soc to 0-100%
 SCALE_SOC = {
     'tesla-fleet-telemetry': 1,
