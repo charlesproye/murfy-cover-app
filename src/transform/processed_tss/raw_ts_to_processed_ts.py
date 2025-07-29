@@ -1,5 +1,7 @@
 from abc import abstractmethod
 from logging import getLogger
+import os
+from dotenv import load_dotenv
 
 from pyspark.sql import DataFrame as DF
 from pyspark.sql import SparkSession, Window
@@ -18,9 +20,11 @@ from core.spark_utils import (get_optimal_nb_partitions,
                               safe_astype_spark_with_error_handling)
 from transform.fleet_info.main import fleet_info
 from transform.processed_tss.config import *
-from transform.processed_tss.config import (NB_CORES_CLUSTER, SCALE_SOC,
+from transform.processed_tss.config import (SCALE_SOC,
                                             SOC_DIFF_THRESHOLD)
 from transform.raw_tss.main import *
+
+load_dotenv() 
 
 
 class RawTsToProcessedTs(CachedETLSpark):
@@ -54,7 +58,6 @@ class RawTsToProcessedTs(CachedETLSpark):
     # TODO:
     # Keep overwrite mode as long as performance is acceptable, don't switch to 'append' yet
     # Keep non-batched system as long as memory usage is manageable
-    # Clean cette classe
 
     def run(self):
 
@@ -69,7 +72,7 @@ class RawTsToProcessedTs(CachedETLSpark):
             tss = ORCHESTRATED_MAKES[self.make][1](self.make, spark=self.spark).run()
 
         optimal_partitions_nb, _ = self._set_optimal_spark_parameters(
-            tss, NB_CORES_CLUSTER
+            tss, int(os.environ.get("NB_CORES_CLUSTER"))
         )  # Optimize partitions
         tss = tss.repartition("vin").coalesce(optimal_partitions_nb)
         tss = tss.cache()
@@ -138,15 +141,15 @@ class RawTsToProcessedTs(CachedETLSpark):
 
     def _reassign_short_phases(self, df, min_duration_minutes=3):
         """
-        Recalcule les phase_id en fusionnant les phases de moins de `min_duration_minutes`
-        avec la phase valide précédente.
+        Recalculates phase_id by merging phases shorter than `min_duration_minutes`
+        with the previous valid phase.
 
         Args:
-            df (DataFrame): DataFrame Spark avec les colonnes `phase_id`, `date`, `total_phase_time`
-            min_duration_minutes (float): Durée minimale pour conserver une phase (en minutes)
+            df (DataFrame): Spark DataFrame with columns `phase_id`, `date`, `total_phase_time`
+            min_duration_minutes (float): Minimum duration to keep a phase (in minutes)
 
         Returns:
-            DataFrame: DataFrame avec la colonne `phase_id` mise à jour
+            DataFrame: DataFrame with updated `phase_id` column
         """
 
         df = df.withColumn(
