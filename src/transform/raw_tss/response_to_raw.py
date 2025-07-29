@@ -14,7 +14,7 @@ from pyspark.sql.types import StringType, StructField, StructType
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from core.spark_utils import get_optimal_nb_partitions
-from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, SCHEMAS
+from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, PARSE_TYPE_MAP
 
 load_dotenv() 
 
@@ -240,11 +240,18 @@ class ResponseToRawTss:
         for _, paths in batch.items():
             keys_to_download.extend(paths)
 
-        schema = SCHEMAS[self.make]
 
         keys_to_download_str = [
             f"{self.settings.S3_BASE_PATH}/{key}" for key in keys_to_download
-        ]
+            ]
+
+
+        field_def = self.bucket.read_yaml_file(f"config/{self.make}.yaml")
+
+        if self.make != 'tesla-fleet-telemetry':
+            field_def = field_def['response_to_raw']
+
+        schema = self._get_dynamic_schema(field_def, PARSE_TYPE_MAP)
 
         return (
             self.spark.read.option("multiline", "true")
@@ -310,4 +317,7 @@ class ResponseToRawTss:
         pass
 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
+        pass
+
+    def _get_dynamic_schema(self, parse_type_map: dict) -> DataFrame:
         pass
