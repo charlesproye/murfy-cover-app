@@ -75,7 +75,6 @@ class BMWResponseToRaw(ResponseToRawTss):
     
     def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict):
 
-
         pushKeyValues_struct = StructType([
             StructField(name, parse_type_map[type_str], True)
             for name, type_str in field_def.items()

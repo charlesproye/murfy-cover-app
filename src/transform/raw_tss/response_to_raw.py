@@ -14,7 +14,7 @@ from pyspark.sql.types import StringType, StructField, StructType
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from core.spark_utils import get_optimal_nb_partitions
-from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, PARSE_TYPE_MAP, NB_CORES_CLUSTER
+from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, PARSE_TYPE_MAP
 
 load_dotenv() 
 

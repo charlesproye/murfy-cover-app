@@ -6,7 +6,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql.types import ArrayType, StructType
-from config import PARSE_TYPE_MAP
+from ..config import PARSE_TYPE_MAP
 from core.s3.s3_utils import S3Service
 
 from transform.raw_tss.response_to_raw import ResponseToRawTss
