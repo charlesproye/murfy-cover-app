@@ -21,7 +21,8 @@ from core.spark_utils import (get_optimal_nb_partitions,
 from transform.fleet_info.main import fleet_info
 from transform.processed_tss.config import *
 from transform.processed_tss.config import (SCALE_SOC,
-                                            SOC_DIFF_THRESHOLD)
+                                            SOC_DIFF_THRESHOLD,
+                                            ODOMETER_MILES_TO_KM)
 from transform.raw_tss.main import *
 
 load_dotenv() 
@@ -136,7 +137,8 @@ class RawTsToProcessedTs(CachedETLSpark):
         return (4 * nb_cores, vin_per_batch)
 
     def _normalize_units_to_metric(self, tss):
-        tss = tss.withColumn("odometer", col("odometer") * 1.609)
+        tss = tss.withColumn("odometer", col("odometer") * ODOMETER_MILES_TO_KM.get(self.make, 1))
+        tss = tss.withColumn("soc", F.col("soc") * SCALE_SOC[self.make])
         return tss
 
     def _reassign_short_phases(self, df, min_duration_minutes=3):
@@ -196,8 +198,6 @@ class RawTsToProcessedTs(CachedETLSpark):
     ) -> DF:
 
         w = Window.partitionBy("vin").orderBy("date")
-
-        tss = tss.withColumn("soc", F.col("soc") * SCALE_SOC[self.make])
 
         tss = tss.withColumn(
             "soc_diff",
