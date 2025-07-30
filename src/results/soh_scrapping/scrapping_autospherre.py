@@ -12,14 +12,15 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
-from src.core.gsheet_utils import *
+from core.sql_utils import get_connection
+from core.gsheet_utils import *
+from activation.config.mappings import mapping_vehicle_type
 
 BASE_URL = "https://www.autosphere.fr"
 SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Mercedes,Bmw,Nissan,Mini,Volkswagen,Volvo,Ford,Ds,Opel,Audi,Kia,Toyota,Peugeot,Dacia,Renault,Hyundai,Lexus,Seat,Mitsubishi,Mg&fuel_type=Electrique&from={}"
 STEP = 23
 START_OFFSET = 0
-STOP_OFFSET = 10000
+STOP_OFFSET = 15
 
 
 def get_all_vehicle_links():
@@ -118,7 +119,7 @@ def extract_vehicle_info(link, car_nbr):
     infos = {}
 
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # Décommente pour exécuter sans interface
+    options.add_argument("--headless")  
     driver = webdriver.Chrome(options=options)
 
     try:
@@ -148,24 +149,20 @@ def extract_vehicle_info(link, car_nbr):
                     f.write(pdf_response.content)
                 data = extract_aviloo_data_from_pdf("aviloo_tmp.pdf")
                 if data["SoH"]:
-                    infos["SoH"] = float(data["SoH"]) / 100
+                    infos["SoH"] = str(data["SoH"]) + '%'
                 if data["kilometrage"]:
                     infos["Odomètre (km)"] = int(data["kilometrage"])
                 if data["OEM"]:
                     infos["OEM"] = data["OEM"]
                 if data["Modèle"]:
                     modele = data["Modèle"]
+                print(data["SoH"])
         except:
             pass
         version_complete = None
         try:
-            links_breadcrumb = wait.until(EC.presence_of_all_elements_located(
-                (By.CSS_SELECTOR, "li.inline-flex.items-center a.text-blue-700")
-            ))
-            if len(links_breadcrumb) >= 4:
-                modele = links_breadcrumb[3].text.strip()
-            version_span = driver.find_element(By.CSS_SELECTOR, "span.text-black-600")
-            version_complete = version_span.text.strip()
+            h1_title = driver.find_element(By.TAG_NAME, "h1")
+            version_complete = h1_title.text.strip()
             if ' - ' in version_complete:
                 version_complete = version_complete[:version_complete.find(' - ')]
             if modele != "2008":
@@ -178,6 +175,7 @@ def extract_vehicle_info(link, car_nbr):
         infos["Modèle"] = modele
         infos['Année'] = int(annee) if annee else None
         infos['battery_capacity'] = battery_capacity if battery_capacity else None
+        print(infos)
     finally:    
         driver.quit()
     return infos
@@ -201,14 +199,22 @@ def main():
         except Exception as e:
             print(f"[{i}] Erreur sur le lien {link} : {e}")
         time.sleep(1)
-    # Bien ordonner les colonnes par rapoort à la gsheet
 
     infos_clean = pd.DataFrame(all_infos).T.dropna(subset='SoH')[["OEM","Modèle","Type","Année","Odomètre (km)","SoH", "lien", "battery_capacity"]]
-    
-    print(infos_clean)
-    print(infos_clean.shape)
+    ### mapping names
+    with get_connection() as con:
+        cursor = con.cursor()
+        cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
+                                                    join make m on vm.make_id=m.id
+                                                    join battery b on b.id=vm.battery_id;""")
+        model_existing = pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
+    infos_clean['id'] = infos_clean.apply(lambda row: mapping_vehicle_type(row['Type'], row['OEM'], row['Modèle'], model_existing, row['battery_capacity'], row['Année']), axis=1)
+    type_mapping = infos_clean.merge(model_existing[['id', 'type']], on='id', how='left')['type']
+    infos_clean['Type'] = [mapped if mapped != 'unknown' else old for old, mapped in zip(infos_clean['Type'], type_mapping) ]
+    infos_clean.drop(columns='id', inplace=True)
+    infos_clean['Odomètre (km)'] = infos_clean['Odomètre (km)'].astype(int)
+    infos_clean = infos_clean.replace(np.nan, "unknown").replace(pd.NA, "unknown")
     export_to_excel(infos_clean, "Courbes de tendance", "Courbes OS")
-
 
 if __name__ == "__main__":
     main()
