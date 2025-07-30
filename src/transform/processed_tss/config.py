@@ -48,7 +48,7 @@ NECESSARY_COLS = {
     'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
     'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
+    'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added', 'ac_charging_power', 'dc_charging_power'],
     'volkswagen': ['vin', 'date', 'odometer', 'soc', 'chargeRate', 'chargePower', 'chargingMode', 'chargingReason', 'externalPowerSupplyState', 'energyFlow']
 }
 
@@ -103,7 +103,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "charger_power": "charging_power",
     # fleet telemetry
     'BatteryLevel_stringValue': 'battery_level',
-    'Soc_stringValue': 'soc',
+    # 'Soc_stringValue': 'soc',
     'OutsideTemp_stringValue': 'outside_temp',
     'Odometer_stringValue': 'odometer',
     'RatedRange_stringValue': 'rated_range',
