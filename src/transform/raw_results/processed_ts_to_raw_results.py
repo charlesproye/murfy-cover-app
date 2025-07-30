@@ -10,6 +10,9 @@ from transform.processed_results.config import UPDATE_FREQUENCY
 from transform.processed_tss.main import ORCHESTRATED_MAKES
 from transform.raw_results.config import RAW_RESULTS_CACHE_KEY_TEMPLATE
 
+# TODO
+# Voir s'il est pertinent de mettre en place une optimisation de la taille des partitions pour cette étape
+
 
 class ProcessedTsToRawResults(CachedETLSpark):
     """
