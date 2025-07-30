@@ -9,7 +9,7 @@ if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 from core.sql_utils import get_connection
 from core.plt_utils import show_trendline
-from core.gsheet_utils import get_gspread_client, load_excel_data
+from core.gsheet_utils import load_excel_data
 # Configuration de la page
 st.set_page_config(page_title="Liste des modèles de véhicules", layout="wide")
 st.title("📊 Données de la table vehicle_model")
@@ -90,11 +90,14 @@ if st.button("show graph from db"):
         fig = show_trendline(df, filtered_df['trendline'].values[0], filtered_df['trendline_max'].values[0], filtered_df['trendline_min'].values[0], selected_type, 'odometer', 'soh')
         st.plotly_chart(fig)
 if st.button("show graph scrapping"):
-    df = load_excel_data(get_gspread_client(), "Courbes de tendance", "Courbes OS")
+    df = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=df[0,:8], data=df[1:,:8])
-    df_sheet['SoH'] = df_sheet['SoH'].apply(lambda x:  x.replace('%', '').strip()).astype(float) / 100
-    fig = show_trendline(df_sheet[(df_sheet['Modèle']==selected_model) & (df_sheet['Type']==selected_type)], 
-                   filtered_df['trendline'].values[0], filtered_df['trendline_max'].values[0], 
-                   filtered_df['trendline_min'].values[0], selected_type, '"Odomètre (km)"', 'SOH')
+    df_sheet['Modèle'] = df_sheet['Modèle'].apply(lambda x: x.lower())
+    df_model = df_sheet[(df_sheet['Modèle']==selected_model) & (df_sheet['Type']==selected_type)].copy()
+    df_model['SoH'] = df_model['SoH'].apply(lambda x:  x.replace('%', '').strip()).astype(float) / 100
+    df_model['Odomètre (km)'] = df_model['Odomètre (km)'].apply(lambda x: x.replace(',', '')).astype(float)
+    fig = show_trendline(df_model,
+                         filtered_df['trendline'].values[0], filtered_df['trendline_max'].values[0],
+                         filtered_df['trendline_min'].values[0], selected_type, "Odomètre (km)", 'SoH')
     st.plotly_chart(fig)
 
