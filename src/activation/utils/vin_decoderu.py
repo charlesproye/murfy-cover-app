@@ -39,8 +39,7 @@ def decode_vin(vin: str):
     try:
         result = response.json()
         print("VIN successfully decoded:\n")
-        for k, v in result.items():
-            print(f"{k}: {v}")
+        return result
 
     except ValueError:
         print("Error decoding JSON response:")
