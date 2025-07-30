@@ -291,5 +291,5 @@ def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacit
             _, _, index = match_type
             return subset.loc[index, "id"]
         
-    raise Exception("unknown model")
+    return "unknown"
 

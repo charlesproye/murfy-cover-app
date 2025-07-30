@@ -8,6 +8,8 @@ from urllib.parse import urljoin, urlparse
 from typing import List, Dict, Optional
 from core.gsheet_utils import get_google_client, load_excel_data, export_to_excel
 from activation.config.mappings import mapping_vehicle_type
+from core.sql_utils import get_connection
+from activation.config.mappings import mapping_vehicle_type
 
 class AramisautoScraper:
     def __init__(self):
@@ -91,6 +93,7 @@ class AramisautoScraper:
             soh_match = re.search(soh_partern, page_text)
             if soh_match:
                 car_info['SoH'] = soh_match.group(0)
+                print(car_info['SoH'])
             # Kilométrage
             km_pattern = r'([\d\s]+)\s*km'
             km_match = re.search(km_pattern, page_text)
@@ -101,9 +104,6 @@ class AramisautoScraper:
             date = re.search(date_pattern, page_text)
             if date:
                 car_info['Année'] = int(date.group(0)[-4:].strip())
-                # else:
-                #     car_info['Année'] = int(date.group(1)[-4:].strip())
-                # print(car_info['Année'])
             
             # Batterie capacity
             battery_pattern = r'\d*.\d*\s[k][W][h]'
@@ -181,6 +181,7 @@ class AramisautoScraper:
         df = pd.DataFrame(data)[["OEM", "Modèle", "Type", "Année", "Odomètre (km)", "SoH", "lien", "battery_capacity"]]
         # Si pas de SoH pas intérressant
         df = df.dropna(subset='SoH')
+        df['Odomètre (km)'] =  df['Odomètre (km)'].astype(int)
         # éviter que ça casse s'il manque une info
         df = df.replace(np.nan, "unknown").replace(pd.NA, "unknown")
         return df
@@ -190,12 +191,23 @@ def main():
     scraper = AramisautoScraper()
     
     # Scraper les voitures électriques
-    infos = scraper.scrape_electric_cars(100)
+    infos = scraper.scrape_electric_cars(2)
     df_infos = scraper.clean_data(infos)
     data_sheet = load_excel_data(get_google_client(), "Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:8], data=data_sheet[1:,:8])
     df_filtré = df_infos[~df_infos['lien'].isin(df_sheet['lien'])]
-    print(df_filtré.isna().sum())
+    ### mapping names
+    with get_connection() as con:
+        cursor = con.cursor()
+        cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
+                                                    join make m on vm.make_id=m.id
+                                                    join battery b on b.id=vm.battery_id;""")
+        model_existing = pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
+    df_filtré['id'] = df_filtré.apply(lambda row: mapping_vehicle_type(row['Type'], row['OEM'], row['Modèle'], model_existing, row['battery_capacity'], row['Année']), axis=1)
+    type_mapping = df_filtré.merge(model_existing[['id', 'type']], on='id', how='left')['type']
+    df_filtré['Type'] = [mapped if mapped != 'unknown' else old for old, mapped in zip(df_filtré['Type'], type_mapping) ]
+    df_filtré.drop(columns='id', inplace=True)
+
     export_to_excel(df_filtré, "Courbes de tendance", "Courbes OS")
 
 if __name__ == "__main__":
