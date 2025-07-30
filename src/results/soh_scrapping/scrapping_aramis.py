@@ -7,7 +7,7 @@ import numpy as np
 from urllib.parse import urljoin, urlparse
 from typing import List, Dict, Optional
 from core.gsheet_utils import get_google_client, load_excel_data, export_to_excel
-
+from activation.config.mappings import mapping_vehicle_type
 
 class AramisautoScraper:
     def __init__(self):
@@ -192,12 +192,11 @@ def main():
     # Scraper les voitures électriques
     infos = scraper.scrape_electric_cars(100)
     df_infos = scraper.clean_data(infos)
-    data_sheet = load_excel_data(get_google_client(), "202505 - Courbes SoH", "Courbes OS")
+    data_sheet = load_excel_data(get_google_client(), "Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:8], data=data_sheet[1:,:8])
     df_filtré = df_infos[~df_infos['lien'].isin(df_sheet['lien'])]
-   # df_filtré['Type'] =  df_filtré['Type'].map(TYPE_MAPPING)
     print(df_filtré.isna().sum())
-    export_to_excel(df_filtré, "202505 - Courbes SoH", "Courbes OS")
+    export_to_excel(df_filtré, "Courbes de tendance", "Courbes OS")
 
 if __name__ == "__main__":
     main()

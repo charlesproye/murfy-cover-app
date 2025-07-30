@@ -186,7 +186,7 @@ def extract_vehicle_info(link, car_nbr):
 def main():
     all_links = get_all_vehicle_links()
     print(len(all_links))
-    data_sheet = load_excel_data(get_google_client(), "202505 - Courbes SoH", "Courbes OS")
+    data_sheet = load_excel_data(get_google_client(), "Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
 
     links_not_fetch = set(all_links) - set(df_sheet['lien'])
@@ -207,7 +207,7 @@ def main():
     
     print(infos_clean)
     print(infos_clean.shape)
-    export_to_excel(infos_clean, "202505 - Courbes SoH", "Courbes OS")
+    export_to_excel(infos_clean, "Courbes de tendance", "Courbes OS")
 
 
 if __name__ == "__main__":
