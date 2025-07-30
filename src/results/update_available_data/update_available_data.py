@@ -74,15 +74,13 @@ def update_model_columns(model_id, available_columns: list, all_columns: list, e
 @main_decorator
 def run(engine: Engine):
     with engine.begin() as conn:
-        result = conn.execute(text("SELECT id FROM vehicle_model where type in ('r110') "))
+        result = conn.execute(text("SELECT id FROM vehicle_model"))
         model_ids = [row[0] for row in result.fetchall()]
 
     for model_id in model_ids:
-        print(model_id)
         try:
             print(f"Checking {model_id}...")
             available_columns = check_columns_from_model(model_id, COLUMNS_TO_CHECK, engine)
-            print('available_columns =', available_columns)
             update_model_columns(model_id, available_columns, COLUMNS_TO_CHECK, engine)
             print(f"✅ {model_id} updated with : {available_columns}")
         except Exception as e:
