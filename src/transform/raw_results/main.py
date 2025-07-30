@@ -4,12 +4,16 @@ import sys
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
-from transform.raw_results.processed_ts_to_raw_results import ProcessedTsToRawResults
-from transform.raw_results.providers.volvo import VolvoProcessedTsToRawResults
-from transform.raw_results.providers.tesla_fleet_telemetry import TeslaFTProcessedTsToRawResults
+from transform.raw_results.processed_ts_to_raw_results import \
+    ProcessedTsToRawResults
 from transform.raw_results.providers.ford import FordProcessedTsToRawResults
-from transform.raw_results.providers.renault import RenaultProcessedTsToRawResults
-from transform.raw_results.providers.stellantis import StellantisProcessedTsToRawResults
+from transform.raw_results.providers.renault import \
+    RenaultProcessedTsToRawResults
+from transform.raw_results.providers.stellantis import \
+    StellantisProcessedTsToRawResults
+from transform.raw_results.providers.tesla_fleet_telemetry import \
+    TeslaFTProcessedTsToRawResults
+from transform.raw_results.providers.volvo import VolvoProcessedTsToRawResults
 
 ORCHESTRATED_MAKES = {
     "bmw": (False, ProcessedTsToRawResults),

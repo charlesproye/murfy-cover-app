@@ -1,15 +1,14 @@
-from pyspark.sql import SparkSession
-from core.caching_utils import CachedETLSpark
-from transform.raw_results.config import RAW_RESULTS_CACHE_KEY_TEMPLATE
-from transform.processed_results.config import UPDATE_FREQUENCY
 from abc import abstractmethod
-from pyspark.sql import DataFrame
-from transform.processed_tss.main import ORCHESTRATED_MAKES
 from logging import Logger
+
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-
+from core.caching_utils import CachedETLSpark
+from transform.processed_results.config import UPDATE_FREQUENCY
+from transform.processed_tss.main import ORCHESTRATED_MAKES
+from transform.raw_results.config import RAW_RESULTS_CACHE_KEY_TEMPLATE
 
 
 class ProcessedTsToRawResults(CachedETLSpark):
@@ -19,11 +18,24 @@ class ProcessedTsToRawResults(CachedETLSpark):
     Default class works for makes without SOH computation
     """
 
-    def __init__(self, make, spark: SparkSession=None, force_update:bool=False, logger: Logger=None, **kwargs):
+    def __init__(
+        self,
+        make,
+        spark: SparkSession = None,
+        force_update: bool = False,
+        logger: Logger = None,
+        **kwargs,
+    ):
         self.make = make
-        self.spark=spark
+        self.spark = spark
         self.logger = logger
-        super().__init__(RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make=make.replace("-", "_")), "s3", force_update=force_update, spark=spark, **kwargs)
+        super().__init__(
+            RAW_RESULTS_CACHE_KEY_TEMPLATE.format(make=make.replace("-", "_")),
+            "s3",
+            force_update=force_update,
+            spark=spark,
+            **kwargs,
+        )
 
     def run(self):
 
@@ -31,7 +43,6 @@ class ProcessedTsToRawResults(CachedETLSpark):
 
         cls = ORCHESTRATED_MAKES[self.make][1]
         pts = cls(make=self.make, spark=self.spark, logger=self.logger).data
-
 
         df = self.aggregate(pts)
 
@@ -43,9 +54,8 @@ class ProcessedTsToRawResults(CachedETLSpark):
         df = self.compute_cycles(df)
 
         df = self.compute_charge_levels(df)
-        
+
         return df
-    
 
     def aggregate(self, pts: DataFrame):
         """
@@ -62,16 +72,15 @@ class ProcessedTsToRawResults(CachedETLSpark):
             F.first("model", ignorenulls=True).alias("model"),
             F.first("version", ignorenulls=True).alias("version"),
         ]
-        
+
         if "consumption" in pts.columns:
             agg_columns.append(F.mean("consumption").alias("consumption"))
         else:
             agg_columns.append(F.lit(None).cast(T.FloatType()).alias("consumption"))
 
         df = (
-            pts
-            .withColumn("floored_date", floored_col)
-            .groupBy('vin', "floored_date")
+            pts.withColumn("floored_date", floored_col)
+            .groupBy("vin", "floored_date")
             .agg(*agg_columns)
             .withColumnRenamed("floored_date", "date")
             .na.drop(subset=["odometer"])
@@ -80,24 +89,18 @@ class ProcessedTsToRawResults(CachedETLSpark):
 
         return df
 
-
     def compute_specific_features(self, df: DataFrame):
         return df
-    
+
     def compute_soh(self, df: DataFrame):
         return df
-    
+
     def compute_consumption(self, df: DataFrame):
         return df
-    
+
     def compute_charge_levels(self, df: DataFrame):
         return df
-    
+
     def compute_cycles(self, df: DataFrame):
         return df
-
-
-    
-
-
 
