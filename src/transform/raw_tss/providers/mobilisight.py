@@ -2,11 +2,12 @@ from functools import reduce
 from logging import Logger
 from typing import Dict, Optional
 
-from config import SCHEMAS
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql.types import ArrayType, StructType
+from ..config import PARSE_TYPE_MAP
+from core.s3.s3_utils import S3Service
 
 from transform.raw_tss.response_to_raw import ResponseToRawTss
 
@@ -108,7 +109,10 @@ class MobilisightResponseToRaw(ResponseToRawTss):
 
         df = df.coalesce(32)
 
-        fields = self._build_fields_from_schema(SCHEMAS[self.make])
+        field_def = S3Service().read_yaml_file(f"config/{self.make}.yaml")["response_to_raw"]
+        schema = self._get_dynamic_schema(field_def, PARSE_TYPE_MAP)
+
+        fields = self._build_fields_from_schema(schema)
 
         # List to store all DataFrames in long format
         long_dfs = []
@@ -154,4 +158,25 @@ class MobilisightResponseToRaw(ResponseToRawTss):
         df_parsed.unpersist()
 
         return pivoted
+        
 
+
+    def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict):
+        if isinstance(field_def, dict):
+            # StructType
+            fields = []
+            for key, value in field_def.items():
+                spark_type = self._get_dynamic_schema(value, parse_type_map)
+                fields.append(StructField(key, spark_type, True))
+            return StructType(fields)
+        elif isinstance(field_def, list):
+            # ArrayType
+            if len(field_def) != 1 or not isinstance(field_def[0], dict):
+                raise ValueError("Each array must contain exactly one dict describing the element structure.")
+            return ArrayType(self._get_dynamic_schema(field_def[0], parse_type_map))
+
+        elif isinstance(field_def, str):
+            # Primitive type
+            return parse_type_map[field_def.lower()]
+        else:
+            raise ValueError(f"Unsupported schema format, following is not a dict: {field_def}")

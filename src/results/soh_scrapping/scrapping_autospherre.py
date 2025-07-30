@@ -14,7 +14,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from src.core.gsheet_utils import *
-from src.results.trendlines_results.config import TYPE_MAPPING
 
 BASE_URL = "https://www.autosphere.fr"
 SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Mercedes,Bmw,Nissan,Mini,Volkswagen,Volvo,Ford,Ds,Opel,Audi,Kia,Toyota,Peugeot,Dacia,Renault,Hyundai,Lexus,Seat,Mitsubishi,Mg&fuel_type=Electrique&from={}"
@@ -187,7 +186,7 @@ def extract_vehicle_info(link, car_nbr):
 def main():
     all_links = get_all_vehicle_links()
     print(len(all_links))
-    data_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
+    data_sheet = load_excel_data(get_google_client(), "202505 - Courbes SoH", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
 
     links_not_fetch = set(all_links) - set(df_sheet['lien'])

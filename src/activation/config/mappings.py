@@ -1,3 +1,9 @@
+
+from rapidfuzz import process, fuzz
+from core.sql_utils import *
+import re
+from datetime import date
+
 MAKE_MAPPING = {
     'mercedes-benz': 'mercedes',
     'mercedes': 'mercedes',
@@ -218,3 +224,67 @@ TESLA_MODEL_MAPPING = {
     'R': 'roadster',
     'C': 'cybertruck'
 }
+
+def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacity=None, sale_year=None):
+    """Map a given vehicle to the closest model identifier in the database.
+    Args:
+        type_car (str): type car to find match
+        make_name (str): make car
+        model_name (str): model car
+        db_df (pd.DataFrame): db with all the model in dbeaver
+        battery_capacity (str, optional): capacity car battery. Defaults to None.
+
+    Returns:
+        str: type le plus proche présent dans la db de vehicle_model
+    """
+   
+    make_name = make_name.lower()
+    type_car = type_car.lower()
+    try:
+        if len(model_name) > 4:
+            d = re.findall('\d*', model_name)
+            d.sort()
+            model_name = d[-1]
+    except:
+        model_name = model_name.lower()
+        
+    # filter on OEM
+    subset = db_df[db_df['make_name'] == make_name].copy()
+
+    # Find the best match
+
+    # Returns the closest model, score_cutoff set to 0.1 for now to ensure we almost always get a result
+    match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio, score_cutoff=.1)
+    if match_model :
+        match_model_name, _, _ = match_model
+        # filter on model name
+        subset = subset[subset['model_name']==match_model_name]
+        # find the battery with the closest capacity
+        try:
+            if battery_capacity:
+                battery_target = float(battery_capacity.lower().replace('kwh', '').strip())
+                subset["distance"] = (subset["capacity"] - battery_target).abs()
+                closest_rows = subset[subset["distance"] == subset["distance"].min()]
+            
+            if sale_year:
+                sale_year =  pd.to_datetime(sale_year)
+                today = pd.to_datetime(date.today())
+                subset[['commissioning_date', 'enf_of_life_date']].fillna(today)
+                subset = subset[(subset['commissioning_date'] <=sale_year) & (subset['enf_of_life_date'] >= sale_year)]
+                closest_rows = subset
+                
+            else:
+                closest_rows = subset
+            # match on type
+            match_type = process.extractOne(type_car, closest_rows['type'], scorer=fuzz.token_sort_ratio)
+            if match_type:
+                _, _, index = match_type
+                return closest_rows.loc[index]["id"]
+
+        # fallback: find the closest type without battery
+        except:
+            match_type = process.extractOne(type_car, subset['type'], scorer=fuzz.token_sort_ratio)
+            _, _, index = match_type
+            return subset.loc[index, "id"]
+        
+    raise Exception("unknown model")
