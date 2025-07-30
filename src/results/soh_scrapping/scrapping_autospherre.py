@@ -29,12 +29,12 @@ def get_all_vehicle_links():
 
     while True:
         url = SEARCH_URL_TEMPLATE.format(offset)
-        print(f"Scraping page avec from={offset} ...")
+        print(f"Scraping page with from={offset} ...")
         response = requests.get(url)
         if offset > STOP_OFFSET:
             break
         if response.status_code != 200:
-            print(f"Page avec from={offset} inaccessible. Fin du scraping.")
+            print(f"Page with from={offset} inaccessible. Stopping scraping.")
             break
 
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -46,18 +46,18 @@ def get_all_vehicle_links():
                 new_links.add(full_url)
 
         if not new_links:
-            print(f"Aucun nouveau lien trouvé avec from={offset}. Fin du scraping.")
+            print(f"No new links found with from={offset}. Stopping scraping.")
             break
 
         initial_count = len(all_links)
         all_links.update(new_links)
         added_count = len(all_links) - initial_count
 
-        print(f"{added_count} nouveaux liens trouvés avec from={offset}.")
+        print(f"{added_count} new links found with from={offset}.")
         offset += STEP
         time.sleep(1)
 
-    print(f"\nNombre total de fiches uniques récupérées : {len(all_links)}")
+    print(f"\nTotal number of unique vehicle pages retrieved: {len(all_links)}")
     return list(all_links)
 
 def extract_soh_from_pdf(pdf_path):
@@ -72,7 +72,7 @@ def extract_soh_from_pdf(pdf_path):
                         if match:
                             return float(match.group(1).replace(',', '.'))
     except Exception as e:
-        print(f"[PDF] Erreur lecture SoH : {e}")
+        print(f"[PDF] Error reading SoH: {e}")
     return None
 
 def extract_aviloo_data_from_pdf(pdf_path):
@@ -111,7 +111,7 @@ def extract_aviloo_data_from_pdf(pdf_path):
                 result["Modèle"] = line.split(":")[-1].replace('Modèle', "").strip()
 
     except Exception as e:
-        print(f"[PDF] Erreur lecture rapport AVILOO : {e}")
+        print(f"[PDF] Error reading AVILOO report: {e}")
 
     return result
 
@@ -156,7 +156,6 @@ def extract_vehicle_info(link, car_nbr):
                     infos["OEM"] = data["OEM"]
                 if data["Modèle"]:
                     modele = data["Modèle"]
-                print(data["SoH"])
         except:
             pass
         version_complete = None
@@ -169,7 +168,7 @@ def extract_vehicle_info(link, car_nbr):
                 version_complete = re.sub(r"\b20\d{2}\b", "", version_complete)
             version_complete = version_complete.replace('Achat Integral', "").replace('Achat Intégral', "").strip()
         except Exception as e:
-            print(f"[{car_nbr}] Erreur fil d’Ariane : {e}")
+            print(f"[{car_nbr}] Error reading breadcrumb/title: {e}")
         infos["lien"] = link
         infos["Type"] = version_complete
         infos["Modèle"] = modele
@@ -201,7 +200,8 @@ def main():
         time.sleep(1)
 
     infos_clean = pd.DataFrame(all_infos).T.dropna(subset='SoH')[["OEM","Modèle","Type","Année","Odomètre (km)","SoH", "lien", "battery_capacity"]]
-    ### mapping names
+    
+    # Mapping to database model
     with get_connection() as con:
         cursor = con.cursor()
         cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
@@ -218,3 +218,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
