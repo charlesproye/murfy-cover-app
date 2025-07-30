@@ -1,30 +1,47 @@
+import logging
+import sys
+
 from core.console_utils import main_decorator
-from core.logging_utils import set_level_of_loggers_with_prefix
-from transform.raw_results.odometer_aggregation import agg_last_odometer
-from transform.raw_results.ford_results import get_results as ford_results
-from transform.raw_results.tesla_results import get_results as tesla_results
-from transform.raw_results.volvo_results import get_results as volvo_results
-from transform.raw_results.renault_results import get_results as renault_results
-from transform.raw_results.mercedes_results import get_results as mercedes_results
-from transform.raw_results.tesla_fleet_telemetry import get_results as tesla_fleet_telemetry_results
+from core.s3.settings import S3Settings
+from core.spark_utils import create_spark_session
+from transform.raw_results.processed_ts_to_raw_results import ProcessedTsToRawResults
+from transform.raw_results.providers.volvo import VolvoProcessedTsToRawResults
+from transform.raw_results.providers.tesla_fleet_telemetry import TeslaFTProcessedTsToRawResults
+from transform.raw_results.providers.ford import FordProcessedTsToRawResults
+from transform.raw_results.providers.renault import RenaultProcessedTsToRawResults
+from transform.raw_results.providers.stellantis import StellantisProcessedTsToRawResults
 
-from transform.raw_results.config import *
+ORCHESTRATED_MAKES = {
+    "bmw": (False, ProcessedTsToRawResults),
+    "mercedes-benz": (False, ProcessedTsToRawResults),
+    "renault": (False, RenaultProcessedTsToRawResults),
+    "volvo-cars": (False, VolvoProcessedTsToRawResults),
+    "stellantis": (False, StellantisProcessedTsToRawResults),
+    "kia": (False, ProcessedTsToRawResults),
+    "ford": (False, FordProcessedTsToRawResults),
+    "tesla-fleet-telemetry": (True, TeslaFTProcessedTsToRawResults),
+    "volkswagen": (False, ProcessedTsToRawResults),
+}
 
-def update_all_raw_tss():
-    for make in MAKES_WITHOUT_SOH:
-        agg_last_odometer(make, force_update=True)
-    ford_results(force_update=True)
-    mercedes_results(force_update=True)
-    renault_results(force_update=True)
-    tesla_results(force_update=True)
-    volvo_results(force_update=True)
-    tesla_fleet_telemetry_results(force_update=True)
 
 @main_decorator
 def main():
-    print("Updating all raw results...")
-    set_level_of_loggers_with_prefix("DEBUG", "transform.raw_results")
-    update_all_raw_tss()
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=sys.stdout,
+    )
+
+    logger = logging.getLogger("ProcessedTsToRawResults")
+    settings = S3Settings()
+    spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
+
+    for make, (is_orchestrated, class_to_use) in ORCHESTRATED_MAKES.items():
+        if is_orchestrated:
+            class_to_use(make=make, spark=spark, logger=logger).run()
+        else:
+            pass
+
 
 if __name__ == "__main__":
     main()
