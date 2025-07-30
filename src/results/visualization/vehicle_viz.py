@@ -26,7 +26,7 @@ def get_vehicle_models():
     with get_connection() as con:
         cursor = con.cursor()
         cursor.execute("""SELECT vm.model_name, vm.type, vm.version, o.oem_name, m.make_name, vm.trendline, 
-                       vm.trendline_min, vm.trendline_max , vm.mileage_data ,vm.soh_data , vm.soh_oem_data ,vm.trendline_bib , vm.commissioning_date , vm.end_of_life_date
+                       vm.trendline_min, vm.trendline_max , vm.odometer_data ,vm.soh_data , vm.soh_oem_data ,vm.trendline_bib , vm.commissioning_date , vm.end_of_life_date
                             FROM vehicle_model vm
                             join oem o  on o.id = vm.oem_id
                             join make m  on m.id = vm.make_id
@@ -35,7 +35,7 @@ def get_vehicle_models():
         return df
 
 vehicle_models = pd.DataFrame(get_vehicle_models(), columns=["model_name", "type", "version", "oem_name", "make_name", "trendline", 
-                                                             "trendline_min", "trendline_max" , "mileage_data" ,"soh_data" , 
+                                                             "trendline_min", "trendline_max" , "odometer_data" ,"soh_data" , 
                                                              "soh_oem_data" ,"trendline_bib" , "commissioning_date" , "end_of_life_date"
 ])
 
