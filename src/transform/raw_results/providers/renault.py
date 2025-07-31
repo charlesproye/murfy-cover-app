@@ -29,7 +29,7 @@ class RenaultProcessedTsToRawResults(ProcessedTsToRawResults):
     def aggregate(self, pts: DataFrame):
         return pts
 
-    def compute_specific_features(self, df):
+    def compute_specific_features(self, pts, df):
         df = df.filter(F.col("charging_status") == "charging").withColumn(
             "expected_battery_energy",
             F.when(

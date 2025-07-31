@@ -27,7 +27,7 @@ class FordProcessedTsToRawResults(ProcessedTsToRawResults):
     def aggregate(self, pts: DataFrame):
         return pts
 
-    def compute_specific_features(self, df):
+    def compute_specific_features(self, pts, df):
         """
         Compute the max battery energy for each net_capacity and soc
         """

@@ -55,7 +55,7 @@ class TeslaFTProcessedTsToRawResults(ProcessedTsToRawResults):
 
         return df
 
-    def compute_specific_features(self, df):
+    def compute_specific_features(self, pts, df):
         """
         Compute specific features for tesla fleet telemetry : soc diff, charging power, energy added
         """
@@ -63,7 +63,7 @@ class TeslaFTProcessedTsToRawResults(ProcessedTsToRawResults):
         window_spec = Window.partitionBy("vin", "charging_status_idx").orderBy("date")
 
         soc_diff_df = (
-            df.groupBy("vin", "charging_status_idx")
+            pts.groupBy("vin", "charging_status_idx")
             .agg(
                 F.first(
                     F.when(F.col("soc").isNotNull(), F.col("soc")), ignorenulls=True

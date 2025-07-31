@@ -49,7 +49,7 @@ class ProcessedTsToRawResults(CachedETLSpark):
 
         df = self.aggregate(pts)
 
-        df = self.compute_specific_features(df)
+        df = self.compute_specific_features(pts, df)
 
         df = self.compute_consumption(df)
 
@@ -92,7 +92,7 @@ class ProcessedTsToRawResults(CachedETLSpark):
 
         return df
 
-    def compute_specific_features(self, df: DataFrame):
+    def compute_specific_features(self, pts: DataFrame, df: DataFrame):
         return df
 
     def compute_soh(self, df: DataFrame):
