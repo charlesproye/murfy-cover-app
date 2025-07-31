@@ -265,6 +265,7 @@ class RawTsToProcessedTs(CachedETLSpark):
             "next_phase", F.lead("direction").over(w)
         )
 
+
         df = df.withColumn(
             "charging_status",
             F.when(F.col("total_soc_diff") > total_soc_diff_threshold, "charging")
@@ -283,34 +284,35 @@ class RawTsToProcessedTs(CachedETLSpark):
         )
 
         df = df.withColumn(
-            "charging_status_change",
-            F.when(
-                F.col("charging_status") != F.lag("charging_status").over(w), 1
-            ).otherwise(0),
-        )
-
-        df = df.withColumn(
-            "charging_status_idx",
-            F.sum("charging_status_change").over(
-                w.rowsBetween(Window.unboundedPreceding, 0)
-            ),
-        )
-
-        df = df.withColumn(
             "next_status",
             F.lead("charging_status").over(w)
         )
         
 
-        # Mettre la phase avant une phase de charging / discharging comme la phase pour avoir la bonne diff de SOC
-
+        # Set the phase before a charging/discharging phase as the phase to get the correct SOC diff
         df = df.withColumn(
             "charging_status",
             F.when(F.col("next_status") == 'charging', "charging")
             .when(F.col("next_status")== "discharging", "discharging")
             .otherwise(col('charging_status'))
         )
+
+        # Clean the charging status for non tesla-fleet-telemetry
+        if self.make != 'tesla-fleet-telemetry':
+            df = df.withColumn(
+                "charging_status",
+                F.when(F.col("charging_status") == "idle", None).otherwise(F.col("charging_status"))
+            )
+
+            df = df.withColumn(
+                "charging_status", 
+                F.coalesce(
+                    F.last("charging_status", ignorenulls=True).over(w),
+                    F.first("charging_status", ignorenulls=True).over(w.orderBy(F.col("date").desc()))
+                )
+            )
         
+
         df = df.withColumn(
             "charging_status_change",
             F.when(
