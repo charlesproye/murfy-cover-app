@@ -75,9 +75,6 @@ class RawTsToProcessedTs(CachedETLSpark):
         optimal_partitions_nb, _ = self._set_optimal_spark_parameters(
             tss, int(os.environ.get("NB_CORES_CLUSTER"))
         )  # Optimize partitions
-        tss = tss.repartition("vin").coalesce(optimal_partitions_nb)
-        tss = tss.cache()
-        tss.count()  # Trigger caching lazy operations
 
         tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
         tss = tss.select(*NECESSARY_COLS[self.make])  # Reduce column volumetry
@@ -92,8 +89,10 @@ class RawTsToProcessedTs(CachedETLSpark):
 
         tss = self.compute_specific_features(tss)
 
+        tss = tss.repartition("vin").coalesce(optimal_partitions_nb)
         tss = tss.cache()
-        tss.count()
+        tss.count()  # Trigger caching lazy operations
+
         tss = tss.join(self.spark.createDataFrame(fleet_info), "vin", "left")
 
         return tss
@@ -198,6 +197,14 @@ class RawTsToProcessedTs(CachedETLSpark):
     ) -> DF:
 
         w = Window.partitionBy("vin").orderBy("date")
+        
+        tss = tss.withColumn(
+            "soc", 
+            F.coalesce(
+                F.last("soc", ignorenulls=True).over(w),
+                F.first("soc", ignorenulls=True).over(w.orderBy(F.col("date").desc()))
+            )
+        )
 
         tss = tss.withColumn(
             "soc_diff",
@@ -244,9 +251,11 @@ class RawTsToProcessedTs(CachedETLSpark):
 
         df = df.withColumn("total_phase_time", F.sum("time_gap_minutes").over(w_phase))
 
-        df = self._reassign_short_phases(
-            df
-        )  # Reassign short phases to previous valid phase (especiallyuseful for tesla-fleet-telemetry noise)
+
+        if self.make == 'tesla-fleet-telemetry':
+            df = self._reassign_short_phases(
+                df
+            )  # Reassign short phases to previous valid phase (especiallyuseful for tesla-fleet-telemetry noise)
 
         w_phase = Window.partitionBy("vin", "phase_id")
 
@@ -262,12 +271,12 @@ class RawTsToProcessedTs(CachedETLSpark):
             .when(F.col("total_soc_diff") < -total_soc_diff_threshold, "discharging")
             .when(
                 (F.col("prev_phase") == F.col("next_phase"))
-                & (F.col("prev_phase") >= 0),
+                & (F.col("prev_phase") > 0),
                 "charging",
             )
             .when(
                 (F.col("prev_phase") == F.col("next_phase"))
-                & (F.col("prev_phase") <= 0),
+                & (F.col("prev_phase") < 0),
                 "discharging",
             )
             .otherwise("idle"),
@@ -279,6 +288,36 @@ class RawTsToProcessedTs(CachedETLSpark):
                 F.col("charging_status") != F.lag("charging_status").over(w), 1
             ).otherwise(0),
         )
+
+        df = df.withColumn(
+            "charging_status_idx",
+            F.sum("charging_status_change").over(
+                w.rowsBetween(Window.unboundedPreceding, 0)
+            ),
+        )
+
+        df = df.withColumn(
+            "next_status",
+            F.lead("charging_status").over(w)
+        )
+        
+
+        # Mettre la phase avant une phase de charging / discharging comme la phase pour avoir la bonne diff de SOC
+
+        df = df.withColumn(
+            "charging_status",
+            F.when(F.col("next_status") == 'charging', "charging")
+            .when(F.col("next_status")== "discharging", "discharging")
+            .otherwise(col('charging_status'))
+        )
+        
+        df = df.withColumn(
+            "charging_status_change",
+            F.when(
+                F.col("charging_status") != F.lag("charging_status").over(w), 1
+            ).otherwise(0),
+        )
+
 
         df = df.withColumn(
             "charging_status_idx",
