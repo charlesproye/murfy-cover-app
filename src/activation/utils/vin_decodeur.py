@@ -5,6 +5,10 @@ import hashlib
 import os
 import sys
 import requests
+import pandas as pd
+from core.sql_utils import get_connection
+from activation.config.mappings import mapping_vehicle_type
+
 
 def decode_vin(vin: str):
     """from a VIN queries the vindecoder.eu API to retrieve detailed vehicle information.
@@ -39,7 +43,27 @@ def decode_vin(vin: str):
     try:
         result = response.json()
         print("VIN successfully decoded:\n")
-        return result
+        for info in result["decode"]:
+            if info['label'] == 'Make':
+                make = info.get("value", '').lower()
+                if make =='mercedes-benz':
+                    make = "mercedes"
+            if info['label'] == 'Model':
+                model = info.get("value", '').lower()
+            if info['label'] == 'Model Year':
+                sale_year = info.get("value", '')
+            if info['label'] == "Engine Power (kW)":
+                engine_power = info.get("value", '')
+        with get_connection() as con:
+                cursor = con.cursor()
+                cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
+                                                            join make m on vm.make_id=m.id
+                                                            join battery b on b.id=vm.battery_id;""")
+                model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
+
+        vehicule_model_id = mapping_vehicle_type(model, make, model, model_existing, engine_power, sale_year)
+
+        return vehicule_model_id
 
     except ValueError:
         print("Error decoding JSON response:")
