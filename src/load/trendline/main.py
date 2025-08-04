@@ -98,31 +98,23 @@ if __name__ == "__main__":
     df_sheet['Modèle'] = df_sheet['Modèle'].apply(str.lower)
     df_sheet["SoH"] = df_sheet["SoH"].apply(lambda x:  x.replace('%', '').strip()).astype(float) / 100
     df_sheet["Odomètre (km)"] = df_sheet["Odomètre (km)"].apply(lambda x:  str(x).replace(',', '').strip()).astype(float)
-    # engine = get_sqlalchemy_engine()
-    # con = engine.connect()
+    engine = get_sqlalchemy_engine()
+    con = engine.connect()
 
-    # with engine.connect() as connection:
-    #     dbeaver_df = pd.read_sql(text("""SELECT vm.model_name, vm.id, vm.type, vm.battery_id, o.oem_name, b.capacity  FROM vehicle_model vm
-    #                                 join OEM o on vm.oem_id=o.id
-    #                                 join battery b on b.id=vm.battery_id;"""), con)
+    with engine.connect() as connection:
+        dbeaver_df = pd.read_sql(text("""SELECT vm.model_name, vm.id, vm.type, m.make_name FROM vehicle_model vm
+                                    join make  on m.id=vm.make_id;"""), con)
+        df_merge = df_sheet.merge(dbeaver_df, right_on=['make_name', 'model_name', 'type'], left_on=['OEM', 'Modèle', 'Type'], how='inner')
 
-    # ### Matching type 
-    # df_sheet['type'] = df_sheet.apply(lambda row: mapping_vehicle_type(row['Type'], row['OEM'], str(row['Modèle']), dbeaver_df,  row['battery_capacity']), axis=1)
-    
-    # df_sheet['Modèle'] = df_sheet['Modèle'].apply(lambda x: x.lower())
-    # df_merge = df_sheet.merge(dbeaver_df[['model_name', "type", 'battery_id']], left_on=['Modèle', "type"], right_on=['model_name', 'type'])
-    # df_merge['type'] = df_merge.groupby(['model_name', 'battery_id'])['type'].transform('first')
-    for model_car in df_sheet['Modèle'].unique()[:1]:
-        print(model_car)
-        for type_car in df_sheet[df_sheet['Modèle']==model_car]['Type'].unique():
-            df_temp = df_sheet[(df_sheet['Modèle']==model_car) & (df_sheet['Type']==type_car)].copy()
-            try:
-                if filtrer_trendlines(df_temp,  "Odomètre (km)", "lien", 50_000, 50_000, 50, 20, 10):
-                    mean_trend, upper_bound, lower_bound = generate_trendline_functions(df_temp, "Odomètre (km)", "SoH")
-                    update_database_trendlines(model_car, type_car, mean_trend, upper_bound, lower_bound, False)
-                    logging.info(f"Trendline mise à jour pour {type_car}")
-            except Exception as e: 
-                logging.error(f"Erreur mise à jour trendline {type_car}: {e}")
+    for model_car in df_merge['id'].unique()[:1]:
+        df_temp = df_merge[(df_merge['id']==model_car)].copy()
+        try:
+            if filtrer_trendlines(df_temp,  "Odomètre (km)", "lien", 50_000, 50_000, 50, 20, 10):
+                mean_trend, upper_bound, lower_bound = generate_trendline_functions(df_temp, "Odomètre (km)", "SoH")
+                update_database_trendlines(model_car, mean_trend, upper_bound, lower_bound, False)
+                logging.info(f"Trendline mise à jour pour {model_car}")
+        except Exception as e: 
+            logging.error(f"Erreur mise à jour trendline {model_car}: {e}")
 
 ######## Compute trendline from bib SoH ####################
 
@@ -138,12 +130,11 @@ if __name__ == "__main__":
                 WHERE o.oem_name = %s
             """
             df = pd.read_sql(query, connection, params=(oem_name,))
-        for model_car in df.model_name.unique():
-            for type_car in df["type"].unique():
-                df_temp = df[(df["model_name"] == model_car) & (df['type']==type_car)]
-                try:
-                    if filtrer_trendlines(df_temp,  "odometer", "vin", 50_000, 50_000, 50, 20, 10):
-                        mean_trend, upper_bound, lower_bound = generate_trendline_functions(df_temp, "odometer", "soh")
-                        update_database_trendlines(model_car, type_car, mean_trend, upper_bound, lower_bound)
-                except Exception as e:
-                    logging.error(f"Erreur modèle {model_car}: {e}")
+        for model_car in df['vehicle_model_id'].unique():
+            df_temp = df[(df['vehicle_model_id']==model_car)].copy()
+            try:
+                if filtrer_trendlines(df_temp,  "odometer", "vin", 50_000, 50_000, 50, 20, 10):
+                    mean_trend, upper_bound, lower_bound = generate_trendline_functions(df_temp, "odometer", "soh")
+                    update_database_trendlines(model_car, mean_trend, upper_bound, lower_bound)
+            except Exception as e:
+                logging.error(f"Erreur modèle {model_car}: {e}")
