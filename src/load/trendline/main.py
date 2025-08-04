@@ -114,11 +114,13 @@ if __name__ == "__main__":
     # df_merge['type'] = df_merge.groupby(['model_name', 'battery_id'])['type'].transform('first')
     for model_car in df_sheet['Modèle'].unique()[:1]:
         print(model_car)
-        for type_car in df_sheet[df_sheet['Modèle']==model_car].type.unique():
+        for type_car in df_sheet[df_sheet['Modèle']==model_car]['Type'].unique():
+            df_temp = df_sheet[(df_sheet['Modèle']==model_car) & (df_sheet['Type']==type_car)].copy()
             try:
-                mean_trend, upper_boun, lower_bound = generate_trendline_functions(df_sheet[(df_sheet['Modèle']==model_car) & (df_sheet['type']==type_car)], "Odomètre (km)", "SoH")
-                update_database_trendlines(model_car, type_car, mean_trend, upper_boun, lower_bound, False)
-                logging.info(f"Trendline mise à jour pour {type_car}")
+                if filtrer_trendlines(df_temp,  "Odomètre (km)", "lien", 50_000, 50_000, 50, 20, 10):
+                    mean_trend, upper_bound, lower_bound = generate_trendline_functions(df_temp, "Odomètre (km)", "SoH")
+                    update_database_trendlines(model_car, type_car, mean_trend, upper_bound, lower_bound, False)
+                    logging.info(f"Trendline mise à jour pour {type_car}")
             except Exception as e: 
                 logging.error(f"Erreur mise à jour trendline {type_car}: {e}")
 
@@ -138,8 +140,10 @@ if __name__ == "__main__":
             df = pd.read_sql(query, connection, params=(oem_name,))
         for model_car in df.model_name.unique():
             for type_car in df["type"].unique():
+                df_temp = df[(df["model_name"] == model_car) & (df['type']==type_car)]
                 try:
-                    mean_trend, upper_boun, lower_bound = generate_trendline_functions(df[(df["model_name"] == model_car)  & (df['type']==type_car)], "odometer", "soh")
-                    update_database_trendlines(model_car, type_car, mean_trend, upper_boun, lower_bound)
+                    if filtrer_trendlines(df_temp,  "odometer", "vin", 50_000, 50_000, 50, 20, 10):
+                        mean_trend, upper_bound, lower_bound = generate_trendline_functions(df_temp, "odometer", "soh")
+                        update_database_trendlines(model_car, type_car, mean_trend, upper_bound, lower_bound)
                 except Exception as e:
                     logging.error(f"Erreur modèle {model_car}: {e}")
