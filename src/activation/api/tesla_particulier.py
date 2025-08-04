@@ -1,9 +1,9 @@
-from src.core.sql_utils import get_connection
+from core.sql_utils import get_connection
 import aiohttp
 import asyncio
 import logging
 import re
-from ...vehicle_info.config.mappings import TESLA_MODEL_MAPPING
+from activation.config.mappings import TESLA_MODEL_MAPPING
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 

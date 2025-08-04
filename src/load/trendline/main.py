@@ -91,7 +91,7 @@ if __name__ == "__main__":
 ######## Compute trendline from scrapping SoH ####################    
     
     #### Get data from scrapping
-    df = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
+    df = load_excel_data(get_google_client(), "202505 - Courbes SoH", "Courbes OS")
     df_sheet = pd.DataFrame(columns=df[0,:8], data=df[1:,:8])
     df_sheet['OEM'] = df_sheet['OEM'].apply(str.lower)
     df_sheet['Modèle'] = df_sheet['Modèle'].apply(str.lower)

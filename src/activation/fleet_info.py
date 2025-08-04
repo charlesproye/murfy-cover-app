@@ -13,10 +13,11 @@ from src.core.pandas_utils import *
 from src.core.s3.s3_utils import S3Service
 from src.core.singleton_s3_bucket import S3
 from src.core.config import *
+from src.core.gsheet_utils import get_google_client
 from .config.credentials import SPREADSHEET_ID 
 from .config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
 from .config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
-from .utils.google_sheets_utils import get_google_client
+
 
 logger = getLogger("ingestion.vehicle_info")
  

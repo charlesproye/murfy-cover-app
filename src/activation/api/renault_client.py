@@ -9,7 +9,7 @@ import logging
 from typing import Dict, Optional, Tuple
 from pathlib import Path
 from enum import Enum
-from src.core.env_utils import get_env_var
+from core.env_utils import get_env_var
 
 class RenaultAPIError(Exception):
     """Base exception for Renault API errors"""
@@ -45,7 +45,7 @@ class RenaultApi:
         self.scope = scope
         self.pwd = pwd
         self.temp_files = []
-        self.pkcs12_file = "src/ingestion/vehicle_info/api/pkcs12.txt"
+        self.pkcs12_file = "src/activation/api/pkcs12.txt"
         self._token_data: Optional[Dict] = None
         self._token_expiry: float = 0
         
@@ -205,6 +205,7 @@ class RenaultApi:
                     async with session.get(url, headers=headers) as response:
                         if response.status == 200:
                             data = await response.json()
+                            print(data)
                             model = data.get("model", "renault model unknown").lower()
                             type_and_version = data.get("version").lower()
                             
