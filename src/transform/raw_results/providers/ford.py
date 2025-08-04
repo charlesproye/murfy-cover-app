@@ -25,18 +25,57 @@ class FordProcessedTsToRawResults(ProcessedTsToRawResults):
         )
 
     def aggregate(self, pts: DataFrame):
-        return pts
 
-    def compute_specific_features(self, pts, df):
-        """
-        Compute the max battery energy for each net_capacity and soc
-        """
+        pts = pts.withColumn('battery_energy', F.col('battery_energy').cast('double'))
+        pts_charging = pts.filter(F.col("charging_status") == "charging")
 
-        max_energy = df.groupBy("net_capacity", "soc").agg(
+        max_energy = pts_charging.groupBy(["net_capacity", "soc"]).agg(
             F.expr("percentile_approx(battery_energy, 0.9)").alias("max_battery_energy")
         )
 
-        df = df.join(max_energy, on=["net_capacity", "soc"], how="left")
+        df = pts.join(max_energy, on=["net_capacity", "soc"], how="left")
+
+        df = df.withColumn('max_battery_energy', F.col('max_battery_energy').cast('double'))
+
+        df = (
+            df
+            .dropna(subset=['battery_energy', 'max_battery_energy'])  
+            .groupBy(['vin', 'charging_status_idx'])
+            .agg(
+                F.first('charging_status', ignorenulls=True).alias('charging_status'),
+                F.sum('battery_energy').alias('battery_energy_sum'),
+                F.sum('max_battery_energy').alias('max_battery_energy_sum'),
+            )
+            .withColumn(
+                'battery_energy_sum',
+                F.when(F.col('charging_status') == 'discharging', None).otherwise(F.col('battery_energy_sum'))
+            )
+            .withColumn(
+                'max_battery_energy_sum',
+                F.when(F.col('charging_status') == 'discharging', None).otherwise(F.col('max_battery_energy_sum'))
+            )
+        )
+
+        return df
+
+    def compute_specific_features(self, pts, df):
+        df_soc_diff = pts.groupBy(['vin', 'charging_status_idx']).agg(
+            F.first("net_capacity", ignorenulls=True).alias("net_capacity"),
+            F.first("odometer", ignorenulls=True).alias("odometer"),
+            F.first("version", ignorenulls=True).alias("version"),
+            F.first("model", ignorenulls=True).alias("model"),
+            F.last('soc', ignorenulls=True).alias('soc_last'),
+            F.first('soc', ignorenulls=True).alias('soc_first'),
+            F.first('date', ignorenulls=True).alias('date'),
+            F.first("odometer", ignorenulls=True).alias("odometer_start"),
+            F.last("odometer", ignorenulls=True).alias("odometer_end"),
+            F.last("range", ignorenulls=True).alias("range"),
+        )
+
+        df_soc_diff = df_soc_diff.withColumn("soc_diff", F.col("soc_last") - F.col("soc_first"))
+        df_soc_diff = df_soc_diff.withColumn("odometer_diff", F.col("odometer_end") - F.col("odometer_start"))
+
+        df = df.join(df_soc_diff, on=['vin', 'charging_status_idx'], how='left')
 
         return df
 
@@ -46,50 +85,12 @@ class FordProcessedTsToRawResults(ProcessedTsToRawResults):
         """
 
         df = df.withColumn(
-            "soh",
-            F.when(
-                F.col("max_battery_energy").isNotNull()
-                & (F.col("max_battery_energy") != 0),
-                F.col("battery_energy") / F.col("max_battery_energy"),
-            ).otherwise(None),
+            'soh', 
+            F.col('battery_energy_sum') / F.col('max_battery_energy_sum')
         )
 
         return df
 
-    def compute_consumption(self, df):
-        """
-        Compute the consumption for Ford
-        """
-
-        df_filtered = df.dropna(subset=["odometer", "soc"])
-
-        consumption = (
-            df_filtered.filter(F.col("charging_status") == "discharging")
-            .groupBy("vin", "charging_status_idx")
-            .agg(
-                F.first("soc").alias("soc_start"),
-                F.last("soc").alias("soc_end"),
-                F.first("odometer").alias("odometer_start"),
-                F.last("odometer").alias("odometer_end"),
-                F.first("net_capacity").alias("net_capacity"),
-            )
-            .withColumn("soc_diff", F.col("soc_start") - F.col("soc_end"))
-            .withColumn(
-                "odometer_diff", F.col("odometer_end") - F.col("odometer_start")
-            )
-            .withColumn(
-                "consumption",
-                F.col("soc_diff")
-                * F.col("net_capacity")
-                * 100
-                / F.col("odometer_diff"),
-            )
-            .filter(F.col("consumption") > 0)
-            .filter(F.col("odometer_diff") > 10)
-            .select("vin", "charging_status_idx", "consumption")
-        )
-
-        return df.join(consumption, on=["vin", "charging_status_idx"], how="left")
 
     def compute_cycles(self, df: DataFrame):
         """

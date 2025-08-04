@@ -39,9 +39,13 @@ class TeslaFTProcessedTsToRawResults(ProcessedTsToRawResults):
             ),
             F.first("net_capacity", ignorenulls=True).alias("net_capacity"),
             F.first("range", ignorenulls=True).alias("range"),
-            F.first("odometer", ignorenulls=True).alias("odometer"),
+            F.first("odometer", ignorenulls=True).alias("odometer_start"),
+            F.last("odometer", ignorenulls=True).alias("odometer_end"),
             F.first("version", ignorenulls=True).alias("version"),
             F.count("soc").alias("size"),
+            F.first("charging_status", ignorenulls=True).alias("charging_status"),
+            F.first("soc", ignorenulls=True).alias("soc_first"),
+            F.last("soc", ignorenulls=True).alias("soc_last"),
             F.first("model", ignorenulls=True).alias("model"),
             F.first("date", ignorenulls=True).alias("date"),
             F.expr("percentile_approx(ac_charging_power, 0.5)").alias(
@@ -149,7 +153,7 @@ class TeslaFTProcessedTsToRawResults(ProcessedTsToRawResults):
         return df.withColumn(
             "estimated_cycles",
             F.round(
-                F.col("odometer")
+                F.col("odometer_start")
                 / (
                     (
                         F.when(F.col("range").isNull(), F.lit(initial_range)).otherwise(
@@ -170,3 +174,33 @@ class TeslaFTProcessedTsToRawResults(ProcessedTsToRawResults):
             ),
         )
 
+    
+    def compute_consumption(self, df):
+        """
+        Compute the consumption for Stellantis
+        """
+
+        df = df.withColumn("odometer_diff", F.col("odometer_end") - F.col("odometer_start"))
+        df = df.withColumn("soc_diff", (F.col("soc_last") - F.col("soc_first")) / 100)
+
+        consumption = (
+            df.filter(F.col("charging_status") == "discharging")
+            .withColumn(
+                "consumption",
+                F.when(
+                    F.col("soh").isNotNull(),
+                    (- 1 * F.col("soc_diff"))
+                    * (F.col("net_capacity")) * (F.col("soh") / 100)
+                    / F.col("odometer_diff")
+                ).otherwise(
+                    (- 1 * F.col("soc_diff"))
+                    * (F.col("net_capacity"))
+                    / F.col("odometer_diff")
+                )
+            )
+            .filter(F.col("consumption") > 0)
+            .filter(F.col("odometer_diff") > 10)
+            .select("vin", "charging_status_idx", "consumption")
+        )
+
+        return df.join(consumption, on=["vin", "charging_status_idx"], how="left")

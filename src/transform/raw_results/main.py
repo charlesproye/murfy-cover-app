@@ -1,5 +1,6 @@
 import logging
 import sys
+from tkinter import FALSE
 
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
@@ -14,16 +15,17 @@ from transform.raw_results.providers.stellantis import \
 from transform.raw_results.providers.tesla_fleet_telemetry import \
     TeslaFTProcessedTsToRawResults
 from transform.raw_results.providers.volvo import VolvoProcessedTsToRawResults
+from transform.raw_results.providers.bmw import BMWProcessedTsToRawResults
 
 ORCHESTRATED_MAKES = {
-    "bmw": (False, ProcessedTsToRawResults),
+    "bmw": (False, BMWProcessedTsToRawResults),
     "mercedes-benz": (False, ProcessedTsToRawResults),
     "renault": (False, RenaultProcessedTsToRawResults),
     "volvo-cars": (False, VolvoProcessedTsToRawResults),
     "stellantis": (False, StellantisProcessedTsToRawResults),
     "kia": (False, ProcessedTsToRawResults),
     "ford": (False, FordProcessedTsToRawResults),
-    "tesla-fleet-telemetry": (False, TeslaFTProcessedTsToRawResults),
+    "tesla-fleet-telemetry": (FALSE, TeslaFTProcessedTsToRawResults),
     "volkswagen": (False, ProcessedTsToRawResults),
 }
 

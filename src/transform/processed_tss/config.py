@@ -41,13 +41,13 @@ SOC_DIFF_THRESHOLD = {
 # Columns to keep in order to run processed_ts + not used but necessary afterwards
 NECESSARY_COLS = {
     'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
-    'renault': ['vin', 'date', 'odometer', 'soc'],
+    'renault': ['vin', 'date', 'odometer', 'soc', 'battery_energy', 'charging_rate'],
     'kia': ['vin', 'date', 'odometer', 'soc'],
     'bmw': ['vin', 'date', 'odometer', 'soc', 'charging_status',  'consumption', 'charging_ac_current', 'charging_ac_voltage', 'current_remaining_fuel_range', 'hv_state_of_health', 'estimated_range', 'model_according_to_data_provider', 'remaining_fuel'],
     'mercedes-benz': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'total_charging_duration', 'start_time', 'end_time', 'energy_charged', 'displayed_state_of_charge', 'displayed_start_state_of_charge', 'charging_rate', 'estimated_range', 'fully_charged_end_times'],
-    'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
-    'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status'],
+    'ford': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'battery_energy'],
+    'volvo-cars': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'estimated_range', 'consumption'],
+    'stellantis': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'soh_oem'],
     'tesla-fleet-telemetry': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added', 'ac_charging_power', 'dc_charging_power'],
     'volkswagen': ['vin', 'date', 'odometer', 'soc', 'chargeRate', 'chargePower', 'chargingMode', 'chargingReason', 'externalPowerSupplyState', 'energyFlow']
 }
@@ -69,6 +69,7 @@ RENAME_COLS_DICT:dict[str, str] = {
     "status": "charging_status",
     "charging_battery_charge_type": "charging_method",
     "usage_electric_consumption_average": 'consumption',
+    "electric_consumption_average": 'consumption',
     # Mobilisight
     "datetime": "date",
     "engine.oilTemperature": "oil_temp",

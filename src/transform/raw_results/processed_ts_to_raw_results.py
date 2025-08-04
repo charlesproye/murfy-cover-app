@@ -51,9 +51,8 @@ class ProcessedTsToRawResults(CachedETLSpark):
 
         df = self.compute_specific_features(pts, df)
 
-        df = self.compute_consumption(df)
-
         df = self.compute_soh(df)
+        df = self.compute_consumption(df)
         df = self.compute_cycles(df)
 
         df = self.compute_charge_levels(df)
@@ -67,39 +66,58 @@ class ProcessedTsToRawResults(CachedETLSpark):
         Default case when there is no SOH computation implemented
         """
 
-        floored_col = F.date_trunc("week", F.col("date")).alias("floored_date")
-
         agg_columns = [
             F.last("odometer", ignorenulls=True).alias("odometer"),
             F.first("make", ignorenulls=True).alias("make"),
             F.first("model", ignorenulls=True).alias("model"),
             F.first("version", ignorenulls=True).alias("version"),
+            F.first("net_capacity", ignorenulls=True).alias("net_capacity"),
+            F.first("date", ignorenulls=True).alias("date"),
+            F.first("soc", ignorenulls=True).alias("soc_first"),
+            F.last("soc", ignorenulls=True).alias("soc_last"),
+            F.first("charging_status", ignorenulls=True).alias("charging_status"),
+            F.first("odometer", ignorenulls=True).alias("odometer_start"),
+            F.last("odometer", ignorenulls=True).alias("odometer_end")
         ]
 
         if "consumption" in pts.columns:
             agg_columns.append(F.mean("consumption").alias("consumption"))
-        else:
-            agg_columns.append(F.lit(None).cast(T.FloatType()).alias("consumption"))
 
         df = (
-            pts.withColumn("floored_date", floored_col)
-            .groupBy("vin", "floored_date")
+            pts.groupBy("vin", "charging_status_idx")
             .agg(*agg_columns)
-            .withColumnRenamed("floored_date", "date")
             .na.drop(subset=["odometer"])
-            .withColumn("soh", F.lit(None).cast(T.FloatType()))
         )
 
         return df
 
     def compute_specific_features(self, pts: DataFrame, df: DataFrame):
+
+        df = df.withColumn("odometer_diff", F.col("odometer_end") - F.col("odometer_start"))
+        df = df.withColumn("soc_diff", F.col("soc_last") - F.col("soc_first"))
+
+
         return df
 
     def compute_soh(self, df: DataFrame):
         return df
 
     def compute_consumption(self, df: DataFrame):
-        return df
+
+        consumption = (
+            df.filter(F.col("charging_status") == "discharging")
+            .withColumn(
+                "consumption",
+                (- 1 * F.col("soc_diff"))
+                * (F.col("net_capacity"))
+                / F.col("odometer_diff"),
+            )
+            .filter(F.col("consumption") > 0)
+            .filter(F.col("odometer_diff") > 10)
+            .select("vin", "charging_status_idx", "consumption")
+        )
+
+        return df.join(consumption, on=["vin", "charging_status_idx"], how="left")
 
     def compute_charge_levels(self, df: DataFrame):
         return df

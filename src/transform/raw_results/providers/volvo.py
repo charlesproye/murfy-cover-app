@@ -26,12 +26,10 @@ class VolvoProcessedTsToRawResults(ProcessedTsToRawResults):
         )
 
     def aggregate(self, pts: DataFrame):
-        return pts
 
-    def compute_soh(self, df):
         w = Window.partitionBy("vin").orderBy("date")
 
-        df = df.withColumn(
+        pts = pts.withColumn(
             "odometer",
             F.coalesce(
                 F.last("odometer", ignorenulls=True).over(w),
@@ -52,7 +50,26 @@ class VolvoProcessedTsToRawResults(ProcessedTsToRawResults):
             ).otherwise(None),
         )
 
+        df = (
+            pts
+            .groupBy(['vin', 'charging_status_idx'])
+            .agg(
+                F.expr("percentile_approx(soh, 0.5)").alias('soh'),
+                F.first("net_capacity", ignorenulls=True).alias("net_capacity"),
+                F.first("odometer", ignorenulls=True).alias("odometer"),
+                F.first("version", ignorenulls=True).alias("version"),
+                F.first('soc', ignorenulls=True).alias('soc_first'),
+                F.last('soc', ignorenulls=True).alias('soc_last'),
+                F.first("model", ignorenulls=True).alias("model"),
+                F.first("date", ignorenulls=True).alias("date"),
+                F.first('range', ignorenulls=True).alias('range'),
+                F.mean('consumption').alias('consumption'),
+                F.first('charging_status', ignorenulls=True).alias('charging_status')
+            )
+        )
+
         return df
+
 
     def compute_cycles(self, df):
         def estimate_cycles_udf(odometer, range_val, soh):
@@ -67,3 +84,6 @@ class VolvoProcessedTsToRawResults(ProcessedTsToRawResults):
 
         return df
 
+
+    def compute_consumption(self, df):
+        return df

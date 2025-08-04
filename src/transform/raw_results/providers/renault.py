@@ -27,27 +27,62 @@ class RenaultProcessedTsToRawResults(ProcessedTsToRawResults):
         )
 
     def aggregate(self, pts: DataFrame):
-        return pts
 
-    def compute_specific_features(self, pts, df):
-        df = df.filter(F.col("charging_status") == "charging").withColumn(
-            "expected_battery_energy",
-            F.when(
-                F.col("net_capacity").isNotNull() & F.col("soc").isNotNull(),
-                F.col("net_capacity") * (F.col("soc") / 100.0),
-            ).otherwise(None),
+        pts = (
+            pts.withColumn(
+                "expected_battery_energy",
+                F.when(
+                    (F.col("net_capacity").isNotNull()) & (F.col("soc").isNotNull()),
+                    F.col("net_capacity") * (F.col("soc") / 100.0)
+                )
+                .otherwise(None)
+            )
+        )
+
+        df = (
+            pts
+            .groupBy(['vin', 'charging_status_idx'])
+            .agg(
+                F.first('charging_status', ignorenulls=True).alias('charging_status'),
+                F.sum('battery_energy').alias('battery_energy_sum'),
+                F.sum('expected_battery_energy').alias('expected_battery_energy_sum'),
+            )
+            .withColumn(
+                'expected_battery_energy_sum',
+                F.when(F.col('charging_status') == 'discharging', None).otherwise(F.col('expected_battery_energy_sum'))
+            )
         )
 
         return df
 
+    def compute_specific_features(self, pts, df):
+        df_soc_diff = pts.groupBy(['vin', 'charging_status_idx']).agg(
+            F.first("net_capacity", ignorenulls=True).alias("net_capacity"),
+            F.first("odometer", ignorenulls=True).alias("odometer"),
+            F.first("version", ignorenulls=True).alias("version"),
+            F.first('soc', ignorenulls=True).alias('soc_first'),
+            F.last('soc', ignorenulls=True).alias('soc_last'),
+            F.first("model", ignorenulls=True).alias("model"),
+            F.first("date", ignorenulls=True).alias("date"),
+            F.last("range", ignorenulls=True).alias("range"),
+            F.first("odometer", ignorenulls=True).alias("odometer_start"),
+            F.last("odometer", ignorenulls=True).alias("odometer_end"),
+            F.mean("charging_rate").alias("charging_rate")
+        )
+
+        df_soc_diff = df_soc_diff.withColumn("soc_diff", F.col("soc_last") - F.col("soc_first"))
+        df_soc_diff = df_soc_diff.withColumn("odometer_diff", F.col("odometer_end") - F.col("odometer_start"))
+
+
+        df = df.join(df_soc_diff, on=['vin', 'charging_status_idx'], how='left')
+
+        return df
+
     def compute_soh(self, df):
+
         df = df.withColumn(
-            "soh",
-            F.when(
-                F.col("expected_battery_energy").isNotNull()
-                & (F.col("expected_battery_energy") != 0),
-                F.col("battery_energy") / F.col("expected_battery_energy"),
-            ).otherwise(None),
+            'soh', 
+            F.col('battery_energy_sum') / F.col('expected_battery_energy_sum')
         )
 
         return df
@@ -69,8 +104,7 @@ class RenaultProcessedTsToRawResults(ProcessedTsToRawResults):
         w = Window.partitionBy("vin").orderBy("date")
 
         return (
-            df.withColumn("soc_diff", F.col("soc") - F.lag("soc").over(w))
-            .withColumn(
+            df.withColumn(
                 "level_1",
                 F.col("soc_diff")
                 * (F.col("charging_rate") < F.lit(LEVEL_1_MAX_POWER)).cast("int"),

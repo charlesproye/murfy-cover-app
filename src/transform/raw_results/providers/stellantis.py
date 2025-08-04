@@ -24,22 +24,73 @@ class StellantisProcessedTsToRawResults(ProcessedTsToRawResults):
         super().__init__(make, spark, force_update, logger=logger, **kwargs)
 
     def aggregate(self, pts: DataFrame):
-        return pts
 
-    def compute_cycles(self, df: DataFrame):
-        """
-        Compute the cycles for Ford
-        """
-
-        def estimate_cycles_udf(odometer, range_val, soh):
-            return estimate_cycles(odometer, range_val, soh)
-
-        estimate_cycles_spark = udf(estimate_cycles_udf, DoubleType())
-
-        df = df.withColumn(
-            "cycles",
-            estimate_cycles_spark(F.col("odometer"), F.col("range"), F.col("soh")),
+        df = (
+            pts
+            .groupBy(['vin', 'charging_status_idx'])
+            .agg(
+                F.expr("percentile_approx(soh_oem, 0.5)").alias('soh_oem'),
+                F.first("net_capacity", ignorenulls=True).alias("net_capacity"),
+                F.first("odometer", ignorenulls=True).alias("odometer"),
+                F.first("version", ignorenulls=True).alias("version"),
+                F.first('soc', ignorenulls=True).alias('soc_first'),
+                F.last('soc', ignorenulls=True).alias('soc_last'),
+                F.first("model", ignorenulls=True).alias("model"),
+                F.first("date", ignorenulls=True).alias("date"),
+                F.first('charging_status', ignorenulls=True).alias('charging_status'),
+                F.first("odometer", ignorenulls=True).alias("odometer_start"),
+                F.last("odometer", ignorenulls=True).alias("odometer_end")
+            )
         )
 
         return df
+
+    
+    def compute_consumption(self, df):
+        """
+        Compute the consumption for Stellantis
+        """
+
+        df = df.withColumn("odometer_diff", F.col("odometer_end") - F.col("odometer_start"))
+        df = df.withColumn("soc_diff", (F.col("soc_last") - F.col("soc_first")) / 100)
+
+        consumption = (
+            df.filter(F.col("charging_status") == "discharging")
+            .withColumn(
+                "consumption",
+                F.when(
+                    F.col("soh_oem").isNotNull(),
+                    (- 1 * F.col("soc_diff"))
+                    * (F.col("net_capacity")) * (F.col("soh_oem") / 100)
+                    / F.col("odometer_diff")
+                ).otherwise(
+                    (- 1 * F.col("soc_diff"))
+                    * (F.col("net_capacity"))
+                    / F.col("odometer_diff")
+                )
+            )
+            .filter(F.col("consumption") > 0)
+            .filter(F.col("odometer_diff") > 10)
+            .select("vin", "charging_status_idx", "consumption")
+        )
+
+        return df.join(consumption, on=["vin", "charging_status_idx"], how="left")
+
+    # SOH is NAN
+    # def compute_cycles(self, df: DataFrame):
+    #     """
+    #     Compute the cycles for Ford
+    #     """
+
+    #     def estimate_cycles_udf(odometer, range_val, soh):
+    #         return estimate_cycles(odometer, range_val, soh)
+
+    #     estimate_cycles_spark = udf(estimate_cycles_udf, DoubleType())
+
+    #     df = df.withColumn(
+    #         "cycles",
+    #         estimate_cycles_spark(F.col("odometer"), F.col("range"), F.col("soh")),
+    #     )
+
+    #     return df
 
