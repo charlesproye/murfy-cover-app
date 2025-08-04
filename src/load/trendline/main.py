@@ -92,12 +92,12 @@ if __name__ == "__main__":
 ######## Compute trendline from scrapping SoH ####################    
     
     #### Get data from scrapping
-    df = load_excel_data(get_google_client(), "202505 - Courbes SoH", "Courbes OS")
+    df = load_excel_data(get_google_client(), "Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=df[0,:8], data=df[1:,:8])
     df_sheet['OEM'] = df_sheet['OEM'].apply(str.lower)
     df_sheet['Modèle'] = df_sheet['Modèle'].apply(str.lower)
     df_sheet["SoH"] = df_sheet["SoH"].apply(lambda x:  x.replace('%', '').strip()).astype(float) / 100
-    df_sheet["Odomètre (km)"] = df_sheet["Odomètre (km)"].apply(lambda x:  str(x).replace(' ', '').strip()).astype(float)
+    df_sheet["Odomètre (km)"] = df_sheet["Odomètre (km)"].apply(lambda x:  str(x).replace(',', '').strip()).astype(float)
     # engine = get_sqlalchemy_engine()
     # con = engine.connect()
 
