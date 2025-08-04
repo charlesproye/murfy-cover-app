@@ -31,23 +31,21 @@ def build_trendline_expressions(coef_mean, coef_lower, coef_upper, y_lower, y_up
     )
 
 
-def update_database_trendlines(model_car, type_car, mean_trendline, upper_trendline, lower_trendline, trendline_bib=True):
+def update_database_trendlines(model_id, mean_trendline, upper_trendline, lower_trendline, trendline_bib=True):
     sql_request = text(f"""
         UPDATE vehicle_model
         SET trendline = :trendline_json,
             trendline_min = :trendline_min_json,
             trendline_max = :trendline_max_json,
             trendline_bib = :trendline_bib
-        WHERE model_name = :model 
-        AND type = :type
+        WHERE id = :model_id 
     """)
     with get_sqlalchemy_engine().begin() as conn:
         conn.execute(sql_request, {
             "trendline_json": json.dumps({"trendline" : mean_trendline}),
             "trendline_min_json": json.dumps({"trendline" : upper_trendline}),
             "trendline_max_json": json.dumps({"trendline" : lower_trendline}),
-            "model": model_car,
-            "type": type_car,
+            "model_id": model_id,
             "trendline_bib": trendline_bib
         })
     
