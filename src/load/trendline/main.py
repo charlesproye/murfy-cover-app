@@ -6,6 +6,7 @@ from sqlalchemy import text
 from load.trendline.trendline_utils import *
 from core.gsheet_utils import *
 from rapidfuzz import process, fuzz
+from core.sql_utils import get_connection
 import re
 
 def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity=None):
@@ -125,18 +126,16 @@ if __name__ == "__main__":
 
     oems = ['tesla'] # add the oem with SoH from bib
     for oem_name in oems:
-        with engine.connect() as connection:
-            query = text("""
+        with get_connection() as connection:
+            query = """
                 SELECT * FROM vehicle v
                 JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
                 JOIN vehicle_data vd ON vd.vehicle_id = v.id
                 JOIN oem o ON o.id = vm.oem_id
                 JOIN battery b ON b.id = vm.battery_id
-                WHERE o.oem_name = :oem_name
-            """)
-            df = pd.read_sql(query, connection, params={"oem_name": oem_name})
-            
-
+                WHERE o.oem_name = %s
+            """
+            df = pd.read_sql(query, connection, params=(oem_name,))
         for model_car in df.model_name.unique():
             for type_car in df["type"].unique():
                 try:
