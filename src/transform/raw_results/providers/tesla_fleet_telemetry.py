@@ -177,7 +177,7 @@ class TeslaFTProcessedTsToRawResults(ProcessedTsToRawResults):
     
     def compute_consumption(self, df):
         """
-        Compute the consumption for Stellantis
+        Compute the consumption for TFT
         """
 
         df = df.withColumn("odometer_diff", F.col("odometer_end") - F.col("odometer_start"))

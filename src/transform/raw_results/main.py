@@ -25,7 +25,7 @@ ORCHESTRATED_MAKES = {
     "stellantis": (False, StellantisProcessedTsToRawResults),
     "kia": (False, ProcessedTsToRawResults),
     "ford": (False, FordProcessedTsToRawResults),
-    "tesla-fleet-telemetry": (FALSE, TeslaFTProcessedTsToRawResults),
+    "tesla-fleet-telemetry": (False, TeslaFTProcessedTsToRawResults),
     "volkswagen": (False, ProcessedTsToRawResults),
 }
 
