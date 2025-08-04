@@ -75,22 +75,3 @@ class StellantisProcessedTsToRawResults(ProcessedTsToRawResults):
         )
 
         return df.join(consumption, on=["vin", "charging_status_idx"], how="left")
-
-    # SOH is NAN
-    # def compute_cycles(self, df: DataFrame):
-    #     """
-    #     Compute the cycles for Ford
-    #     """
-
-    #     def estimate_cycles_udf(odometer, range_val, soh):
-    #         return estimate_cycles(odometer, range_val, soh)
-
-    #     estimate_cycles_spark = udf(estimate_cycles_udf, DoubleType())
-
-    #     df = df.withColumn(
-    #         "cycles",
-    #         estimate_cycles_spark(F.col("odometer"), F.col("range"), F.col("soh")),
-    #     )
-
-    #     return df
-

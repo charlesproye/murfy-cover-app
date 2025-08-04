@@ -1,6 +1,5 @@
 import logging
 import sys
-from tkinter import FALSE
 
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
