@@ -225,14 +225,13 @@ def filtrer_trendlines(df, col_odometer='odometer', col_vin='vin', km_lower=8000
     - A list of tuples (Modèle, model_id) that meet the criteria
     """
     
-    resultats = []
     for modele, group in df.groupby(["Modèle", 'model_id']):
         nb_total_vins = group[col_vin].nunique()
         nb_lower = group[group[col_odometer] <= km_lower][col_vin].nunique()
         nb_upper = group[group[col_odometer] >= km_upper][col_vin].nunique()
         
         if nb_total_vins >= vin_total and nb_lower >= nbr_under and nb_upper >= nbr_upper:
-            return resultats
+            return modele
     raise  print("The model don't respect the filtering criteria")
 
 
