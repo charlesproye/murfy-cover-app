@@ -103,18 +103,20 @@ if __name__ == "__main__":
 
     with engine.connect() as connection:
         dbeaver_df = pd.read_sql(text("""SELECT vm.model_name, vm.id, vm.type, m.make_name FROM vehicle_model vm
-                                    join make  on m.id=vm.make_id;"""), con)
+                                    join make m on m.id=vm.make_id;"""), con)
         df_merge = df_sheet.merge(dbeaver_df, right_on=['make_name', 'model_name', 'type'], left_on=['OEM', 'Modèle', 'Type'], how='inner')
-
-    for model_car in df_merge['id'].unique()[:1]:
+        
+    logging.info(f"Starting trendline update from gsheet")
+    
+    for model_car in df_merge['id'].unique():
         df_temp = df_merge[(df_merge['id']==model_car)].copy()
         try:
             if filtrer_trendlines(df_temp,  "Odomètre (km)", "lien", 50_000, 50_000, 50, 20, 10):
                 mean_trend, upper_bound, lower_bound = generate_trendline_functions(df_temp, "Odomètre (km)", "SoH")
                 update_database_trendlines(model_car, mean_trend, upper_bound, lower_bound, False)
-                logging.info(f"Trendline mise à jour pour {model_car}")
+                logging.info(f"Trendline update for car model {model_car}")
         except Exception as e: 
-            logging.error(f"Erreur mise à jour trendline {model_car}: {e}")
+            logging.error(f"Error with car model: {model_car}: {e}")
 
 ######## Compute trendline from bib SoH ####################
 
@@ -130,6 +132,9 @@ if __name__ == "__main__":
                 WHERE o.oem_name = %s
             """
             df = pd.read_sql(query, connection, params=(oem_name,))
+            
+        logging.info(f"Starting trendline update from dbeaver")
+        
         for model_car in df['vehicle_model_id'].unique():
             df_temp = df[(df['vehicle_model_id']==model_car)].copy()
             try:
@@ -137,4 +142,4 @@ if __name__ == "__main__":
                     mean_trend, upper_bound, lower_bound = generate_trendline_functions(df_temp, "odometer", "soh")
                     update_database_trendlines(model_car, mean_trend, upper_bound, lower_bound)
             except Exception as e:
-                logging.error(f"Erreur modèle {model_car}: {e}")
+                logging.error(f"Error with car model: {model_car}: {e}")
