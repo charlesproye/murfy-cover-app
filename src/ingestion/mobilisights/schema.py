@@ -273,7 +273,7 @@ class ChargingMode(StrEnum):
 class Charging(WithTimestamp, forbid_unknown_fields=False):
     plugged: Optional[bool] = None
     status: Optional[ChargingStatus] = None
-    remainingTime: Optional[int] = None
+    remainingTime: Optional[ValueWithUnit[int, DurationUnit]] = None  # Changed to ValueWithUnit instead of TimestampedValueWithUnit
     mode: Optional[ChargingMode] = None
     planned: Optional[dt] = None
     rate: Optional[int | ValueWithUnit[float, ChargingRateUnit]] = None

@@ -6,8 +6,7 @@ import pandas as pd
 import numpy as np
 from urllib.parse import urljoin, urlparse
 from typing import List, Dict, Optional
-from src.core.gsheet_utils import get_gspread_client, load_excel_data, export_to_excel
-from src.results.trendlines_results.config import TYPE_MAPPING
+from core.gsheet_utils import get_google_client, load_excel_data, export_to_excel
 
 
 class AramisautoScraper:
@@ -184,7 +183,6 @@ class AramisautoScraper:
         df = df.dropna(subset='SoH')
         # éviter que ça casse s'il manque une info
         df = df.replace(np.nan, "unknown").replace(pd.NA, "unknown")
-        print(df.battery_capacity.unique())
         return df
         
         
@@ -194,7 +192,7 @@ def main():
     # Scraper les voitures électriques
     infos = scraper.scrape_electric_cars(100)
     df_infos = scraper.clean_data(infos)
-    data_sheet = load_excel_data(get_gspread_client(), "202505 - Courbes SoH", "Courbes OS")
+    data_sheet = load_excel_data(get_google_client(), "202505 - Courbes SoH", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:8], data=data_sheet[1:,:8])
     df_filtré = df_infos[~df_infos['lien'].isin(df_sheet['lien'])]
    # df_filtré['Type'] =  df_filtré['Type'].map(TYPE_MAPPING)

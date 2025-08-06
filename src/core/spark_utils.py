@@ -15,54 +15,44 @@ from pyspark.sql.types import (
 
 LIST_COL_TO_DROP = ["model"]
 
-
 def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
     """
     Create a session spark with a connexion to scaleway
-
     """
     os.environ["PYSPARK_SUBMIT_ARGS"] = (
-        "--packages org.apache.hadoop:hadoop-aws:3.3.4 pyspark-shell"
+        "--packages org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0 pyspark-shell"
     )
 
-    g1gc_options = (
-        "-XX:+UseG1GC "  # Activer G1GC
-        "-XX:MaxGCPauseMillis=100 "  # Pause GC max de 100ms
-        "-XX:G1HeapRegionSize=32m "  # Taille des régions G1
-        "-XX:+UseStringDeduplication "  # Déduplication des chaînes
-        "-XX:+UnlockExperimentalVMOptions "  # Débloquer les options expérimentales
-        "-XX:+UseZGC "  # ZGC pour les gros heaps (Java 11+)
-        "-XX:+DisableExplicitGC "  # Désactiver System.gc()
-        "-XX:+UseGCOverheadLimit "  # Activer la limite de surcharge GC
-        "-XX:GCTimeRatio=9 "  # Ratio temps GC vs temps application
-        "-XX:+PrintGCDetails "  # Logs détaillés du GC (optionnel)
-        "-XX:+PrintGCTimeStamps "  # Timestamps dans les logs GC
-        "-Xloggc:/tmp/spark-gc.log"  # Fichier de log GC
-    )
+    
     spark = (
         SparkSession.builder.appName("Scaleway S3 Read JSON")
-        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4")
+        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0")
         .config("spark.hadoop.fs.s3a.endpoint", "https://s3.fr-par.scw.cloud")
         .config("spark.hadoop.fs.s3a.access.key", access_key)
         .config("spark.hadoop.fs.s3a.secret.key", secret_key)
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .config("spark.driver.host", "localhost")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        )
-        .config("spark.executor.memory", "10g")  # Garder une mémoire suffisante
-        .config("spark.driver.memory", "10g")  # Garder une mémoire suffisante
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
+        # Nouvelles configurations pour résoudre le ClassNotFoundException
+        .config("spark.hadoop.fs.s3a.experimental.input.fadvise", "normal")
+        .config("spark.hadoop.fs.s3a.connection.maximum", "1000")
+        .config("spark.hadoop.fs.s3a.threads.max", "20")
+        .config("spark.hadoop.fs.s3a.threads.core", "10")
+        .config("spark.hadoop.fs.s3a.buffer.dir", "/tmp")
+        .config("spark.hadoop.fs.s3a.block.size", "134217728")  # 128MB
+        .config("spark.hadoop.fs.s3a.multipart.size", "134217728")  # 128MB
+        .config("spark.hadoop.fs.s3a.multipart.threshold", "134217728")  # 128MB
+        # Configuration pour éviter les problèmes de commit protocol
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "64MB")
+        .config("spark.sql.shuffle.partitions", "200")
+        .config("spark.default.parallelism", "200")
+        .config("spark.executor.memory", "10g")
+        .config("spark.driver.memory", "10g")
         .config("spark.driver.maxResultSize", "4g")
-        # Configuration G1GC pour les executors
-        .config("spark.executor.extraJavaOptions", g1gc_options)
-        # Configuration G1GC pour le driver
-        .config("spark.driver.extraJavaOptions", g1gc_options)
         .getOrCreate()
     )
-    # .config("spark.sql.debug.maxToStringFields", "0") \
-    # .config("spark.sql.adaptive.logLevel", "WARN") \
 
     return spark
 
@@ -346,3 +336,48 @@ def align_dataframes_for_union(df1, df2, strategy="intersection"):
 
     return df1_aligned, df2_aligned
 
+
+def get_optimal_nb_partitions(file_size_bytes: float, nb_vin: int) -> int:
+    """
+    Calcule le nombre idéal de partitions Spark basé sur la taille du fichier et le nombre de VINs.
+    
+    Cette fonction détermine le nombre optimal de partitions pour optimiser les performances
+    Spark en fonction de la taille moyenne par VIN et de la recommandation de 128MB par partition.
+    
+    Args:
+        file_size_bytes (float): Taille totale du fichier en octets
+        nb_vin (int): Nombre de VINs (véhicules) dans le fichier
+    
+    Returns:
+        int: Nombre idéal de partitions Spark
+        
+    Raises:
+        ValueError: Si file_size_bytes ou nb_vin sont négatifs ou nuls
+    """
+    # Validation des paramètres
+    if file_size_bytes <= 0 or nb_vin <= 0:
+        raise ValueError("file_size_bytes et nb_vin doivent être positifs")
+    
+    # Calcul de la taille moyenne par VIN
+    size_file_mb = file_size_bytes / (1024 * 1024)
+    print(f"📁 Taille du fichier: {size_file_mb:.2f} MB")
+    
+    avg_size_file_vin_mb = size_file_mb / nb_vin
+    
+    # Calcul du nombre idéal de VINs par partition (basé sur 128MB recommandé)
+    nb_vin_ideal_size = 128 / avg_size_file_vin_mb
+
+    # Logique de décision
+    if nb_vin_ideal_size < 0.5:
+        return nb_vin
+    elif nb_vin_ideal_size < 1:
+        return nb_vin
+    else:
+        optimal_partitions = int(nb_vin / nb_vin_ideal_size)
+        if int(optimal_partitions) == 0:
+            return 1
+        elif optimal_partitions % 2 == 0:
+            pass
+        else:
+            optimal_partitions += 1
+        return optimal_partitions

@@ -1,61 +1,47 @@
-from typing import Callable
-import inspect
+import logging
+import sys
 
-from pandas import DataFrame as DF
+from core.console_utils import main_decorator
+from core.s3.settings import S3Settings
+from core.spark_utils import create_spark_session
+from transform.raw_tss.providers.bmw import BMWResponseToRaw
+from transform.raw_tss.providers.high_mobility import HighMobilityResponseToRaw
+from transform.raw_tss.providers.mobilisight import MobilisightResponseToRaw
+from transform.raw_tss.providers.tesla_fleet_telemetry import TeslaFTResponseToRawTss
+from transform.raw_tss.providers.volkswagen import VolkswagenResponseToRaw
 
-from core.s3.s3_utils import S3Service
-from core.console_utils import single_dataframe_script_main
-from core.logging_utils import set_level_of_loggers_with_prefix
-from transform.raw_tss.high_mobility_raw_tss import get_raw_tss as hm_get_raw_tss
-from transform.raw_tss.bmw_raw_tss import get_raw_tss as bmw_get_raw_tss
-from transform.raw_tss.tesla_raw_tss import get_raw_tss as tesla_get_raw_tss
-from transform.raw_tss.mobilisight_raw_tss import get_raw_tss as mobilisight_get_raw_tss
-from transform.raw_tss.fleet_telemetry_raw_tss import get_raw_tss as fleet_telemetry_raw_tss
-from transform.raw_tss.spark_raw_tss import get_raw_tss as get_raw_tss_spark
-
-GET_RAW_TSS_FUNCTIONS:dict[str, Callable[[bool, S3Service], DF]] = {
-    # Stellantis
-    "stellantis":       mobilisight_get_raw_tss,
-    # BMW
-    "bmw":              bmw_get_raw_tss,
-    # Tesla
-    "tesla":            tesla_get_raw_tss,
-    # Kia
-    "kia":              hm_get_raw_tss,
-    # Mercedes-Benz
-    "mercedes-benz":    hm_get_raw_tss,
-    # Ford
-    "ford":             hm_get_raw_tss,
-    # Renault
-    "renault":          hm_get_raw_tss,
-    # Volvo
-    "volvo-cars":       hm_get_raw_tss,
-    # fleet-telemetry
-    "tesla-fleet-telemetry":  get_raw_tss_spark,
-    
+ORCHESTRATED_MAKES = {
+    "bmw": (False, BMWResponseToRaw),
+    "mercedes-benz": (False, HighMobilityResponseToRaw),
+    "renault": (False, HighMobilityResponseToRaw),
+    "volvo-cars": (False, HighMobilityResponseToRaw),
+    "stellantis": (False, MobilisightResponseToRaw),
+    "kia": (False, HighMobilityResponseToRaw),
+    "ford": (False, HighMobilityResponseToRaw),
+    "tesla-fleet-telemetry": (False, TeslaFTResponseToRawTss),
+    "volkswagen": (False, VolkswagenResponseToRaw),
 }
 
-def get_raw_tss(brand:str, **kwargs) -> DF:
-    func = GET_RAW_TSS_FUNCTIONS[brand]
-    if "brand" in inspect.signature(func).parameters:
-        kwargs["brand"] = brand
-    
-    return func(**kwargs)
 
-def update_all_raw_tss():
-    set_level_of_loggers_with_prefix("DEBUG", "transform")
-    for brand in list(GET_RAW_TSS_FUNCTIONS.keys()):
-        try:
-            print(brand, ":")
-            single_dataframe_script_main(get_raw_tss, brand=brand, force_update=True)
-        except Exception as e:
-            print(f"[red]Error updating {brand}:[/red] {e}")
-            from rich.console import Console
-            console = Console()
-            console.print_exception(show_locals=False)
-        print("============================")
+@main_decorator
+def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=sys.stdout,
+    )
+
+    logger = logging.getLogger("ResponseToRawTss")
+    settings = S3Settings()
+    spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
+
+    for make, (is_orchestrated, class_to_use) in ORCHESTRATED_MAKES.items():
+        if is_orchestrated:
+            class_to_use(make=make, spark=spark, logger=logger).run()
+        else:
+            pass
+
 
 if __name__ == "__main__":
-    from rich.traceback import install
-    install(extra_lines=1)
-    update_all_raw_tss()
+    main()
+
