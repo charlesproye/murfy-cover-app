@@ -1,7 +1,8 @@
 import asyncio
 
 import msgspec
-from src.core.compressor import Compressor
+from transform.compressor.compressor import Compressor
+from core.s3.async_s3 import AsyncS3
 
 
 class VolkswagenCompressor(Compressor):
