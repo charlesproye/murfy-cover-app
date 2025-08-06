@@ -38,6 +38,7 @@ SOC_DIFF_THRESHOLD = {
     'volkswagen': 0.05,
 }
 
+<<<<<<< HEAD
 # Columns to keep in order to run processed_ts + not used but necessary afterwards
 NECESSARY_COLS = {
     'tesla': ['vin', 'date', 'odometer', 'soc', 'charging_status', 'dc_charge_energy_added', 'ac_charge_energy_added'],
@@ -143,6 +144,8 @@ RENAME_COLS_DICT:dict[str, str] = {
     "energyLevelPrimaryEnginePercentage": "soc"
 }
 
+=======
+>>>>>>> dev
 
 
 

@@ -19,10 +19,10 @@ from core.s3.settings import S3Settings
 from core.spark_utils import (get_optimal_nb_partitions,
                               safe_astype_spark_with_error_handling)
 from transform.fleet_info.main import fleet_info
-from transform.processed_tss.config import *
 from transform.processed_tss.config import (SCALE_SOC,
                                             SOC_DIFF_THRESHOLD,
-                                            ODOMETER_MILES_TO_KM)
+                                            ODOMETER_MILES_TO_KM,
+                                            S3_PROCESSED_TSS_KEY_FORMAT)
 from transform.raw_tss.main import *
 
 load_dotenv() 
@@ -62,6 +62,8 @@ class RawTsToProcessedTs(CachedETLSpark):
 
     def run(self):
 
+        self.logger.info(f"Running for {self.make}")
+
         if self.bucket.check_spark_file_exists(
             f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet"
         ):
@@ -76,8 +78,13 @@ class RawTsToProcessedTs(CachedETLSpark):
             tss, int(os.environ.get("NB_CORES_CLUSTER"))
         )  # Optimize partitions
 
-        tss = tss.withColumnsRenamed(RENAME_COLS_DICT)
-        tss = tss.select(*NECESSARY_COLS[self.make])  # Reduce column volumetry
+        dynamic_config = self.bucket.read_yaml_file(f"config/{self.make}.yaml")
+
+        if dynamic_config is None:
+            raise ValueError(f"Config file config/{self.make}.yaml not found")
+
+        tss = tss.withColumnsRenamed(dynamic_config['raw_tss_to_processed_tss']['rename'])
+        tss = tss.select(*dynamic_config['raw_tss_to_processed_tss']['keep'])  # Reduce column volumetry
 
         tss = safe_astype_spark_with_error_handling(tss)
         tss = self._normalize_units_to_metric(tss)
