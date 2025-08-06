@@ -185,3 +185,15 @@ def estimate_cycles(total_range:float=0, initial_range:float=1, soh:float=1.0):
 
 def log_function(x, a ,b, c):
     return a + b * np.log1p(x / c)
+
+def ic_computation(df):
+    size_ = df.shape[0]
+    m = df['soh'].mean()
+    med = df['soh'].median()
+    std = df['soh'].std()
+    if size_ > 0:
+        upper_bound = m + 1.96 * (std/np.sqrt(size_))
+        lower_bound = m - 1.96 * (std/np.sqrt(size_))
+        
+        return (round(lower_bound, 4),round( upper_bound, 4)), size_, med
+    return (np.nan, np.nan), size_, med
