@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from core.stats_utils import compute_confidence_interval
+from core.sql_utils import get_connection
 
 def analyze_coef_variation(df, cv_threshold=5):
     """
@@ -74,7 +75,6 @@ def coverage_oem(data_df, soh_df, oems=None):
     coverage = {}
 
     for oem in oems:
-        print(oem)
         coverage[oem] = {}
 
         # Number of VINs associated with this OEM in data_df
@@ -217,4 +217,41 @@ def plot_soh(df: pd.DataFrame):
     )
 
     fig.show()
+
+
+def main(df):
+    print("\n--- Coefficient of Variation Analysis ---")
+    cv_stats, unstable_vins = analyze_coef_variation(df, cv_threshold=5)
+
+    print("\n--- Check Monotonic Decrease of SoH ---")
+    monotonic_summary = check_soh_decresing(df)
+    print(monotonic_summary)
+
+    print("\n--- SoH Coverage per OEM ---")
+    with get_connection() as connection:
+        query = """
+            SELECT * FROM vehicle v
+            JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
+            JOIN oem o ON o.id = vm.oem_id
+        """
+        dbeaver_df = pd.read_sql(query, connection)
+    coverage_stats = coverage_oem(dbeaver_df, df)
+
+    print("\n--- Correlation between SoH and SoC ---")
+    corr_soc = correlation_soc(df)
+    print(corr_soc)
+
+    print("\n--- Proportion of Decreasing SoH in Odometer Bins (5,000 km) ---")
+    prop_decreasing = proportion_soh_decreasing_per_km(df, bin_size_km=5000)
+    print(prop_decreasing)
+
+    print("\n--- Confidence Interval Calculation per VIN ---")
+    ic_df = compute_ic_per_vin(df, plot=True)  
+
+    print("\n--- Plot SoH vs Odometer ---")
+    plot_soh(df)
+
+if __name__ == "__main__":
+    pass
+
 
