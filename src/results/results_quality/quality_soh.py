@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from core.stats_utils import compute_confidence_interval
-
+import numpy as np
 
 def analyze_coef_variation(df, cv_threshold=5):
     """
@@ -122,6 +122,48 @@ def correlation_soc(df):
     selected_column = "soh"
     selected_corr = corr[[selected_column]].sort_values(by=selected_column, ascending=False)
     return selected_corr
+
+def proportion_soh_decreasing_per_bin(df: pd.DataFrame, 
+                                      bin_size_km: int = 5000) -> pd.Series:
+    """
+    For each vehicle, compute the proportion of odometer bins (of size bin_size_km)
+    in which the SoH is non-increasing.
+
+    Args:
+        df (pd.DataFrame): DataFrame with 'vehicle_id', 'odometer', 'SoH'.
+        bin_size_km (int): Size of each odometer bin in kilometers.
+    Returns:
+        pd.Series: Proportion of non-increasing SoH bins per vehicle.
+    """
+    required_columns = {'vin', 'odometer', 'soh'}
+    if not required_columns.issubset(df.columns):
+        raise ValueError(f"DataFrame must contain columns: {required_columns}")
+    
+    results = {}
+
+    for vehicle_id, group in df.groupby('vin'):
+        group = group.sort_values('odometer').reset_index(drop=True)
+        group['bin'] = (group['odometer'] // bin_size_km).astype(int)
+
+        decreasing_flags = []
+
+        for _, bin_df in group.groupby('bin'):
+            if len(bin_df) < 2:
+                continue  # Not enough points to determine a trend
+
+            soh_diff = bin_df['soh'].diff().dropna()
+            is_decreasing = (soh_diff < 0).any()
+            decreasing_flags.append(is_decreasing)
+
+        if decreasing_flags:
+            proportion = sum(decreasing_flags) / len(decreasing_flags)
+        else:
+            proportion = np.nan  # or 0.0, depending on your use case
+
+        results[vehicle_id] = proportion
+
+    return pd.Series(results, name=f'proportion_non_increasing_per_{bin_size_km//1000}k_km')
+
 
 def compute_ic_per_vin(df, plot=False):
     ic_df = df.groupby('vin', observed=True)['soh'].apply(compute_confidence_interval).reset_index()
