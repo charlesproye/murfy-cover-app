@@ -1,23 +1,15 @@
-import datetime
-from logging import getLogger
-import asyncio
 from core.sql_utils import *
 from core.stats_utils import *
 from core.pandas_utils import *
 from transform.processed_results.config import *
-from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
-from pyspark.sql import functions as F, Window, SparkSession
-from pyspark.sql import DataFrame
-from pyspark.sql.types import DoubleType
-from pyspark.sql.functions import when, col, last, median, first, sum as spark_sum, lit
-from transform.raw_results.RawResults import RawResult
 from transform.processed_results.config import *
 from core.spark_utils import create_spark_session
-from pyspark.sql.types import DoubleType, DateType
 from core.timer_utils import CodeTimer
 from core.s3.settings import S3Settings
 from core.s3.s3_utils import S3Service
+from transform.raw_results.main import ORCHESTRATED_MAKES
+from pyspark.sql import SparkSession
 
 class ProcessedResults():
     """
@@ -31,7 +23,8 @@ class ProcessedResults():
     
     def run(self):
         logger.info(f"Démarrage de processed results pour {self.make}.")
-        raw_results = RawResult(make=self.make, spark=self.spark).data.toPandas()
+        cls = ORCHESTRATED_MAKES[self.make][1]
+        raw_results = cls(make=self.make, spark=self.spark, logger=self.logger).data.toPandas()
         processed_results = self.get_processed_results(raw_results, self.make)
 
         return processed_results
