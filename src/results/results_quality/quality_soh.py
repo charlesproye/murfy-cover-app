@@ -1,7 +1,7 @@
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 from core.stats_utils import compute_confidence_interval
-import numpy as np
 
 def analyze_coef_variation(df, cv_threshold=5):
     """
@@ -27,7 +27,6 @@ def analyze_coef_variation(df, cv_threshold=5):
 
     return stats, unstable_vehicles.vin.unique()
 
-
 def check_soh_decresing(df):
     """
     Checks whether the SoH (State of Health) values are monotonically decreasing for each VIN over time.
@@ -52,8 +51,7 @@ def check_soh_decresing(df):
     "absolute": montonic_mask_per_vin["monotonically_decreasing"].value_counts(dropna=False, normalize=False)
 }
     return pd.concat(value_counts_per_vin, axis=1, keys=value_counts_per_vin.keys(), names=["value_counts_type"])
-    
-  
+
 def coverage_oem(data_df, soh_df, oems=None):
     """
     Computes SoH data coverage per OEM.
@@ -105,7 +103,6 @@ def coverage_oem(data_df, soh_df, oems=None):
 
     return coverage
 
-
 def correlation_soc(df):
     """compute soh correlation with soc 
     Args:
@@ -123,7 +120,7 @@ def correlation_soc(df):
     selected_corr = corr[[selected_column]].sort_values(by=selected_column, ascending=False)
     return selected_corr
 
-def proportion_soh_decreasing_per_bin(df: pd.DataFrame, 
+def proportion_soh_decreasing_per_km(df: pd.DataFrame, 
                                       bin_size_km: int = 5000) -> pd.Series:
     """
     For each vehicle, compute the proportion of odometer bins (of size bin_size_km)
@@ -138,7 +135,7 @@ def proportion_soh_decreasing_per_bin(df: pd.DataFrame,
     required_columns = {'vin', 'odometer', 'soh'}
     if not required_columns.issubset(df.columns):
         raise ValueError(f"DataFrame must contain columns: {required_columns}")
-    
+
     results = {}
 
     for vehicle_id, group in df.groupby('vin'):
@@ -164,7 +161,6 @@ def proportion_soh_decreasing_per_bin(df: pd.DataFrame,
 
     return pd.Series(results, name=f'proportion_non_increasing_per_{bin_size_km//1000}k_km')
 
-
 def compute_ic_per_vin(df, plot=False):
     ic_df = df.groupby('vin', observed=True)['soh'].apply(compute_confidence_interval).reset_index()
     def plot_distrib_ic():
@@ -187,4 +183,38 @@ def compute_ic_per_vin(df, plot=False):
         fig = plot_distrib_ic()
         fig.show()
     return ic_df
-    
+
+def plot_soh(df: pd.DataFrame):
+    """
+    Plot interactive SoH vs odometer curves using Plotly for each vehicle (VIN).
+
+    Args:
+        df (pd.DataFrame): DataFrame containing VINs, odometer, and SoH.
+    """
+    required_columns = {"vin", "odometer", "soh"}
+    if not required_columns.issubset(df.columns):
+        raise ValueError(f"DataFrame must contain columns: {required_columns}")
+
+    fig = go.Figure()
+
+    for vin, group in df.groupby("vin"):
+        group = group.sort_values("odometer")
+        fig.add_trace(go.Scatter(
+            x=group["odometer"],
+            y=group["soh"],
+            mode='lines+markers',
+            name=str(vin),
+            hovertemplate=f"'vin': {vin}<br>odometer: %{{x}}<br>soh: %{{y}}<extra></extra>"
+        ))
+
+    fig.update_layout(
+        title="SoH vs Odometer per Vehicle",
+        xaxis_title="Odometer (km)",
+        yaxis_title="State of Health (SoH)",
+        legend_title="vin",
+        template="plotly_white",
+        height=600
+    )
+
+    fig.show()
+
