@@ -2,8 +2,8 @@ from logging import Logger
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from transform.raw_results.config import LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
+from transform.processed_phases.config import LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
 
 
 class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
@@ -69,15 +69,15 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
                 * (F.col("CHARGING_RATE") < F.lit(LEVEL_1_MAX_POWER)).cast("int"),
             ) 
             .withColumn(
-                "level_2",
-                F.col("soc_diff")
+                "LEVEL_2",
+                F.col("SOC_DIFF")
                 * F.col("CHARGING_RATE")
                 .between(F.lit(LEVEL_1_MAX_POWER), F.lit(LEVEL_2_MAX_POWER))
                 .cast("int"),
             )
             .withColumn(
-                "level_3",
-                F.col("soc_diff")
+                "LEVEL_3",
+                F.col("SOC_DIFF")
                 * (F.col("CHARGING_RATE") > F.lit(LEVEL_2_MAX_POWER)).cast("int"),
             )
         )
