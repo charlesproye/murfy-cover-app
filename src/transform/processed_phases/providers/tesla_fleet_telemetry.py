@@ -3,9 +3,10 @@ from logging import Logger
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
+from transform.processed_phases.config import LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
 
 
-class TeslaFTTsToProcessedPhases(RawTsToProcessedPhases):
+class TeslaFTRawTsToProcessedPhases(RawTsToProcessedPhases):
 
     def __init__(
         self,
@@ -19,19 +20,6 @@ class TeslaFTTsToProcessedPhases(RawTsToProcessedPhases):
             make, spark=spark, force_update=force_update, logger=logger, **kwargs
         )
 
-    def compute_specific_features_before_aggregation(self, df_tss):
-        df_tss = df_tss.withColumn('battery_energy', F.col('battery_energy').cast('double'))
-
-        df_tss_charging = df_tss.filter(F.col("PHASE_STATUS") == "charging")
-
-        max_battery_energy = df_tss_charging.groupBy(["net_capacity", "soc"]).agg(
-            F.expr("percentile_approx(battery_energy, 0.9)").alias("max_battery_energy")
-        )
-
-        df = df_tss.join(max_battery_energy, on=["net_capacity", "soc"], how="left")
-        df = df.withColumn('max_battery_energy', F.col('max_battery_energy').cast('double'))
-
-        return df
 
 
     def aggregate_stats(self, df_tss):
@@ -43,7 +31,7 @@ class TeslaFTTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
-            # Ford / A voir si je peux gérer ça avec la config
+            # TFT / A voir si je peux gérer ça avec la config
             F.min("ac_charge_energy_added").alias("AC_ENERGY_ADDED_MIN"),
             F.min("dc_charge_energy_added").alias("DC_ENERGY_ADDED_MIN"),
             F.last("ac_charge_energy_added", ignorenulls=True).alias(
@@ -52,8 +40,14 @@ class TeslaFTTsToProcessedPhases(RawTsToProcessedPhases):
             F.last("dc_charge_energy_added", ignorenulls=True).alias(
                 "DC_ENERGY_ADDED_END"
             ),
+            F.expr("percentile_approx(ac_charging_power, 0.5)").alias(
+                "AC_CHARGING_POWER_MEDIAN"
+            ),
+            F.expr("percentile_approx(dc_charging_power, 0.5)").alias(
+                "DC_CHARGING_POWER_MEDIAN"
+            ),
+            F.first("tesla_code", ignorenulls=True).alias("TESLA_CODE"),
         ]
-
         
 
         if "consumption" in df_tss.columns:
@@ -70,15 +64,48 @@ class TeslaFTTsToProcessedPhases(RawTsToProcessedPhases):
     
     def compute_specific_features_after_aggregation(self, df_aggregated):
 
-        df_aggregated = df_aggregated.withColumn(
-            'BATTERY_ENERGY_SUM',
-            F.when(F.col('PHASE_STATUS') == 'discharging', None).otherwise(F.col('BATTERY_ENERGY_SUM'))
-        )
-        df_aggregated = df_aggregated.withColumn(
-            'MAX_BATTERY_ENERGY_SUM',
-            F.when(F.col('PHASE_STATUS') == 'discharging', None).otherwise(F.col('MAX_BATTERY_ENERGY_SUM'))
+        df = df_aggregated.withColumn(
+            "CHARGING_POWER",
+            F.coalesce(F.col("AC_CHARGING_POWER_MEDIAN"), F.lit(0))
+            + F.coalesce(F.col("DC_CHARGING_POWER_MEDIAN"), F.lit(0)),
         )
 
-        df_aggregated = df_aggregated.withColumn("SOH", F.col("BATTERY_ENERGY_SUM") / F.col("MAX_BATTERY_ENERGY_SUM"))
+        df_aggregated = (
+            df_aggregated.withColumn(
+                "AC_ENERGY_ADDED",
+                F.col("AC_ENERGY_ADDED_END") - F.col("AC_ENERGY_ADDED_MIN"),
+            )
+            .withColumn(
+                "DC_ENERGY_ADDED",
+                F.col("DC_ENERGY_ADDED_END") - F.col("DC_ENERGY_ADDED_MIN"),
+            )
+            .withColumn("ENERGY_ADDED", F.col("DC_ENERGY_ADDED"))
+        )
+
+        df_aggregated = (
+            df_aggregated.withColumn(
+                "LEVEL_1",
+                F.col("SOC_DIFF")
+                * F.when(F.col("CHARGING_POWER") < LEVEL_1_MAX_POWER, 1).otherwise(0)
+                / 100,
+            )
+            .withColumn(
+                "LEVEL_2",
+                F.col("SOC_DIFF")
+                * F.when(
+                    F.col("CHARGING_POWER").between(
+                        LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
+                    ),
+                    1,
+                ).otherwise(0)
+                / 100,
+            )
+            .withColumn(
+                "LEVEL_3",
+                F.col("SOC_DIFF")
+                * F.when(F.col("CHARGING_POWER") > LEVEL_2_MAX_POWER, 1).otherwise(0)
+                / 100,
+            )
+        )
 
         return df_aggregated
