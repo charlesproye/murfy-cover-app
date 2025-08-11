@@ -17,9 +17,9 @@ ORCHESTRATED_MAKES = {
     "volvo-cars": (False, HighMobilityResponseToRaw),
     "stellantis": (False, MobilisightResponseToRaw),
     "kia": (False, HighMobilityResponseToRaw),
-    "ford": (False, HighMobilityResponseToRaw),
-    "tesla-fleet-telemetry": (False, TeslaFTResponseToRawTss),
-    "volkswagen": (False, VolkswagenResponseToRaw),
+    "ford": (True, HighMobilityResponseToRaw),
+    "tesla-fleet-telemetry": (True, TeslaFTResponseToRawTss),
+    "volkswagen": (True, VolkswagenResponseToRaw),
 }
 
 

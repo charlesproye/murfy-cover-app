@@ -47,7 +47,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
         self.settings = S3Settings()
 
         super().__init__(
-            PROCESSED_PHASES_CACHE_KEY_TEMPLATE.format(make=make),
+            PROCESSED_PHASES_CACHE_KEY_TEMPLATE.format(make=make.replace("-", "_")),
             "s3",
             force_update=force_update,
             spark=spark,
@@ -215,9 +215,6 @@ class RawTsToProcessedPhases(CachedETLSpark):
     ) -> DF:
 
         w = Window.partitionBy("vin").orderBy("date") # Window partitioned by vin and sorted by date
-
-        # Scale all SOCs from 0 to 100 %
-        tss = tss.withColumn("soc", F.col("soc") * SCALE_SOC[self.make])
         
         # Remove rows with null values for the "soc" column, don't do forward fill to be able to distinguish real idles
         tss = tss.na.drop(subset=["soc"]) 

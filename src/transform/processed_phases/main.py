@@ -3,18 +3,22 @@ import sys
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
+from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
 from transform.processed_phases.providers.renault import RenaultRawTsToProcessedPhases
+from transform.processed_phases.providers.ford import FordRawTsToProcessedPhases
+from transform.processed_phases.providers.volvo import VolvoRawTsToProcessedPhases
+from transform.processed_phases.providers.stellantis import StellantisRawTsToProcessedPhases
 
 ORCHESTRATED_MAKES = {
     "bmw": (False, None),
-    "mercedes-benz": (False, None),
-    "renault": (True, RenaultRawTsToProcessedPhases),
-    "volvo-cars": (False, None),
-    "stellantis": (False, None),
-    "kia": (False, None),
-    "ford": (False, None),
+    "mercedes-benz": (False, RawTsToProcessedPhases),
+    "renault": (False, RenaultRawTsToProcessedPhases),
+    "volvo-cars": (False, VolvoRawTsToProcessedPhases),
+    "stellantis": (True, StellantisRawTsToProcessedPhases),
+    "kia": (False, RawTsToProcessedPhases),
+    "ford": (False, FordRawTsToProcessedPhases),
     "tesla-fleet-telemetry": (False, None),
-    "volkswagen": (False, None),
+    "volkswagen": (False, RawTsToProcessedPhases),
 }
 
 
