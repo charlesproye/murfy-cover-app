@@ -64,7 +64,7 @@ class TeslaFTRawTsToProcessedPhases(RawTsToProcessedPhases):
     
     def compute_specific_features_after_aggregation(self, df_aggregated):
 
-        df = df_aggregated.withColumn(
+        df_aggregated = df_aggregated.withColumn(
             "CHARGING_POWER",
             F.coalesce(F.col("AC_CHARGING_POWER_MEDIAN"), F.lit(0))
             + F.coalesce(F.col("DC_CHARGING_POWER_MEDIAN"), F.lit(0)),
