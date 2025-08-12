@@ -14,14 +14,15 @@ class TeslaFTCompressor(Compressor):
         return self.make
 
     def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
-        data = []
+        ndjson_lines = []
         for file in new_files.values():
             decoded = msgspec.json.decode(file)
-            if isinstance(decoded,str):
+            if isinstance(decoded, str):
                 decoded = msgspec.json.decode(decoded.encode())
-            data.extend(decoded) # Extend instead of append for TFT
+            for record in decoded:
+                ndjson_lines.append(msgspec.json.encode(record))
 
-        return msgspec.json.encode(data)
+        return b"\n".join(ndjson_lines)
 
     @classmethod
     async def compress(cls, make: str):

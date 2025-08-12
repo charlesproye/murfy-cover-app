@@ -31,6 +31,7 @@ class Compressor(ABC):
     async def _compress_temp_vin_data(self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2):
         attempt = 0
         while attempt < max_retries: # Random client error failure
+            print(f"DOWNLOAD VIN: {vin_folder_path}")
             try:
                 new_files = await self._s3.download_folder(f"{vin_folder_path}temp/")
                 break  # Success, exit retry loop
