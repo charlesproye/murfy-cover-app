@@ -2,11 +2,13 @@ from functools import reduce
 from logging import Logger
 from typing import Optional
 
-from transform.raw_tss.config import SCHEMAS
+from transform.raw_tss.config import PARSE_TYPE_MAP
+from core.s3.s3_utils import S3Service
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (col, explode, expr, input_file_name, lit,
                                    regexp_extract, size, udf)
-from pyspark.sql.types import ArrayType, StringType, StructType, TimestampType
+from pyspark.sql.types import ArrayType, StringType, StructType, TimestampType, StructField
+
 
 from transform.raw_tss.response_to_raw import ResponseToRawTss
 from transform.raw_tss.providers.utils import get_next_scheduled_timestamp
@@ -38,6 +40,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
         )
 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
+
         """
         Parse dict from High Mobility API response
 
@@ -82,7 +85,8 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
 
         signals = []
 
-        full_schema = SCHEMAS[self.make]
+        field_def = S3Service().read_yaml_file(f"config/{self.make}.yaml")["response_to_raw"]
+        full_schema = self._get_dynamic_schema(field_def, PARSE_TYPE_MAP)
 
         for top_field in full_schema.fields:
             domain = top_field.name
@@ -123,7 +127,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
                             # Use get_next_scheduled_timestamp for custom data
                             get_next_scheduled_timestamp_udf(
                                 col("entry.timestamp"), col("entry.data")
-                            ).alias("value"),
+                            ).cast('string').alias("value"),
                         )
                     )
                 else:
@@ -135,7 +139,7 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
                             col("vin"),
                             col("entry.timestamp").alias("date"),
                             lit(signal_name).alias("signal"),
-                            col(f"entry.{value_path}").alias("value"),
+                            col(f"entry.{value_path}").cast('string').alias("value"),
                         )
                     )
                 dfs.append(exploded)
@@ -152,3 +156,43 @@ class HighMobilityResponseToRaw(ResponseToRawTss):
 
         return pivoted
 
+
+    def build_data_struct(self, data_obj, parse_type_map: dict):
+        if isinstance(data_obj, str):
+            # data est un type simple
+            return parse_type_map[data_obj]
+        elif isinstance(data_obj, dict):
+            # data est un dict -> StructType avec champs imbriqués
+            fields = []
+            for k, v in data_obj.items():
+                fields.append(StructField(k, self.build_data_struct(v, parse_type_map)))
+            return StructType(fields)
+        else:
+            raise ValueError("Type inattendu dans data")
+    
+    def build_schema_from_dict(self, d, parse_type_map: dict):
+        fields = []
+        for key, val in d.items():
+            # val est une liste d'objets qui ont timestamp/failure/data
+            # On prend le premier élément pour analyser "data"
+            example = val[0]
+            data_type = self.build_data_struct(example["data"], parse_type_map)
+
+            struct_fields = [
+                StructField("timestamp", TimestampType()),
+                StructField("failure", StringType()),
+                StructField("data", data_type),
+            ]
+
+            # Le champ est un ArrayType de ce struct
+            field_type = ArrayType(StructType(struct_fields))
+            fields.append(StructField(key, field_type))
+        return StructType(fields)
+    
+    def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict):
+        
+        spark_schema = StructType()
+        for top_level_key, subdict in field_def.items():
+            struct = self.build_schema_from_dict(subdict, parse_type_map)
+            spark_schema.add(StructField(top_level_key, struct))
+        return spark_schema

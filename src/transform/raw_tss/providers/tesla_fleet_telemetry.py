@@ -140,3 +140,67 @@ class TeslaFTResponseToRawTss(ResponseToRawTss):
 
         return pivoted
 
+    def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict):
+        return StructType(
+                [
+                    StructField("vin", StringType(), True),
+                    StructField("timestamp", LongType(), True),
+                    StructField("readable_date", StringType(), True),
+                    StructField("createdAt", StringType(), True),
+                    StructField(
+                        "data",
+                        ArrayType(
+                            StructType(
+                                [
+                                    StructField("key", StringType(), True),
+                                    StructField(
+                                        "value",
+                                        StructType(
+                                            [
+                                                StructField("doubleValue", DoubleType(), True),
+                                                StructField("intValue", IntegerType(), True),
+                                                StructField(
+                                                    "booleanValue", BooleanType(), True
+                                                ),
+                                                StructField("stringValue", StringType(), True),
+                                                StructField("carTypeValue", StringType(), True),
+                                                StructField(
+                                                    "bmsStateValue", StringType(), True
+                                                ),
+                                                StructField(
+                                                    "climateKeeperModeValue", StringType(), True
+                                                ),
+                                                StructField(
+                                                    "chargePortValue", StringType(), True
+                                                ),
+                                                StructField(
+                                                    "defrostModeValue", StringType(), True
+                                                ),
+                                                StructField(
+                                                    "detailedChargeStateValue",
+                                                    StringType(),
+                                                    True,
+                                                ),
+                                                StructField(
+                                                    "fastChargerValue", StringType(), True
+                                                ),
+                                                StructField(
+                                                    "hvacAutoModeValue", StringType(), True
+                                                ),
+                                                StructField(
+                                                    "hvacPowerValue", StringType(), True
+                                                ),
+                                                StructField(
+                                                    "sentryModeStateValue", StringType(), True
+                                                ),
+                                                StructField("invalid", BooleanType(), True),
+                                            ]
+                                        ),
+                                    ),
+                                ]
+                            )
+                        ),
+                        True,
+                    ),
+                ]
+            )

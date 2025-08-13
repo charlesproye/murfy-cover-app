@@ -1,0 +1,42 @@
+from pyspark.sql import DataFrame as DF
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when
+
+from transform.processed_tss.raw_ts_to_processed_ts import RawTsToProcessedTs
+
+
+class TeslaFTRawTsToProcessedTs(RawTsToProcessedTs):
+    """
+    Compute the specific features for the Tesla Fleet Telemetry data.
+    """
+
+    def __init__(
+        self,
+        make: str,
+        id_col: str = "vin",
+        log_level: str = "INFO",
+        force_update: bool = False,
+        spark: SparkSession = None,
+        **kwargs,
+    ):
+
+        super().__init__(
+            make=make,
+            id_col=id_col,
+            log_level=log_level,
+            force_update=force_update,
+            spark=spark,
+            **kwargs,
+        )
+
+    def compute_specific_features(self, tss: DF) -> DF:
+        tss = tss.withColumn(
+            "charge_energy_added",
+            when(
+                col("dc_charge_energy_added").isNotNull()
+                & (col("dc_charge_energy_added") > 0),
+                col("dc_charge_energy_added"),
+            ).otherwise(col("ac_charge_energy_added")),
+        )
+        return tss
+
