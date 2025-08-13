@@ -56,30 +56,3 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
         df_aggregated = df_aggregated.withColumn("SOH", F.col("BATTERY_ENERGY") / F.col("EXPECTED_BATTERY_ENERGY"))
 
         return df_aggregated
-
-    
-    def compute_specific_features_after_aggregation(self, df_aggregated):
-
-        df_aggregated = df_aggregated.withColumn("SOH", F.col("BATTERY_ENERGY") / F.col("EXPECTED_BATTERY_ENERGY"))
-
-        df_aggregated = (
-            df_aggregated.withColumn(
-                "LEVEL_1",
-                F.col("SOC_DIFF")
-                * (F.col("CHARGING_RATE") < F.lit(LEVEL_1_MAX_POWER)).cast("int"),
-            ) 
-            .withColumn(
-                "LEVEL_2",
-                F.col("SOC_DIFF")
-                * F.col("CHARGING_RATE")
-                .between(F.lit(LEVEL_1_MAX_POWER), F.lit(LEVEL_2_MAX_POWER))
-                .cast("int"),
-            )
-            .withColumn(
-                "LEVEL_3",
-                F.col("SOC_DIFF")
-                * (F.col("CHARGING_RATE") > F.lit(LEVEL_2_MAX_POWER)).cast("int"),
-            )
-        )
-
-        return df_aggregated

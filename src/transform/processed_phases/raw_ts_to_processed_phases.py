@@ -51,6 +51,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
             "s3",
             force_update=force_update,
             spark=spark,
+            repartition_key='VIN',
             **kwargs,
         )
 
@@ -62,7 +63,6 @@ class RawTsToProcessedPhases(CachedETLSpark):
     # REvoir avec Hugo la bonne agrégation de chacune des métriques
 
     def run(self):
-
         # Load the raw tss dataframe
         self.logger.info(f"Running for {self.make}")
 
@@ -107,11 +107,10 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
         phase_tss = self.compute_specific_features_before_aggregation(phase_tss)
 
+        phase_tss = phase_tss.orderBy("date", "vin")
+
         # Aggregate the time series stats to the phase dataframe / OEM dependent
         phases_enriched = self.aggregate_stats(phase_tss)
-
-        # Compute the specific features / OEM dependent
-        phases_enriched = self.compute_specific_features_after_aggregation(phases_enriched)
 
         return phases_enriched
 
@@ -358,6 +357,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
         
         return df
 
+
     def generate_phase(self, df: DF) -> DF:
         """
         Aggregate phases to get the final phase dataframe
@@ -443,9 +443,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
         # Join 
         tss_phased = ph.join(ts, on=join_condition, how="left")
 
-        # Ajout
         tss_phased = tss_phased.join(self.spark.createDataFrame(fleet_info), "vin", "left").drop("vin").withColumnRenamed("VIN_ph", "VIN")
-
         
         return tss_phased
 
@@ -479,10 +477,3 @@ class RawTsToProcessedPhases(CachedETLSpark):
         )
 
         return df_final
-    
-    def compute_specific_features_after_aggregation(self, phase_df: DF) -> DF:
-        """
-        Compute the specific features
-        """
-        return phase_df
-

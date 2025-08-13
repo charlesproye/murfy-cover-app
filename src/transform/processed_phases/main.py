@@ -11,15 +11,15 @@ from transform.processed_phases.providers.stellantis import StellantisRawTsToPro
 from transform.processed_phases.providers.tesla_fleet_telemetry import TeslaFTRawTsToProcessedPhases
 
 ORCHESTRATED_MAKES = {
-    "bmw": (False, RawTsToProcessedPhases),
-    "mercedes-benz": (False, RawTsToProcessedPhases),
-    "renault": (False, RenaultRawTsToProcessedPhases),
-    "volvo-cars": (False, VolvoRawTsToProcessedPhases),
-    "stellantis": (False, StellantisRawTsToProcessedPhases),
-    "kia": (False, RawTsToProcessedPhases),
-    "ford": (False, FordRawTsToProcessedPhases),
-    "tesla-fleet-telemetry": (False, TeslaFTRawTsToProcessedPhases),
-    "volkswagen": (False, RawTsToProcessedPhases),
+    "bmw": (True, RawTsToProcessedPhases),
+    "mercedes-benz": (True, RawTsToProcessedPhases),
+    "renault": (True, RenaultRawTsToProcessedPhases),
+    "volvo-cars": (True, VolvoRawTsToProcessedPhases),
+    "stellantis": (True, StellantisRawTsToProcessedPhases),
+    "kia": (True, RawTsToProcessedPhases),
+    "ford": (True, FordRawTsToProcessedPhases),
+    "tesla-fleet-telemetry": (True, TeslaFTRawTsToProcessedPhases),
+    "volkswagen": (True, RawTsToProcessedPhases),
 }
 
 

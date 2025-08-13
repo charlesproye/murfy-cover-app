@@ -3,7 +3,6 @@ from logging import Logger
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
-from transform.processed_phases.config import LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
 
 
 class TeslaFTRawTsToProcessedPhases(RawTsToProcessedPhases):
@@ -58,54 +57,5 @@ class TeslaFTRawTsToProcessedPhases(RawTsToProcessedPhases):
             .agg(*agg_columns)
         )
 
-
-        return df_aggregated
-
-    
-    def compute_specific_features_after_aggregation(self, df_aggregated):
-
-        df_aggregated = df_aggregated.withColumn(
-            "CHARGING_POWER",
-            F.coalesce(F.col("AC_CHARGING_POWER_MEDIAN"), F.lit(0))
-            + F.coalesce(F.col("DC_CHARGING_POWER_MEDIAN"), F.lit(0)),
-        )
-
-        df_aggregated = (
-            df_aggregated.withColumn(
-                "AC_ENERGY_ADDED",
-                F.col("AC_ENERGY_ADDED_END") - F.col("AC_ENERGY_ADDED_MIN"),
-            )
-            .withColumn(
-                "DC_ENERGY_ADDED",
-                F.col("DC_ENERGY_ADDED_END") - F.col("DC_ENERGY_ADDED_MIN"),
-            )
-            .withColumn("ENERGY_ADDED", F.col("DC_ENERGY_ADDED"))
-        )
-
-        df_aggregated = (
-            df_aggregated.withColumn(
-                "LEVEL_1",
-                F.col("SOC_DIFF")
-                * F.when(F.col("CHARGING_POWER") < LEVEL_1_MAX_POWER, 1).otherwise(0)
-                / 100,
-            )
-            .withColumn(
-                "LEVEL_2",
-                F.col("SOC_DIFF")
-                * F.when(
-                    F.col("CHARGING_POWER").between(
-                        LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
-                    ),
-                    1,
-                ).otherwise(0)
-                / 100,
-            )
-            .withColumn(
-                "LEVEL_3",
-                F.col("SOC_DIFF")
-                * F.when(F.col("CHARGING_POWER") > LEVEL_2_MAX_POWER, 1).otherwise(0)
-                / 100,
-            )
-        )
 
         return df_aggregated

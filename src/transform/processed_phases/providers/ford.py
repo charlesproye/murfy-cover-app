@@ -48,7 +48,6 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.sum('max_battery_energy').alias('MAX_BATTERY_ENERGY_SUM')
         ]
 
-        
 
         if "consumption" in df_tss.columns:
             agg_columns.append(F.mean("consumption").alias("CONSUMPTION"))
@@ -57,22 +56,5 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
             df_tss.groupBy("VIN", "PHASE_INDEX", "DATETIME_BEGIN", "DATETIME_END", "PHASE_STATUS", "SOC_FIRST", "SOC_LAST", "SOC_DIFF", "NO_SOC_DATAPOINT", "IS_USABLE_PHASE")
             .agg(*agg_columns)
         )
-
-
-        return df_aggregated
-
-    
-    def compute_specific_features_after_aggregation(self, df_aggregated):
-
-        df_aggregated = df_aggregated.withColumn(
-            'BATTERY_ENERGY_SUM',
-            F.when(F.col('PHASE_STATUS') == 'discharging', None).otherwise(F.col('BATTERY_ENERGY_SUM'))
-        )
-        df_aggregated = df_aggregated.withColumn(
-            'MAX_BATTERY_ENERGY_SUM',
-            F.when(F.col('PHASE_STATUS') == 'discharging', None).otherwise(F.col('MAX_BATTERY_ENERGY_SUM'))
-        )
-
-        df_aggregated = df_aggregated.withColumn("SOH", F.col("BATTERY_ENERGY_SUM") / F.col("MAX_BATTERY_ENERGY_SUM"))
 
         return df_aggregated

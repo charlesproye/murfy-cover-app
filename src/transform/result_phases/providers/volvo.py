@@ -2,14 +2,14 @@ from logging import Logger
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
+from transform.result_phases.processed_phase_to_result_phase import ProcessedPhaseToResultPhase
 
 
-class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
+class VolvoProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
 
     def __init__(
         self,
-        make="ford",
+        make="volvo-cars",
         spark: SparkSession = None,
         force_update: bool = False,
         logger: Logger = None,
@@ -19,6 +19,21 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
             make, spark=spark, force_update=force_update, logger=logger, **kwargs
         )
 
+    def compute_specific_features_before_aggregation(self, df_tss):
+        df_tss = df_tss.withColumn(
+                        "SOH",
+                        F.when(
+                            (F.col("soc").isNotNull())
+                            & (F.col("range").isNotNull())
+                            & (F.col("range") != 0),
+                            F.col("estimated_range")
+                            / (F.col("soc") / 100.0)
+                            / F.col("range")
+                            / F.lit(0.87),
+                        ).otherwise(None),
+                    )
+
+        return df_tss
 
     def aggregate_stats(self, df_tss):
         agg_columns = [
@@ -29,11 +44,9 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
-            # Stellantis / A voir si je peux gérer ça avec la config
-            F.expr("percentile_approx(soh_oem, 0.5)").alias('SOH_OEM'),
+            # Volvo / A voir si je peux gérer ça avec la config
+            F.expr("percentile_approx(SOH, 0.5)").alias('SOH')
         ]
-
-        
 
         if "consumption" in df_tss.columns:
             agg_columns.append(F.mean("consumption").alias("CONSUMPTION"))
@@ -43,26 +56,4 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
             .agg(*agg_columns)
         )
 
-
         return df_aggregated
-
-    def compute_consumption(self, phase_df):
-        """
-        Compute the consumption
-        """
-        
-        phase_df = (
-            phase_df
-            .withColumn("ODOMETER_DIFF", F.col("ODOMETER_LAST") - F.col("ODOMETER_FIRST"))
-            .withColumn(
-                "CONSUMPTION",
-                F.when(F.col("PHASE_STATUS") == "discharging",
-                (- 1 * F.col("SOC_DIFF"))
-                * (F.col("BATTERY_NET_CAPACITY")) * (F.col("SOH_OEM") / 100)
-                / F.col("ODOMETER_DIFF"),
-                ).otherwise(None)
-            )
-        )
-
-        return phase_df
-
