@@ -43,7 +43,7 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
-            # Ford / A voir si je peux gérer ça avec la config
+            # Ford specific features / Might be able to handle with config
             F.sum('battery_energy').alias('BATTERY_ENERGY_SUM'),
             F.sum('max_battery_energy').alias('MAX_BATTERY_ENERGY_SUM')
         ]

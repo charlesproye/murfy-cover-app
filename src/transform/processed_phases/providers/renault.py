@@ -3,7 +3,6 @@ from logging import Logger
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
-from transform.processed_phases.config import LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
 
 
 class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
@@ -39,7 +38,7 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
-            # Renault / A voir si je peux gérer ça avec la config
+            # Renault specific features / Might be able to handle with config
             F.sum('battery_energy').alias('BATTERY_ENERGY'),
             F.sum('expected_battery_energy').alias('EXPECTED_BATTERY_ENERGY'),
             F.mean('charging_rate').alias('CHARGING_RATE')

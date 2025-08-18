@@ -44,7 +44,7 @@ class VolvoRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
-            # Volvo / A voir si je peux gérer ça avec la config
+            # Volvo specific features / Might be able to handle with config
             F.expr("percentile_approx(SOH, 0.5)").alias('SOH')
         ]
 

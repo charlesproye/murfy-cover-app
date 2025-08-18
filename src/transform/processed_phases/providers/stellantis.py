@@ -29,7 +29,7 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
-            # Stellantis / A voir si je peux gérer ça avec la config
+            # Stellantis specific features / Might be able to handle with config
             F.expr("percentile_approx(soh_oem, 0.5)").alias('SOH_OEM'),
         ]
 
@@ -45,24 +45,4 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
 
 
         return df_aggregated
-
-    def compute_consumption(self, phase_df):
-        """
-        Compute the consumption
-        """
-        
-        phase_df = (
-            phase_df
-            .withColumn("ODOMETER_DIFF", F.col("ODOMETER_LAST") - F.col("ODOMETER_FIRST"))
-            .withColumn(
-                "CONSUMPTION",
-                F.when(F.col("PHASE_STATUS") == "discharging",
-                (- 1 * F.col("SOC_DIFF"))
-                * (F.col("BATTERY_NET_CAPACITY")) * (F.col("SOH_OEM") / 100)
-                / F.col("ODOMETER_DIFF"),
-                ).otherwise(None)
-            )
-        )
-
-        return phase_df
 
