@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from logging import getLogger
 import os
 from dotenv import load_dotenv
@@ -58,9 +57,9 @@ class RawTsToProcessedPhases(CachedETLSpark):
     # TODO:
     # Keep overwrite mode as long as performance is acceptable, don't switch to 'append' yet
     # Keep non-batched system as long as memory usage is manageable
-    # Ajouter le config file pour la face d'aggrégation des métriques sur les phase
-    # Revoir avec Hugo comment on gère le 'usable phase'
-    # REvoir avec Hugo la bonne agrégation de chacune des métriques
+    # Add config file for the aggregation of the metrics on the phases
+    # Check with Hugo how to handle the 'usable phase'
+    # Check with Hugo the aggregation criteria for each metric
 
     def run(self):
         # Load the raw tss dataframe
@@ -269,7 +268,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
             df = self._reassign_short_phases(
                 df
-            )  # Reassign short phases to previous valid phase (especiallyuseful for tesla-fleet-telemetry noise)
+            )  # Reassign short phases to previous valid phase (especially useful for tesla-fleet-telemetry noise)
 
 
         # Total soc gained or lost in the naive phase
@@ -459,7 +458,6 @@ class RawTsToProcessedPhases(CachedETLSpark):
         Aggregate the time series stats to the phase dataframe
         """
         agg_columns = [
-            #Minimum 
             F.first("make", ignorenulls=True).alias("MAKE"),
             F.first("model", ignorenulls=True).alias("MODEL"),
             F.first("version", ignorenulls=True).alias("VERSION"),
