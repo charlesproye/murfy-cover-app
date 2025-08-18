@@ -19,7 +19,7 @@ ORCHESTRATED_MAKES = {
     "kia": (False, HighMobilityResponseToRaw),
     "ford": (False, HighMobilityResponseToRaw),
     "tesla-fleet-telemetry": (False, TeslaFTResponseToRawTss),
-    "volkswagen": (True, VolkswagenResponseToRaw),
+    "volkswagen": (False, VolkswagenResponseToRaw),
 }
 
 

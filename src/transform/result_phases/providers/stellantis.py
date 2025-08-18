@@ -9,7 +9,7 @@ class StellantisProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
 
     def __init__(
         self,
-        make="ford",
+        make="stellantis",
         spark: SparkSession = None,
         force_update: bool = False,
         logger: Logger = None,
