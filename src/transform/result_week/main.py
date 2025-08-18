@@ -5,7 +5,7 @@ from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
 from transform.result_week.result_phase_to_result_week import ResultPhaseToResultWeek
 from core.pandas_utils import concat
-# from core.sql_utils import left_merge_rdb_table, truncate_rdb_table_and_insert_df
+from core.sql_utils import left_merge_rdb_table, truncate_rdb_table_and_insert_df
 
 ORCHESTRATED_MAKES = {
     "bmw": (True, False, False),
@@ -21,10 +21,11 @@ ORCHESTRATED_MAKES = {
 
 VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
     "SOH": "soh",
+    "SOH_OEM": "soh_oem",
     "ODOMETER": "odometer",
     "LEVEL_1": "level_1",
     "LEVEL_2": "level_2",
-    "level_3": "level_3",
+    "LEVEL_3": "level_3",
     "vehicle_id": "vehicle_id",
     "DATE":"timestamp"
 }
@@ -54,11 +55,8 @@ def main():
             pass
     results_week = concat(result_week_list)
 
-    print(results_week)
-    print(results_week.columns)
-
-    #df_global = left_merge_rdb_table(results_week, "vehicle", "VIN", "vin", {"id": "vehicle_id"})
-    # truncate_rdb_table_and_insert_df(df_global, "vehicle_data", VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS, logger=logger)
+    df_global = left_merge_rdb_table(results_week, "vehicle", "VIN", "vin", {"id": "vehicle_id"})
+    truncate_rdb_table_and_insert_df(df_global, "vehicle_data", VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS, logger=logger)
 
 
 if __name__ == "__main__":
