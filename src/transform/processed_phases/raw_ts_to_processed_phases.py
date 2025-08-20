@@ -393,9 +393,6 @@ class RawTsToProcessedPhases(CachedETLSpark):
         ).withColumn(
             "adjusted_last_soc",
             F.when(condition, F.col("next_first_soc")).otherwise(F.col("last_soc"))
-        ).withColumn(
-            "is_usable_phase",
-            F.when(F.col("count_points") > 1, F.lit(1)).otherwise(F.lit(0))
         )
 
         phase_stats = phase_stats.drop('last_soc', 'last_date')
@@ -408,6 +405,8 @@ class RawTsToProcessedPhases(CachedETLSpark):
         phase_stats = phase_stats.withColumn('total_phase_time_minutes', 
         (F.unix_timestamp(col('last_date')) - F.unix_timestamp(col('first_date'))) / 60
         )
+
+        phase_stats = phase_stats.withColumn('is_usable_phase', F.when((F.col('count_points') > 1) & (F.col('total_phase_time_minutes') <= 1440), F.lit(1)).otherwise(0))
 
         return phase_stats
 
