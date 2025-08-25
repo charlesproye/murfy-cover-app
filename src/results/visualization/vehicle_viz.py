@@ -10,17 +10,18 @@ if SRC_PATH not in sys.path:
 from core.sql_utils import get_connection
 from core.plt_utils import show_trendline
 from core.gsheet_utils import load_excel_data
-# Configuration de la page
+
+# page config
 st.set_page_config(page_title="Liste des modèles de véhicules", layout="wide")
 st.title("📊 Données de la table vehicle_model")
 
-# Paramètres de connexion à la base (à adapter à ta configuration réelle)
+# connexion env
 DB_HOST = os.environ.get("DB_DATA_EV_HOST")
 DB_PORT = os.environ.get("DB_DATA_EV_PORT")
 DB_NAME = os.environ.get("DB_DATA_EV_NAME")
 DB_USER = os.environ.get("DB_DATA_EV_USER")
 DB_PASSWORD = os.environ.get("DB_DATA_EV_PASSWORD")
-# Connexion à la base de données PostgreSQL
+
 
 def get_vehicle_models():
     with get_connection() as con:
@@ -59,13 +60,16 @@ filtered_df = filtered_df[filtered_df['type'] == selected_type] if type_choices 
 type_choices = sorted(filtered_df['version'].dropna().unique())
 selected_version = st.selectbox("Choisir une Version", [""] + type_choices)
 
-# Dernier filtre appliqué
+# Last filter used
 if selected_version:
     filtered_df = filtered_df[filtered_df['version'] == selected_version]
 
-# Affichage DF
+# vizualisation 
 st.subheader("📋 Données filtrées")
 st.dataframe(filtered_df, use_container_width=True)
+
+# Show graph
+# from db
 
 if st.button("show graph from db"):
     with get_connection() as con:
@@ -89,6 +93,9 @@ if st.button("show graph from db"):
         df = pd.DataFrame(cursor.fetchall(), columns=['soh', 'odometer'], dtype=float).dropna()
         fig = show_trendline(df, filtered_df['trendline'].values[0], filtered_df['trendline_max'].values[0], filtered_df['trendline_min'].values[0], selected_type, 'odometer', 'soh')
         st.plotly_chart(fig)
+
+# from gsheet
+
 if st.button("show graph scrapping"):
     df = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=df[0,:8], data=df[1:,:8])
