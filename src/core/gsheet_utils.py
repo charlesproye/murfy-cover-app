@@ -72,4 +72,4 @@ def export_to_excel(df_to_write, gsheet, feuille):
     sheet_out = client.open(gsheet)
     worksheet = sheet_out.worksheet(feuille)
     worksheet.append_rows(df_to_write.values.tolist())
-    print(f"Données écritent dans {gsheet} {feuille}")
+    print(f"Data written in {gsheet} {feuille}")
