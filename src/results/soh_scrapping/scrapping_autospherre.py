@@ -17,10 +17,10 @@ from core.gsheet_utils import *
 from activation.config.mappings import mapping_vehicle_type
 
 BASE_URL = "https://www.autosphere.fr"
-SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Mercedes,Bmw,Nissan,Mini,Volkswagen,Volvo,Ford,Ds,Opel,Audi,Kia,Toyota,Peugeot,Dacia,Renault,Hyundai,Lexus,Seat,Mitsubishi,Mg&fuel_type=Electrique&from={}"
+SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Mercedes,Bmw,Nissan,Mini,Volkswagen,Tesla,Volvo,Ford,Ds,Opel,Audi,Kia,Toyota,Peugeot,Dacia,Renault,Hyundai,Lexus,Seat,Mitsubishi,Mg&fuel_type=Electrique&from={}"
 STEP = 23
 START_OFFSET = 0
-STOP_OFFSET = 1000
+STOP_OFFSET = 3000
 
 
 def get_all_vehicle_links():
