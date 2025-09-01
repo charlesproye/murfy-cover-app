@@ -2,9 +2,7 @@ import plotly.express as px
 from plotly.graph_objects import Figure
 import pandas as pd
 from pandas import DataFrame as DF
-import plotly.express as px
 from plotly.graph_objects import Figure
-import plotly.express as px
 import plotly.graph_objects as go
 from scipy.optimize import curve_fit
 from .pandas_utils import *
@@ -111,4 +109,58 @@ def plot_log(df: pd.DataFrame, column:str) -> go.Figure:
 
         # Génération des valeurs ajustées
         fig.add_traces(go.Scatter(x=x_vals, y=y_vals, name=f'{value} trend', line=dict(color=color)))
+    return fig
+
+
+def trendline_apply(x, f):
+    return eval(f)
+
+def show_trendline(df, trendline, trendline_max, trendline_min, model, odometer_column_name, soh_column_name):
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=df[odometer_column_name],
+        y=df[soh_column_name],
+        mode='markers',
+        marker_color='rgba(50, 182, 193, .9)',
+        name='SoH'
+    ))
+
+    x_sorted = df[odometer_column_name].sort_values()
+    fig.add_trace(go.Scatter(
+        x=x_sorted,
+        y=trendline_apply(x_sorted, trendline['trendline']),
+        mode='lines',
+        line=dict(color='red'),
+        name='Fit'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=x_sorted,
+        y=trendline_apply(x_sorted, trendline_max['trendline']),
+        mode='lines',
+        line=dict(color='green'),
+        name='Upper'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=x_sorted,
+        y=trendline_apply(x_sorted, trendline_min['trendline']),
+        mode='lines',
+        line=dict(color='green'),
+        name='Lower'
+    ))
+
+    fig.update_layout(
+        width=1000,
+        height=600,
+        xaxis_title='Odometer',
+        yaxis_title='State of Health (SoH)',
+        legend_title='Légende',
+        title=f"version: {model}",
+        template='plotly_white',
+        xaxis=dict(range=[0, 150000]),  # Change selon l'échelle souhaitée pour l'odomètre
+        yaxis=dict(range=[.75, 1.1])     # Change selon l'échelle souhaitée pour le SoH
+    )
+
     return fig
