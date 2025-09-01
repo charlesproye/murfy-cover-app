@@ -442,7 +442,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
         tss_phased = ph.join(ts, on=join_condition, how="left")
 
         tss_phased = tss_phased.join(self.spark.createDataFrame(fleet_info), "vin", "left").drop("vin").withColumnRenamed("VIN_ph", "VIN")
-        
+
         return tss_phased
 
 

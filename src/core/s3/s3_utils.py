@@ -92,7 +92,7 @@ class S3Service():
             # Vérifier si le DataFrame n'est pas vide
             if processed.count() > 0:
                 processed, df = align_dataframes_for_union(
-                    processed, df, strategy="intersection"
+                    processed, df, strategy="union"
                 )
                 df_write = processed.union(df).dropDuplicates()
 

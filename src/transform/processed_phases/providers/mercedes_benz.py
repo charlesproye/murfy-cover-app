@@ -5,11 +5,11 @@ from pyspark.sql import functions as F
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
 
 
-class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
+class MercedesBenzRawTsToProcessedPhases(RawTsToProcessedPhases):
 
     def __init__(
         self,
-        make="renault",
+        make="mercedes-benz",
         spark: SparkSession = None,
         force_update: bool = False,
         logger: Logger = None,
@@ -18,16 +18,6 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
         super().__init__(
             make, spark=spark, force_update=force_update, logger=logger, **kwargs
         )
-
-    def compute_specific_features_before_aggregation(self, df_tss):
-        df_tss = df_tss.withColumn("expected_battery_energy",
-                        F.when(
-                            (F.col("net_capacity").isNotNull()) & (F.col("soc").isNotNull()),
-                            F.col("net_capacity") * (F.col("soc") / 100.0)
-                        )
-                        .otherwise(None)
-                    )
-        return df_tss
 
     def aggregate_stats(self, df_tss):
         agg_columns = [
@@ -38,10 +28,10 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
-            # Renault specific features / Might be able to handle with config
-            F.sum('battery_energy').alias('BATTERY_ENERGY'),
-            F.sum('expected_battery_energy').alias('EXPECTED_BATTERY_ENERGY'),
-            F.mean('charging_rate').alias('CHARGING_RATE')
+            # Mercedes specific features / Might be able to handle with config
+            F.mean('charging_rate').alias('CHARGING_RATE_MEAN'),
+            F.last('total_charging_duration', ignorenulls=True).alias('CHARGING_DURATION_OEM'),
+            F.last('energy_charged', ignorenulls=True).alias('TOTAL_ENERGY_CHARGED')
         ]
 
         if "consumption" in df_tss.columns:
