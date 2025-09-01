@@ -11,16 +11,6 @@ services:
     env_file:
       - .env
 
-  data_ev_staging:
-    platform: linux/amd64
-    image: rg.fr-par.scw.cloud/bib-images/data_ev_staging:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: data_ev_staging
-    env_file:
-      - .env
-
   tesla_ingestion_service:
     build:
       context: .
