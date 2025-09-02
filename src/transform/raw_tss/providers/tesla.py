@@ -48,6 +48,8 @@ class TeslaResponseToRaw(ResponseToRawTss):
         """
 
         # On renomme readable_date en date
+        df = df.coalesce(optimal_partitions_nb)
+        
         df = df.withColumnRenamed("readable_date", "date")
 
         # Colonnes à agréger (tout sauf vin et date)
@@ -57,7 +59,7 @@ class TeslaResponseToRaw(ResponseToRawTss):
         agg_exprs = [first(c, ignorenulls=True).alias(c) for c in cols_to_agg]
 
         # GroupBy et agrégation
-        parsed = df.groupBy("vin", "date").agg(*agg_exprs)
+        parsed = df.groupBy("vin", "date").agg(*agg_exprs).coalesce(optimal_partitions_nb)
 
         return parsed
     
