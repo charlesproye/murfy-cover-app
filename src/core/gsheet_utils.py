@@ -59,7 +59,8 @@ def clean_gsheet(gsheet, feuille, keep_first_line=True):
     else:
         worksheet.clear()
         
-def load_excel_data(client, gsheet, feuille):
+def load_excel_data(gsheet, feuille):
+    client = get_google_client()
     sheet = client.open(gsheet)
     courbes_sheet = sheet.worksheet(feuille)
     sheet_data = np.array(courbes_sheet.get_all_values())
