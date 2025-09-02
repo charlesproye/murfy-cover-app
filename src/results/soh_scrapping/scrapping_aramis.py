@@ -24,7 +24,7 @@ class AramisautoScraper:
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
         })
-    
+
     def get_page_content(self, url: str) -> Optional[BeautifulSoup]:
         """Fetch the HTML content of a page"""
         try:
@@ -208,7 +208,7 @@ def main():
     scraper = AramisautoScraper()
 
     # Scrape electric car listings
-    infos = scraper.scrape_electric_cars(20, existing_links = set(df_sheet['lien']))
+    infos = scraper.scrape_electric_cars(100, existing_links = set(df_sheet['lien']))
     df_infos = scraper.clean_data(infos)
 
     # Map with internal database model
@@ -223,7 +223,7 @@ def main():
     type_mapping = df_infos.merge(model_existing[['id', 'type']], on='id', how='left')['type']
     df_infos['Type'] = [mapped if mapped != 'unknown' else old for old, mapped in zip(df_infos['Type'], type_mapping)]
     df_infos.drop(columns='id', inplace=True)
-
+    df_infos = df_infos.replace(np.nan, "unknown").replace(pd.NA, "unknown")
     export_to_excel(df_infos, "Courbes de tendance", "Courbes OS")
 
 if __name__ == "__main__":
