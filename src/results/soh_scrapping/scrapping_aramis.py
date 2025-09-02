@@ -7,13 +7,15 @@ import numpy as np
 from urllib.parse import urljoin, urlparse
 from typing import List, Dict, Optional
 from core.gsheet_utils import get_google_client, load_excel_data, export_to_excel
-
+from activation.config.mappings import mapping_vehicle_type
+from core.sql_utils import get_connection
+from activation.config.mappings import mapping_vehicle_type
 
 class AramisautoScraper:
     def __init__(self):
         self.base_url = "https://www.aramisauto.com"
         self.session = requests.Session()
-        # Headers pour simuler un navigateur réel
+        # Headers to simulate a real browser
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -22,22 +24,22 @@ class AramisautoScraper:
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
         })
-    
+
     def get_page_content(self, url: str) -> Optional[BeautifulSoup]:
-        """Récupère le contenu d'une page web"""
+        """Fetch the HTML content of a page"""
         try:
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
             return BeautifulSoup(response.content, 'html.parser')
         except requests.RequestException as e:
-            print(f"Erreur lors de la récupération de {url}: {e}")
+            print(f"Error fetching {url}: {e}")
             return None
     
     def extract_car_links_from_listing(self, soup: BeautifulSoup) -> List[str]:
-        """Extrait tous les liens vers les voitures depuis une page de listing"""
+        """Extract all car listing links from a listing page"""
         car_links = []
         
-        # Différents sélecteurs possibles pour les liens de voitures
+        # Different possible selectors for car links
         selectors = [
             'a[href*="/voitures/"]',
             'a[href*="/vehicule/"]',
@@ -52,18 +54,17 @@ class AramisautoScraper:
             for link in links:
                 href = link.get('href')
                 if href:
-                    # Convertir en URL absolue si nécessaire
+                    # Convert to absolute URL if needed
                     if href.startswith('/'):
                         href = urljoin(self.base_url, href)
                     
-                    # Vérifier que c'est bien un lien vers une voiture
+                    # Confirm the URL is actually a car page
                     if self.is_car_link(href):
                         car_links.append(href)
-        
-        return list(set(car_links))  # Supprimer les doublons
+        return car_links
     
     def is_car_link(self, url: str) -> bool:
-        """Vérifie si une URL pointe vers une fiche de voiture"""
+        """Check if a URL points to a car detail page"""
         car_patterns = [
             r'/voitures/.+/.+/.+/rv\d+/',
             r'/vehicule/',
@@ -77,45 +78,47 @@ class AramisautoScraper:
         return False
     
     def extract_car_info(self, car_url: str) -> Dict:
-        """Extrait les informations d'une voiture depuis sa fiche"""
+        """Extract information from a single car page"""
         soup = self.get_page_content(car_url)
         if not soup:
-            return {"lien": car_url, "error": "Impossible de récupérer la page"}
+            return {"lien": car_url, "error": "Unable to retrieve the page"}
         
         car_info = {"lien": car_url}
         
         try: 
             page_text = soup.get_text()
-            # SOH
+            
+            # SoH
             soh_partern = r'\d{2,3}\s%'
             soh_match = re.search(soh_partern, page_text)
             if soh_match:
                 car_info['SoH'] = soh_match.group(0)
-            # Kilométrage
+                print(car_info['SoH'])
+            
+            # Odometer
             km_pattern = r'([\d\s]+)\s*km'
             km_match = re.search(km_pattern, page_text)
             if km_match:
                 car_info['Odomètre (km)'] = int(km_match.group(0).replace('km', '').replace(' ', ''))
-            # Date
+            
+            # Year
             date_pattern = r'\d{1,2}\/\d{1,2}\/\d{2,4}'
             date = re.search(date_pattern, page_text)
             if date:
                 car_info['Année'] = int(date.group(0)[-4:].strip())
-                # else:
-                #     car_info['Année'] = int(date.group(1)[-4:].strip())
-                # print(car_info['Année'])
             
-            # Batterie capacity
+            # Battery capacity
             battery_pattern = r'\d*.\d*\s[k][W][h]'
             battery_match = re.search(battery_pattern, page_text)
             if battery_match:
                 car_info['battery_capacity'] = battery_match.group(0)
             
-            # Type
+            # Full version (Type)
             price_info_elements = soup.select('.default-body.price-information-row, .price-information-row, .default-body')
             type_car = " ".join(price_info_elements[0].text.split())
             car_info['Type'] = type_car
-            # Marque et modèle depuis l'URL
+
+            # Brand and model from URL
             url_parts = urlparse(car_url).path.split('/')
             if len(url_parts) >= 4 and 'voitures' in url_parts:
                 try:
@@ -128,29 +131,29 @@ class AramisautoScraper:
                     pass
             
         except Exception as e:
-            car_info['error'] = f"Erreur lors de l'extraction: {e}"
+            car_info['error'] = f"Error extracting car data: {e}"
         
         return car_info
     
-    def scrape_electric_cars(self, max_pages: int = 100) -> List[Dict]:
-        """Scrape toutes les voitures électriques"""
-        print("Début du scraping des voitures électriques...")
+    def scrape_electric_cars(self, max_pages: int = 100, existing_links: Optional[set] = None) -> List[Dict]:
+        """Scrape all electric cars from the AramisAuto website"""
+        print("Starting electric car scraping...")
         
         all_cars = []
         base_electric_url = "https://www.aramisauto.com/achat/electrique/"
         
-        # Récupérer la première page
+        # Load the first page
         soup = self.get_page_content(base_electric_url)
         if not soup:
-            print("Impossible de récupérer la page principale")
+            print("Unable to load main electric page")
             return []
         
-        # Extraire les liens de voitures
+        # Extract car links
         car_links = self.extract_car_links_from_listing(soup)
-        print(f"Trouvé {len(car_links)} liens de voitures sur la page principale")
+
+        print(f"Found {len(car_links)} car links on the main page")
         
-        # Chercher d'autres pages (pagination)
-        pagination_links = []
+        # Look for additional paginated pages
         for page_num in range(2, max_pages + 1):
             page_url = f"{base_electric_url}?page={page_num}"
             page_soup = self.get_page_content(page_url)
@@ -158,46 +161,65 @@ class AramisautoScraper:
                 page_car_links = self.extract_car_links_from_listing(page_soup)
                 if page_car_links:
                     car_links.extend(page_car_links)
-                    print(f"Page {page_num}: {len(page_car_links)} liens trouvés")
+                    print(f"Page {page_num}: {len(page_car_links)} links found")
                 else:
                     break
+    
+        if existing_links is not None:
+            car_links = set(car_links) - existing_links
+        print(f"Total: {len(car_links)} unique car links found")
         
-        # Supprimer les doublons  
-        car_links = list(set(car_links))
-        print(f"Total: {len(car_links)} liens uniques trouvés")
-        
-        # Extraire les informations de chaque voiture
+        # Extract data from each car page
         for i, car_url in enumerate(car_links, 1):
-            print(f"Extraction {i}/{len(car_links)}: {car_url}")
+            print(f"Extracting {i}/{len(car_links)}: {car_url}")
             car_info = self.extract_car_info(car_url)
             all_cars.append(car_info)
             time.sleep(1)
-            
         
         return all_cars
     
     def clean_data(self, data):
-        # ordonner les données par rapport a la gsheet
+        # Align column order with Google Sheets structure
         df = pd.DataFrame(data)[["OEM", "Modèle", "Type", "Année", "Odomètre (km)", "SoH", "lien", "battery_capacity"]]
-        # Si pas de SoH pas intérressant
+
+        # Drop cars without SoH
         df = df.dropna(subset='SoH')
-        # éviter que ça casse s'il manque une info
+
+        # Ensure numeric field is integer
+        df['Odomètre (km)'] =  df['Odomètre (km)'].astype(int)
+
+        # Replace missing values with 'unknown'
         df = df.replace(np.nan, "unknown").replace(pd.NA, "unknown")
         return df
-        
-        
+
+
 def main():
-    scraper = AramisautoScraper()
     
-    # Scraper les voitures électriques
-    infos = scraper.scrape_electric_cars(100)
-    df_infos = scraper.clean_data(infos)
-    data_sheet = load_excel_data(get_google_client(), "202505 - Courbes SoH", "Courbes OS")
+    # Load current data from Google Sheet
+    data_sheet = load_excel_data(get_google_client(), "Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:8], data=data_sheet[1:,:8])
-    df_filtré = df_infos[~df_infos['lien'].isin(df_sheet['lien'])]
-   # df_filtré['Type'] =  df_filtré['Type'].map(TYPE_MAPPING)
-    print(df_filtré.isna().sum())
-    export_to_excel(df_filtré, "202505 - Courbes SoH", "Courbes OS")
+    
+    scraper = AramisautoScraper()
+
+    # Scrape electric car listings
+    infos = scraper.scrape_electric_cars(100, existing_links = set(df_sheet['lien']))
+    df_infos = scraper.clean_data(infos)
+
+    # Map with internal database model
+    with get_connection() as con:
+        cursor = con.cursor()
+        cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
+                                                    join make m on vm.make_id=m.id
+                                                    join battery b on b.id=vm.battery_id;""")
+        model_existing = pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
+
+    df_infos['id'] = df_infos.apply(lambda row: mapping_vehicle_type(row['Type'], row['OEM'], row['Modèle'], model_existing, row['battery_capacity'], row['Année']), axis=1)
+    type_mapping = df_infos.merge(model_existing[['id', 'type']], on='id', how='left')['type']
+    df_infos['Type'] = [mapped if mapped != 'unknown' else old for old, mapped in zip(df_infos['Type'], type_mapping)]
+    df_infos.drop(columns='id', inplace=True)
+    df_infos = df_infos.replace(np.nan, "unknown").replace(pd.NA, "unknown")
+    export_to_excel(df_infos, "Courbes de tendance", "Courbes OS")
 
 if __name__ == "__main__":
     main()
+
