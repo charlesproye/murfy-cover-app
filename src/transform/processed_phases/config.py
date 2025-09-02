@@ -8,6 +8,7 @@ ODOMETER_MILES_TO_KM = {
 # Coefficient to scale soc to 0-100%
 SCALE_SOC = {
     'tesla-fleet-telemetry': 1,
+    'tesla': 1,
     'mercedes-benz': 100,
     'volvo-cars': 100,
     'kia': 100,
@@ -30,6 +31,7 @@ SOC_DIFF_THRESHOLD = {
     'stellantis': 0.05,
     'bmw': 0.05,
     'volkswagen': 0.05,
+    'tesla': 0.05
 }
 
 # Power thresholds for charging level classification

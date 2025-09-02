@@ -17,6 +17,7 @@ ORCHESTRATED_MAKES = {
     "ford": (True, True, False),
     "tesla-fleet-telemetry": (True, True, True),
     "volkswagen": (True, False, False),
+    "tesla": (True, True, True)
 }
 
 VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
