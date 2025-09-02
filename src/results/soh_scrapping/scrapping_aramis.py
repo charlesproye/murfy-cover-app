@@ -129,10 +129,16 @@ class AramisautoScraper:
                         car_info['Modèle'] = url_parts[brand_index + 1].replace('-', ' ').title()
                 except (ValueError, IndexError):
                     pass
-            
-        except Exception as e:
+            # Price
+            price_block = soup.select_one('div.price-amount')
+            if price_block:
+                price_text = price_block.get_text(strip=True)
+                price_clean = re.sub(r'[^\d]', '', price_text)
+                if price_clean:
+                    car_info['price'] = int(price_clean)
+                    
+        except Exception as e: 
             car_info['error'] = f"Error extracting car data: {e}"
-        
         return car_info
     
     def scrape_electric_cars(self, max_pages: int = 100, existing_links: Optional[set] = None) -> List[Dict]:
@@ -180,7 +186,7 @@ class AramisautoScraper:
     
     def clean_data(self, data):
         # Align column order with Google Sheets structure
-        df = pd.DataFrame(data)[["OEM", "Modèle", "Type", "Année", "Odomètre (km)", "SoH", "lien", "battery_capacity"]]
+        df = pd.DataFrame(data)[["OEM", "Modèle", "Type", "Année", "Odomètre (km)", "SoH", "lien", "battery_capacity", 'price']]
 
         # Drop cars without SoH
         df = df.dropna(subset='SoH')
