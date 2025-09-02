@@ -7,6 +7,7 @@ from logging import Logger
 from typing import Optional
 import os
 from dotenv import load_dotenv
+import math
 
 from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark.sql.types import StringType, StructField, StructType
@@ -64,6 +65,8 @@ class ResponseToRawTss:
             optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
                 keys_to_download_per_vin, paths_to_exclude, int(os.environ.get("NB_CORES_CLUSTER"))
             )
+
+            print(f"Nombre de batchs = {math.ceil(len(keys_to_download_per_vin) / batch_size)}")
 
             for batch_num, batch in enumerate(
                 self._batch_dict_items(keys_to_download_per_vin, batch_size), 1
