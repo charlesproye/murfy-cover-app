@@ -174,7 +174,6 @@ class MobilisightResponseToRaw(ResponseToRawTss):
             if len(field_def) != 1 or not isinstance(field_def[0], dict):
                 raise ValueError("Each array must contain exactly one dict describing the element structure.")
             return ArrayType(self._get_dynamic_schema(field_def[0], parse_type_map))
-
         elif isinstance(field_def, str):
             # Primitive type
             return parse_type_map[field_def.lower()]
