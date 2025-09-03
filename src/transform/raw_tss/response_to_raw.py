@@ -87,7 +87,6 @@ class ResponseToRawTss:
                 )
 
                 self._update_last_parsed_date(batch)
-                end = time.time()
 
                 raw_tss_parsed.unpersist()
                 del raw_tss_parsed
