@@ -1,13 +1,12 @@
 import os
-import gspread
 from google.oauth2.service_account import Credentials
 import numpy as np
 import json 
 import base64
 import logging
 from logging import getLogger
-from typing import Any, List
-
+from typing import Any
+import gspread
 
 logger = getLogger("ingestion.vehicle_info")
 
@@ -36,23 +35,24 @@ def get_google_client() -> Any:
         )
 
         return gspread.authorize(credentials)
-
-        
     except Exception as e:
-        logging.error(f"Failed to get Google Sheets client: {str(e)}")
-        raise
+        raise ValueError(f"Failed to get Google Sheets client: {str(e)}") from e
 
 def clean_gsheet(gsheet, feuille, keep_first_line=True):
+    """erased data from the gsheet
+
+    Args:
+        gsheet (str): name of the gsheet
+        feuille (str): name of the sheet 
+        keep_first_line (bool, optional): True if you want to keep the first line. Defaults to True.
+    """
     client = get_google_client()
 
     spreadsheet = client.open(gsheet)
     worksheet = spreadsheet.worksheet(feuille)
-
-    # Récupérer le nombre total de lignes et colonnes utilisées
     rows = worksheet.row_count
     cols = worksheet.col_count
 
-    # Construire la plage à effacer (tout sauf la 1ère ligne)
     if keep_first_line is True:
         range_to_clear = f'A2:{chr(64 + cols)}{rows}' 
         worksheet.batch_clear([range_to_clear])
@@ -64,8 +64,6 @@ def load_excel_data(gsheet, feuille):
     sheet = client.open(gsheet)
     courbes_sheet = sheet.worksheet(feuille)
     sheet_data = np.array(courbes_sheet.get_all_values())
-
-    
     return sheet_data
 
 def export_to_excel(df_to_write, gsheet, feuille):
@@ -73,4 +71,5 @@ def export_to_excel(df_to_write, gsheet, feuille):
     sheet_out = client.open(gsheet)
     worksheet = sheet_out.worksheet(feuille)
     worksheet.append_rows(df_to_write.values.tolist())
-    print(f"Data written in {gsheet} {feuille}")
+    logging.info("Data written in %s %s", gsheet, feuille)
+
