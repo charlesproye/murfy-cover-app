@@ -4,6 +4,7 @@ import time
 import re
 from urllib.parse import unquote
 from datetime import date
+from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -21,8 +22,8 @@ BASE_URL = "https://www.autosphere.fr"
 SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Mercedes,Bmw,Nissan,Mini,Volkswagen,Tesla,Volvo,Ford,Ds,Opel,Audi,Kia,Toyota,Peugeot,Dacia,Renault,Hyundai,Lexus,Seat,Mitsubishi,Mg&fuel_type=Electrique&from={}"
 STEP = 23
 START_OFFSET = 0
-STOP_OFFSET = 3000
-
+STOP_OFFSET = 50
+PATH_FILE = Path(__file__).parent / "link_unsuable.txt"
 
 def get_all_vehicle_links():
     all_links = set()
@@ -184,7 +185,7 @@ def extract_price(wait, car_nbr):
         return None
 
 
-def extract_aviloo_data(wait, car_nbr):
+def extract_aviloo_data(wait, car_nbr, link):
     data = None
     try:
         aviloo_link_elem = wait.until(
@@ -199,7 +200,9 @@ def extract_aviloo_data(wait, car_nbr):
                 
     except Exception as e:
         print(f"[{car_nbr}] Aviloo not found: {e}")
-
+        with open(PATH_FILE, "a", encoding="utf-8") as f:
+            f.write(f"{link}\n")
+            f.flush()
     return data
 
 def extract_version_complete(driver, modele, car_nbr):
@@ -231,7 +234,7 @@ def extract_vehicle_info(link, car_nbr):
         price = extract_price(wait, car_nbr)
         modele = get_model_from_autosphere(driver)
         version_complete = extract_version_complete(driver, modele, car_nbr)
-        data_aviloo = extract_aviloo_data(wait, car_nbr)
+        data_aviloo = extract_aviloo_data(wait, car_nbr, link)
         infos.update({
             "lien": link,
             "Type": version_complete,
@@ -252,9 +255,14 @@ def main():
     all_links = get_all_vehicle_links()
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
-    links_not_fetch = set(all_links) - set(df_sheet['lien'])
+    try:
+        with open(PATH_FILE, "r", encoding="utf-8") as f:
+            link_already_try = {line.strip() for line in f if line.strip()}
+    except FileNotFoundError:
+        link_already_try = set()
+    links_not_fetch = set(all_links) - set(df_sheet['lien']) - link_already_try
     all_infos = {}
-
+    print(f"Number of link to scrappe = {len(links_not_fetch)}")
     for i, link in enumerate(tqdm(links_not_fetch, desc="Scraping", unit="link"), start=1):
         print(f"[{i}] Récupération des infos depuis : {link}")
         try:
@@ -284,4 +292,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+
 
