@@ -242,7 +242,7 @@ def get_spoticar_data(url: str, timeout: int = 20) -> Dict[str, Optional[str]]:
 
 
 def main():
-    car_links = get_all_car_links(max_pages=1)
+    car_links = get_all_car_links(max_pages=10) # nbr pages
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
     try:
