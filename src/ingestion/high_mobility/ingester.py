@@ -303,16 +303,12 @@ class HMIngester:
 
     def __process_job_queue(self):
         while not self.__shutdown_requested.is_set():
-            if not self.__is_compressing:
-                try:
-                    job = self.__job_queue.get(timeout=1)
-                    self.__executor.submit(job)
-                    self.__job_queue.task_done()
-                except queue.Empty:
-                    pass
-            else:
-                time.sleep(1)
-
+            try:
+                job = self.__job_queue.get(timeout=1)
+                self.__executor.submit(job)
+                self.__job_queue.task_done()
+            except queue.Empty:
+                pass
 
     def run(self):
             self.__schedule_tasks()
@@ -331,13 +327,3 @@ class HMIngester:
         self.__update_vehicles_initial()
         self.__scheduler_logger.info("Starting initial scheduler run")
         self.__fetch_scheduler.run_all()
-        
-        self.__scheduler_logger.info("Scheduled daily compression at 00:00")
-
-        # Wait for all ongoing tasks to complete
-        self.__executor.shutdown(wait=True)
-        
-        # Recreate the executor and reschedule tasks
-        self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers)
-        self.__fetch_scheduler.clear()
-        self.__schedule_tasks()
