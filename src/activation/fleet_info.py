@@ -10,8 +10,6 @@ import re
 
 
 from core.pandas_utils import *
-from core.s3.s3_utils import S3Service
-from core.singleton_s3_bucket import S3
 from core.config import *
 from core.gsheet_utils import get_google_client
 from .config.credentials import SPREADSHEET_ID 
@@ -62,7 +60,7 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
             logger.error(f"Failed to fetch data after {max_retries} attempts. Last error: {str(last_error)}")
             raise
 
-def safe_astype(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
+def safe_astype_activation(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
     """Safely convert DataFrame columns to specified types.
     
     Args:
@@ -239,8 +237,8 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
             if col not in df.columns:
                 logger.warning(f"Missing column {col}, adding empty column")
                 df[col] = None
-        # Add this before safe_astype
-        df = df.pipe(safe_astype, COL_DTYPES)
+        # Add this before safe_astype_activation
+        df = df.pipe(safe_astype_activation, COL_DTYPES)
         df = df.pipe(clean_version, model_col='model', version_col='type')
         df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
         df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
