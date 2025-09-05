@@ -11,7 +11,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException
 from core.sql_utils import get_connection
 from core.gsheet_utils import load_excel_data, export_to_excel
 from activation.config.mappings import mapping_vehicle_type
