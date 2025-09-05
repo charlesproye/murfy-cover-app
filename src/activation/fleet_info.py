@@ -10,8 +10,6 @@ import re
 
 
 from core.pandas_utils import *
-from core.s3.s3_utils import S3Service
-from core.singleton_s3_bucket import S3
 from core.config import *
 from core.gsheet_utils import get_google_client
 from .config.credentials import SPREADSHEET_ID 
@@ -62,7 +60,7 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
             logger.error(f"Failed to fetch data after {max_retries} attempts. Last error: {str(last_error)}")
             raise
 
-def safe_astype(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
+def safe_astype_activation(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
     """Safely convert DataFrame columns to specified types.
     
     Args:
@@ -248,9 +246,39 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     
     return df
         
-    # except Exception as e:
-    #     logger.error(f"Error reading fleet info: {str(e)}")
-    #     raise
+        # Map OEM names
+        if 'oem' in df.columns:
+            df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
+        
+        df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].apply(lambda x: x.str.lower())
+        
+        # Convert dates with explicit format handling
+        date_columns = ['start_date', 'end_of_contract']
+        for col in date_columns:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], yearfirst=True, errors='coerce').dt.strftime('%Y-%m-%d')
+        
+        # Remove duplicates and convert types
+        df = df.drop_duplicates(subset="vin")
+        df = df.replace({pd.NaT: None})
+        
+        # Ensure all required columns exist before type conversion
+        for col in COL_DTYPES:
+            if col not in df.columns:
+                logger.warning(f"Missing column {col}, adding empty column")
+                df[col] = None
+        # Add this before safe_astype_activation
+        df = df.pipe(safe_astype_activation, COL_DTYPES)
+        df = df.pipe(clean_version, model_col='model', version_col='type')
+        df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
+        df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
+        logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
+        
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error reading fleet info: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     df = asyncio.run(read_fleet_info(owner_filter=''))
