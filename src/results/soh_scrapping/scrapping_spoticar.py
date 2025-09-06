@@ -42,8 +42,6 @@ def get_car_links(url):
     driver = make_driver()
     try:
         driver.get(url)
-
-        # Scroll progressif pour charger toutes les annonces
         last_height = 0
         while True:
             driver.execute_script("window.scrollBy(0, 1200);")
@@ -88,11 +86,8 @@ def get_all_car_links(max_pages=10):
             break
     return list(all_links)
 
-
-
 def _text_of(element) -> str:
     return re.sub(r"\s+", " ", element.text).strip()
-
 
 def find_value_by_label(driver: webdriver.Chrome, label: str) -> Optional[str]:
     label_norm = label.lower()
@@ -128,28 +123,31 @@ def find_value_by_label(driver: webdriver.Chrome, label: str) -> Optional[str]:
     return None
 
 
+def get_info(driver, url):
+    try:
+        marque_modele = driver.find_element(By.CSS_SELECTOR, "span.title.title-brand-model.product-line").text.strip()
+        version = driver.find_element(By.CSS_SELECTOR, "div.sub-title.title-finition").text.strip()
+        annee = driver.find_element(By.CSS_SELECTOR, "div.tag.field_vo_matriculation_year").text.strip()
+        kilometrage = driver.find_element(By.CSS_SELECTOR, "div.tag.field_vo_mileage").text.replace('km', '').replace(' ', '').strip()
+        marque, modele = marque_modele.split(" ", 1)
+        return {
+        "lien": url,
+        "OEM": marque,
+        "Modèle": modele,
+        "Type": version,
+        "Année": annee,
+        "Odomètre (km)": kilometrage,
+    }
+    except Exception as e:
+        print(f"Erreur extraction {url} : {e}")
+        return None
+
 def extract_price(driver: webdriver.Chrome) -> Optional[str]:
     try:
         price_el = driver.find_element(By.CSS_SELECTOR, "div.total-price-value span")
         return _text_of(price_el)
     except Exception as e:
         return None
-
-
-def extract_title_parts(driver: webdriver.Chrome) -> Dict[str, Optional[str]]:
-    out = {"make": None, "modele": None, "version": None}
-    try:
-        h1 = driver.find_element(By.TAG_NAME, "h1")
-        title = _text_of(h1)
-    except Exception as e:
-        title = driver.title or ""
-    if title:
-        parts = title.split()
-        if parts:
-            out["make"] = parts[0]
-            if len(parts) > 1:
-                out["modele"] = parts[1]
-    return out
 
 
 def scroll_slowly(driver: webdriver.Chrome, steps: int = 6, pause: float = 0.5):
@@ -168,16 +166,9 @@ def add_link_to_unused_list(link):
         f.flush()
     
 
-def get_spoticar_data(url: str, timeout: int = 20) -> Dict[str, Optional[str]]:
-    driver = make_driver()
+def get_soh(driver, url):
+    page_text = _text_of(driver.find_element(By.TAG_NAME, 'body'))
     try:
-        driver.get(url)
-        WebDriverWait(driver, timeout).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
-        scroll_slowly(driver)
-
-        page_text = _text_of(driver.find_element(By.TAG_NAME, 'body'))
-
-        soh = None
         soh_match = re.search(r"(?i)\bsoh\b\s*[:\-]?\s*(\d{1,3})\s*%", page_text)
         if soh_match:
             soh = soh_match.group(1)
@@ -185,52 +176,51 @@ def get_spoticar_data(url: str, timeout: int = 20) -> Dict[str, Optional[str]]:
             soh_match2 = re.search(r"(?i)(sant[eé] de (la )?batterie|[ée]tat de sant[eé]).{0,20}?(\d{1,3})\s*%", page_text)
             if soh_match2:
                 soh = soh_match2.group(3)
+        return soh
+    except Exception as e:
+        print("No SoH found")
+        add_link_to_unused_list(url)
+        return None
 
-        if not soh:
-            print(url, "SoH not found")
-            add_link_to_unused_list(url)
+def get_wltp(driver):
+    try:
+        wltp = find_value_by_label(driver, "Autonomie électrique en cycle combiné")
+        wltp = re.sub(r"[^\d]", "", wltp) if wltp else None
+        return wltp
+    except Exception:
+        print("WLTP not found")
+        return None
+    
+    
+def get_price(driver):
+    try:
+        price = driver.find_element(By.CSS_SELECTOR, "div.total-price-value span").text.strip()
+        price = re.sub(r"[^\d]", "", price) if price else None
+    except Exception:
+        print("Price not found")
+    return price
 
-        try:
-            odometer_el = driver.find_element(By.CSS_SELECTOR, "div.tag.field_vo_mileage")
-            odometer = _text_of(odometer_el)
-            odometer = re.sub(r"[^\d]", "", odometer)
-        except Exception:
-            odometer = find_value_by_label(driver, "Kilométrage")
-            odometer = re.sub(r"[^\d]", "", odometer) if odometer else None
-            if not odometer:
-                print(url, "Odometer not found")
+def get_battery_capacity(version):
+    match = re.search(r"(\d+)\s*kWh", version) 
+    if match:
+        return int(match.group(1))
+    return None
 
-        try:
-            wltp = find_value_by_label(driver, "Autonomie électrique en cycle combiné")
-            wltp = re.sub(r"[^\d]", "", wltp) if wltp else None
-            if not wltp:
-                print(url, "WLTP not found")
-                add_link_to_unused_list(url)
-        except Exception:
-            wltp = None
-            print(url, "WLTP not found")
+def get_spoticar_data(url: str, timeout: int = 20) -> Dict[str, Optional[str]]:
+    driver = make_driver()
+    try:
+        driver.get(url)
+        WebDriverWait(driver, timeout).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+        scroll_slowly(driver)
 
-        try:
-            price = extract_price(driver)
-            price = re.sub(r"[^\d]", "", price) if price else None
-            if not price:
-                print(url, "Price not found")
-        except Exception:
-            price = None
-            print(url, "Price not found")
-
-        return {
-            "lien": url,
-            "SoH": soh,
-            "Odomètre (km)": odometer,
-            "WLTP": wltp,
-            "price": price,
-            "OEM": find_value_by_label(driver, "make"),
-            "Modèle": find_value_by_label(driver, "Modèle"),
-            "Type": find_value_by_label(driver, "Version"),
-            "Année": find_value_by_label(driver, "Année"),
-            "battery_capacity": None
-        }
+        infos = get_info(driver, url)
+        infos['SoH'] = get_soh(driver, url)
+        
+        infos['WLTP'] = get_wltp(driver)
+        infos['price'] = get_price(driver)
+        
+        infos['battery_capacity'] = get_battery_capacity(infos['Type'])
+        return infos
 
     except Exception as e:
         print(url, f"Erreur fatale : {e}")
@@ -240,9 +230,8 @@ def get_spoticar_data(url: str, timeout: int = 20) -> Dict[str, Optional[str]]:
         driver.quit()
 
 
-
 def main():
-    car_links = get_all_car_links(max_pages=10) # nbr pages
+    car_links = get_all_car_links(max_pages=13) # nbr pages
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
     try:
