@@ -1,13 +1,19 @@
 import asyncio
 
 import msgspec
-from src.core.compressor import Compressor
+from transform.compressor.compressor import Compressor
+from core.s3.async_s3 import AsyncS3
 
 
 class BMWCompressor(Compressor):
+    def __init__(self, make='bmw') -> None:
+        super().__init__()
+        self.make = make
+        self._s3 = AsyncS3()
+
     @property
     def brand_prefix(self) -> str:
-        return "bmw"
+        return self.make
 
     def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
         data = []
@@ -18,13 +24,14 @@ class BMWCompressor(Compressor):
             data.append(decoded)
         return msgspec.json.encode({"data": data})
 
-
-async def compress():
-    asyncio.get_event_loop().set_debug(False)
-    compressor = BMWCompressor()
-    await compressor.run()
+    @classmethod
+    async def compress(cls, make: str):
+        """Compress data for any make"""
+        asyncio.get_event_loop().set_debug(False)
+        compressor = cls(make)
+        await compressor.run()
 
 
 if __name__ == "__main__":
-    asyncio.run(compress())
+    asyncio.run(BMWCompressor.compress('bmw'))
 

@@ -238,22 +238,26 @@ def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacit
     Returns:
         str: type le plus proche présent dans la db de vehicle_model
     """
-   
+    try:
+        db_df['capacity'] = db_df['capacity'].astype(float)
+    except:
+        print("column battery capacity doesn't have the right name please change to cacity")
     make_name = make_name.lower()
     type_car = type_car.lower()
     try:
-        if len(model_name) > 4:
-            d = re.findall('\d*', model_name)
-            d.sort()
-            model_name = d[-1]
+        d = re.findall('\d*', model_name)
+        d.sort()
+        nbr = d[-1]
+        if nbr:
+            model_name = nbr
+        else:
+            model_name = model_name.lower()
+        
     except:
         model_name = model_name.lower()
-        
     # filter on OEM
     subset = db_df[db_df['make_name'] == make_name].copy()
-
     # Find the best match
-
     # Returns the closest model, score_cutoff set to 0.1 for now to ensure we almost always get a result
     match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio, score_cutoff=.1)
     if match_model :
@@ -267,7 +271,7 @@ def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacit
                 subset["distance"] = (subset["capacity"] - battery_target).abs()
                 closest_rows = subset[subset["distance"] == subset["distance"].min()]
             
-            if sale_year:
+            elif sale_year:
                 sale_year =  pd.to_datetime(sale_year)
                 today = pd.to_datetime(date.today())
                 subset[['commissioning_date', 'enf_of_life_date']].fillna(today)
@@ -288,4 +292,5 @@ def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacit
             _, _, index = match_type
             return subset.loc[index, "id"]
         
-    raise Exception("unknown model")
+    return "unknown"
+
