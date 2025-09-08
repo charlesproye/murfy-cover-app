@@ -28,14 +28,13 @@ class Compressor(ABC):
             print(f"DOWNLOAD VIN: {vin_path}")
             print(f"{(i/len(vins_with_temps) * 100):.2f}%")
             await self._compress_temp_vin_data(vin_path)
-            gc.collect()
 
     async def _compress_temp_vin_data(self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2):
         attempt = 0
-        while attempt < max_retries:
+        while attempt < max_retries: # Random client error failure
             try:
                 new_files = await self._s3.download_folder(f"{vin_folder_path}temp/")
-                break
+                break  # Success, exit retry loop
             except ClientError as e:
                 attempt += 1
                 print(f"[WARN] S3 download failed (attempt {attempt}): {e}")
@@ -47,8 +46,7 @@ class Compressor(ABC):
         encoded_data = self._temp_data_to_daily_file(new_files)
 
         await self._s3.upload_file(
-            path=f"{vin_folder_path}{self._filename()}",
-            file=encoded_data
+            path=f"{vin_folder_path}{self._filename()}", file=encoded_data
         )
         
         await self._s3.delete_folder(f"{vin_folder_path}temp/")
@@ -57,7 +55,8 @@ class Compressor(ABC):
         del new_files
         del encoded_data
         gc.collect()
-    
+
+
     @abstractmethod
     def _temp_data_to_daily_file(self, new_files:dict[str,bytes])->bytes:
         pass

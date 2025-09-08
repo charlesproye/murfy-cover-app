@@ -9,10 +9,10 @@ from gspread import Cell
 import re
 
 
-from core.pandas_utils import *
-from core.s3.s3_utils import S3Service
-from core.singleton_s3_bucket import S3
-from core.config import *
+from src.core.pandas_utils import *
+from src.core.s3.s3_utils import S3Service
+from src.core.singleton_s3_bucket import S3
+from src.core.config import *
 from core.gsheet_utils import get_google_client
 from .config.credentials import SPREADSHEET_ID 
 from .config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
