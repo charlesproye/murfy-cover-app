@@ -53,7 +53,7 @@ class Compressor(ABC):
         
         await self._s3.delete_folder(f"{vin_folder_path}temp/")
 
-        # 🔥 libérer la mémoire immédiatement
+        # Emptying memory
         del new_files
         del encoded_data
         gc.collect()
