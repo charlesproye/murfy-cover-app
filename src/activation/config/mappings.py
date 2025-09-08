@@ -238,6 +238,8 @@ def mapping_vehicle_type(type_car, make_name, model_name, db_df, battery_capacit
     Returns:
         str: type le plus proche présent dans la db de vehicle_model
     """
+    if not model_name or model_name=="unknown":
+        raise ValueError("missing model name") 
     try:
         db_df['capacity'] = db_df['capacity'].astype(float)
     except:
