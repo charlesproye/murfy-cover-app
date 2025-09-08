@@ -56,5 +56,6 @@ dependencies:
       - beautifulsoup4==4.13.4
       - selenium==4.33.0
       - PyPDF2==3.0.1
-      - RapidFuzz==3.13.0
+      - rapidfuzz==3.13.0
+      - streamlit==1.47.0
 
