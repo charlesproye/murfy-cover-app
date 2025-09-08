@@ -39,5 +39,3 @@ SOC_DIFF_THRESHOLD = {
 }
 
 
-
-
