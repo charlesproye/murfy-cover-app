@@ -5,6 +5,12 @@ from typing import Annotated, Iterable
 import aioboto3
 from botocore.exceptions import ClientError
 from .settings import S3Settings
+from typing import AsyncGenerator
+import msgspec
+from typing import Type, TypeVar
+
+T = TypeVar("T")
+
 
 class AsyncS3:
     def __init__(self, settings: S3Settings | None = None, max_concurrency: int = 200):
@@ -81,8 +87,10 @@ class AsyncS3:
                 data = await self.get_file(key)
                 if data is not None:
                     results[key] = data
+
         await asyncio.gather(*(download(f) for f in paths))
         return results
+
 
     async def upload_file(self, path: str, file: bytes) -> None:
         async with self._client() as client:  # type: ignore
@@ -103,6 +111,16 @@ class AsyncS3:
         _, files = await self.list_content(folder_path)
         self.logger.info(f"{len(files) = }: {files[:10] = }")
         return await self.get_files(files)
+
+    async def download_folder_in_batches(
+        self, folder_path: str, batch_size: int = 200
+    ) -> AsyncGenerator[dict[str, bytes], None]:
+        _, files = await self.list_content(folder_path)
+
+        # Divide files list in sublists
+        for i in range(0, len(files), batch_size):
+            batch = files[i:i + batch_size]
+            yield await self.get_files(batch)
         
     async def delete_folder(self, prefix: str) -> int:
         deleted_count = 0
