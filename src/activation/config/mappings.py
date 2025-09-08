@@ -3,7 +3,7 @@ from rapidfuzz import process, fuzz
 from core.sql_utils import *
 import re
 from datetime import date
-import pandas as pd 
+import pandas as pd
 
 MAKE_MAPPING = {
     'mercedes-benz': 'mercedes',
