@@ -4,6 +4,7 @@ from core.s3.async_s3 import AsyncS3
 from datetime import datetime
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
+import gc
 
 class Compressor(ABC):
     """Compressor class that could be extended or modified easily to be used for all car brand compression"""
@@ -49,7 +50,13 @@ class Compressor(ABC):
         )
         
         await self._s3.delete_folder(f"{vin_folder_path}temp/")
-    
+
+        # Emptying memory
+        del new_files
+        del encoded_data
+        gc.collect()
+
+
     @abstractmethod
     def _temp_data_to_daily_file(self, new_files:dict[str,bytes])->bytes:
         pass
