@@ -1,22 +1,15 @@
-import datetime
-from logging import getLogger
-import asyncio
 from core.sql_utils import *
 from core.stats_utils import *
 from core.pandas_utils import *
 from transform.processed_results.config import *
-from core.console_utils import single_dataframe_script_main
 from core.logging_utils import set_level_of_loggers_with_prefix
-from pyspark.sql import functions as F, Window, SparkSession
-from pyspark.sql import DataFrame
-from pyspark.sql.types import DoubleType
-from pyspark.sql.functions import when, col, last, median, first, sum as spark_sum, lit
-from transform.raw_results.RawResults import RawResult
 from transform.processed_results.config import *
-from core.s3_utils import S3_Bucket
 from core.spark_utils import create_spark_session
-from pyspark.sql.types import DoubleType, DateType
 from core.timer_utils import CodeTimer
+from core.s3.settings import S3Settings
+from core.s3.s3_utils import S3Service
+from transform.raw_results.main import ORCHESTRATED_MAKES
+from pyspark.sql import SparkSession
 
 class ProcessedResults():
     """
@@ -30,7 +23,8 @@ class ProcessedResults():
     
     def run(self):
         logger.info(f"Démarrage de processed results pour {self.make}.")
-        raw_results = RawResult(make=self.make, spark=self.spark).data.toPandas()
+        cls = ORCHESTRATED_MAKES[self.make][1]
+        raw_results = cls(make=self.make, spark=self.spark, logger=self.logger).data.toPandas()
         processed_results = self.get_processed_results(raw_results, self.make)
 
         return processed_results
@@ -122,11 +116,10 @@ class ProcessedResults():
     def update_vehicle_data_table(cls, spark):
         processed_results = []
         logger.info("Updating 'vehicle_data' table.")
-        for make in GET_RESULTS_FUNCS.keys():
-            if make == "tesla-fleet-telemetry":
-                cls = ProcessedResults
-                processed_result = cls(make=make, spark=spark).run()
-                processed_results.append(processed_result)
+        for make in MAKES:
+            cls = ProcessedResults
+            processed_result = cls(make=make, spark=spark).run()
+            processed_results.append(processed_result)
         return concat(processed_results)
 
 if __name__ == "__main__":
@@ -137,12 +130,14 @@ if __name__ == "__main__":
     set_level_of_loggers_with_prefix("DEBUG", "core.sql_utils")
     set_level_of_loggers_with_prefix("DEBUG", "transform.results")
 
-    bucket = S3_Bucket()
+    settings = S3Settings()
 
-    creds = bucket.get_creds_from_dot_env()
+    # Initialisation
+    bucket = S3Service()
+
     spark_session = create_spark_session(
-            creds["aws_access_key_id"],
-            creds["aws_secret_access_key"]
+        settings.S3_KEY,
+        settings.S3_SECRET
     )
 
     df = ProcessedResults.update_vehicle_data_table(spark=spark_session)
