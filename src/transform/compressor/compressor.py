@@ -5,6 +5,9 @@ from datetime import datetime
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
 import gc
+import msgspec
+from transform.compressor.providers.utils import MergedCarState
+import io
 
 class Compressor(ABC):
     """Compressor class that could be extended or modified easily to be used for all car brand compression"""
@@ -27,7 +30,10 @@ class Compressor(ABC):
         for i, vin_path in enumerate(vins_with_temps):
             print(f"DOWNLOAD VIN: {vin_path}")
             print(f"{(i/len(vins_with_temps) * 100):.2f}%")
-            await self._compress_temp_vin_data(vin_path)
+            if self.brand_prefix == "stellantis":
+                await self._compress_temp_vin_data_buffer(vin_path)
+            else:
+                await self._compress_temp_vin_data(vin_path)
 
     async def _compress_temp_vin_data(self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2):
         attempt = 0
@@ -54,6 +60,43 @@ class Compressor(ABC):
         # Emptying memory
         del new_files
         del encoded_data
+        gc.collect()
+
+    async def _compress_temp_vin_data_buffer(self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2):
+        attempt = 0
+        buf = io.BytesIO()
+        first_item = True
+        
+        while attempt < max_retries:
+            try:
+                buf.write(b"[") 
+                async for batch in self._s3.download_folder_in_batches(f"{vin_folder_path}temp/", batch_size=1000):
+                    merged_data = self._temp_data_to_daily_file(batch)
+                    # Free memory
+                    del batch
+                    gc.collect()
+                    if not first_item:
+                        buf.write(b",")
+                    buf.write(merged_data)
+                    first_item = False
+                buf.write(b"]")  
+                break
+            except ClientError as e:
+                attempt += 1
+                print(f"[WARN] S3 download failed (attempt {attempt}): {e}")
+                if attempt >= max_retries:
+                    print(f"[ERROR] Giving up on {vin_folder_path}")
+                    return
+                await asyncio.sleep(retry_delay)
+
+        buf.seek(0)
+        await self._s3.upload_file(
+            path=f"{vin_folder_path}{self._filename()}",
+            file=buf.getvalue()
+        )
+        await self._s3.delete_folder(f"{vin_folder_path}temp/")
+
+        buf.close()
         gc.collect()
 
 
