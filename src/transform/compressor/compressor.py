@@ -1,13 +1,13 @@
 import asyncio
+import gc
+import io
+from abc import ABC, abstractmethod
+from datetime import datetime
+
+from botocore.exceptions import ClientError
 
 from core.s3.async_s3 import AsyncS3
-from datetime import datetime
-from abc import ABC, abstractmethod
-from botocore.exceptions import ClientError
-import gc
-import msgspec
-from transform.compressor.providers.utils import MergedCarState
-import io
+
 
 class Compressor(ABC):
     """Compressor class that could be extended or modified easily to be used for all car brand compression"""
@@ -17,27 +17,38 @@ class Compressor(ABC):
 
     @property
     @abstractmethod
-    def brand_prefix(self)->str:
+    def brand_prefix(self) -> str:
         pass
-    
+
     async def run(self):
         vins_folders, _ = await self._s3.list_content(f"response/{self.brand_prefix}/")
-        r = await asyncio.gather(*(self._s3.list_content(f"{vin_path}temp/") for vin_path in vins_folders))
-        vins_with_temps:list[str] = []
-        for i,(_, files) in enumerate(r): 
-            if len(files)>0:
+        r = await asyncio.gather(
+            *(self._s3.list_content(f"{vin_path}temp/") for vin_path in vins_folders)
+        )
+        vins_with_temps: list[str] = []
+        for i, (_, files) in enumerate(r):
+            if len(files) > 0:
                 vins_with_temps.append(vins_folders[i])
         for i, vin_path in enumerate(vins_with_temps):
             print(f"DOWNLOAD VIN: {vin_path}")
             print(f"{(i/len(vins_with_temps) * 100):.2f}%")
-            if self.brand_prefix == "stellantis":
+            if self.brand_prefix in [
+                "stellantis",
+                "ford",
+                "kia",
+                "renault",
+                "volvo-cars",
+                "mercedes-benz",
+            ]:
                 await self._compress_temp_vin_data_buffer(vin_path)
             else:
                 await self._compress_temp_vin_data(vin_path)
 
-    async def _compress_temp_vin_data(self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2):
+    async def _compress_temp_vin_data(
+        self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2
+    ):
         attempt = 0
-        while attempt < max_retries: # Random client error failure
+        while attempt < max_retries:  # Random client error failure
             try:
                 new_files = await self._s3.download_folder(f"{vin_folder_path}temp/")
                 break  # Success, exit retry loop
@@ -54,7 +65,7 @@ class Compressor(ABC):
         await self._s3.upload_file(
             path=f"{vin_folder_path}{self._filename()}", file=encoded_data
         )
-        
+
         await self._s3.delete_folder(f"{vin_folder_path}temp/")
 
         # Emptying memory
@@ -62,24 +73,29 @@ class Compressor(ABC):
         del encoded_data
         gc.collect()
 
-    async def _compress_temp_vin_data_buffer(self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2):
+    async def _compress_temp_vin_data_buffer(
+        self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2
+    ):
         attempt = 0
         buf = io.BytesIO()
         first_item = True
-        
+
         while attempt < max_retries:
             try:
-                buf.write(b"[") 
-                async for batch in self._s3.download_folder_in_batches(f"{vin_folder_path}temp/", batch_size=1000):
+                buf.write(b"[")
+                async for batch in self._s3.download_folder_in_batches(
+                    f"{vin_folder_path}temp/", batch_size=4000
+                ):
                     merged_data = self._temp_data_to_daily_file(batch)
-                    # Free memory
+
+                    # Emptying batch memory
                     del batch
                     gc.collect()
                     if not first_item:
                         buf.write(b",")
                     buf.write(merged_data)
                     first_item = False
-                buf.write(b"]")  
+                buf.write(b"]")
                 break
             except ClientError as e:
                 attempt += 1
@@ -91,19 +107,16 @@ class Compressor(ABC):
 
         buf.seek(0)
         await self._s3.upload_file(
-            path=f"{vin_folder_path}{self._filename()}",
-            file=buf.getvalue()
+            path=f"{vin_folder_path}{self._filename()}", file=buf.getvalue()
         )
         await self._s3.delete_folder(f"{vin_folder_path}temp/")
 
         buf.close()
         gc.collect()
 
-
     @abstractmethod
-    def _temp_data_to_daily_file(self, new_files:dict[str,bytes])->bytes:
+    def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
         pass
-
 
     def _filename(self):
         return f"{datetime.now().strftime('%Y-%m-%d')}.json"

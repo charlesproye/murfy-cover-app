@@ -5,6 +5,9 @@ from transform.compressor.providers.volkswagen import VolkswagenCompressor
 from transform.compressor.providers.high_mobility import HighMobilityCompressor
 from core.console_utils import main_decorator
 
+
+
+
 COMPRESSORS= {
     "bmw": BMWCompressor,
     "mercedes-benz": HighMobilityCompressor,
@@ -16,3 +19,5 @@ COMPRESSORS= {
     "tesla-fleet-telemetry": TeslaFTCompressor,
     "volkswagen": VolkswagenCompressor
 }
+
+
