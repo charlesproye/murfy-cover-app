@@ -31,19 +31,50 @@ class HighMobilityCompressor(Compressor):
     def brand_prefix(self) -> str:
         return self.make
 
-    def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
+    def merged_is_empty(self, merged_obj) -> bool:
+        """
+        Returns True if all array fields in a Merged* object are empty.
+        Recursively checks nested msgspec.Structs.
+        """
+        # Iterate over all declared fields
+        for field in type(merged_obj).__annotations__:
+            value = getattr(merged_obj, field, None)
+
+            if value is None:
+                continue
+
+            # If value is a msgspec.Struct, recurse
+            if isinstance(value, msgspec.Struct):
+                if not self.merged_is_empty(value):
+                    return False
+            # If value is a list/array, check if empty
+            elif isinstance(value, list):
+                if len(value) > 0:
+                    return False
+            else:
+                # Other types can be ignored or treated as empty
+                continue
+
+        return True
+
+
+
+    def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes | None:
         brand_info_cls, merged_cls = self.schemas[self.make]
 
-        merged = merged_cls.new()  # instance vide prête à merger
+        merged = merged_cls.new()
 
         for file in new_files.values():
-            # Décoder en schéma brut
             decoded: brand_info_cls = msgspec.json.decode(file, type=brand_info_cls)
-            # Merger dans la structure fusionnée
+
             merged.merge(decoded)
 
-        # Encoder le résultat fusionné
+
+        if self.merged_is_empty(merged):
+            print('empty')
+            return None
         return msgspec.json.encode(merged)
+
 
     @classmethod
     async def compress(cls, make: str):

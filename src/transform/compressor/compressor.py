@@ -77,24 +77,27 @@ class Compressor(ABC):
         self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2
     ):
         attempt = 0
-        buf = io.BytesIO()
         first_item = True
 
         while attempt < max_retries:
             try:
+                buf = io.BytesIO()
                 buf.write(b"[")
                 async for batch in self._s3.download_folder_in_batches(
                     f"{vin_folder_path}temp/", batch_size=4000
                 ):
                     merged_data = self._temp_data_to_daily_file(batch)
 
-                    # Emptying batch memory
-                    del batch
-                    gc.collect()
-                    if not first_item:
-                        buf.write(b",")
-                    buf.write(merged_data)
-                    first_item = False
+                    if merged_data:
+                        # Emptying batch memory
+                        del batch
+                        gc.collect()
+                        if not first_item:
+                            buf.write(b",")
+                        buf.write(merged_data)
+                        first_item = False
+                    else:
+                        pass
                 buf.write(b"]")
                 break
             except ClientError as e:
@@ -105,10 +108,12 @@ class Compressor(ABC):
                     return
                 await asyncio.sleep(retry_delay)
 
-        buf.seek(0)
-        await self._s3.upload_file(
-            path=f"{vin_folder_path}{self._filename()}", file=buf.getvalue()
-        )
+        if buf.getvalue() != b"[]":
+            buf.seek(0)
+            await self._s3.upload_file(
+                path=f"{vin_folder_path}{self._filename()}", file=buf.getvalue()
+            )
+
         await self._s3.delete_folder(f"{vin_folder_path}temp/")
 
         buf.close()
