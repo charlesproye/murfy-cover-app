@@ -1,25 +1,49 @@
 import asyncio
+
 import msgspec
-from transform.compressor.compressor import Compressor
+
 from core.s3.async_s3 import AsyncS3
+from transform.compressor.compressor import Compressor
+from transform.compressor.providers.schemas.ford import (FordInfo,
+                                                         MergedFordInfo)
+from transform.compressor.providers.schemas.kia import KiaInfo, MergedKiaInfo
+from transform.compressor.providers.schemas.mercedes_benz import (
+    MercedesBenzInfo, MergedMercedesBenzInfo)
+from transform.compressor.providers.schemas.renault import (MergedRenaultInfo,
+                                                            RenaultInfo)
+from transform.compressor.providers.schemas.volvo_cars import (MergedVolvoInfo,
+                                                               VolvoInfo)
+
 
 class HighMobilityCompressor(Compressor):
     def __init__(self, make) -> None:
         self.make = make
         self._s3 = AsyncS3()
+        self.schemas = {
+            "kia": (KiaInfo, MergedKiaInfo),
+            "ford": (FordInfo, MergedFordInfo),
+            "mercedes-benz": (MercedesBenzInfo, MergedMercedesBenzInfo),
+            "renault": (RenaultInfo, MergedRenaultInfo),
+            "volvo-cars": (VolvoInfo, MergedVolvoInfo),
+        }
 
     @property
     def brand_prefix(self) -> str:
         return self.make
 
     def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
-        data = []
+        brand_info_cls, merged_cls = self.schemas[self.make]
+
+        merged = merged_cls.new()  # instance vide prête à merger
+
         for file in new_files.values():
-            decoded = msgspec.json.decode(file)
-            if isinstance(decoded,str):
-                decoded = msgspec.json.decode(decoded.encode())
-            data.append(decoded)
-        return msgspec.json.encode(data)
+            # Décoder en schéma brut
+            decoded: brand_info_cls = msgspec.json.decode(file, type=brand_info_cls)
+            # Merger dans la structure fusionnée
+            merged.merge(decoded)
+
+        # Encoder le résultat fusionné
+        return msgspec.json.encode(merged)
 
     @classmethod
     async def compress(cls, make: str):
@@ -27,5 +51,4 @@ class HighMobilityCompressor(Compressor):
         asyncio.get_event_loop().set_debug(False)
         compressor = cls(make)
         await compressor.run()
-
 
