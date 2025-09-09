@@ -31,23 +31,21 @@ def build_trendline_expressions(coef_mean, coef_lower, coef_upper, y_lower, y_up
     )
 
 
-def update_database_trendlines(model_car, type_car, mean_trendline, upper_trendline, lower_trendline, trendline_bib=True):
+def update_database_trendlines(model_id, mean_trendline, upper_trendline, lower_trendline, trendline_bib=True):
     sql_request = text(f"""
         UPDATE vehicle_model
         SET trendline = :trendline_json,
             trendline_min = :trendline_min_json,
             trendline_max = :trendline_max_json,
             trendline_bib = :trendline_bib
-        WHERE model_name = :model 
-        AND type = :type
+        WHERE id = :model_id 
     """)
     with get_sqlalchemy_engine().begin() as conn:
         conn.execute(sql_request, {
             "trendline_json": json.dumps({"trendline" : mean_trendline}),
             "trendline_min_json": json.dumps({"trendline" : upper_trendline}),
             "trendline_max_json": json.dumps({"trendline" : lower_trendline}),
-            "model": model_car,
-            "type": type_car,
+            "model_id": model_id,
             "trendline_bib": trendline_bib
         })
     
@@ -208,5 +206,29 @@ def compute_lower_bound(df, trendlines, coef_mean):
     upper_bound = new_upper[1]
     return upper_bound
 
+
+def filtrer_trendlines(df, col_odometer='odometer', col_vin='vin', km_lower=80000, km_upper=100000, vin_total=50, nbr_under=20, nbr_upper=10):
+    """
+    Filters models based on mileage and the number of unique listings.
+
+    Parameters:
+    - df: DataFrame with the data point
+    - km_low: maximum mileage for low-mileage vehicles (default: 80,000 km)
+    - km_high: minimum mileage for high-mileage vehicles (default: 100,000 km)
+    - min_total: minimum number of unique listings required for a model
+    - min_low: minimum number of low-mileage listings required
+    - min_high: minimum number of high-mileage listings required
+
+    Returns:
+    - A list of tuples (Modèle, model_id) that meet the criteria
+    """
+    
+    nb_total_vins = df[col_vin].nunique()
+    nb_lower = df[df[col_odometer] <= km_lower][col_vin].nunique()
+    nb_upper = df[df[col_odometer] >= km_upper][col_vin].nunique()
+    
+    if nb_total_vins >= vin_total and nb_lower >= nbr_under and nb_upper >= nbr_upper:
+        return nb_total_vins
+    print("The model don't respect the filtering criteria")
 
 

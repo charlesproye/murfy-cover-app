@@ -72,8 +72,6 @@ def main():
     ingester = HMIngester(
         refresh_interval=args.refresh_interval,
         max_workers=args.max_workers,
-        compress_interval=args.compress_interval,
-        compress_threaded=args.compress_threaded,
         batch_size=args.batch_size,
     )
 

@@ -15,7 +15,6 @@ import schedule
 from botocore.credentials import threading
 from botocore.exceptions import ClientError
 from ingestion.mobilisights.api import MSApi
-from ingestion.mobilisights.compresser import MobilisightsCompresser
 from ingestion.mobilisights.schema import CarState, ErrorMesage
 
 
@@ -28,7 +27,6 @@ class MobilisightsIngester:
     __bucket: str
 
     __fetch_scheduler = schedule.Scheduler()
-    __compress_scheduler = schedule.Scheduler()
     __worker_thread: threading.Thread
     __executor: concurrent.futures.ThreadPoolExecutor
     __job_queue: Queue[Callable]
@@ -37,15 +35,12 @@ class MobilisightsIngester:
 
     rate_limit: int = 36
     upload_interval: int = 60
-    compress_time: Optional[str] = "00:00",
     max_workers: int = 8
-    compress_threaded: bool = True
 
     def __init__(
         self,
         rate_limit: Optional[int] = 36,
-        max_workers: Optional[int] = 8,
-        compress_time: Optional[str] = "00:00",
+        max_workers: Optional[int] = 8
     ):
         """
         Parameters
@@ -56,9 +51,6 @@ class MobilisightsIngester:
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
             default: 8
-        compress_time: str, optional
-            The time of day at which to compress the S3 data
-            default: "00:00"
         """
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
@@ -121,7 +113,6 @@ class MobilisightsIngester:
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.__job_queue = Queue()
         self.rate_limit = rate_limit or self.rate_limit
-        self.compress_time = compress_time or self.compress_time
         self.max_workers = max_workers or self.max_workers
 
         signal.signal(signal.SIGTERM, self.__handle_shutdown_signal)
@@ -205,19 +196,6 @@ class MobilisightsIngester:
                         f"Encountered error {error.name} while fetching vehicle data: {error.message}"
                     )
 
-    def __compress(self):
-        self.__ingester_logger.info("Starting compression job")
-        try:
-            compresser = MobilisightsCompresser(
-                threaded=self.compress_threaded,
-                max_workers=self.max_workers
-            )
-            compresser.run()  # Using run() instead of start()
-            self.__ingester_logger.info("Compression job completed successfully")
-        except Exception as e:
-            self.__ingester_logger.error(f"Error during compression: {e}")
-        finally:
-            self.__is_compressing = False
 
     def __schedule_tasks(self):
         self.__fetch_scheduler.every(self.rate_limit).seconds.do(
@@ -225,30 +203,11 @@ class MobilisightsIngester:
         ).tag("fetch")
         self.__scheduler_logger.info(f"Scheduled vehicle fetch every {self.rate_limit} seconds")
 
-        # Schedule compression at specified time
-        self.__compress_scheduler.every().day.at(self.compress_time).do(self.__compress)
-        self.__scheduler_logger.info(f"Scheduled daily compression at {self.compress_time}")
-
         # Run initial fetch
         self.__scheduler_logger.info("Starting initial fetch")
         self.__fetch_vehicles()
 
     def run(self):
-        # Check for a forced compression parameter
-        compress_only = os.getenv("COMPRESS_ONLY_MS") == "1"
-        
-        if compress_only:
-            self.__ingester_logger.info("COMPRESS_ONLY_MS flag set. Running compression first.")
-            self.__is_compressing = True
-            try:
-                self.__compress()
-            except Exception as e:
-                self.__ingester_logger.error(f"Error during compression: {e}")
-            finally:
-                self.__is_compressing = False
-            self.__ingester_logger.info("Compression completed. Exiting.")
-            return
-
         self.__schedule_tasks()
         self.__worker_thread = threading.Thread(target=self.__process_job_queue)
         self.__ingester_logger.info("Starting worker thread")
@@ -256,9 +215,7 @@ class MobilisightsIngester:
         self.__scheduler_logger.info("Starting scheduler")
 
         while not self.__shutdown_requested.is_set():
-            if not self.__is_compressing:
-                self.__fetch_scheduler.run_pending()
-            self.__compress_scheduler.run_pending()
+            self.__fetch_scheduler.run_pending()
             time.sleep(1)
 
         self.__shutdown()

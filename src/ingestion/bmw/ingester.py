@@ -16,7 +16,6 @@ import msgspec
 import schedule
 from botocore.client import ClientError
 from ingestion.bmw.api import BMWApi
-from ingestion.bmw.compress_data import BMWCompresser
 from ingestion.high_mobility.schema import all_brands
 from ingestion.high_mobility.schema.brands import decode_vehicle_info
 from ingestion.bmw.vehicle import Vehicle
@@ -29,10 +28,8 @@ class BMWIngester:
     __api: BMWApi
     __s3 = boto3.client("s3")
     __bucket: str
-    __compresser: BMWCompresser
 
     __fetch_scheduler = schedule.Scheduler()
-    __compress_scheduler = schedule.Scheduler()
     __vehicles: set[Vehicle] = set()
     __worker_thread: threading.Thread
     __executor: concurrent.futures.ThreadPoolExecutor
@@ -43,17 +40,13 @@ class BMWIngester:
     refresh_interval: int = 2 * 60
     limit_rate: int = 120
     upload_interval: int = 60
-    compress_interval: int = 12
     max_workers: int = 8
-    compress_threaded: bool = True
 
     def __init__(
         self,
         refresh_interval: Optional[int] = 2 * 60,
         limit_rate: Optional[int] = 120,
-        max_workers: Optional[int] = 8,
-        compress_interval: Optional[int] = 12,
-        compress_threaded: Optional[bool] = True,
+        max_workers: Optional[int] = 8
     ):
         """
         Parameters
@@ -64,10 +57,8 @@ class BMWIngester:
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
             default: 8
-        compress_interval: int, optional
-            The interval at which to compress the S3 data (in hours)
-            default: 12
         """
+
         dotenv.load_dotenv()
         BMW_BASE_URL = os.getenv("BMW_BASE_URL")
         if BMW_BASE_URL is None:
@@ -131,18 +122,11 @@ class BMWIngester:
         )
         self.__bucket = S3_BUCKET
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
-        self.__compresser = BMWCompresser(
-            self.__s3,
-            self.__bucket,
-            threaded=self.compress_threaded,
-            max_workers=self.max_workers,
-        )
+
         self.__job_queue = Queue()
         self.refresh_interval = refresh_interval or self.refresh_interval
         self.limit_rate = limit_rate or self.limit_rate
-        self.compress_interval = compress_interval or self.compress_interval
         self.max_workers = max_workers or self.max_workers
-        self.compress_threaded = compress_threaded or self.compress_threaded
 
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
@@ -184,7 +168,6 @@ class BMWIngester:
 
     def __request_shutdown(self):
         self.__shutdown_requested.set()
-        self.__compresser.shutdown()
 
     def __shutdown(self):
         self.__worker_thread.join()
@@ -371,10 +354,6 @@ class BMWIngester:
                 log_error(info)
                 return
 
-    async def __compress(self):
-        self.__ingester_logger.info("Starting compression job")
-        await self.__compresser.run()
-
     def __process_job_queue(self):
         self.__ingester_logger.info("Starting processing job queue")
         while not self.__shutdown_requested.is_set():
@@ -387,27 +366,16 @@ class BMWIngester:
         self.__ingester_logger.info("Stopping worker thread")
 
     def run(self):        
-        if os.getenv("COMPRESS_ONLY_BMW") and os.getenv("COMPRESS_ONLY_BMW") == "1":
-            asyncio.run(self.__compress())
-        else:
-            self.__update_vehicles_initial()
-            self.__worker_thread = threading.Thread(target=self.__process_job_queue)
-            self.__scheduler_logger.info("Starting initial scheduler run")
-            self.__fetch_scheduler.run_all()
-            self.__compress_scheduler.every(self.compress_interval).hours.do(
-                lambda: asyncio.run(self.__compress()) 
-            ).tag("compress")
-            self.__scheduler_logger.info(
-                f"Schedule S3 compressing at {self.compress_interval}"
-            )
-            self.__ingester_logger.info("Starting worker thread")
-            self.__worker_thread.start()
-            self.__scheduler_logger.info("Starting scheduler")
-            while not self.__shutdown_requested.is_set():
-                now = datetime.now().hour
-                if now >= 4 and now <= 23:
-                    self.__fetch_scheduler.run_pending()
-                else:
-                    self.__compress_scheduler.run_pending()
-                time.sleep(1)
-            self.__shutdown()
+        self.__update_vehicles_initial()
+        self.__worker_thread = threading.Thread(target=self.__process_job_queue)
+        self.__scheduler_logger.info("Starting initial scheduler run")
+        self.__fetch_scheduler.run_all()
+        self.__ingester_logger.info("Starting worker thread")
+        self.__worker_thread.start()
+        self.__scheduler_logger.info("Starting scheduler")
+        while not self.__shutdown_requested.is_set():
+            now = datetime.now().hour
+            if now >= 4 and now <= 23:
+                self.__fetch_scheduler.run_pending()
+            time.sleep(1)
+        self.__shutdown()
