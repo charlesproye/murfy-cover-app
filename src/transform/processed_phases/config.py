@@ -1,14 +1,8 @@
-from pandas.api.types import CategoricalDtype
-from pyspark.sql.types import FloatType, TimestampType, StringType, BooleanType
-from pandas import Timedelta as TD
-import pandas as pd
-
-S3_PROCESSED_TSS_KEY_FORMAT = 'processed_ts/{make}/time_series/processed_ts_spark.parquet'
-
+PROCESSED_PHASES_CACHE_KEY_TEMPLATE = "processed_phases/processed_phases_{make}.parquet"
 
 ODOMETER_MILES_TO_KM = {
     "tesla": 1.60934,
-    "tesla-fleet-telemetry": 1.60934,
+    "tesla-fleet-telemetry": 1.60934
 }
 
 # Coefficient to scale soc to 0-100%
@@ -19,7 +13,7 @@ SCALE_SOC = {
     'kia': 100,
     'renault': 100,
     'ford': 100,
-    'stellantis': 100,
+    'stellantis': 1,
     'bmw': 1,
     'volkswagen': 1,
 }
@@ -38,4 +32,6 @@ SOC_DIFF_THRESHOLD = {
     'volkswagen': 0.05,
 }
 
-
+# Power thresholds for charging level classification
+LEVEL_1_MAX_POWER = 8   # this is to approximate the power of the charger that can go up to 7 kW
+LEVEL_2_MAX_POWER = 45  # this is to approximate the power of the charger that can go up to 44 kW
