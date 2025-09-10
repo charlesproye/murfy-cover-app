@@ -124,6 +124,7 @@ class MobilisightResponseToRaw(ResponseToRawTss):
 
             exploded = exploded.cache()
 
+
             # Create one row per field (excluding datetime and unit)
             for field_in_struct, alias in field_mapping.items():
                 long_df = exploded.select(

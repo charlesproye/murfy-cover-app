@@ -1,11 +1,12 @@
 import logging
 import sys
+from turtle import up
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
 from transform.result_week.result_phase_to_result_week import ResultPhaseToResultWeek
 from core.pandas_utils import concat
-from core.sql_utils import left_merge_rdb_table, truncate_rdb_table_and_insert_df
+from core.sql_utils import left_merge_rdb_table, insert_df_and_deduplicate
 
 ORCHESTRATED_MAKES = {
     "bmw": (True, False, False),
@@ -28,7 +29,8 @@ VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
     "LEVEL_2": "level_2",
     "LEVEL_3": "level_3",
     "vehicle_id": "vehicle_id",
-    "DATE":"timestamp"
+    "DATE":"timestamp",
+    "CONSUMPTION": "consumption"
 }
 
 
@@ -49,15 +51,13 @@ def main():
     for make, (is_orchestrated, has_soh, has_levels) in ORCHESTRATED_MAKES.items():
         if is_orchestrated:
             result_week = ResultPhaseToResultWeek(make=make, spark=spark, logger=logger, has_soh=has_soh, has_levels=has_levels).run()
-            print(result_week)
-            print(result_week.columns)
             result_week_list.append(result_week)
         else:
             pass
     results_week = concat(result_week_list)
 
     df_global = left_merge_rdb_table(results_week, "vehicle", "VIN", "vin", {"id": "vehicle_id"})
-    truncate_rdb_table_and_insert_df(df_global, "vehicle_data", VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS, logger=logger)
+    insert_df_and_deduplicate(df_global, "vehicle_data", ["vehicle_id", "timestamp"], VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS, logger=logger, uuid_cols=['vehicle_id'])
 
 
 if __name__ == "__main__":

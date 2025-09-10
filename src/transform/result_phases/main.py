@@ -12,15 +12,15 @@ from transform.result_phases.providers.tesla_fleet_telemetry import TeslaFTProce
 from transform.result_phases.providers.tesla import TeslaProcessedPhaseToResultPhase
 
 ORCHESTRATED_MAKES = {
-    "bmw": (False, ProcessedPhaseToResultPhase),
-    "mercedes-benz": (False, ProcessedPhaseToResultPhase),
-    "renault": (False, RenaultProcessedPhaseToResultPhase),
-    "volvo-cars": (False, VolvoProcessedPhaseToResultPhase),
-    "stellantis": (False, StellantisProcessedPhaseToResultPhase),
-    "kia": (False, ProcessedPhaseToResultPhase),
-    "ford": (False, FordProcessedPhaseToResultPhase),
-    "tesla-fleet-telemetry": (False, TeslaFTProcessedPhaseToResultPhase),
-    "volkswagen": (False, ProcessedPhaseToResultPhase),
+    "bmw": (True, ProcessedPhaseToResultPhase),
+    "mercedes-benz": (True, ProcessedPhaseToResultPhase),
+    "renault": (True, RenaultProcessedPhaseToResultPhase),
+    "volvo-cars": (True, VolvoProcessedPhaseToResultPhase),
+    "stellantis": (True, StellantisProcessedPhaseToResultPhase),
+    "kia": (True, ProcessedPhaseToResultPhase),
+    "ford": (True, FordProcessedPhaseToResultPhase),
+    "tesla-fleet-telemetry": (True, TeslaFTProcessedPhaseToResultPhase),
+    "volkswagen": (True, ProcessedPhaseToResultPhase),
     "tesla": (False, TeslaProcessedPhaseToResultPhase),
 }
 
