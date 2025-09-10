@@ -19,8 +19,8 @@ class VolvoRawTsToProcessedPhases(RawTsToProcessedPhases):
             make, spark=spark, force_update=force_update, logger=logger, **kwargs
         )
 
-    def compute_specific_features_before_aggregation(self, df_tss):
-        df_tss = df_tss.withColumn(
+    def compute_specific_features_before_aggregation(self, phase_df):
+        phase_df = phase_df.withColumn(
                         "SOH",
                         F.when(
                             (F.col("soc").isNotNull())
@@ -33,9 +33,9 @@ class VolvoRawTsToProcessedPhases(RawTsToProcessedPhases):
                         ).otherwise(None),
                     )
 
-        return df_tss
+        return phase_df
 
-    def aggregate_stats(self, df_tss):
+    def aggregate_stats(self, phase_df):
         agg_columns = [
             # Minimum 
             F.first("make", ignorenulls=True).alias("MAKE"),
@@ -48,11 +48,11 @@ class VolvoRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.expr("percentile_approx(SOH, 0.5)").alias('SOH')
         ]
 
-        if "consumption" in df_tss.columns:
+        if "consumption" in phase_df.columns:
             agg_columns.append(F.mean("consumption").alias("CONSUMPTION"))
 
         df_aggregated = (
-            df_tss.groupBy("VIN", "PHASE_INDEX", "DATETIME_BEGIN", "DATETIME_END", "PHASE_STATUS", "SOC_FIRST", "SOC_LAST", "SOC_DIFF", "NO_SOC_DATAPOINT", "IS_USABLE_PHASE")
+            phase_df.groupBy("VIN", "PHASE_INDEX", "DATETIME_BEGIN", "DATETIME_END", "PHASE_STATUS", "SOC_FIRST", "SOC_LAST", "SOC_DIFF", "NO_SOC_DATAPOINT", "IS_USABLE_PHASE")
             .agg(*agg_columns)
         )
 
