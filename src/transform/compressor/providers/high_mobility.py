@@ -69,9 +69,8 @@ class HighMobilityCompressor(Compressor):
 
             merged.merge(decoded)
 
-
+        # Cope with empty data
         if self.merged_is_empty(merged):
-            print('empty')
             return None
         return msgspec.json.encode(merged)
 
