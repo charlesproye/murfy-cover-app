@@ -317,7 +317,7 @@ class ResponseToRawTss:
         pass
 
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
-        pass
+        return df
 
-    def _get_dynamic_schema(self, parse_type_map: dict) -> DataFrame:
-        pass
+    def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict) -> DataFrame:
+        return StructType()
