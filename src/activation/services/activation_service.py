@@ -1,12 +1,10 @@
-import asyncio
 import logging
-import uuid
-from re import S
 from typing import Optional, Tuple
-
+import logging
 import aiohttp
 import pandas as pd
-import requests
+
+from core.sql_utils import get_connection
 
 from activation.api.bmw_client import BMWApi
 from activation.api.hm_client import HMApi
