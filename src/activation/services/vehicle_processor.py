@@ -14,13 +14,14 @@ from core.sql_utils import get_connection
 from activation.utils import *
 
 class VehicleProcessor:
-    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, tesla_particulier_api: callable, renault_api: callable, df: pd.DataFrame):
+    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, tesla_api: callable, tesla_particulier_api: callable, renault_api: callable, volkswagen_api: callable, df: pd.DataFrame):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
         self.tesla_api = tesla_api
         self.tesla_particulier_api = tesla_particulier_api
         self.renault_api = renault_api
+        self.volkswagen_api = volkswagen_api
         self.df = df
     
     async def _get_oem(self, cursor, oem_raw: str) -> str:
@@ -376,6 +377,7 @@ class VehicleProcessor:
         except Exception as e:
             logging.error(f"Error in Renault processing: {str(e)}")
             raise
+
     async def process_bmw(self) -> None:
         """Process BMW vehicles."""
         try:
@@ -663,6 +665,63 @@ class VehicleProcessor:
             logging.error(f"Error generating vehicle summary: {str(e)}")
             raise        
 
+    # async def process_volkswagen(self) -> None:
+    #     """Process Volkswagen vehicles."""
+    #     try:
+    #         df_vw = self.df[(self.df['oem'] == 'volkswagen') & (self.df['real_activation'] == True)]
+    #         async with aiohttp.ClientSession() as session:
+    #             with get_connection() as con:
+    #                 cursor = con.cursor()
+    #                 cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
+    #                                                             join make m on vm.make_id=m.id
+    #                                                             join battery b on b.id=vm.battery_id
+    #                                                             where make_name='bmw';""")
+    #                 model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
+                    
+    #                 for _, vehicle in df_vw.iterrows():
+    #                     try:
+    #                         vin = vehicle['vin']
+    #                         fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+    #                         region_id = await self._get_or_create_region(cursor, vehicle['country'])
+    #                         #Check if vehicle exists
+    #                         cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
+    #                         vehicle_exists = cursor.fetchone()
+    #                         vehicle_exists = vehicle_exists[0] if vehicle_exists else None
+
+    #                         if not vehicle_exists:
+    #                             #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
+    #                             model_name, model_type = await self.bmw_api.get_data(session, vin)
+    #                             logging.info(f"Processing Volkswagen vehicle {vin} | {model_name} | {model_type}")
+    #                             model_id = mapping_vehicle_type(model_type, "volkswagen", model_name, model_existing)
+    #                             vehicle_id = str(uuid.uuid4())
+    #                             insert_query = """
+    #                                 INSERT INTO vehicle (
+    #                                     id, vin, fleet_id, region_id, vehicle_model_id,
+    #                                     licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
+    #                                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    #                             """
+    #                             cursor.execute(
+    #                                 insert_query,
+    #                                 (
+    #                                     vehicle_id, vin, fleet_id, region_id, model_id,
+    #                                     vehicle['licence_plate'], vehicle['end_of_contract'], vehicle['start_date'], vehicle['real_activation'], vehicle['EValue'], 
+    #                                     vehicle['eligibility']
+    #                                 )
+    #                             )
+    #                             logging.info(f"New Volkswagen vehicle inserted in DB VIN: {vehicle['vin']}")
+    #                         else:
+    #                             cursor.execute(
+    #                                 "UPDATE vehicle SET activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+    #                                 (vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility'], vin)
+    #                             )
+    #                         con.commit()
+    #                     except Exception as e:
+    #                         logging.error(f"Error processing Volkswagen vehicle {vehicle['vin']}: {str(e)}")
+    #                         con.rollback()
+    #                         continue
+    #     except Exception as e:
+    #         logging.error(f"Error in Volkswagen processing: {str(e)}")
+    #         raise
         
         
 

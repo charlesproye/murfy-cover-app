@@ -213,13 +213,20 @@ class VolkswagenApi:
             response.raise_for_status()
             data = await response.json()
 
-            return {item["vin"]: {'status':item["status"], 'reason':item["enrollment-rejection-reason"]} for item in data if item["vin"] in vins}
+            results = {}
+
+            results = {item["vin"]: {'status_bool':item["status"] == 'enrollment_completed', 'status':item["status"], 'reason':item["enrollment-rejection-reason"]} for item in data if item["vin"] in vins}
+            for vin in vins:
+                if vin not in results:
+                    results[vin] = {'status_bool':False, 'status':None, 'reason':None}
+
+            return results
 
         except Exception as e:
             self.logger.error(f"Vehicle status check failed: {str(e)}")
             return {vin: "error" for vin in vins}
 
-    async def activate_vehicle(
+    async def activate_vehicles(
         self,
         session: aiohttp.ClientSession,
         vins: list[str]
@@ -270,7 +277,6 @@ class VolkswagenApi:
 
         try:
             response = await session.delete(url, headers=headers, json=payload)
-            print(response)
             response.raise_for_status()
             data = await response.json()
             

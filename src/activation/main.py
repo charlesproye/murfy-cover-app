@@ -16,6 +16,7 @@ from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
 from activation.fleet_info import read_fleet_info as fleet_info
 from activation.api.renault_client import RenaultApi
+from activation.api.volkswagen_client import VolkswagenApi
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -61,6 +62,15 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             scope=RENAULT_SCOPE,
             pwd=RENAULT_PWD
         )
+
+        volkswagen_api = VolkswagenApi(
+            auth_url=VW_AUTH_URL,
+            base_url=VW_BASE_URL,
+            organization_id=VW_ORGANIZATION_ID,
+            client_username=VW_CLIENT_USERNAME,
+            client_password=VW_CLIENT_PASSWORD
+        )
+
         # Get initial fleet info
         df = await fleet_info(owner_filter=owner_filter)
         # Initialize activation service
@@ -69,27 +79,29 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             hm_api=hm_api,
             stellantis_api=stellantis_api,
             # tesla_api=tesla_api,
-            tesla_api=None,
+            # tesla_api=None,
             # tesla_particulier_api=tesla_particulier_api,
-            tesla_particulier_api=None,
+            # tesla_particulier_api=None,
             renault_api=renault_api,
+            volkswagen_api=volkswagen_api,
             fleet_info_df=df
         )
 
         # Process all brands in parallel
         await asyncio.gather(
             # activation_service.activation_tesla(),
-            activation_service.activation_bmw(),
-            activation_service.activation_hm(),
-            activation_service.activation_stellantis(),
+            # activation_service.activation_bmw(),
+            # activation_service.activation_hm(),
+            # activation_service.activation_stellantis(),
             # activation_service.activation_tesla_particulier()
+            activation_service.activation_volkswagen()
         )
 
         # Get updated fleet info after activation"""
         logging.info('-------------------------------Activation completed-------------------------------')
-        df = await fleet_info(owner_filter=owner_filter)
+    #     df = await fleet_info(owner_filter=owner_filter)
         
-        # # # Process vehicles with updated info
+    #     # # # Process vehicles with updated info
         vehicle_processor = VehicleProcessor(
             bmw_api=bmw_api,
             hm_api=hm_api,
@@ -99,15 +111,16 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             #tesla_particulier_api=tesla_particulier_api,
             tesla_particulier_api=None,
             renault_api=renault_api,
+            volkswagen_api=volkswagen_api,
             df=df
         )
 
         await asyncio.gather(
             vehicle_processor.process_other_vehicles(),
-            # vehicle_processor.process_tesla(),
-            vehicle_processor.process_renault(),
-            vehicle_processor.process_deactivated_vehicles(),
-            vehicle_processor.process_bmw(),
+            # # vehicle_processor.process_tesla(),
+            # vehicle_processor.process_renault(),
+            # vehicle_processor.process_deactivated_vehicles(),
+            # vehicle_processor.process_bmw(),
             # vehicle_processor.process_tesla_particulier()
             )
         
