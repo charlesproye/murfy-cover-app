@@ -1,6 +1,6 @@
 import logging
 from typing import Optional
-from src.core.gsheet_utils import get_google_client
+from core.gsheet_utils import get_google_client
 from ..config.credentials import SPREADSHEET_ID
 import pandas as pd
 
