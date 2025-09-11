@@ -79,6 +79,7 @@ class BMWApi:
             vehicle_data: Dictionary containing vehicle information (vin, licence_plate, note, contract)
         """
         try:
+            print(vehicle_data)
             url = f"{self.base_url}/vehicle"
             vehicle_data['contract']['end_date'] = ""
             headers = await self._get_headers(session)
