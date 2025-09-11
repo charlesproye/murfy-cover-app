@@ -20,7 +20,7 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
         )
 
 
-    def aggregate_stats(self, df_tss):
+    def aggregate_stats(self, phase_df):
         agg_columns = [
             # Minimum 
             F.first("make", ignorenulls=True).alias("MAKE"),
@@ -35,11 +35,11 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
 
         
 
-        if "consumption" in df_tss.columns:
+        if "consumption" in phase_df.columns:
             agg_columns.append(F.mean("consumption").alias("CONSUMPTION"))
 
         df_aggregated = (
-            df_tss.groupBy("VIN", "PHASE_INDEX", "DATETIME_BEGIN", "DATETIME_END", "PHASE_STATUS", "SOC_FIRST", "SOC_LAST", "SOC_DIFF", "NO_SOC_DATAPOINT", "IS_USABLE_PHASE")
+            phase_df.groupBy("VIN", "PHASE_INDEX", "DATETIME_BEGIN", "DATETIME_END", "PHASE_STATUS", "SOC_FIRST", "SOC_LAST", "SOC_DIFF", "NO_SOC_DATAPOINT", "IS_USABLE_PHASE")
             .agg(*agg_columns)
         )
 

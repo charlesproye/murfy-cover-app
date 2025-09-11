@@ -70,24 +70,24 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         """
         return pph
 
-    def compute_soh(self, pph: DF) -> DF:
+    def compute_soh(self, df_aggregated: DF) -> DF:
         """
         Compute the soh
         """
-        return pph
+        return df_aggregated
 
 
-    def compute_charge_levels(self, pph: DF) -> DF:
+    def compute_charge_levels(self, df_aggregated: DF) -> DF:
         """
         Compute the charge levels
         """
-        return pph
+        return df_aggregated
 
-    def compute_cycles(self, pph: DF) -> DF:
+    def compute_cycles(self, df_aggregated: DF) -> DF:
         """
         Compute the cycles
         """
-        return pph
+        return df_aggregated
 
     
     def compute_consumption(self, phase_df: DF) -> DF:

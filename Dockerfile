@@ -12,7 +12,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONASYNCIODEBUG=0 \
     PYTHONIOENCODING=utf-8 \
     PYTHONOPTIMIZE=2 \
-    PYTHONHASHSEED=random
+    PYTHONHASHSEED=random \
+    PYTHONPATH=/app/src
 
 # Copier votre application dans le conteneur
 WORKDIR /app
