@@ -92,9 +92,9 @@ class HMApi:
                     data = await response.json()
                     status = data.get('status', '').lower()
                     if status == 'approved':
-                        return True
+                        return True, data
                     else:
-                        return False
+                        return False, data
                 
                 else:
                     return False
@@ -110,7 +110,7 @@ class HMApi:
                 headers = await self._get_headers(session)
                 response = await session.get(url, headers=headers)
                 
-                if response.status_code == 401:
+                if response.status == 401:
                     result = self._handle_auth_error(response, retry_count)
                     if result is None:
                         retry_count += 1
@@ -147,6 +147,8 @@ class HMApi:
                         }
                     ]}
                 )
+
+                
                 if response.status == 401:
                     self._access_token = None
                     retry_count += 1
@@ -154,8 +156,8 @@ class HMApi:
                     continue
 
                 elif response.ok:
-                    print("La réponse est ok")
-                    return await self.get_status(vin,session)
+                    status, _ = await self.get_status(vin,session)
+                    return status
                 else:
                     return False
 

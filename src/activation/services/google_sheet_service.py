@@ -35,6 +35,7 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
         real_activation_col = headers.index("Real Activation") + 1
         eligibility_col = headers.index("Eligibility") + 1
         error_col = headers.index("Activation Error") + 1
+        # api_detail = headers.index("API Detail") + 1
         oem_col = headers.index("Oem") + 1
         make_col = headers.index("Make") + 1
         ownership_col = headers.index("Ownership") + 1
@@ -69,6 +70,10 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
                     'range': f'R{row_idx}C{error_col}',
                     'values': [[row['Activation_Error'] if row['Activation_Error'] is not None else '']]
                 })
+                # updates.append({
+                #     'range': f'R{row_idx}C{api_detail}',
+                #     'values': [row['API_Detail'] if row['API_Detail'] is not None in row else '']
+                # })
                 updates.append({
                     'range': f'R{row_idx}C{account_owner_col}',
                     'values': [[account_owner_value]]
@@ -81,13 +86,14 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
                 new_row[real_activation_col - 1] = False
                 new_row[eligibility_col - 1] = True
                 new_row[error_col - 1] = row['Activation_Error']
+                # new_row[api_detail - 1] = row['API_Detail']
                 new_row[oem_col - 1] = 'TESLA'
                 new_row[make_col - 1] = 'TESLA'
                 new_row[ownership_col - 1] = "Bib"
                 new_row[country_col - 1] = 'France'
                 new_row[account_owner_col - 1] = account_owner_value
                 inserts.append(new_row)
-        
+
         # Execute batch updates
         if updates:
             sheet.batch_update(updates)

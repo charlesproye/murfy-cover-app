@@ -440,7 +440,7 @@ class VehicleActivationService:
                 desired_state = row["activation"]
 
                 try:
-                    current_state = await self.hm_api.get_status(vin, session)
+                    current_state, _ = await self.hm_api.get_status(vin, session)
                     if current_state == desired_state:
                         logging.info(
                             f"High Mobility vehicle {vin} already in desired state: {desired_state}"
@@ -475,11 +475,13 @@ class VehicleActivationService:
                                 logging.info(
                                     f"High Mobility vehicle {vin} activation failed"
                                 )
+                                _, response = await self.hm_api.get_status(vin, session)
                                 vehicle_data = {
                                     "vin": vin,
                                     "Eligibility": False,
                                     "Real_Activation": False,
-                                    "Activation_Error": "Failed to activate or pending approval",
+                                    "Activation_Error": response['status'] if response['status'] is not None else '',
+                                    "API_Detail": response['changelog'][-1]['reason'] if 'reason' in response['changelog'][-1] is not None else '',
                                 }
                                 status_data.append(vehicle_data)
                                 continue
@@ -551,8 +553,16 @@ class VehicleActivationService:
         await update_vehicle_activation_data(status_df)
 
     async def activation_volkswagen(self):
-        """Process Volkswagen vehicle activation/deactivation."""
-        
+        """Process Volkswagen vehicle activation/deactivation with safe values for Google Sheets."""
+
+        def safe_bool(val):
+            """Convert None/NaN to empty string, keep True/False as-is."""
+            if val is True:
+                return True
+            if val is False:
+                return False
+            return ""
+
         df_vw = self.fleet_info_df[self.fleet_info_df["oem"] == "volkswagen"]
 
         status_data = []
@@ -579,6 +589,7 @@ class VehicleActivationService:
                 for vin in desired_states
             }
 
+            # --- Déjà dans l'état souhaité ---
             vins_in_desired_state = {
                 vin: info
                 for vin, info in merged_states.items()
@@ -604,15 +615,14 @@ class VehicleActivationService:
                 )
                 vehicle_data = {
                     "vin": vin,
-                    "Eligibility": info[
-                        "current_state"
-                    ],  # Notion d'élégibilité confondue chez VW
-                    "Real_Activation": info["current_state"],
+                    "Eligibility": safe_bool(info["current_state"]),  # VW confond eligibility & activation
+                    "Real_Activation": safe_bool(info["current_state"]),
                     "Activation_Error": "",
+                    "API_Detail": "",
                 }
                 status_data.append(vehicle_data)
-                continue
 
+            # --- Activation ---
             logging.info("\nVOLKSWAGEN ACTIVATION : Starting")
             await self.volkswagen_api.activate_vehicles(session, vins_to_activate)
             activated_current_states = await self.volkswagen_api.check_vehicle_status(
@@ -621,23 +631,22 @@ class VehicleActivationService:
 
             for vin, info in activated_current_states.items():
                 logging.info(
-                    f"Update Volkswagen vehicle that has just been activated {vin}  : {info['status_bool']}"
+                    f"Update Volkswagen vehicle that has just been activated {vin} : {info['status_bool']}"
                 )
                 vehicle_data = {
                     "vin": vin,
-                    "Eligibility": info[
-                        "status_bool"
-                    ],  # Egibility and activation are not divided at VW
-                    "Real_Activation": info["status_bool"],
+                    "Eligibility": safe_bool(info.get("status_bool")),
+                    "Real_Activation": safe_bool(info.get("status_bool")),
                     "Activation_Error": (
-                        str(info["status"]) + " - " + str(info["reason"])
-                        if not info["status_bool"]
-                        else ""
+                        str(info.get("status")) if not info.get("status_bool") else ""
+                    ),
+                    "API_Detail": (
+                        str(info.get("reason")) if not info.get("status_bool") else ""
                     ),
                 }
                 status_data.append(vehicle_data)
-                continue
 
+            # --- Désactivation ---
             logging.info("\nVOLKSWAGEN DEACTIVATION : Starting")
             await self.volkswagen_api.deactivate_vehicles(session, vins_to_deactivate)
             deactivated_current_states = await self.volkswagen_api.check_vehicle_status(
@@ -646,21 +655,24 @@ class VehicleActivationService:
 
             for vin, info in deactivated_current_states.items():
                 logging.info(
-                    f"Update Volkswagen vehicle that has just been deactivated {vin}  : {info['status_bool']}"
+                    f"Update Volkswagen vehicle that has just been deactivated {vin} : {info['status_bool']}"
                 )
                 vehicle_data = {
                     "vin": vin,
-                    "Eligibility": info[
-                        "status_bool"
-                    ],  # Notion d'élégibilité confondue chez VW
-                    "Real_Activation": info["status_bool"],
-                    "Activation_Error": "",  # Egibility and activation are not divided at VW
+                    "Eligibility": safe_bool(info.get("status_bool")),
+                    "Real_Activation": safe_bool(info.get("status_bool")),
+                    "Activation_Error": "",
+                    "API_Detail": "",
                 }
                 status_data.append(vehicle_data)
-                continue
 
-            status_df = pd.DataFrame(status_data)
-            await update_vehicle_activation_data(status_df)
+        # --- Nettoyage avant envoi vers Google Sheets ---
+        status_df = pd.DataFrame(status_data)
+        status_df = status_df.replace([None, float("inf"), float("-inf")], "")
+        status_df = status_df.where(pd.notnull(status_df), "")
+
+        await update_vehicle_activation_data(status_df)
+
 
 
     # async def activation_tesla(self):
