@@ -724,7 +724,7 @@ class VehicleActivationService:
                 status_data.append(vehicle_data)
                 continue
 
-            logging.info("\VOLKSWAGEN DEACTIVATION : Starting")
+            logging.info("\nVOLKSWAGEN DEACTIVATION : Starting")
             await self.volkswagen_api.deactivate_vehicles(session, vins_to_deactivate)
             deactivated_current_states = await self.volkswagen_api.check_vehicle_status(
                 session, vins_to_deactivate

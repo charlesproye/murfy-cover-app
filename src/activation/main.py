@@ -89,13 +89,12 @@ async def process_vehicles(owner_filter: Optional[str] = None):
 
         # Process all brands in parallel
         await asyncio.gather(
-            # activation_service.activation_tesla(),
-            # activation_service.activation_bmw(),
-            # activation_service.activation_hm(),
-            # activation_service.activation_stellantis(),
-            # activation_service.activation_tesla_particulier()
+            activation_service.activation_bmw(),
+            activation_service.activation_hm(),
+            activation_service.activation_stellantis(),
             activation_service.activation_volkswagen()
         )
+
 
         # Get updated fleet info after activation"""
         logging.info('-------------------------------Activation completed-------------------------------')
@@ -106,10 +105,6 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             bmw_api=bmw_api,
             hm_api=hm_api,
             stellantis_api=stellantis_api,
-            #tesla_api=tesla_api,
-            tesla_api=None,
-            #tesla_particulier_api=tesla_particulier_api,
-            tesla_particulier_api=None,
             renault_api=renault_api,
             volkswagen_api=volkswagen_api,
             df=df
@@ -117,11 +112,9 @@ async def process_vehicles(owner_filter: Optional[str] = None):
 
         await asyncio.gather(
             vehicle_processor.process_other_vehicles(),
-            # # vehicle_processor.process_tesla(),
-            # vehicle_processor.process_renault(),
-            # vehicle_processor.process_deactivated_vehicles(),
-            # vehicle_processor.process_bmw(),
-            # vehicle_processor.process_tesla_particulier()
+            vehicle_processor.process_renault(),
+            vehicle_processor.process_deactivated_vehicles(),
+            vehicle_processor.process_bmw()
             )
         
         #await vehicle_processor.delete_unused_models()
