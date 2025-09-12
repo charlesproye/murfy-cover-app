@@ -59,15 +59,19 @@ class BMWApi:
     async def check_vehicle_status(self, vin: str, session: aiohttp.ClientSession) -> Tuple[int, Any]:
         """Get vehicle clearance status."""
         try:
+
             url = f"{self.base_url}/vehicle/{vin}"
             headers = await self._get_headers(session)
             response = await session.get(url, headers=headers)
+            response_text = await response.text()
+            response_json = json.loads(response_text)
+
             if response.status == 200:
-                return True
+                return True, response_json['fleet']
             elif response.status == 404:
-                return False
+                return False, None
             else:
-                return False
+                return False, None
         except Exception as e:
             logging.error(f"Failed to get BMW clearance: {str(e)}")
             return 500, str(e)
@@ -79,7 +83,6 @@ class BMWApi:
             vehicle_data: Dictionary containing vehicle information (vin, licence_plate, note, contract)
         """
         try:
-            print(vehicle_data)
             url = f"{self.base_url}/vehicle"
             vehicle_data['contract']['end_date'] = ""
             headers = await self._get_headers(session)
@@ -145,8 +148,10 @@ class BMWApi:
         try:
             url = f"{self.base_url}/data/vehicle/{vin}"
             headers = await self._get_headers(session)
+            print(url)
             response = await session.get(url, headers=headers)
             response_data = await response.json()
+
             
             # Find the model entry in the data array
             model_entry = next((item for item in response_data.get('data', []) 

@@ -1,4 +1,5 @@
 import logging
+from re import S
 import aiohttp
 import pandas as pd
 import uuid
@@ -234,7 +235,7 @@ class VehicleProcessor:
                             cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
                             vehicle_exists = cursor.fetchone()
                             vehicle_exists = vehicle_exists[0] if vehicle_exists else None
-                            model_name, model_type = await self.bmw_api.get_data(session, vin)
+                            model_name, model_type = await self.bmw_api.get_data(vin, session)
                             model_id = mapping_vehicle_type(model_type, vehicle["make"], model_name, model_existing)
                             if not vehicle_exists:
                                 #Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db

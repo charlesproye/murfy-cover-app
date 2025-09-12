@@ -34,7 +34,6 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
             
             # Get headers from first row and use them as column names
             df = pd.DataFrame(data)
-            print(df)
             
             logger.info(f"Successfully fetched {len(df)} rows from Google Sheets")
             return df
@@ -237,8 +236,10 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         if col not in df.columns:
             logger.warning(f"Missing column {col}, adding empty column")
             df[col] = None
+
+
     # Add this before safe_astype
-    df = df.pipe(safe_astype, COL_DTYPES)
+    df = df.pipe(safe_astype_activation, COL_DTYPES)
     df = df.pipe(clean_version, model_col='model', version_col='type')
     df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
     df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')

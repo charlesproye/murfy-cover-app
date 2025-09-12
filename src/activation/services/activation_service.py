@@ -1,4 +1,5 @@
 import logging
+from this import d
 from typing import Optional, Tuple
 import logging
 import aiohttp
@@ -10,13 +11,13 @@ from activation.api.bmw_client import BMWApi
 from activation.api.hm_client import HMApi
 from activation.api.renault_client import RenaultApi
 from activation.api.stellantis_client import StellantisApi
-from activation.api.tesla_client import TeslaApi
-from activation.api.tesla_particulier import TeslaParticulierApi
 from activation.api.volkswagen_client import VolkswagenApi
 from activation.config.settings import ACTIVATION_TIMEOUT
 from activation.services.google_sheet_service import \
     update_vehicle_activation_data
 from core.sql_utils import get_connection
+import time
+import json
 
 
 class VehicleActivationService:
@@ -67,19 +68,32 @@ class VehicleActivationService:
                     break
 
             if not target_fleet_id:
-                error_msg = f"Fleet {target_fleet_name} not found"
+                for fleet in result.get("fleets", []):
+                    if fleet.get("name", "").lower() == "bib":
+                        target_fleet_id_bib = fleet["fleet_id"]
+                        break
+                error_msg = f"Fleet {target_fleet_name} not found, adding to bib fleet"
                 logging.error(error_msg)
-                return False, error_msg
+                target_fleet_id = target_fleet_id_bib
 
             status_code, result = await self.bmw_api.add_vehicle_to_fleet(
                 target_fleet_id, vin, session
             )
+
+            result = json.loads(result)
 
             if status_code in [200, 201, 204]:
                 logging.info(
                     f"Successfully added vehicle {vin} to {target_fleet_name} fleet"
                 )
                 return True, None
+            if status_code == 422:
+                logging.info(f"Vehicle {vin} already in fleet")
+                return True, None
+            if status_code == 429:
+                if result['message'] == 'Too Many Requests':
+                    time.sleep(1)
+                    return await self._add_to_fleet(vin, session)
             else:
                 error_msg = f"Failed to add vehicle to fleet: HTTP {status_code}"
                 logging.error(error_msg)
@@ -138,12 +152,24 @@ class VehicleActivationService:
 
             status_code, result = await self.bmw_api.create_clearance(payload, session)
 
+            result = json.loads(result)
+
             logging.info(f"Create clearance response")
 
             if status_code in [200, 201, 204]:
                 fleet_success, fleet_error = await self._add_to_fleet(vin, session)
                 if not fleet_success:
                     return False, fleet_error
+                return True, None
+            elif "message" in result.keys():
+                if result["message"] == 'Too Many Requests':
+                    time.sleep(1)
+                    return await self._activate_bmw(session, vin)
+                else:
+                    pass
+            elif status_code == 403 and result['logErrorId'] == 'BMWFD_VEHICLE_ALREADY_EXISTS':
+                logging.info(f"BMW vehicle {vin} already added")
+                fleet_success, fleet_error = await self._add_to_fleet(vin, session)
                 return True, None
             else:
                 error_msg = f"Failed to activate BMW vehicle: HTTP {status_code}, Response: {result}"
@@ -286,121 +312,6 @@ class VehicleActivationService:
         status_df = pd.DataFrame(status_data)
         await update_vehicle_activation_data(status_df)
 
-    async def activation_tesla(self):
-        """Process Tesla vehicle activation/deactivation.
-
-        Returns:
-            pd.DataFrame: DataFrame containing vehicle status with columns:
-                - vin: Vehicle identification number
-                - Eligibility: Whether the vehicle is eligible for activation
-                - Real_Activation: Current activation status
-                - Activation_Error: Any error messages
-                - account_owner: Tesla account owner name
-        """
-        logging.info("Checking eligibility of Tesla vehicles")
-
-        # Get Tesla vehicles from fleet info
-        ggsheet_tesla = self.fleet_info_df[self.fleet_info_df["oem"] == "tesla"]
-
-        # Get Tesla API data
-        async with aiohttp.ClientSession() as session:
-            api_tesla = await self.tesla_api._build_vin_mapping(session)
-
-            # Create DataFrame for vehicles in API
-            api_vehicles = pd.DataFrame(
-                [
-                    {
-                        "vin": vin,
-                        "Eligibility": True,
-                        "Real_Activation": (
-                            ggsheet_tesla[ggsheet_tesla["vin"] == vin][
-                                "activation"
-                            ].iloc[0]
-                            == True
-                            if not ggsheet_tesla[ggsheet_tesla["vin"] == vin].empty
-                            else False
-                        ),
-                        "Activation_Error": None,
-                        "account_owner": account_name,
-                    }
-                    for vin, account_name in api_tesla
-                ]
-            )
-            print(f"Tesla vehicles in API: {len(api_vehicles)}")
-
-            # Create DataFrame for vehicles not in API
-            missing_vehicles = pd.DataFrame(
-                [
-                    {
-                        "vin": vin,
-                        "Eligibility": False,
-                        "Real_Activation": False,
-                        "Activation_Error": "Vehicle not found in Tesla accounts",
-                        "account_owner": None,
-                    }
-                    for vin in ggsheet_tesla["vin"]
-                    if vin
-                    not in [
-                        v[0] for v in api_tesla
-                    ]  # Extract VINs from tuples for comparison
-                ]
-            )
-            print(f"Missing tesla vehicles): {len(missing_vehicles)}")
-
-            # Combine both DataFrames
-            status_df = pd.concat([api_vehicles, missing_vehicles], ignore_index=True)
-            print(f"Total tesla vehicles: {len(status_df)}")
-            await update_vehicle_activation_data(status_df)
-
-    async def activation_tesla_particulier(self):
-        """Process Tesla particulier vehicle activation/deactivation"""
-        status_data = []
-
-        async with aiohttp.ClientSession() as session:
-            with get_connection() as con:
-                cursor = con.cursor()
-                cursor.execute("SELECT vin,full_name FROM tesla.user")
-                vins = cursor.fetchall()
-
-                for vin, full_name in vins:
-                    try:
-                        actual_state = await self.tesla_particulier_api.get_status(
-                            vin, session, cursor
-                        )
-                        print(f"Actual state: {actual_state}")
-
-                        if actual_state:
-                            vehicle_data = {
-                                "vin": vin,
-                                "Eligibility": True,
-                                "Real_Activation": True,
-                                "Activation_Error": None,
-                                "account_owner": full_name,
-                            }
-                            status_data.append(vehicle_data)
-                        else:
-                            vehicle_data = {
-                                "vin": vin,
-                                "Eligibility": False,
-                                "Real_Activation": False,
-                                "Activation_Error": "Particulier Tesla account not found",
-                                "account_owner": full_name,
-                            }
-                            status_data.append(vehicle_data)
-
-                    except Exception as e:
-                        status_data.append(
-                            {
-                                "vin": vin,
-                                "Eligibility": False,
-                                "Real_Activation": False,
-                                "Activation_Error": f"Error processing vehicle: {str(e)}",
-                                "account_owner": full_name,
-                            }
-                        )
-
-                status_df = pd.DataFrame(status_data)
-                await update_vehicle_activation_data(status_df)
 
     async def activation_bmw(self):
         """Process BMW vehicle activation/deactivation."""
@@ -410,9 +321,12 @@ class VehicleActivationService:
             for _, row in df_bmw.iterrows():
                 vin = row["vin"]
                 desired_state = row["activation"]
-                current_state = await self.bmw_api.check_vehicle_status(vin, session)
+                current_state, fleet = await self.bmw_api.check_vehicle_status(vin, session)
 
                 if desired_state == current_state:
+                    if not fleet and desired_state:
+                        await self._add_to_fleet(vin, session)
+
                     logging.info(
                         f"BMW vehicle {vin} already in desired state: {desired_state}"
                     )
@@ -748,3 +662,119 @@ class VehicleActivationService:
             status_df = pd.DataFrame(status_data)
             await update_vehicle_activation_data(status_df)
 
+
+    # async def activation_tesla(self):
+    #     """Process Tesla vehicle activation/deactivation.
+
+    #     Returns:
+    #         pd.DataFrame: DataFrame containing vehicle status with columns:
+    #             - vin: Vehicle identification number
+    #             - Eligibility: Whether the vehicle is eligible for activation
+    #             - Real_Activation: Current activation status
+    #             - Activation_Error: Any error messages
+    #             - account_owner: Tesla account owner name
+    #     """
+    #     logging.info("Checking eligibility of Tesla vehicles")
+
+    #     # Get Tesla vehicles from fleet info
+    #     ggsheet_tesla = self.fleet_info_df[self.fleet_info_df["oem"] == "tesla"]
+
+    #     # Get Tesla API data
+    #     async with aiohttp.ClientSession() as session:
+    #         api_tesla = await self.tesla_api._build_vin_mapping(session)
+
+    #         # Create DataFrame for vehicles in API
+    #         api_vehicles = pd.DataFrame(
+    #             [
+    #                 {
+    #                     "vin": vin,
+    #                     "Eligibility": True,
+    #                     "Real_Activation": (
+    #                         ggsheet_tesla[ggsheet_tesla["vin"] == vin][
+    #                             "activation"
+    #                         ].iloc[0]
+    #                         == True
+    #                         if not ggsheet_tesla[ggsheet_tesla["vin"] == vin].empty
+    #                         else False
+    #                     ),
+    #                     "Activation_Error": None,
+    #                     "account_owner": account_name,
+    #                 }
+    #                 for vin, account_name in api_tesla
+    #             ]
+    #         )
+    #         print(f"Tesla vehicles in API: {len(api_vehicles)}")
+
+    #         # Create DataFrame for vehicles not in API
+    #         missing_vehicles = pd.DataFrame(
+    #             [
+    #                 {
+    #                     "vin": vin,
+    #                     "Eligibility": False,
+    #                     "Real_Activation": False,
+    #                     "Activation_Error": "Vehicle not found in Tesla accounts",
+    #                     "account_owner": None,
+    #                 }
+    #                 for vin in ggsheet_tesla["vin"]
+    #                 if vin
+    #                 not in [
+    #                     v[0] for v in api_tesla
+    #                 ]  # Extract VINs from tuples for comparison
+    #             ]
+    #         )
+    #         print(f"Missing tesla vehicles): {len(missing_vehicles)}")
+
+    #         # Combine both DataFrames
+    #         status_df = pd.concat([api_vehicles, missing_vehicles], ignore_index=True)
+    #         print(f"Total tesla vehicles: {len(status_df)}")
+    #         await update_vehicle_activation_data(status_df)
+
+    # async def activation_tesla_particulier(self):
+    #     """Process Tesla particulier vehicle activation/deactivation"""
+    #     status_data = []
+
+    #     async with aiohttp.ClientSession() as session:
+    #         with get_connection() as con:
+    #             cursor = con.cursor()
+    #             cursor.execute("SELECT vin,full_name FROM tesla.user")
+    #             vins = cursor.fetchall()
+
+    #             for vin, full_name in vins:
+    #                 try:
+    #                     actual_state = await self.tesla_particulier_api.get_status(
+    #                         vin, session, cursor
+    #                     )
+    #                     print(f"Actual state: {actual_state}")
+
+    #                     if actual_state:
+    #                         vehicle_data = {
+    #                             "vin": vin,
+    #                             "Eligibility": True,
+    #                             "Real_Activation": True,
+    #                             "Activation_Error": None,
+    #                             "account_owner": full_name,
+    #                         }
+    #                         status_data.append(vehicle_data)
+    #                     else:
+    #                         vehicle_data = {
+    #                             "vin": vin,
+    #                             "Eligibility": False,
+    #                             "Real_Activation": False,
+    #                             "Activation_Error": "Particulier Tesla account not found",
+    #                             "account_owner": full_name,
+    #                         }
+    #                         status_data.append(vehicle_data)
+
+    #                 except Exception as e:
+    #                     status_data.append(
+    #                         {
+    #                             "vin": vin,
+    #                             "Eligibility": False,
+    #                             "Real_Activation": False,
+    #                             "Activation_Error": f"Error processing vehicle: {str(e)}",
+    #                             "account_owner": full_name,
+    #                         }
+    #                     )
+
+    #             status_df = pd.DataFrame(status_data)
+    #             await update_vehicle_activation_data(status_df)
