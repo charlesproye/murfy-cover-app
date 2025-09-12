@@ -77,7 +77,7 @@ class S3Service():
             else:
                 raise e
 
-    def save_df_as_parquet_spark(self, df: DF, key: str, spark):
+    def save_df_as_parquet_spark(self, df: DF, key: str, spark, repartition_key: Optional[str] = 'vin'):
         """
         Censée faire une concat de ce qui existe et écraser les fichiers déjà présents dans scaleway.
         Aucune idée de la rapidité ni de la viabilité.
@@ -92,7 +92,7 @@ class S3Service():
             # Vérifier si le DataFrame n'est pas vide
             if processed.count() > 0:
                 processed, df = align_dataframes_for_union(
-                    processed, df, strategy="intersection"
+                    processed, df, strategy="union"
                 )
                 df_write = processed.union(df).dropDuplicates()
 
@@ -112,9 +112,9 @@ class S3Service():
                 raise e
 
         # Écriture optimisée
-        df_write.repartition("vin").coalesce(32).write.mode("overwrite").option("parquet.compression", "snappy").option(
+        df_write.repartition(repartition_key).coalesce(32).write.mode("overwrite").option("parquet.compression", "snappy").option(
             "parquet.block.size", 67108864
-        ).partitionBy("vin").parquet(s3_path)
+        ).partitionBy(repartition_key).parquet(s3_path)
 
     def append_spark_df_to_parquet(self, df: DF, key: str, repartition: Optional[str] = None):
         s3_path = f"s3a://{self.bucket_name}/{key}"

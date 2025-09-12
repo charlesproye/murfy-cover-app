@@ -9,10 +9,8 @@ from gspread import Cell
 import re
 
 
-from src.core.pandas_utils import *
-from src.core.s3.s3_utils import S3Service
-from src.core.singleton_s3_bucket import S3
-from src.core.config import *
+from core.pandas_utils import *
+from core.config import *
 from core.gsheet_utils import get_google_client
 from .config.credentials import SPREADSHEET_ID 
 from .config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
@@ -62,7 +60,7 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
             logger.error(f"Failed to fetch data after {max_retries} attempts. Last error: {str(last_error)}")
             raise
 
-def safe_astype(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
+def safe_astype_activation(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
     """Safely convert DataFrame columns to specified types.
     
     Args:
