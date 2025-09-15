@@ -9,11 +9,9 @@ from gspread import Cell
 import re
 
 
-from src.core.pandas_utils import *
-from src.core.s3.s3_utils import S3Service
-from src.core.singleton_s3_bucket import S3
-from src.core.config import *
-from src.core.gsheet_utils import get_google_client
+from core.pandas_utils import *
+from core.config import *
+from core.gsheet_utils import get_google_client
 from .config.credentials import SPREADSHEET_ID 
 from .config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
 from .config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
@@ -40,29 +38,29 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
             
             logger.info(f"Successfully fetched {len(df)} rows from Google Sheets")
             return df
-            
+        
         except APIError as e:
             last_error = e
             if e.response.status_code in [429, 500, 503]:  # Rate limit or server error
                 sleep_time = min(delay * (2 ** attempt), MAX_RETRY_DELAY)
                 logger.warning(f"API error (status {e.response.status_code}), attempt {attempt + 1}/{max_retries}. "
-                             f"Waiting {sleep_time} seconds before retry...")
+                                f"Waiting {sleep_time} seconds before retry...")
                 time.sleep(sleep_time)
                 continue
             raise  # Re-raise if it's not a retryable error
-            
+
         except Exception as e:
             last_error = e
             if attempt < max_retries - 1:
                 sleep_time = min(delay * (2 ** attempt), MAX_RETRY_DELAY)
                 logger.warning(f"Unexpected error: {str(e)}, attempt {attempt + 1}/{max_retries}. "
-                             f"Waiting {sleep_time} seconds before retry...")
+                            f"Waiting {sleep_time} seconds before retry...")
                 time.sleep(sleep_time)
                 continue
             logger.error(f"Failed to fetch data after {max_retries} attempts. Last error: {str(last_error)}")
             raise
 
-def safe_astype(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
+def safe_astype_activation(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
     """Safely convert DataFrame columns to specified types.
     
     Args:
@@ -179,78 +177,78 @@ def standardize_model_type(df: pd.DataFrame, oem_col='oem', model_col='model', t
 
 async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     """Read fleet information from Google Sheets."""
-    try:
-        logger.info("Starting to read fleet information...")
-        # Get data with retries
-        df = get_google_sheet_data()
+    # try:
+    logger.info("Starting to read fleet information...")
+    # Get data with retries
+    df = get_google_sheet_data()
 
-        if df.empty:
-            raise ValueError("No data retrieved from Google Sheets")
+    if df.empty:
+        raise ValueError("No data retrieved from Google Sheets")
+        
+    logger.info(f"Retrieved {len(df)} rows from Google Sheets")
+    
+    # Clean column names
+    df.columns = [col if col == "EValue" else col.lower().strip().replace(' ', '_') for col in df.columns]
+
+    # Handle potential variations of the owner column name
+    owner_column_variants = ['owner', 'ownership', 'ownership_', 'fleet_owner', 'fleet']
+    owner_col = None
+    for variant in owner_column_variants:
+        if variant in df.columns:
+            owner_col = variant
+            logger.info(f"Found owner column: {variant}")
+            break
             
-        logger.info(f"Retrieved {len(df)} rows from Google Sheets")
-        
-        # Clean column names
-        df.columns = [col if col == "EValue" else col.lower().strip().replace(' ', '_') for col in df.columns]
-   
-        # Handle potential variations of the owner column name
-        owner_column_variants = ['owner', 'ownership', 'ownership_', 'fleet_owner', 'fleet']
-        owner_col = None
-        for variant in owner_column_variants:
-            if variant in df.columns:
-                owner_col = variant
-                logger.info(f"Found owner column: {variant}")
-                break
-                
-        if owner_col is None:
-            raise ValueError(f"Could not find owner column. Available columns: {df.columns.tolist()}")
+    if owner_col is None:
+        raise ValueError(f"Could not find owner column. Available columns: {df.columns.tolist()}")
 
-        # Rename the owner column to 'owner' for consistency
-        df = df.rename(columns={owner_col: 'owner'})
-        
-        # Apply owner filter if provided
-        if owner_filter:
-            logger.info(f"Filtering by owner: {owner_filter}")
-            initial_count = len(df)
-            df = df[df['owner'].str.lower() == owner_filter.lower()]
-            logger.info(f"Found {len(df)} vehicles for owner {owner_filter} (filtered from {initial_count})")
-        
+    # Rename the owner column to 'owner' for consistency
+    df = df.rename(columns={owner_col: 'owner'})
+    
+    # Apply owner filter if provided
+    if owner_filter:
+        logger.info(f"Filtering by owner: {owner_filter}")
+        initial_count = len(df)
+        df = df[df['owner'].str.lower() == owner_filter.lower()]
+        logger.info(f"Found {len(df)} vehicles for owner {owner_filter} (filtered from {initial_count})")
+    
 
-        # Clean and standardize data
-        # df = df.pipe(map_col_to_dict, "country", COUNTRY_MAPPING)
+    # Clean and standardize data
+    # df = df.pipe(map_col_to_dict, "country", COUNTRY_MAPPING)
+    
+    # Map OEM names
+    if 'oem' in df.columns:
+        df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
+    
+    df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].apply(lambda x: x.str.lower())
+    
+    # Convert dates with explicit format handling
+    date_columns = ['start_date', 'end_of_contract']
+    for col in date_columns:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], yearfirst=True, errors='coerce').dt.strftime('%Y-%m-%d')
+    
+    # Remove duplicates and convert types
+    df = df.drop_duplicates(subset="vin")
+    df = df.replace({pd.NaT: None})
+    
+    # Ensure all required columns exist before type conversion
+    for col in COL_DTYPES:
+        if col not in df.columns:
+            logger.warning(f"Missing column {col}, adding empty column")
+            df[col] = None
+    # Add this before safe_astype
+    df = df.pipe(safe_astype, COL_DTYPES)
+    df = df.pipe(clean_version, model_col='model', version_col='type')
+    df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
+    df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
+    logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
+    
+    return df
         
-        # Map OEM names
-        if 'oem' in df.columns:
-            df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
-        
-        df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].apply(lambda x: x.str.lower())
-        
-        # Convert dates with explicit format handling
-        date_columns = ['start_date', 'end_of_contract']
-        for col in date_columns:
-            if col in df.columns:
-                df[col] = pd.to_datetime(df[col], yearfirst=True, errors='coerce').dt.strftime('%Y-%m-%d')
-        
-        # Remove duplicates and convert types
-        df = df.drop_duplicates(subset="vin")
-        df = df.replace({pd.NaT: None})
-        
-        # Ensure all required columns exist before type conversion
-        for col in COL_DTYPES:
-            if col not in df.columns:
-                logger.warning(f"Missing column {col}, adding empty column")
-                df[col] = None
-        # Add this before safe_astype
-        df = df.pipe(safe_astype, COL_DTYPES)
-        df = df.pipe(clean_version, model_col='model', version_col='type')
-        df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
-        df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
-        logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
-        
-        return df
-        
-    except Exception as e:
-        logger.error(f"Error reading fleet info: {str(e)}")
-        raise
+    # except Exception as e:
+    #     logger.error(f"Error reading fleet info: {str(e)}")
+    #     raise
 
 if __name__ == "__main__":
     df = asyncio.run(read_fleet_info(owner_filter=''))

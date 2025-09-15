@@ -63,7 +63,6 @@ def main():
     ingester = MobilisightsIngester(
         rate_limit=args.rate_limit,
         max_workers=args.max_workers,
-        compress_time=args.compress_time,
     )
 
     ingester.run()
