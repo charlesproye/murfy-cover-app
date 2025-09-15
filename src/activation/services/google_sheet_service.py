@@ -3,6 +3,16 @@ from typing import Optional
 from core.gsheet_utils import get_google_client
 from activation.config.credentials import SPREADSHEET_ID
 import pandas as pd
+import math
+
+
+def sanitize_value(val):
+    """Ensure value is JSON compliant (no NaN, inf)."""
+    if val is None:
+        return ""
+    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+        return ""
+    return val
 
 async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
     """Update or insert vehicle activation data in Google Sheet.
@@ -35,7 +45,7 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
         real_activation_col = headers.index("Real Activation") + 1
         eligibility_col = headers.index("Eligibility") + 1
         error_col = headers.index("Activation Error") + 1
-        # api_detail = headers.index("API Detail") + 1
+        api_detail = headers.index("API Detail") + 1
         oem_col = headers.index("Oem") + 1
         make_col = headers.index("Make") + 1
         ownership_col = headers.index("Ownership") + 1
@@ -60,24 +70,25 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
                 # Update existing row
                 updates.append({
                     'range': f'R{row_idx}C{real_activation_col}',
-                    'values': [[(row['Real_Activation'])]]
+                    'values': [[sanitize_value(row['Real_Activation'])]]
                 })
                 updates.append({
                     'range': f'R{row_idx}C{eligibility_col}',
-                    'values': [[row['Eligibility']]]
+                    'values': [[sanitize_value(row['Eligibility'])]]
                 })
                 updates.append({
                     'range': f'R{row_idx}C{error_col}',
-                    'values': [[row['Activation_Error'] if row['Activation_Error'] is not None else '']]
+                    'values': [[sanitize_value(row['Activation_Error'])]]
                 })
-                # updates.append({
-                #     'range': f'R{row_idx}C{api_detail}',
-                #     'values': [row['API_Detail'] if row['API_Detail'] is not None in row else '']
-                # })
+                updates.append({
+                    'range': f'R{row_idx}C{api_detail}',
+                    'values': [[sanitize_value(row['API_Detail'])]]
+                })
                 updates.append({
                     'range': f'R{row_idx}C{account_owner_col}',
                     'values': [[account_owner_value]]
                 })
+
             else:
                 new_row = [""] * len(headers)  # Create empty row with same length as headers
                 new_row[vin_col - 1] = vin

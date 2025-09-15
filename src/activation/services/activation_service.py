@@ -476,6 +476,7 @@ class VehicleActivationService:
                                     f"High Mobility vehicle {vin} activation failed"
                                 )
                                 _, response = await self.hm_api.get_status(vin, session)
+
                                 vehicle_data = {
                                     "vin": vin,
                                     "Eligibility": False,
