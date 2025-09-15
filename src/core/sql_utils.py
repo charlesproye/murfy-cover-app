@@ -5,13 +5,9 @@ from sqlalchemy import Engine, create_engine, text, inspect
 from sqlalchemy import Connection as Con
 from contextlib import contextmanager
 
-from .spark_utils import *
 from .pandas_utils import *
 from .config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR, DB_URI_FORMAT_KEYS_PROD, DB_URI_FORMAT_STR_PROD
 from .env_utils import get_env_var
-from pyspark.sql.functions import monotonically_increasing_id, udf
-from pyspark.sql import functions as F
-from pyspark.sql.types import StringType
 import uuid
 
 logger = getLogger("core.sql_utils")
@@ -99,59 +95,4 @@ def truncate_rdb_table_and_insert_df(
     with engine.begin() as conn:  
         conn.execute(text(f"DELETE FROM {table_name}"))  # Delete all rows
         df.to_sql(table_name, conn, if_exists="append", index=False)
-    return df
-
-
-def truncate_rdb_table_and_insert_df_spark(
-    df, 
-    table_name: str, 
-    src_dest_cols: dict[str, str]|list[str], 
-    logger: Logger=logger,
-    is_prod: bool = False,
-):
-    """
-    Version Spark de truncate_rdb_table_and_insert_df
-    """
-    logger.debug(f"Truncating {table_name} and inserting a new Spark DataFrame in it.")
-    
-    # Preprocess input
-    if isinstance(src_dest_cols, list):
-        src_dest_cols = dict(zip(src_dest_cols, src_dest_cols))
-    
-    # Renommer les colonnes
-    for old_name, new_name in src_dest_cols.items():
-        df = df.withColumnRenamed(old_name, new_name)
-    
-    # Sélectionner seulement les colonnes de destination
-    df = df.select(list(src_dest_cols.values()))
-    
-    # Check for a required not null "id" column in the table
-    inspector = inspect(get_sqlalchemy_engine(is_prod))
-    table_columns_info = inspector.get_columns(table_name)
-    notna_cols = [col['name'] for col in table_columns_info if not col['nullable']]
-    
-    # Add "id" column if it is required and not present
-    if "id" in notna_cols and "id" not in df.columns:
-        logger.debug(f'"id" column is a mandatory not null col in rdb table {table_name} but is not in lhs. Adding id column to lhs.')
-        # Utiliser uuid4 au lieu de monotonically_increasing_id pour UUID
-        
-        @udf(StringType())
-        def generate_uuid():
-            return str(uuid.uuid4())
-        
-        df = df.withColumn("id", generate_uuid())
-    
-    # Drop rows with missing values in required columns
-    for col_name in notna_cols:
-        if col_name in df.columns:
-            df = df.filter(col(col_name).isNotNull())
-    
-    # Convertir en pandas pour l'insertion
-    df_pandas = df.toPandas()
-    
-    # Update the table
-    with get_sqlalchemy_engine(is_prod).begin() as conn:  
-        conn.execute(text(f"DELETE FROM {table_name}"))  # Delete all rows
-        df_pandas.to_sql(table_name, conn, if_exists="append", index=False)
-    
     return df

@@ -10,13 +10,12 @@ from activation.config.credentials import *
 from activation.api.bmw_client import BMWApi
 from activation.api.hm_client import HMApi
 from activation.api.stellantis_client import StellantisApi
-from activation.api.tesla_client import TeslaApi
-from activation.api.tesla_particulier import TeslaParticulierApi
 from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
 from activation.fleet_info import read_fleet_info as fleet_info
 from activation.api.renault_client import RenaultApi
 from activation.api.volkswagen_client import VolkswagenApi
+
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -90,10 +89,10 @@ async def process_vehicles(owner_filter: Optional[str] = None):
 
         # Process all brands in parallel
         await asyncio.gather(
-            #activation_service.activation_bmw(),
+            activation_service.activation_bmw(),
             activation_service.activation_hm(),
-            # activation_service.activation_stellantis(),
-            # activation_service.activation_volkswagen()
+            activation_service.activation_stellantis(),
+            activation_service.activation_volkswagen()
         )
 
 
@@ -112,10 +111,10 @@ async def process_vehicles(owner_filter: Optional[str] = None):
         )
 
         await asyncio.gather(
-            #vehicle_processor.process_other_vehicles(),
-            # vehicle_processor.process_renault(),
-            # vehicle_processor.process_deactivated_vehicles(),
-            # vehicle_processor.process_bmw()
+            vehicle_processor.process_other_vehicles(),
+            vehicle_processor.process_renault(),
+            vehicle_processor.process_deactivated_vehicles(),
+            vehicle_processor.process_bmw()
             )
         
         #await vehicle_processor.delete_unused_models()

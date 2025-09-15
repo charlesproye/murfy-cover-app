@@ -148,7 +148,6 @@ class BMWApi:
         try:
             url = f"{self.base_url}/data/vehicle/{vin}"
             headers = await self._get_headers(session)
-            print(url)
             response = await session.get(url, headers=headers)
             response_data = await response.json()
 

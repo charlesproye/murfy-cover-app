@@ -72,8 +72,8 @@ class VehicleActivationService:
                     if fleet.get("name", "").lower() == "bib":
                         target_fleet_id_bib = fleet["fleet_id"]
                         break
-                error_msg = f"Fleet {target_fleet_name} not found, adding to bib fleet"
-                logging.error(error_msg)
+                warning_msg = f"Fleet {target_fleet_name} not found, adding to bib fleet"
+                logging.warning(error_msg)
                 target_fleet_id = target_fleet_id_bib
 
             status_code, result = await self.bmw_api.add_vehicle_to_fleet(
@@ -428,8 +428,8 @@ class VehicleActivationService:
     async def activation_hm(self):
         """Process High Mobility vehicle activation/deactivation."""
         df_hm = self.fleet_info_df[
-            self.fleet_info_df["oem"].isin(["renault"])
-        ]  # (['ford', 'mercedes', 'kia','renault'])]
+            self.fleet_info_df["oem"].isin(["renault", 'ford', 'mercedes', 'kia', 'volvo'])
+        ] 
         status_data = []
         async with aiohttp.ClientSession() as session:
             for _, row in df_hm.iterrows():
