@@ -17,6 +17,15 @@ class VehicleProcessor:
         self.renault_api = renault_api
         self.volkswagen_api = volkswagen_api
         self.df = df
+
+    async def _clean_value(self, val, expected_type="str"):
+        if val in [None, "None", "nan", "NaN", ""]:
+            return None
+        if expected_type == "int":
+            return int(val)
+        if expected_type == "bool":
+            return bool(val) if not isinstance(val, bool) else val
+        return val
     
     async def _get_oem(self, cursor, oem_raw: str) -> str:
         """Get or create OEM record."""
@@ -304,12 +313,14 @@ class VehicleProcessor:
                                     licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
                                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """
+
                             cursor.execute(
                                 insert_query,
                                 (
-                                    vehicle_id, vehicle['vin'], fleet_id, region_id, model_id,
-                                    vehicle['licence_plate'], vehicle['end_of_contract'],
-                                    vehicle['start_date'], vehicle['real_activation'], vehicle['EValue'], vehicle['eligibility']
+                                    vehicle_id, await self._clean_value(vehicle['vin']), fleet_id, region_id, model_id,
+                                    await self._clean_value(vehicle['licence_plate']), await self._clean_value(vehicle['end_of_contract']),
+                                    await self._clean_value(vehicle['start_date']), await self._clean_value(vehicle['real_activation'], 'bool'),
+                                    await self._clean_value(vehicle['EValue'], 'bool'), await self._clean_value(vehicle['eligibility'], 'bool')
                                 )
                             )
                             logging.info(f"New vehicle inserted in DB VIN: {vehicle['vin']}")

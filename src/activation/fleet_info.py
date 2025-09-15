@@ -25,15 +25,11 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
     client = get_google_client()
     delay = initial_delay
 
-    print(client)
-
     last_error = None
     
     for attempt in range(max_retries):
         try:
             sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-
-            print(sheet)
 
             # Get all values including headers
             data = sheet.get_all_records()
