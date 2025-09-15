@@ -16,6 +16,7 @@ from activation.config.settings import ACTIVATION_TIMEOUT
 from activation.services.google_sheet_service import \
     update_vehicle_activation_data
 from core.sql_utils import get_connection
+from activation.config.config import REASON_MAPPING
 import time
 import json
 
@@ -476,14 +477,28 @@ class VehicleActivationService:
                                     f"High Mobility vehicle {vin} activation failed"
                                 )
                                 _, response = await self.hm_api.get_status(vin, session)
+                                
+                                response['status'] if response['status'] is not None else ''
+                                api_detail = response['changelog'][-1]['reason'] if 'reason' in response['changelog'][-1] is not None else ''
+
+                                if api_detail in REASON_MAPPING['high-mobility'].keys():
+                                    api_detail_trad = REASON_MAPPING['high-mobility']['api_detail']
+                                elif response['status'] == "pending":
+                                    api_detail_trad = "En attente que le véhicule émette des données pour qu'il soit activé"
+                                elif response['status'] == "rejected":
+                                    api_detail_trad = REASON_MAPPING['high-mobility']['unspecified']
+                                else:
+                                    api_detail_trad = ''
+                                
 
                                 vehicle_data = {
                                     "vin": vin,
                                     "Eligibility": False,
                                     "Real_Activation": False,
                                     "Activation_Error": response['status'] if response['status'] is not None else '',
-                                    "API_Detail": response['changelog'][-1]['reason'] if 'reason' in response['changelog'][-1] is not None else '',
+                                    "API_Detail": api_detail,
                                 }
+
                                 status_data.append(vehicle_data)
                                 continue
                         except Exception as e:
@@ -494,7 +509,7 @@ class VehicleActivationService:
                                 "vin": vin,
                                 "Eligibility": True,
                                 "Real_Activation": False,
-                                "Activation_Error": "Failed to activate or pending approval",
+                                "Activation_Error": "Erreur d'activation, le VIN est faux ou non activable sur High Mobility",
                             }
                             status_data.append(vehicle_data)
                             continue
@@ -590,7 +605,6 @@ class VehicleActivationService:
                 for vin in desired_states
             }
 
-            # --- Déjà dans l'état souhaité ---
             vins_in_desired_state = {
                 vin: info
                 for vin, info in merged_states.items()
@@ -634,6 +648,15 @@ class VehicleActivationService:
                 logging.info(
                     f"Update Volkswagen vehicle that has just been activated {vin} : {info['status_bool']}"
                 )
+
+                if not info.get("status_bool"):
+                    if info.get("reason") in REASON_MAPPING['volkswagen'].keys():
+                        api_detail = REASON_MAPPING['volkswagen'][info.get("status")]
+                    else:
+                        api_detail = "Statut inconnu, voir avec l'équipe TECH pour le définir."
+                else:
+                    api_detail = ""
+                
                 vehicle_data = {
                     "vin": vin,
                     "Eligibility": safe_bool(info.get("status_bool")),
@@ -642,12 +665,12 @@ class VehicleActivationService:
                         str(info.get("status")) if not info.get("status_bool") else ""
                     ),
                     "API_Detail": (
-                        str(info.get("reason")) if not info.get("status_bool") else ""
+                        api_detail
                     ),
                 }
                 status_data.append(vehicle_data)
 
-            # --- Désactivation ---
+            # --- Deactivation ---
             logging.info("\nVOLKSWAGEN DEACTIVATION : Starting")
             await self.volkswagen_api.deactivate_vehicles(session, vins_to_deactivate)
             deactivated_current_states = await self.volkswagen_api.check_vehicle_status(
@@ -667,7 +690,7 @@ class VehicleActivationService:
                 }
                 status_data.append(vehicle_data)
 
-        # --- Nettoyage avant envoi vers Google Sheets ---
+        # --- Cleaning before sending to Google Sheets ---
         status_df = pd.DataFrame(status_data)
         status_df = status_df.replace([None, float("inf"), float("-inf")], "")
         status_df = status_df.where(pd.notnull(status_df), "")
