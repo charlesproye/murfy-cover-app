@@ -6,10 +6,12 @@ from pyspark.sql import SparkSession
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
-from core.stats_utils import mask_out_outliers_by_interquartile_range, force_decay
+from core.stats_utils import mask_out_outliers_by_interquartile_range, force_decay, make_weighted_avg
+
 
 from transform.result_week.config import *
 from transform.result_phases.main import *
+
 
 
 
@@ -63,6 +65,8 @@ class ResultPhaseToResultWeek():
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].ffill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].bfill()
 
+        rweek['CONSUMPTION'] = rweek.apply(lambda row: row['CONSUMPTION'] * row['SOH'] if row['SOH'] is not None else row['CONSUMPTION'], axis=1)
+
         return rweek
 
     def _replace_inf_soh(self, df):
@@ -88,13 +92,17 @@ class ResultPhaseToResultWeek():
 
         return results
 
-    def _agg_results_by_update_frequency(self, results:pd.DataFrame) -> pd.DataFrame:
+    def _agg_results_by_update_frequency(self, results: pd.DataFrame) -> pd.DataFrame:
+        """
+        Aggregate results per VIN and date, with weighted consumption.
+        """
+
         results["DATE"] = (
-            pd.to_datetime(results["DATETIME_BEGIN"], format='mixed')
+            pd.to_datetime(results["DATETIME_BEGIN"], format="mixed")
             .dt.floor(UPDATE_FREQUENCY)
             .dt.tz_localize(None)
             .dt.date
-            .astype('datetime64[ns]')
+            .astype("datetime64[ns]")
         )
 
         agg_spec = {
@@ -106,31 +114,46 @@ class ResultPhaseToResultWeek():
             "LEVEL_1": ("LEVEL_1", "sum"),
             "LEVEL_2": ("LEVEL_2", "sum"),
             "LEVEL_3": ("LEVEL_3", "sum"),
-            "CONSUMPTION": ("CONSUMPTION", "median"),
         }
 
-        # Ne garder que les colonnes présentes
+        def weighted_consumption(series: pd.Series):
+            idx = series.index
+            v = pd.to_numeric(series, errors="coerce")
+            w = pd.to_numeric(results.loc[idx, "ODOMETER_DIFF"], errors="coerce")
+
+            if w.sum() == 0:
+                return None
+
+            result = (v * w).sum() / w.sum()
+
+            soh_vals = pd.to_numeric(results.loc[idx, "SOH"], errors="coerce").dropna()
+            if not soh_vals.empty and soh_vals.median() > 0:
+                result *= soh_vals.median()
+
+            return result
+
         agg_dict = {
             new_col: pd.NamedAgg(src_col, func)
             for src_col, (new_col, func) in agg_spec.items()
             if src_col in results.columns
         }
 
+        if self.make != 'bmw':
+            agg_dict["CONSUMPTION"] = pd.NamedAgg("CONSUMPTION", weighted_consumption) # Ponderate consumption by ODOMETER_DIFF
+        else:
+            agg_dict["CONSUMPTION"] = pd.NamedAgg("CONSUMPTION", "median")
+            
         assign_cols = ["LEVEL_1", "LEVEL_2", "LEVEL_3"]
-
-        num_cols = ["SOH", "SOH_OEM", "CONSUMPTION", "LEVEL_1", "LEVEL_2", "LEVEL_3", "ODOMETER_LAST"]
+        num_cols = ["SOH", "SOH_OEM", "CONSUMPTION", "LEVEL_1", "LEVEL_2", "LEVEL_3", "ODOMETER_LAST", "ODOMETER_DIFF"]
 
         for col in num_cols:
             if col in results.columns:
                 results[col] = pd.to_numeric(results[col], errors="coerce")
-
+            
         return (
-            results
-            .assign(**{
-                col: results[col].fillna(0)  # ou autre traitement
-                for col in assign_cols
-                if col in results.columns
-            })
+            results.assign(
+                **{col: results[col].fillna(0) for col in assign_cols if col in results.columns}
+            )
             .groupby(["VIN", "DATE"], observed=True, as_index=False)
             .agg(**agg_dict)
         )
