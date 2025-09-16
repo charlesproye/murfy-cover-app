@@ -98,13 +98,17 @@ class StellantisApi:
             
             data = await response.json()
             if not data or not isinstance(data, list):
-                return False, None
+                return False, None, None
             
             for i in range(len(data)):
                 if data[i].get("status") == 'activated':
-                    return True, data[i].get("_id",None)
+                    return True, data[i].get("_id",None), data[i].get("status",None)
+                elif data[i].get("status") == 'pending':
+                    return False, None, data[i].get("status",None)
+                elif data[i].get("status") == 'rejected':
+                    return False, None, data[i].get("status",None)
                 
-            return False, None
+            return False, None, None
             
         except Exception as e:
             logging.error(f"Failed to get vehicle status for VIN {vin}: {str(e)}")

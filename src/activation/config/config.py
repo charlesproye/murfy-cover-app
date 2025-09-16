@@ -3,7 +3,8 @@ REASON_MAPPING = {
         "BMWFD_VEHICLE_NOT_ALLOWED": "Le véhicule n’est pas éligible à l’activation."
     },
     "stellantis": {
-        "pending": "En attente - raison à chercher auprès de Mobilisight"
+        "pending": "En attente - raison à chercher auprès de Mobilisight",
+        "rejected": "En attente - raison à chercher auprès de Mobilisight"
     },
     "high-mobility": {
             "unspecified": "Lorsqu’une activation échoue sans raison spécifique, ce motif est renvoyé. Pour de nombreuses marques, cela signifie que le véhicule n’est pas éligible.",

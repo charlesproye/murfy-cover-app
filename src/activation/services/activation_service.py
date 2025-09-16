@@ -172,8 +172,11 @@ class VehicleActivationService:
                 logging.info(f"BMW vehicle {vin} already added")
                 fleet_success, fleet_error = await self._add_to_fleet(vin, session)
                 return True, None
+            elif status_code == 412 and result['logErrorId'] == 'BMWFD_VEHICLE_NOT_ALLOWED':
+                logging.info(f"BMW vehicle {vin} is not allowed to be activated")
+                return False, REASON_MAPPING['bmw']['BMWFD_VEHICLE_NOT_ALLOWED']
             else:
-                error_msg = f"Failed to activate BMW vehicle: HTTP {status_code}, Response: {result}"
+                error_msg = f"L'activation du véhicule a échoué: Code d'erreur {status_code}, Response: {result['logErrorId']}"
                 return False, error_msg
 
         except Exception as e:
@@ -197,6 +200,7 @@ class VehicleActivationService:
                         "Eligibility": False,
                         "Real_Activation": False,
                         "Activation_Error": "Not eligible",
+                        "API_Detail": "Le VIN est non éligible à l'activation sur Stellantis"
                     }
                     if desired_state:
                         logging.info(
@@ -209,7 +213,7 @@ class VehicleActivationService:
                     status_data.append(vehicle_data)
                     continue
 
-                current_state, contract_id = await self.stellantis_api.get_status(
+                current_state, contract_id, _ = await self.stellantis_api.get_status(
                     vin, session
                 )
 
@@ -231,7 +235,7 @@ class VehicleActivationService:
                         status_code, error_msg = await self.stellantis_api.deactivate(
                             contract_id, session
                         )
-                        real_state, contract_id = await self.stellantis_api.get_status(
+                        real_state, contract_id, _ = await self.stellantis_api.get_status(
                             vin, session
                         )
                         if status_code in [200, 204]:
@@ -275,7 +279,7 @@ class VehicleActivationService:
                     status_code, result = await self.stellantis_api.activate(
                         vin, session
                     )
-                    real_state, contract_id = await self.stellantis_api.get_status(
+                    real_state, contract_id, status = await self.stellantis_api.get_status(
                         vin, session
                     )
                     if status_code in [200, 201, 204]:
@@ -294,7 +298,8 @@ class VehicleActivationService:
                             "vin": vin,
                             "Eligibility": real_state,
                             "Real_Activation": real_state,
-                            "Activation_Error": "Activation in progress",
+                            "Activation_Error": status, 
+                            "API_Detail": REASON_MAPPING['stellantis'][status] if status in REASON_MAPPING['stellantis'].keys() else f"La description du statut {status} est inconnue, voir avec l'équipe TECH."
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -306,6 +311,7 @@ class VehicleActivationService:
                             "Eligibility": real_state,
                             "Real_Activation": real_state,
                             "Activation_Error": error_msg,
+                            "API_Detail": f"Erreur de l'API lors de l'activation du véhicule."
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -341,7 +347,7 @@ class VehicleActivationService:
                     continue
 
                 elif desired_state:
-                    success, _ = await self._activate_bmw(session, vin)
+                    success, api_detail = await self._activate_bmw(session, vin)
                     if success:
                         logging.info(f"BMW vehicle {vin} activated successfully")
                         vehicle_data = {
@@ -359,6 +365,7 @@ class VehicleActivationService:
                             "Eligibility": False,
                             "Real_Activation": False,
                             "Activation_Error": "Activation failed",
+                            "API_Detail": api_detail
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -482,7 +489,7 @@ class VehicleActivationService:
                                 api_detail = response['changelog'][-1]['reason'] if 'reason' in response['changelog'][-1] is not None else ''
 
                                 if api_detail in REASON_MAPPING['high-mobility'].keys():
-                                    api_detail_trad = REASON_MAPPING['high-mobility']['api_detail']
+                                    api_detail_trad = REASON_MAPPING['high-mobility'][api_detail]
                                 elif response['status'] == "pending":
                                     api_detail_trad = "En attente que le véhicule émette des données pour qu'il soit activé"
                                 elif response['status'] == "rejected":
@@ -496,7 +503,7 @@ class VehicleActivationService:
                                     "Eligibility": False,
                                     "Real_Activation": False,
                                     "Activation_Error": response['status'] if response['status'] is not None else '',
-                                    "API_Detail": api_detail,
+                                    "API_Detail": api_detail_trad,
                                 }
 
                                 status_data.append(vehicle_data)
@@ -650,7 +657,7 @@ class VehicleActivationService:
                 )
 
                 if not info.get("status_bool"):
-                    if info.get("reason") in REASON_MAPPING['volkswagen'].keys():
+                    if info.get("status") in REASON_MAPPING['volkswagen'].keys():
                         api_detail = REASON_MAPPING['volkswagen'][info.get("status")]
                     else:
                         api_detail = "Statut inconnu, voir avec l'équipe TECH pour le définir."
