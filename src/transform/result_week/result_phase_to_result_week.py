@@ -1,21 +1,19 @@
 from logging import getLogger
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from pyspark.sql import SparkSession
 
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
-from core.stats_utils import mask_out_outliers_by_interquartile_range, force_decay, make_weighted_avg
-
-
-from transform.result_week.config import *
+from core.stats_utils import (force_decay, make_weighted_avg,
+                              mask_out_outliers_by_interquartile_range)
 from transform.result_phases.main import *
+from transform.result_week.config import *
 
 
-
-
-class ResultPhaseToResultWeek():
+class ResultPhaseToResultWeek:
 
     def __init__(
         self,
@@ -25,7 +23,7 @@ class ResultPhaseToResultWeek():
         has_soh: bool = False,
         has_soh_oem: bool = False,
         has_levels: bool = False,
-        **kwargs
+        **kwargs,
     ):
         self.make = make
         logger_name = f"transform.result_week.{make}"
@@ -37,35 +35,44 @@ class ResultPhaseToResultWeek():
         self.has_soh = has_soh
         self.has_levels = has_levels
 
-
-
     def run(self):
         self.logger.info(f"Running {self.make}.")
-        cls = ORCHESTRATED_MAKES[self.make][1]   
+        cls = ORCHESTRATED_MAKES[self.make][1]
         rph = cls(make=self.make, spark=self.spark, logger=self.logger).data.toPandas()
 
-        rweek =  (
+        rweek = (
             rph
             # Some raw estimations may have inf values, this will make mask_out_outliers_by_interquartile_range and force_monotonic_decrease fail
             # So we replace them by NaNs.
             .pipe(self._replace_inf_soh)
             .sort_values(["VIN", "DATETIME_BEGIN"])
-            .pipe(self._make_charge_levels_presentable if self.has_levels else (lambda rph: rph))
+            .pipe(
+                self._make_charge_levels_presentable
+                if self.has_levels
+                else (lambda rph: rph)
+            )
             .eval(SOH_FILTER_EVAL_STRINGS[self.make])
             .pipe(self._agg_results_by_update_frequency)
-            .groupby('VIN', observed=True)
+            .groupby("VIN", observed=True)
             .apply(self._make_soh_presentable_per_vehicle, include_groups=False)
             .reset_index(level=0)
             .sort_values(["VIN", "DATE"])
         )
-        
+
         if self.has_soh:
             rweek["SOH"] = rweek.groupby("VIN", observed=True)["SOH"].ffill()
             rweek["SOH"] = rweek.groupby("VIN", observed=True)["SOH"].bfill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].ffill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].bfill()
 
-        rweek['CONSUMPTION'] = rweek.apply(lambda row: row['CONSUMPTION'] * row['SOH'] if row['SOH'] is not None else row['CONSUMPTION'], axis=1)
+        rweek["CONSUMPTION"] = rweek.apply(
+            lambda row: (
+                row["CONSUMPTION"] * row["SOH"]
+                if row["SOH"] is not None
+                else row["CONSUMPTION"]
+            ),
+            axis=1,
+        )
 
         return rweek
 
@@ -78,7 +85,9 @@ class ResultPhaseToResultWeek():
 
     def _make_charge_levels_presentable(self, results: pd.DataFrame) -> pd.DataFrame:
         level_columns = ["LEVEL_1", "LEVEL_2", "LEVEL_3"]
-        existing_level_columns = [col for col in level_columns if col in results.columns]
+        existing_level_columns = [
+            col for col in level_columns if col in results.columns
+        ]
 
         if not existing_level_columns:
             return results
@@ -87,8 +96,12 @@ class ResultPhaseToResultWeek():
 
         nb_negative_levels = negative_charge_levels.sum().sum()
         if nb_negative_levels > 0:
-            self.logger.warning(f"There are {nb_negative_levels}({100*nb_negative_levels/len(results):2f}%) negative charge levels, setting them to 0.")
-        results[["LEVEL_1", "LEVEL_2", "LEVEL_3"]] = results[["LEVEL_1", "LEVEL_2", "LEVEL_3"]].mask(negative_charge_levels, 0)
+            self.logger.warning(
+                f"There are {nb_negative_levels}({100*nb_negative_levels/len(results):2f}%) negative charge levels, setting them to 0."
+            )
+        results[["LEVEL_1", "LEVEL_2", "LEVEL_3"]] = results[
+            ["LEVEL_1", "LEVEL_2", "LEVEL_3"]
+        ].mask(negative_charge_levels, 0)
 
         return results
 
@@ -101,8 +114,7 @@ class ResultPhaseToResultWeek():
             pd.to_datetime(results["DATETIME_BEGIN"], format="mixed")
             .dt.floor(UPDATE_FREQUENCY)
             .dt.tz_localize(None)
-            .dt.date
-            .astype("datetime64[ns]")
+            .dt.date.astype("datetime64[ns]")
         )
 
         agg_spec = {
@@ -138,33 +150,49 @@ class ResultPhaseToResultWeek():
             if src_col in results.columns
         }
 
-        if self.make != 'bmw':
-            agg_dict["CONSUMPTION"] = pd.NamedAgg("CONSUMPTION", weighted_consumption) # Ponderate consumption by ODOMETER_DIFF
+        if self.make != "bmw":
+            agg_dict["CONSUMPTION"] = pd.NamedAgg(
+                "CONSUMPTION", weighted_consumption
+            )  # Ponderate consumption by ODOMETER_DIFF
         else:
             agg_dict["CONSUMPTION"] = pd.NamedAgg("CONSUMPTION", "median")
-            
+
         assign_cols = ["LEVEL_1", "LEVEL_2", "LEVEL_3"]
-        num_cols = ["SOH", "SOH_OEM", "CONSUMPTION", "LEVEL_1", "LEVEL_2", "LEVEL_3", "ODOMETER_LAST", "ODOMETER_DIFF"]
+        num_cols = [
+            "SOH",
+            "SOH_OEM",
+            "CONSUMPTION",
+            "LEVEL_1",
+            "LEVEL_2",
+            "LEVEL_3",
+            "ODOMETER_LAST",
+            "ODOMETER_DIFF",
+        ]
 
         for col in num_cols:
             if col in results.columns:
                 results[col] = pd.to_numeric(results[col], errors="coerce")
-            
+
         return (
             results.assign(
-                **{col: results[col].fillna(0) for col in assign_cols if col in results.columns}
+                **{
+                    col: results[col].fillna(0)
+                    for col in assign_cols
+                    if col in results.columns
+                }
             )
             .groupby(["VIN", "DATE"], observed=True, as_index=False)
             .agg(**agg_dict)
         )
-        
 
-    def _make_soh_presentable_per_vehicle(self, df:pd.DataFrame) -> pd.DataFrame:
+    def _make_soh_presentable_per_vehicle(self, df: pd.DataFrame) -> pd.DataFrame:
         if df["SOH"].isna().all():
             return df
         if df["SOH"].count() > 3:
             outliser_mask = mask_out_outliers_by_interquartile_range(df["SOH"])
-            assert outliser_mask.any(), f"There seems to be only outliers???:\n{df['SOH']}."
+            assert (
+                outliser_mask.any()
+            ), f"There seems to be only outliers???:\n{df['SOH']}."
             df = df[outliser_mask].copy()
         if df["SOH"].count() >= 2:
             df["SOH"] = force_decay(df[["SOH", "ODOMETER"]])
