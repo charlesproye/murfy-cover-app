@@ -83,9 +83,10 @@ def scrape_all_cars(max_pages=None, delay=1):
         
         if delay > 0:
             time.sleep(delay)
-    
-    print(f"Terminé! Total: {len(all_links)} liens uniques")
-    return sorted(all_links)
+
+        if len(page_links) != 20 :
+            print(f"Terminé! Total: {len(all_links)} liens uniques")
+            return sorted(all_links)
 
 def extract_autonomy_wltp(soup):
     """Récupère l'autonomie WLTP ou temps doux depuis le div spécifique."""
@@ -195,7 +196,7 @@ def get_car_infos(url):
     return result
 if __name__ == "__main__":
 
-    all_car_link = scrape_all_cars(max_pages=100, delay=1)
+    all_car_link = scrape_all_cars(max_pages=5, delay=1)
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0,:7], data=data_sheet[1:,:7])
     try:
