@@ -25,18 +25,15 @@ HEADERS = {
 }
 
 def build_page_url(base_url, page_number):
-    """Construit l'URL pour une page spécifique"""
     parsed_url = urlparse(base_url)
     query_params = parse_qs(parsed_url.query)
     query_params['page'] = [str(page_number)]
     return f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}?{urlencode(query_params, doseq=True)}"
 
 def is_car_link(url):
-    """Vérifie si l'URL est un lien vers une voiture"""
     return bool(re.search(r'/voitures-electriques/\d+', url))
 
 def get_car_links_from_page(url):
-    """Récupère les liens de voitures d'une page"""
     try:
         resp = requests.get(url, headers=HEADERS, timeout=20)
         resp.raise_for_status()
@@ -51,22 +48,20 @@ def get_car_links_from_page(url):
         return links, soup
     
     except Exception as e:
-        print(f"Erreur sur {url}: {e}")
+        print(f"Error on {url}: {e}")
         return set(), None
 
 def scrape_all_cars(max_pages=None, delay=1):
-    """Scrape tous les liens de voitures sur toutes les pages"""
     all_links = set()
     
-    print("Analyse de la première page...")
     first_links, first_soup = get_car_links_from_page(URL)
     
     if not first_soup:
-        print("Erreur: impossible de récupérer la première page")
+        print("Can't get firts page")
         return []
     
     all_links.update(first_links)
-    print(f"Page 1: {len(first_links)} liens trouvés")
+    print(f"Page 1: {len(first_links)} links found")
     
     for page in range(2, max_pages + 1):
         print(f"Page {page}...")
@@ -75,21 +70,19 @@ def scrape_all_cars(max_pages=None, delay=1):
         page_links, _ = get_car_links_from_page(page_url)
         
         if not page_links:
-            print(f"Aucun lien trouvé page {page}, arrêt")
+            print(f"No link found {page}")
             break
         
         all_links.update(page_links)
-        print(f"Page {page}: {len(page_links)} liens trouvés")
+        print(f"Page {page}: {len(page_links)} link found")
         
         if delay > 0:
             time.sleep(delay)
 
         if len(page_links) != 20 :
-            print(f"Terminé! Total: {len(all_links)} liens uniques")
             return sorted(all_links)
 
 def extract_autonomy_wltp(soup):
-    """Récupère l'autonomie WLTP ou temps doux depuis le div spécifique."""
     div = soup.find("div", class_="text-sm font-semibold text-gray-900 group-hover:text-green-600 transition-colors")
     if div:
         text = div.get_text(strip=True)
