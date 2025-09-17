@@ -23,6 +23,7 @@ class FordCharging(msgspec.Struct):
     battery_level: Optional[HMApiValue[float]] = None
     charge_limit: Optional[HMApiValue[float]] = None
     charger_voltage: Optional[HMApiValue[float]] = None
+    charging_current: Optional[HMApiValue[float]] = None
     time_to_complete_charge: Optional[HMApiValue[DataWithUnit[float]]] = None  # Changed
     status: Optional[HMApiValue[str]] = None
     battery_performance_status: Optional[HMApiValue[str]] = None
