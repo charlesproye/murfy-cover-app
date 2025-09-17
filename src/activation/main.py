@@ -15,6 +15,7 @@ from activation.services.vehicle_processor import VehicleProcessor
 from activation.fleet_info import read_fleet_info as fleet_info
 from activation.api.renault_client import RenaultApi
 from activation.api.volkswagen_client import VolkswagenApi
+from activation.api.kia_client import KiaApi
 
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
@@ -44,16 +45,15 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             fleet_id=STELLANTIS_FLEET_ID,
             company_id=STELLANTIS_COMPANY_ID
         )
-        # tesla_api = TeslaApi(
-        #     base_url=TESLA_BASE_URL,
-        #     slack_token=SLACK_TOKEN,
-        #     slack_channel_id=SLACK_CHANNEL_ID
-        # )
-        # tesla_particulier_api = TeslaParticulierApi(
-        #     base_url=TESLA_BASE_URL,
-        #     token_url= TESLA_TOKEN_URL,
-        #     client_id=TESLA_CLIENT_ID,
-        # )
+
+        kia_api = KiaApi(
+            auth_url=KIA_AUTH_URL,
+            base_url=KIA_BASE_URL,
+            client_username=KIA_API_USERNAME,
+            client_pwd=KIA_API_PWD,
+            api_key=KIA_API_KEY
+        )
+
         renault_api = RenaultApi(
             kid=RENAULT_KID,
             aud=RENAULT_AUD,
@@ -69,6 +69,17 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             client_username=VW_CLIENT_USERNAME,
             client_password=VW_CLIENT_PASSWORD
         )
+
+        # tesla_api = TeslaApi(
+        #     base_url=TESLA_BASE_URL,
+        #     slack_token=SLACK_TOKEN,
+        #     slack_channel_id=SLACK_CHANNEL_ID
+        # )
+        # tesla_particulier_api = TeslaParticulierApi(
+        #     base_url=TESLA_BASE_URL,
+        #     token_url= TESLA_TOKEN_URL,
+        #     client_id=TESLA_CLIENT_ID,
+        # )
 
         # Get initial fleet info
         df = await fleet_info(owner_filter=owner_filter)

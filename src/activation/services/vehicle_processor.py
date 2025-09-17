@@ -1,3 +1,4 @@
+from ast import mod
 import logging
 from re import S
 import aiohttp
@@ -305,6 +306,9 @@ class VehicleProcessor:
                         version = 'unknown'
                         logging.info(f"Processing vehicle {vehicle['vin']} | {model_name} | {model_type} | {version}")
                         model_id = mapping_vehicle_type(model_type, vehicle['make'], model_name, model_existing)
+                        logging.info(f"Model ID: {model_id}")
+                        
+
                         if not vehicle_exists:
                             vehicle_id = str(uuid.uuid4())
                             insert_query = """

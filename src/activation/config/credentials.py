@@ -38,6 +38,13 @@ VW_CLIENT_USERNAME = get_env_var('VW_CLIENT_USERNAME')
 VW_CLIENT_PASSWORD = get_env_var('VW_CLIENT_PASSWORD')
 VW_ORGANIZATION_ID = get_env_var('VW_ORGANIZATION_ID')
 
+
+KIA_AUTH_URL = get_env_var('KIA_AUTH_URL')
+KIA_BASE_URL = get_env_var('KIA_BASE_URL')
+KIA_API_USERNAME = get_env_var('KIA_API_USERNAME')
+KIA_API_PWD = get_env_var('KIA_API_PWD')
+KIA_API_KEY = get_env_var('KIA_API_KEY')
+
 # TESLA_BASE_URL = get_env_var('TESLA_BASE_URL')
 # TESLA_TOKEN_URL = get_env_var('TESLA_TOKEN_URL')
 # TESLA_CLIENT_ID = get_env_var('TESLA_CLIENT_ID')

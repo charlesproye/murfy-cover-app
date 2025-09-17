@@ -496,7 +496,6 @@ class VehicleActivationService:
                                     api_detail_trad = REASON_MAPPING['high-mobility']['unspecified']
                                 else:
                                     api_detail_trad = ''
-                                
 
                                 vehicle_data = {
                                     "vin": vin,
