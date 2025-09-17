@@ -95,6 +95,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             # tesla_particulier_api=None,
             renault_api=renault_api,
             volkswagen_api=volkswagen_api,
+            kia_api=kia_api,
             fleet_info_df=df
         )
 
@@ -104,6 +105,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             activation_service.activation_hm(),
             activation_service.activation_stellantis(),
             activation_service.activation_volkswagen()
+            # activation_service.activation_kia()
         )
 
 

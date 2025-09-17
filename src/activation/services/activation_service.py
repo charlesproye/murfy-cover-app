@@ -12,6 +12,7 @@ from activation.api.hm_client import HMApi
 from activation.api.renault_client import RenaultApi
 from activation.api.stellantis_client import StellantisApi
 from activation.api.volkswagen_client import VolkswagenApi
+from activation.api.kia_client import KiaApi
 from activation.config.settings import ACTIVATION_TIMEOUT
 from activation.services.google_sheet_service import \
     update_vehicle_activation_data
@@ -30,14 +31,52 @@ class VehicleActivationService:
         stellantis_api: StellantisApi,
         renault_api: RenaultApi,
         volkswagen_api: VolkswagenApi,
+        kia_api: KiaApi,
         fleet_info_df: pd.DataFrame,
     ):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
         self.renault_api = renault_api
+        self.kia_api = kia_api
         self.fleet_info_df = fleet_info_df
         self.volkswagen_api = volkswagen_api
+
+    async def _get_current_states_kia(self, session: aiohttp.ClientSession, vins: list[str]):
+        """Get the current states of a list of vins."""
+
+            current_states_vehicle = await self.kia_api._get_status_consent_type(
+                session, ['vehicle']
+            )['body']['results']
+
+            current_states_dtc = await self.kia_api._get_status_consent_type(
+                session, ['dtcInfo']
+            )['body']['results']
+
+
+            merged = {}
+
+            for vin in vins:
+                merged[vin] = {'vehicle': False, 'dtcInfo': False}
+
+
+            for el in current_states_vehicle:
+                merged[el["vin"]]['vehicle'] = True
+            for el in current_states_dtc:
+                merged[el["vin"]]['dtcInfo'] = True
+            
+            for vin in merged.keys():
+                merged[vin]['status_bool'] = True if merged[vin]['vehicle'] and merged[vin]['dtcInfo'] else False
+                if merged[vin]['vehicle'] and (not merged[vin]['dtcInfo']):
+                    merged[vin]['reason'] = 'Package véhicule activé mais pas dtcInfo'
+                elif merged[vin]['dtcInfo'] and (not merged[vin]['vehicle']):
+                    merged[vin]['reason'] = 'Package dtcInfo activé mais pas véhicule'
+                elif(not merged[vin]['dtcInfo']) and (not merged[vin]['vehicle']):
+                    merged[vin]['reason'] = 'Package dtcInfo activé mais pas véhicule'
+                else:
+                    merged[vin]['reason'] = ''
+
+            return merged
 
     async def _add_to_fleet(
         self, vin: str, session: aiohttp.ClientSession
@@ -319,7 +358,6 @@ class VehicleActivationService:
         status_df = pd.DataFrame(status_data)
         await update_vehicle_activation_data(status_df)
 
-
     async def activation_bmw(self):
         """Process BMW vehicle activation/deactivation."""
         df_bmw = self.fleet_info_df[self.fleet_info_df["oem"] == "bmw"]
@@ -436,7 +474,7 @@ class VehicleActivationService:
     async def activation_hm(self):
         """Process High Mobility vehicle activation/deactivation."""
         df_hm = self.fleet_info_df[
-            self.fleet_info_df["oem"].isin(["renault", 'ford', 'mercedes', 'kia', 'volvo'])
+            self.fleet_info_df["oem"].isin(["renault", 'ford', 'mercedes', 'volvo', 'kia'])
         ] 
         status_data = []
         async with aiohttp.ClientSession() as session:
@@ -691,6 +729,140 @@ class VehicleActivationService:
                     "vin": vin,
                     "Eligibility": safe_bool(info.get("status_bool")),
                     "Real_Activation": safe_bool(info.get("status_bool")),
+                    "Activation_Error": "",
+                    "API_Detail": "",
+                }
+                status_data.append(vehicle_data)
+
+        # --- Cleaning before sending to Google Sheets ---
+        status_df = pd.DataFrame(status_data)
+        status_df = status_df.replace([None, float("inf"), float("-inf")], "")
+        status_df = status_df.where(pd.notnull(status_df), "")
+
+        await update_vehicle_activation_data(status_df)
+
+    async def activation_kia(self):
+        """Process KIA vehicle activation/deactivation with safe values for Google Sheets."""
+
+        def safe_bool(val):
+            """Convert None/NaN to empty string, keep True/False as-is."""
+            if val is True:
+                return True
+            if val is False:
+                return False
+            return ""
+
+        df_kia = self.fleet_info_df[self.fleet_info_df["oem"] == "kia"]
+
+        status_data = []
+
+        async with aiohttp.ClientSession() as session:
+            desired_states = {
+                vin: {"desired_state": desired_state}
+                for vin, desired_state in zip(
+                    df_kia["vin"].tolist(), df_kia["activation"].tolist()
+                )
+            }
+
+            merged = await self._get_current_states_kia(session, desired_states.keys())
+
+            merged_states = {
+                vin: {
+                    "desired_state": desired_states[vin]["desired_state"],
+                    "current_state": merged[vin]['status_bool'],
+                    "current_state_status": merged[vin]['reason'],
+                }
+                for vin in merged.keys()
+            }
+
+            vins_in_desired_state = {
+                vin: info
+                for vin, info in merged_states.items()
+                if info["desired_state"] == info["current_state"]
+            }
+
+            vins_to_activate = [
+                vin
+                for vin, info in merged_states.items()
+                if info["desired_state"] is True and info["current_state"] is False
+            ]
+
+            vins_to_deactivate = [
+                vin
+                for vin, info in merged_states.items()
+                if info["desired_state"] is False and info["current_state"] is True
+            ]
+
+            logging.info("\KIA STATUS UPDATE : Starting")
+            for vin, info in vins_in_desired_state.items():
+                logging.info(
+                    f"KIA vehicle {vin} already in desired state: {info['desired_state']}"
+                )
+                vehicle_data = {
+                    "vin": vin,
+                    "Eligibility": safe_bool(info["current_state"]),  # VW confond eligibility & activation
+                    "Real_Activation": safe_bool(info["current_state"]),
+                    "Activation_Error": "",
+                    "API_Detail": "",
+                }
+                status_data.append(vehicle_data)
+
+            # --- Activation ---
+            logging.info("\KIA ACTIVATION : Starting")
+            
+            await self.kia_api._activate_vins(
+                session, vins_to_activate
+            )
+
+            activated_current_states = await self._get_current_states_kia(session, vins_to_activate)
+
+            for vin in vins_to_activate:
+                logging.info(
+                    f"Update Kia vehicle that has just been activated {vin} : {info['status_bool']}"
+                )
+
+                if vin not in activated_current_states.keys():
+                    vehicle_data = {
+                        "vin": vin,
+                        "Eligibility": False,
+                        "Real_Activation": False,
+                        "Activation_Error":"vin not eligible for data sharing",
+                        "API_Detail": "Le vin n'est pas éligible pour le partage de données, VIN erroné ou d'une version non prise en charge",
+                    }
+                
+                else:
+                    info = activated_current_states[vin]
+
+                    if info['status_bool']:
+                        vehicle_data = {
+                            "vin": vin,
+                            "Eligibility": True,
+                            "Real_Activation": True,
+                            "Activation_Error": "",
+                            "API_Detail": "",
+                        }
+                    else:
+                        vehicle_data = {
+                            "vin": vin,
+                            "Eligibility": True,
+                            "Real_Activation": False,
+                            "Activation_Error": info['reason'],
+                            "API_Detail": info['reason'],
+                        }
+                status_data.append(vehicle_data)
+
+            # --- Deactivation ---
+            logging.info("\nKIA DEACTIVATION : Starting")
+            await self.kia_api.delete_consent(session, vins_to_deactivate)
+
+            for vin, info in deactivated_current_states.items():
+                logging.info(
+                    f"Update KIA vehicle that has just been deactivated {vin} : {info['status_bool']}"
+                )
+                vehicle_data = {
+                    "vin": vin,
+                    "Eligibility": True,
+                    "Real_Activation": False,
                     "Activation_Error": "",
                     "API_Detail": "",
                 }

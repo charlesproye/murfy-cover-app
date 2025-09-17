@@ -60,8 +60,6 @@ class KiaApi:
             "apiType": "real_time"
         }
 
-        print(self._access_token)
-
         headers = {
             "Content-Type": "application/json",
             "x-api-key": self.api_key,

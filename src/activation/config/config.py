@@ -1,7 +1,4 @@
 REASON_MAPPING = {
-    "kia": {
-        "vin not eligible for data sharing": "Le vin n'est pas éligible pour le partage de données, VIN erroné ou d'une version non prise en charge"
-    },
     "bmw": {
         "BMWFD_VEHICLE_NOT_ALLOWED": "Le véhicule n’est pas éligible à l’activation."
     },
