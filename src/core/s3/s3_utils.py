@@ -94,7 +94,11 @@ class S3Service():
                 processed, df = align_dataframes_for_union(
                     processed, df, strategy="union"
                 )
-                df_write = processed.union(df).dropDuplicates()
+
+                if 'DATETIME_BEGIN' in processed.columns and 'DATETIME_BEGIN' in df.columns:
+                    df_write = processed.union(df).dropDuplicates(['VIN', 'DATETIME_BEGIN'])
+                else:
+                    df_write = processed.union(df).dropDuplicates()
 
             else:
                 df_write = df

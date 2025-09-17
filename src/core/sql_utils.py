@@ -9,6 +9,8 @@ from .pandas_utils import *
 from .config import DB_URI_FORMAT_KEYS, DB_URI_FORMAT_STR, DB_URI_FORMAT_KEYS_PROD, DB_URI_FORMAT_STR_PROD
 from .env_utils import get_env_var
 import uuid
+from decimal import Decimal, ROUND_HALF_UP
+
 
 logger = getLogger("core.sql_utils")
 
@@ -95,4 +97,101 @@ def truncate_rdb_table_and_insert_df(
     with engine.begin() as conn:  
         conn.execute(text(f"DELETE FROM {table_name}"))  # Delete all rows
         df.to_sql(table_name, conn, if_exists="append", index=False)
+    return df
+
+def insert_df_and_deduplicate(
+    df: pd.DataFrame,
+    table_name: str,
+    key_cols: list[str],
+    src_dest_cols: dict[str, str] | list[str],
+    logger: Logger,
+    uuid_cols: list[str] = [],
+    batch_size: int = 5000,
+    is_prod: bool = False,
+    keep_col: str = "created_at"  # colonne pour garder la dernière ligne
+):
+    """
+    Insert a Pandas DataFrame into a Postgres table and remove duplicates.
+
+    - Inserts all rows in batches
+    - Deduplicates table on key_cols keeping the last row by keep_col
+    - Handles UUID columns and mandatory 'id'
+    - Clips numeric columns to avoid NumericValueOutOfRange
+    """
+
+    logger.debug(f"Inserting into {table_name} in batches of {batch_size} (deduplicating after).")
+
+    # Normalize column mapping
+    if isinstance(src_dest_cols, list):
+        src_dest_cols = dict(zip(src_dest_cols, src_dest_cols))
+    df = df.rename(columns=src_dest_cols)
+
+    df = df.dropna(subset=['vehicle_id'], how="any")
+
+    # Keep only the columns that exist in destination
+    df = df[list(src_dest_cols.values())]
+
+    logger.debug(f'"id" column is mandatory in {table_name} but missing. Adding UUIDs.')
+    df['id'] = [str(uuid.uuid4()) for _ in range(len(df))]
+
+
+    # Cast UUID columns to string
+    for col in uuid_cols:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: str(x) if pd.notna(x) else None)
+
+    engine = get_sqlalchemy_engine(is_prod)
+
+    # Optional: Clip numeric columns based on Postgres precision/scale
+    numeric_info = pd.read_sql(
+        f"""
+        SELECT column_name, numeric_precision, numeric_scale
+        FROM information_schema.columns
+        WHERE table_name = '{table_name}' AND data_type = 'numeric';
+        """,
+        engine
+    )
+    numeric_map = {
+        row['column_name']: (row['numeric_precision'], row['numeric_scale'])
+        for _, row in numeric_info.iterrows()
+        if row['column_name'] in df.columns
+    }
+    for col, (prec, scale) in numeric_map.items():
+        if prec and scale:
+            max_value = 10 ** (prec - scale) - 10 ** (-scale)
+            min_value = -max_value
+            df[col] = df[col].apply(lambda x: None if pd.isna(x)
+                                     else float(Decimal(x).quantize(Decimal(f"1.{'0'*scale}"), rounding=ROUND_HALF_UP)))
+            df[col] = df[col].clip(lower=min_value, upper=max_value)
+
+    # Insert in batches
+    for start in range(0, len(df), batch_size):
+        df_batch = df.iloc[start:start + batch_size]
+        logger.debug(f"Inserting batch {start}-{start + len(df_batch)}...")
+        with engine.begin() as conn:
+            df_batch.to_sql(table_name, conn, if_exists="append", index=False)
+
+    # Deduplicate table
+    key_cols_sql = ", ".join(key_cols)
+    dedup_sql = f"""
+    WITH duplicates AS (
+        SELECT
+            ctid,
+            ROW_NUMBER() OVER (
+                PARTITION BY {key_cols_sql}
+                ORDER BY {keep_col} DESC
+            ) AS rn
+        FROM {table_name}
+    )
+    DELETE FROM {table_name}
+    WHERE ctid IN (
+        SELECT ctid
+        FROM duplicates
+        WHERE rn > 1
+    );
+    """
+    logger.debug(f"Removing duplicates in {table_name} keeping last by {keep_col}...")
+    with engine.begin() as conn:
+        conn.execute(text(dedup_sql))
+
     return df

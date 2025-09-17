@@ -171,9 +171,9 @@ class VehicleProcessor:
                 with get_connection() as con:
                     cursor = con.cursor()
                     cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
-                                                                join make m on vm.make_id=m.id
-                                                                join battery b on b.id=vm.battery_id
-                                                                join oem o on o.id = vm.oem_id 
+                                                                left join make m on vm.make_id=m.id
+                                                                left join battery b on b.id=vm.battery_id
+                                                                left join oem o on o.id = vm.oem_id 
                                                                 where oem_name='renault';""")
                     model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
                     
@@ -230,9 +230,9 @@ class VehicleProcessor:
                 with get_connection() as con:
                     cursor = con.cursor()
                     cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
-                                                                join make m on vm.make_id=m.id
-                                                                join battery b on b.id=vm.battery_id
-                                                                join oem o on o.id = vm.oem_id 
+                                                                left join make m on vm.make_id=m.id
+                                                                left join battery b on b.id=vm.battery_id
+                                                                left join oem o on o.id = vm.oem_id 
                                                                 where oem_name='bmw';""")
                     model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
                     
@@ -292,8 +292,8 @@ class VehicleProcessor:
             with get_connection() as con:
                 cursor = con.cursor()
                 cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
-                                                                join make m on vm.make_id=m.id
-                                                                join battery b on b.id=vm.battery_id""")
+                                                                left join make m on vm.make_id=m.id
+                                                                left join battery b on b.id=vm.battery_id""")
                 model_existing =  pd.DataFrame(cursor.fetchall(), columns=["model_name", "id", "type",  "commissioning_date", "vm.end_of_life_date", "make_name", "capacity"])
                 for _, vehicle in other_df.iterrows():
                     try:
@@ -304,7 +304,7 @@ class VehicleProcessor:
                         model_name = vehicle['model'] if vehicle['model'] is not None else 'unknown'
                         model_type = vehicle['type'] if vehicle['type'] is not None else 'unknown'
                         version = 'unknown'
-                        logging.info(f"Processing vehicle {vehicle['vin']} | {model_name} | {model_type} | {version}")
+                        logging.info(f"Processing vehicle {vehicle['vin']} | {vehicle['make']} | {model_name} | {model_type} | {version}")
                         model_id = mapping_vehicle_type(model_type, vehicle['make'], model_name, model_existing)
                         logging.info(f"Model ID: {model_id}")
                         
