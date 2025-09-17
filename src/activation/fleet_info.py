@@ -220,7 +220,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     if 'oem' in df.columns:
         df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
     
-    df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].apply(lambda x: x.str.lower())
+    df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].astype(str).apply(lambda x: x.str.lower())
     
     # Convert dates with explicit format handling
     date_columns = ['start_date', 'end_of_contract']
