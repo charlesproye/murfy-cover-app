@@ -7,7 +7,7 @@ from pyspark.sql import SparkSession
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
-from core.stats_utils import (force_decay, make_weighted_avg,
+from core.stats_utils import (force_decay,
                               mask_out_outliers_by_interquartile_range)
 from transform.result_phases.main import *
 from transform.result_week.config import *
