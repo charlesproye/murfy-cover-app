@@ -4,7 +4,6 @@ import logging
 from typing import Annotated, Iterable
 import aioboto3
 from botocore.exceptions import ClientError
-from fastapi import Depends
 from .settings import S3Settings
 
 class AsyncS3:
@@ -131,4 +130,3 @@ class AsyncS3:
 def get_async_s3() -> AsyncS3:
     return AsyncS3()
 
-AsyncS3Dep = Annotated[AsyncS3,Depends(get_async_s3)]
