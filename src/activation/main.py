@@ -46,13 +46,13 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             company_id=STELLANTIS_COMPANY_ID
         )
 
-        kia_api = KiaApi(
-            auth_url=KIA_AUTH_URL,
-            base_url=KIA_BASE_URL,
-            client_username=KIA_API_USERNAME,
-            client_pwd=KIA_API_PWD,
-            api_key=KIA_API_KEY
-        )
+        # kia_api = KiaApi(
+        #     auth_url=KIA_AUTH_URL,
+        #     base_url=KIA_BASE_URL,
+        #     client_username=KIA_API_USERNAME,
+        #     client_pwd=KIA_API_PWD,
+        #     api_key=KIA_API_KEY
+        # )
 
         renault_api = RenaultApi(
             kid=RENAULT_KID,
@@ -95,7 +95,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             # tesla_particulier_api=None,
             renault_api=renault_api,
             volkswagen_api=volkswagen_api,
-            kia_api=kia_api,
+            # kia_api=kia_api,
             fleet_info_df=df
         )
 
