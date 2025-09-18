@@ -1,5 +1,4 @@
 import logging
-from this import d
 from typing import Optional, Tuple
 import logging
 import aiohttp
@@ -113,7 +112,7 @@ class VehicleActivationService:
                         target_fleet_id_bib = fleet["fleet_id"]
                         break
                 warning_msg = f"Fleet {target_fleet_name} not found, adding to bib fleet"
-                logging.warning(error_msg)
+                logging.warning(warning_msg)
                 target_fleet_id = target_fleet_id_bib
 
             status_code, result = await self.bmw_api.add_vehicle_to_fleet(
@@ -793,7 +792,7 @@ class VehicleActivationService:
                 if info["desired_state"] is False and info["current_state"] is True
             ]
 
-            logging.info("\KIA STATUS UPDATE : Starting")
+            logging.info("KIA STATUS UPDATE : Starting")
             for vin, info in vins_in_desired_state.items():
                 logging.info(
                     f"KIA vehicle {vin} already in desired state: {info['desired_state']}"

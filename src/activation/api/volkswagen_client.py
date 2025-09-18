@@ -132,7 +132,7 @@ class VolkswagenApi:
 
         # Préparer la liste des confirmations
         payload = {
-            "vehicle-comfirmations": [
+            "vehicle-confirmations": [
                 {"vin": el['vin'], "verification-code": el['verification-code']} 
                 for el in response_approval
             ]
