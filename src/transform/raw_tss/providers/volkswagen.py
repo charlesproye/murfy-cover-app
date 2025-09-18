@@ -3,6 +3,7 @@ from typing import Optional
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import first
+from pyspark.sql.types import StructType, StructField, ArrayType
 
 from transform.raw_tss.response_to_raw import ResponseToRawTss
 
@@ -57,4 +58,20 @@ class VolkswagenResponseToRaw(ResponseToRawTss):
         grouped = parsed.groupBy("vin", "date").agg(*aggregations)
 
         return grouped
+
+
+    def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict):
+        """
+        Transforme un dict {colonne: type} en StructType Spark.
+        Si field_def est défini, emballe le StructType interne dans un ArrayType sous ce nom.
+        """
+        sp_schema = StructType([
+            StructField(col, parse_type_map[tp], True)
+            for col, tp in field_def.items()
+        ])
+        
+        return StructType([
+            StructField("data", ArrayType(sp_schema), True)
+        ])
+
 

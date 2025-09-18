@@ -86,6 +86,7 @@ class CachedETLSpark(ABC):
         settings: S3Settings = S3Settings(),
         spark: SparkSession = None,
         writing_mode: Optional[str] = None,
+        repartition_key: Optional[str] = 'vin',
         **kwargs,
     ):
         """
@@ -124,7 +125,7 @@ class CachedETLSpark(ABC):
                 if writing_mode == "append":
                     bucket.append_spark_df_to_parquet(self.data, path, self.spark)
                 else:
-                    bucket.save_df_as_parquet_spark(self.data, path, self.spark)
+                    bucket.save_df_as_parquet_spark(self.data, path, self.spark, repartition_key)
             elif on == "local_storage":
                 self.data.write.parquet(path)
         else:
