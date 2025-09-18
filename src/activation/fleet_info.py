@@ -9,10 +9,8 @@ from gspread import Cell
 import re
 
 
-from src.core.pandas_utils import *
-from src.core.s3.s3_utils import S3Service
-from src.core.singleton_s3_bucket import S3
-from src.core.config import *
+from core.pandas_utils import *
+from core.config import *
 from core.gsheet_utils import get_google_client
 from .config.credentials import SPREADSHEET_ID 
 from .config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
@@ -62,7 +60,7 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
             logger.error(f"Failed to fetch data after {max_retries} attempts. Last error: {str(last_error)}")
             raise
 
-def safe_astype(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
+def safe_astype_activation(df: pd.DataFrame, dtypes: Dict[str, Any]) -> pd.DataFrame:
     """Safely convert DataFrame columns to specified types.
     
     Args:
@@ -222,7 +220,7 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     if 'oem' in df.columns:
         df['oem'] = df['oem'].apply(lambda x: OEM_MAPPING.get(x, x.lower()) if pd.notna(x) else x)
     
-    df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].apply(lambda x: x.str.lower())
+    df[['oem', 'make','model','type']] = df[['oem', 'make','model','type']].astype(str).apply(lambda x: x.str.lower())
     
     # Convert dates with explicit format handling
     date_columns = ['start_date', 'end_of_contract']
