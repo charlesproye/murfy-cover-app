@@ -118,6 +118,12 @@ class ResultPhaseToResultWeek():
 
         assign_cols = ["LEVEL_1", "LEVEL_2", "LEVEL_3"]
 
+        num_cols = ["SOH", "SOH_OEM", "CONSUMPTION", "LEVEL_1", "LEVEL_2", "LEVEL_3", "ODOMETER_LAST"]
+
+        for col in num_cols:
+            if col in results.columns:
+                results[col] = pd.to_numeric(results[col], errors="coerce")
+
         return (
             results
             .assign(**{

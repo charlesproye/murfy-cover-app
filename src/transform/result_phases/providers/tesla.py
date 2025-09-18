@@ -6,11 +6,11 @@ from transform.result_phases.config import LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
 from transform.result_phases.processed_phase_to_result_phase import ProcessedPhaseToResultPhase
 
 
-class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
+class TeslaProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
 
     def __init__(
         self,
-        make="tesla-fleet-telemetry",
+        make="tesla",
         spark: SparkSession = None,
         force_update: bool = False,
         logger: Logger = None,
@@ -23,23 +23,7 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
     
     def compute_specific_features(self, df_aggregated):
 
-        df_aggregated = df_aggregated.withColumn(
-            "CHARGING_POWER",
-            F.coalesce(F.col("AC_CHARGING_POWER_MEDIAN"), F.lit(0))
-            + F.coalesce(F.col("DC_CHARGING_POWER_MEDIAN"), F.lit(0)),
-        )
-
-        df_aggregated = (
-            df_aggregated.withColumn(
-                "AC_ENERGY_ADDED",
-                F.col("AC_ENERGY_ADDED_END") - F.col("AC_ENERGY_ADDED_MIN"),
-            )
-            .withColumn(
-                "DC_ENERGY_ADDED",
-                F.col("DC_ENERGY_ADDED_END") - F.col("DC_ENERGY_ADDED_MIN"),
-            )
-            .withColumn("ENERGY_ADDED", F.col("DC_ENERGY_ADDED"))
-        )
+        df_aggregated = df_aggregated.withColumn("ENERGY_ADDED", F.col("ENERGY_ADDED_END") - F.col("ENERGY_ADDED_MIN"))
 
         return df_aggregated
     
