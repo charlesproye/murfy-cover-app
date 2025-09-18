@@ -41,12 +41,6 @@ if selected_vin:
 
 # Colonnes à afficher
 columns_to_show = ["vin", "oem", "activation", "eligibility", "real_activation", "activation_error", "api_detail"]
-filtered_df = filtered_df[columns_to_show]
-
-filtered_df["interpretation"] = filtered_df.apply(
-    lambda row: REASON_MAPPING.get(row["oem"], {}).get(row["activation_error"], ""),
-    axis=1
-)
 
 
 # --- Transformer les booléens en ticks/croix ---
