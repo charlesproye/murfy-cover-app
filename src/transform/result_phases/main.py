@@ -1,4 +1,5 @@
 import logging
+from pickle import TRUE
 import sys
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
@@ -11,13 +12,13 @@ from transform.result_phases.providers.tesla_fleet_telemetry import TeslaFTProce
 from transform.result_phases.providers.tesla import TeslaProcessedPhaseToResultPhase
 
 ORCHESTRATED_MAKES = {
-    "bmw": (True, ProcessedPhaseToResultPhase),
-    "mercedes-benz": (True, ProcessedPhaseToResultPhase),
-    "renault": (True, RenaultProcessedPhaseToResultPhase),
-    "volvo-cars": (True, VolvoProcessedPhaseToResultPhase),
-    "stellantis": (True, StellantisProcessedPhaseToResultPhase),
-    "kia": (True, ProcessedPhaseToResultPhase),
-    "ford": (True, ProcessedPhaseToResultPhase),
+    "bmw": (False, ProcessedPhaseToResultPhase),
+    "mercedes-benz": (False, ProcessedPhaseToResultPhase),
+    "renault": (False, RenaultProcessedPhaseToResultPhase),
+    "volvo-cars": (False, VolvoProcessedPhaseToResultPhase),
+    "stellantis": (False, StellantisProcessedPhaseToResultPhase),
+    "kia": (False, ProcessedPhaseToResultPhase),
+    "ford": (False, ProcessedPhaseToResultPhase),
     "tesla-fleet-telemetry": (True, TeslaFTProcessedPhaseToResultPhase),
     "volkswagen": (True, ProcessedPhaseToResultPhase),
     "tesla": (False, TeslaProcessedPhaseToResultPhase),

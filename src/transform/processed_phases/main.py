@@ -17,13 +17,13 @@ from transform.processed_phases.providers.bmw import BMWRawTsToProcessedPhases
 ORCHESTRATED_MAKES = {
     "bmw": (False, BMWRawTsToProcessedPhases),
     "mercedes-benz": (False, MercedesBenzRawTsToProcessedPhases),
-    "renault": (False, RenaultRawTsToProcessedPhases),
+    "renault": (True, RenaultRawTsToProcessedPhases),
     "volvo-cars": (False, VolvoRawTsToProcessedPhases),
     "stellantis": (False, StellantisRawTsToProcessedPhases),
     "kia": (False, RawTsToProcessedPhases),
-    "ford": (True, FordRawTsToProcessedPhases),
-    "tesla-fleet-telemetry": (True, TeslaFTRawTsToProcessedPhases),
-    "volkswagen": (True, RawTsToProcessedPhases),
+    "ford": (False, FordRawTsToProcessedPhases),
+    "tesla-fleet-telemetry": (False, TeslaFTRawTsToProcessedPhases),
+    "volkswagen": (False, RawTsToProcessedPhases),
     "tesla": (False, TeslaRawTsToProcessedPhases),
 }
 
