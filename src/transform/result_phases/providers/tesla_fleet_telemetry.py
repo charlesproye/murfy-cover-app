@@ -90,12 +90,6 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
             )
         )
     
-    def compute_cycles(self, df_aggregated):
-        """
-        Compute the cycles
-        """
-
-        return df_aggregated
 
     def compute_soh(self, df_aggregated):
         """

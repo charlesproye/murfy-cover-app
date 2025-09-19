@@ -18,7 +18,7 @@ ORCHESTRATED_MAKES = {
     "ford": (True, True, False),
     "tesla-fleet-telemetry": (True, True, True),
     "volkswagen": (True, False, False),
-    "tesla": (True, True, True)
+    "tesla": (False, True, True)
 }
 
 VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
@@ -30,7 +30,7 @@ VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
     "LEVEL_3": "level_3",
     "vehicle_id": "vehicle_id",
     "DATE":"timestamp",
-    "CONSUMPTION": "consumption"
+    "CONSUMPTION": "consumption",
     "ESTIMATED_CYCLES": "cycles"
 }
 

@@ -6,7 +6,7 @@ from pyspark.sql import SparkSession
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
-from core.stats_utils import mask_out_outliers_by_interquartile_range, force_decay
+from core.stats_utils import mask_out_outliers_by_interquartile_range, force_decay, estimate_cycles
 
 from transform.result_week.config import *
 from transform.result_phases.main import *
@@ -109,7 +109,7 @@ class ResultPhaseToResultWeek():
             "LEVEL_2": ("LEVEL_2", "sum"),
             "LEVEL_3": ("LEVEL_3", "sum"),
             "CONSUMPTION": ("CONSUMPTION", "median"),
-            "AUTONOMY": ("AUTONOMY", "first")
+            "RANGE": ("RANGE", "first")
         }
 
         # Ne garder que les colonnes présentes
@@ -157,9 +157,9 @@ class ResultPhaseToResultWeek():
         """
 
         if 'SOH' in df.columns:
-                df["ESTIMATED_CYCLES"] = df.apply(lambda row: estimate_cycles(row["ODOMETER_FIRST"], row["RANGE"], row["SOH"]), axis=1)
+                df["ESTIMATED_CYCLES"] = df.apply(lambda row: estimate_cycles(row["ODOMETER"], row["RANGE"], row["SOH"]), axis=1)
         else:
-            df["ESTIMATED_CYCLES"] = df.apply(lambda row: estimate_cycles(row["ODOMETER_FIRST"], row["RANGE"]), axis=1)
+            df["ESTIMATED_CYCLES"] = df.apply(lambda row: estimate_cycles(row["ODOMETER"], row["RANGE"]), axis=1)
 
         return df
 
