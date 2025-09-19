@@ -43,39 +43,39 @@ class VehicleActivationService:
 
     async def _get_current_states_kia(self, session: aiohttp.ClientSession, vins: list[str]):
         """Get the current states of a list of vins."""
+        
+        current_states_vehicle = await self.kia_api._get_status_consent_type(
+            session, ['vehicle']
+        )['body']['results']
 
-            current_states_vehicle = await self.kia_api._get_status_consent_type(
-                session, ['vehicle']
-            )['body']['results']
-
-            current_states_dtc = await self.kia_api._get_status_consent_type(
-                session, ['dtcInfo']
-            )['body']['results']
-
-
-            merged = {}
-
-            for vin in vins:
-                merged[vin] = {'vehicle': False, 'dtcInfo': False}
+        current_states_dtc = await self.kia_api._get_status_consent_type(
+            session, ['dtcInfo']
+        )['body']['results']
 
 
-            for el in current_states_vehicle:
-                merged[el["vin"]]['vehicle'] = True
-            for el in current_states_dtc:
-                merged[el["vin"]]['dtcInfo'] = True
-            
-            for vin in merged.keys():
-                merged[vin]['status_bool'] = True if merged[vin]['vehicle'] and merged[vin]['dtcInfo'] else False
-                if merged[vin]['vehicle'] and (not merged[vin]['dtcInfo']):
-                    merged[vin]['reason'] = 'Package véhicule activé mais pas dtcInfo'
-                elif merged[vin]['dtcInfo'] and (not merged[vin]['vehicle']):
-                    merged[vin]['reason'] = 'Package dtcInfo activé mais pas véhicule'
-                elif(not merged[vin]['dtcInfo']) and (not merged[vin]['vehicle']):
-                    merged[vin]['reason'] = 'Package dtcInfo activé mais pas véhicule'
-                else:
-                    merged[vin]['reason'] = ''
+        merged = {}
 
-            return merged
+        for vin in vins:
+            merged[vin] = {'vehicle': False, 'dtcInfo': False}
+
+
+        for el in current_states_vehicle:
+            merged[el["vin"]]['vehicle'] = True
+        for el in current_states_dtc:
+            merged[el["vin"]]['dtcInfo'] = True
+        
+        for vin in merged.keys():
+            merged[vin]['status_bool'] = True if merged[vin]['vehicle'] and merged[vin]['dtcInfo'] else False
+            if merged[vin]['vehicle'] and (not merged[vin]['dtcInfo']):
+                merged[vin]['reason'] = 'Package véhicule activé mais pas dtcInfo'
+            elif merged[vin]['dtcInfo'] and (not merged[vin]['vehicle']):
+                merged[vin]['reason'] = 'Package dtcInfo activé mais pas véhicule'
+            elif(not merged[vin]['dtcInfo']) and (not merged[vin]['vehicle']):
+                merged[vin]['reason'] = 'Package dtcInfo activé mais pas véhicule'
+            else:
+                merged[vin]['reason'] = ''
+
+        return merged
 
     async def _add_to_fleet(
         self, vin: str, session: aiohttp.ClientSession
@@ -807,7 +807,7 @@ class VehicleActivationService:
                 status_data.append(vehicle_data)
 
             # --- Activation ---
-            logging.info("\KIA ACTIVATION : Starting")
+            logging.info("KIA ACTIVATION : Starting")
             
             await self.kia_api._activate_vins(
                 session, vins_to_activate

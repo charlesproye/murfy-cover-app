@@ -65,6 +65,12 @@ class VehicleProcessor:
         result = cursor.fetchone()
         if result:
             return result[0]
+        elif owner != '':
+            company_id = str(uuid.uuid4())
+            fleet_id = str(uuid.uuid4())
+
+            cursor.execute("INSERT INTO company (name, description, id) VALUES (%s, %s, %s) RETURNING id", (owner, '', company_id))
+            cursor.execute("INSERT INTO fleet (fleet_name, company_id, id) VALUES (%s, %s, %s, %s) RETURNING id", (owner, company_id, fleet_id))
         else:
             cursor.execute("SELECT id FROM fleet WHERE LOWER(fleet_name) = 'bib'")
             result = cursor.fetchone()
