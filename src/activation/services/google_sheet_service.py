@@ -48,7 +48,9 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
         api_detail = headers.index("API Detail") + 1
         oem_col = headers.index("Oem") + 1
         make_col = headers.index("Make") + 1
-        ownership_col = headers.index("Ownership") + 1
+        fleet_col = headers.index("Fleet") + 1
+        company_col = headers.index("Company") + 1
+        # owner_col = headers.index("Owner") + 1
         country_col = headers.index("Country") + 1
         account_owner_col = headers.index("account_owner") + 1
         updates = []
@@ -100,7 +102,9 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
                 # new_row[api_detail - 1] = row['API_Detail']
                 new_row[oem_col - 1] = 'TESLA'
                 new_row[make_col - 1] = 'TESLA'
-                new_row[ownership_col - 1] = "Bib"
+                new_row[company_col - 1] = "Bib"
+                new_row[fleet_col - 1] = "Bib"
+                # new_row[owner_col - 1] = "Bib"
                 new_row[country_col - 1] = 'France'
                 new_row[account_owner_col - 1] = account_owner_value
                 inserts.append(new_row)

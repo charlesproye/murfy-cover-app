@@ -11,12 +11,13 @@ from core.sql_utils import get_connection
 from activation.utils import *
 
 class VehicleProcessor:
-    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, renault_api: callable, volkswagen_api: callable, df: pd.DataFrame):
+    def __init__(self, bmw_api: callable, hm_api: callable, stellantis_api: callable, renault_api: callable, volkswagen_api: callable, kia_api: callable, df: pd.DataFrame):
         self.bmw_api = bmw_api
         self.hm_api = hm_api
         self.stellantis_api = stellantis_api
         self.renault_api = renault_api
         self.volkswagen_api = volkswagen_api
+        self.kia_api = kia_api
         self.df = df
 
     async def _clean_value(self, val, expected_type="str"):
@@ -56,21 +57,49 @@ class VehicleProcessor:
             return cursor.fetchone()[0]
         return result[0]
 
-    async def  _get_fleet_id(self, cursor, owner: str) -> Optional[str]:
-        """Get Fleet ID by owner name."""
+    async def  _get_company_id(self, cursor, company: str) -> Optional[str]:
+        """Get COMPANY ID by fleet name."""
+
         cursor.execute(
-            "SELECT id FROM fleet WHERE LOWER(fleet_name) = LOWER(%s)",
-            (owner,)
+            "SELECT id FROM company WHERE LOWER(fleet_name) = LOWER(%s)",
+            (company,)
         )
         result = cursor.fetchone()
+        
         if result:
             return result[0]
-        elif owner != '':
+        elif company != '':
             company_id = str(uuid.uuid4())
+            cursor.execute("INSERT INTO company (name, description, id) VALUES (%s, %s, %s) RETURNING id", (company, '', company_id))
+            result = cursor.fetchone()
+            return result[0]
+
+        else:
+            cursor.execute("SELECT id FROM company WHERE LOWER(name) = 'bib'")
+            result = cursor.fetchone()
+            return result[0]
+
+    async def  _get_fleet_id(self, cursor, fleet: str, company: str='') -> Optional[str]:
+        """Get Fleet ID by fleet name."""
+
+        cursor.execute(
+            "SELECT id FROM fleet WHERE LOWER(fleet_name) = LOWER(%s)",
+            (fleet,)
+        )
+
+        result = cursor.fetchone()
+
+        if result:
+            return result[0]
+
+        elif fleet != '':
+            company_id = await self._get_company_id(cursor, company)
+
             fleet_id = str(uuid.uuid4())
 
-            cursor.execute("INSERT INTO company (name, description, id) VALUES (%s, %s, %s) RETURNING id", (owner, '', company_id))
-            cursor.execute("INSERT INTO fleet (fleet_name, company_id, id) VALUES (%s, %s, %s, %s) RETURNING id", (owner, company_id, fleet_id))
+            cursor.execute("INSERT INTO fleet (fleet_name, company_id, id) VALUES (%s, %s, %s, %s) RETURNING id", (fleet, company_id, fleet_id))
+            result = cursor.fetchone()
+            return result[0]
         else:
             cursor.execute("SELECT id FROM fleet WHERE LOWER(fleet_name) = 'bib'")
             result = cursor.fetchone()
@@ -186,7 +215,7 @@ class VehicleProcessor:
                     for _, vehicle in renault_df.iterrows():
                         try:
                             vin = vehicle['vin']
-                            fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+                            fleet_id = await self._get_fleet_id(cursor, vehicle['fleet'], vehicle['company'])
                             region_id = await self._get_or_create_region(cursor, vehicle['country'])
                             # Check if vehicle exists
                             cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
@@ -244,8 +273,8 @@ class VehicleProcessor:
                     
                     for _, vehicle in bmw_df.iterrows():
                         try:
-                            vin = vehicle['vin']
-                            fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+                            vin = vehicle['vin'])
+                            fleet_id = await self._get_fleet_id(cursor, vehicle['fleet'], vehicle['company'])
                             region_id = await self._get_or_create_region(cursor, vehicle['country'])
                             #Check if vehicle exists
                             cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vin,))
@@ -305,7 +334,7 @@ class VehicleProcessor:
                     try:
                         cursor.execute("SELECT id FROM vehicle WHERE vin = %s", (vehicle['vin'],))
                         vehicle_exists = cursor.fetchone()
-                        fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+                        fleet_id = await self._get_fleet_id(cursor, vehicle['fleet'], vehicle['company'])
                         region_id = await self._get_or_create_region(cursor, vehicle['country'])
                         model_name = vehicle['model'] if vehicle['model'] is not None else 'unknown'
                         model_type = vehicle['type'] if vehicle['type'] is not None else 'unknown'
@@ -534,7 +563,7 @@ class VehicleProcessor:
     #                         model_code = vin[3]
     #                         model_name = TESLA_MODEL_MAPPING.get(model_code, 'unknown')
     #                         logging.info(f"Processing Tesla vehicle {vin} with model {model_name}")
-    #                         fleet_id = await self._get_fleet_id(cursor, vehicle['owner'])
+    #                         fleet_id = await self._get_fleet_id(cursor, vehicle['fleet'])
     #                         region_id = await self._get_or_create_region(cursor, vehicle['country'])
     #                         # Check if vehicle exists
     #                         cursor.execute("SELECT id, vehicle_model_id FROM vehicle WHERE vin = %s", (vin,))
@@ -607,8 +636,8 @@ class VehicleProcessor:
     #                         logging.info(f"Processing Tesla particulier vehicle {vin} with model {model_name}")
     #                         cursor.execute("SELECT full_name FROM tesla.user WHERE vin = %s", (vin,))
     #                         user_info = cursor.fetchone()
-    #                         owner = user_info[0]
-    #                         fleet_id = await self._get_fleet_id(cursor, owner)
+    #                         fleet = user_info[0]
+    #                         fleet_id = await self._get_fleet_id(cursor, fleet)
     #                         region_id = await self._get_or_create_region(cursor, 'France')
                             
     #                         # Check if vehicle exists
