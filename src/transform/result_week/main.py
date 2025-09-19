@@ -31,6 +31,7 @@ VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
     "vehicle_id": "vehicle_id",
     "DATE":"timestamp",
     "CONSUMPTION": "consumption"
+    "ESTIMATED_CYCLES": "cycles"
 }
 
 

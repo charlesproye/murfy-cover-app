@@ -56,6 +56,8 @@ class ResultPhaseToResultWeek():
             .reset_index(level=0)
             .sort_values(["VIN", "DATE"])
         )
+
+        rweek = self.compute_cycles(rweek)
         
         if self.has_soh:
             rweek["SOH"] = rweek.groupby("VIN", observed=True)["SOH"].ffill()
@@ -107,6 +109,7 @@ class ResultPhaseToResultWeek():
             "LEVEL_2": ("LEVEL_2", "sum"),
             "LEVEL_3": ("LEVEL_3", "sum"),
             "CONSUMPTION": ("CONSUMPTION", "median"),
+            "AUTONOMY": ("AUTONOMY", "first")
         }
 
         # Ne garder que les colonnes présentes
@@ -145,5 +148,18 @@ class ResultPhaseToResultWeek():
             df = df[outliser_mask].copy()
         if df["SOH"].count() >= 2:
             df["SOH"] = force_decay(df[["SOH", "ODOMETER"]])
+        return df
+
+
+    def compute_cycles(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Compute the estimated number of cycles
+        """
+
+        if 'SOH' in df.columns:
+                df["ESTIMATED_CYCLES"] = df.apply(lambda row: estimate_cycles(row["ODOMETER_FIRST"], row["RANGE"], row["SOH"]), axis=1)
+        else:
+            df["ESTIMATED_CYCLES"] = df.apply(lambda row: estimate_cycles(row["ODOMETER_FIRST"], row["RANGE"]), axis=1)
+
         return df
 

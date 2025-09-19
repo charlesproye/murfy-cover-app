@@ -1,5 +1,6 @@
 import logging
 import sys
+from tkinter import FALSE
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
@@ -20,9 +21,9 @@ ORCHESTRATED_MAKES = {
     "volvo-cars": (False, VolvoRawTsToProcessedPhases),
     "stellantis": (False, StellantisRawTsToProcessedPhases),
     "kia": (False, RawTsToProcessedPhases),
-    "ford": (False, FordRawTsToProcessedPhases),
-    "tesla-fleet-telemetry": (False, TeslaFTRawTsToProcessedPhases),
-    "volkswagen": (False, RawTsToProcessedPhases),
+    "ford": (True, FordRawTsToProcessedPhases),
+    "tesla-fleet-telemetry": (True, TeslaFTRawTsToProcessedPhases),
+    "volkswagen": (True, RawTsToProcessedPhases),
     "tesla": (False, TeslaRawTsToProcessedPhases),
 }
 
