@@ -20,6 +20,7 @@ from pyspark.sql import SparkSession
 from core.spark_utils import align_dataframes_for_union
 from botocore.exceptions import ClientError
 import yaml
+import joblib 
 
 class S3Service():
     def __init__(self, settings:S3Settings|None = None):
@@ -448,6 +449,33 @@ class S3Service():
             raise
         except Exception as e:
             self.logger.error(f"Error reading YAML file {path}: {e}")
+            raise
+        
+    def save_as_pickle(self, obj, key: str) -> None:
+        buffer = BytesIO()
+        try:
+            joblib.dump(obj, buffer)
+            buffer.seek(0)
+        
+            self._s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=buffer.getvalue()
+            )
+            self.logger.info(f"File save on s3://{self.bucket_name}/{key}")
+        except Exception as e:
+            self.logger.error(f"Error saving pickle file s3://{self.bucket_name}/{key}: {e}")
+            raise
+        
+    def load_pickle(self, key):
+        
+        try:
+            response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            buffer = BytesIO(response["Body"].read())
+            model = joblib.load(buffer)
+            return model
+        except Exception as e:
+            self.logger.error(f"Error reading pickle file s3://{self.bucket_name}/{key}: {e}")
             raise
 
 @lru_cache
