@@ -8,6 +8,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error, root_mean_squared_error
 import numpy as np
 from core.s3.s3_utils import S3Service
+from core.gsheet_utils import load_excel_data
+from core.sql_utils import get_sqlalchemy_engine
 
 class CarPricePredictor:
     """
@@ -33,6 +35,7 @@ class CarPricePredictor:
         self.max_depth = max_depth
         self.random_state = random_state
         self.categorical_features = categorical_features or ['make', 'battery_chemistry']
+        self.feature_columns = ['make','autonomy','battery_chemistry','net_capacity', 'odometer', 'year', 'soh']
 
         # Model initialization
         self.model = RandomForestRegressor(
@@ -226,4 +229,83 @@ class CarPricePredictor:
         }
 
         return metrics
+    
+    def get_data(self) -> pd.DataFrame:
+        """
+        Load and preprocess data for training.
+        - Reads Excel scrap data
+        - Joins with database vehicle model info
+        - Cleans and formats columns
+        """
+        df_scrapping = load_excel_data("Courbes de tendance", "Courbes OS")
+        df_scrapping = pd.DataFrame(columns=df_scrapping[:1][0], data=df_scrapping[1:])
+        df_scrapping = df_scrapping.rename(columns={'OEM': 'make', 'SoH':'soh', 'Odomètre (km)': 'odometer', 'Année': 'year'})  # lowercase for consistency
+
+        engine = get_sqlalchemy_engine()
+        df_dbeaver = pd.read_sql(
+            """
+            SELECT vm.model_name, vm.type, vm.version, vm.autonomy,
+                   b.battery_chemistry, b.capacity, b.net_capacity
+            FROM vehicle_model vm
+            JOIN battery b ON b.id = vm.battery_id
+            """,
+            engine
+        )
+
+        df_scrapping['Modèle'] = df_scrapping['Modèle'].apply(lambda x: x.lower())
+        # Merge sources
+        df_info = df_scrapping.merge(
+            df_dbeaver,
+            right_on=["model_name", "type"],
+            left_on=['Modèle', 'Type'],
+            how='left'
+        )[
+            ['make', 'Modèle', 'Type', 'version', 'autonomy',
+             'battery_chemistry', 'net_capacity',
+             'odometer', 'year', 'soh', 'price']
+        ].drop_duplicates(subset=['make', 'Modèle', 'odometer', 'year', 'soh', 'price'])
+
+        # Clean numeric values
+        df_info['price'] = df_info['price'].replace('', np.nan).astype(float)
+        df_info['soh'] = df_info['soh'].apply(lambda x: float(str(x).replace('%', '')))
+        df_info['odometer'] = df_info['odometer'].apply(lambda x: float(str(x).replace(',', '').replace(' ', '')))
+        df_info['year'] = df_info['year'].astype(int)
+
+        # Drop rows missing essential values
+        df_info = df_info.dropna(subset=['price', 'net_capacity']).reset_index(drop=True)
+        return df_info
+
+    def run(self, model_name: str, target_column: str = 'price') -> None:
+        """
+        End-to-end pipeline to fetch data, train the model, and save it to S3.
+
+        Args:
+            model_name: Name under which the trained model will be saved in S3
+            target_column: Column name for the target variable
+        """
+        try:
+            print("Fetching training data...")
+            data = self.get_data()
+            if data is None or data.empty:
+                raise ValueError("No training data received from _get_data()")
+
+            if target_column not in data.columns:
+                raise ValueError(f"Target column '{target_column}' not found in dataset")
+
+            # Separate features and target
+            X = data[self.feature_columns]
+            y = data[target_column]
+
+            print("Training model...")
+            self.fit(X, y, target_column=target_column)
+
+            print("Saving model to S3...")
+            self.save(model_name)
+
+            print(f"Run completed successfully. Model saved as '{model_name}'")
+
+        except Exception as e:
+            print(f"Error in run(): {str(e)}")
+            raise
+
 
