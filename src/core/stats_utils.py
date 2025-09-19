@@ -133,9 +133,9 @@ def force_decay(df, window_size=3, max_drop=0.003):
         et que la série ne stagne pas sur plus de 2 points.
     """
     # Calcul de la moyenne mobile
-    smoothed = df['soh'].rolling(window=window_size, min_periods=2).mean().values
+    smoothed = df['SOH'].rolling(window=window_size, min_periods=2).mean().values
     # récupère l'odomètre pour la dcroissance forcé.
-    odometer = df['odometer'].ffill().copy().values
+    odometer = df['ODOMETER'].ffill().copy().values
     n = len(smoothed)
     
     # Pour le démarrage, on part du maximum de la série lissée / pas forcéement optimal

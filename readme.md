@@ -37,7 +37,16 @@ conda env update -f conda-env.yaml
  conda env remove --name data_ev && conda env create --name data_ev --file conda-env.yaml
 # to launch immediatly the environment:
 conda env remove --name data_ev && conda env create --name data_ev --file conda-env.yaml && conda activate data_ev
+```
 
+
+Install [uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation)
+```bash
+# To install all deps
+uv sync --locked --all-extras
+
+# Only specific ones (like transform only)
+uv sync --locked --extra transform
 ```
 
 ### Core:
