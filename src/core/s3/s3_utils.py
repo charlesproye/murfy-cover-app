@@ -4,7 +4,7 @@ import logging
 from typing import Annotated, Any, Optional
 from datetime import datetime
 from io import BytesIO
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 import boto3
 from fastapi import Depends
@@ -13,13 +13,11 @@ from pandas import Series
 import pyarrow.parquet as pq
 from pandas import DataFrame as DF
 
-from ..config import *
-from ..pandas_utils import str_split_and_retain_src
-from .settings import S3Settings
-import tempfile
+from core.config import *
+from core.pandas_utils import str_split_and_retain_src
+from core.s3.settings import S3Settings
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import regexp_extract, col
-from ..spark_utils import align_dataframes_for_union
+from core.spark_utils import align_dataframes_for_union
 from botocore.exceptions import ClientError
 import yaml
 
