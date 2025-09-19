@@ -398,8 +398,8 @@ class S3Service():
         if not prefix.endswith("/"):
             prefix += "/"
         pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
-        for pages in pages:
-            for obj in pages["Contents"]:
+        for page in pages:
+            for obj in page["Contents"]:
                 if obj['Key'] in prefix_to_exclude or (exclude_temp and "/temp/" in obj['Key']):
                     continue
                 objects.append(obj['Size'])
