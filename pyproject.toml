@@ -90,18 +90,11 @@ results = [
     "oauth2client",
 ]
 
-# Full development environment with all dependencies
-dev = [
-    "data_ev[activation,transform,eda,load,web,results]",
-    "pytest",
-    "black",
-    "ruff",
-]
-
 # Ingestion module dependencies - for data ingestion from various sources
 ingestion = [
     "rapidfuzz==3.13.0",
     "aiokafka==0.10.0",
+    "memory-profiler==0.61.0",
 ]
 
 # Scraping module dependencies
@@ -109,6 +102,14 @@ scraping = [
     "beautifulsoup4==4.13.4",
     "selenium==4.33.0",
     "PyPDF2==3.0.1",
+]
+
+# Full development environment with all dependencies
+dev = [
+    "data_ev[activation,transform,eda,load,web,results,ingestion]",
+    "pytest",
+    "black",
+    "ruff",
 ]
 
 [tool.setuptools.packages.find]

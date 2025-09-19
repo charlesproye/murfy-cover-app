@@ -28,6 +28,7 @@ __pycache__/
 *.ipynb
 .env
 .env.local
+.venv/
 
 # Large directories we don't need in production
 src/eda/

@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-from src.core.s3.async_s3 import AsyncS3
+from core.s3.async_s3 import AsyncS3
 import pandas as pd
 import pyarrow.parquet as pq
 import io

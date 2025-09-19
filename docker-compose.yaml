@@ -6,7 +6,7 @@ services:
     image: rg.fr-par.scw.cloud/bib-images/data_ev:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
     container_name: data_ev
     env_file:
       - .env
@@ -14,20 +14,20 @@ services:
   tesla_ingestion_service:
     build:
       context: .
-      dockerfile: tesla.Dockerfile
+      dockerfile: docker/tesla.Dockerfile
     container_name: tesla-ingestion
     env_file:
       - ./.env
       - ./.python.env
     volumes:
-      - .:/app
+      - ./src:/app/src
     depends_on:
       - redis
 
   # bmw_ingestion_service:
   #   build:
   #     context: .
-  #     dockerfile: bmw.Dockerfile
+  #     dockerfile: docker/bmw.Dockerfile
   #   container_name: bmw-ingestion
   #   env_file:
   #     - ./.env
@@ -40,13 +40,13 @@ services:
   hm_ingestion_service:
     build:
       context: .
-      dockerfile: hm.Dockerfile
+      dockerfile: docker/hm.Dockerfile
     container_name: hm-ingestion
     env_file:
       - ./.env
       - ./.python.env
     volumes:
-      - .:/app
+      - ./src:/app/src
     depends_on:
       - redis
     deploy:
@@ -79,26 +79,26 @@ services:
   ms_ingestion_service:
     build:
       context: .
-      dockerfile: mobilisights.Dockerfile
+      dockerfile: docker/mobilisights.Dockerfile
     container_name: ms-ingestion
     env_file:
       - ./.env
       - ./.python.env
     volumes:
-      - .:/app
+      - ./src:/app/src
     depends_on:
       - redis
 
   transform_service:
     build:
       context: .
-      dockerfile: transform.Dockerfile
+      dockerfile: docker/transform.Dockerfile
     container_name: transform
     env_file:
       - ./.env
       - ./.python.env
     volumes:
-      - .:/app
+      - ./src:/app/src
     depends_on:
       - redis
 

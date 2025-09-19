@@ -1,6 +1,6 @@
 from sqlalchemy.exc import OperationalError
 
-from src.core.sql_utils import get_connection
+from core.sql_utils import get_connection
 from sqlalchemy import text
 
 class FrontUtils:
