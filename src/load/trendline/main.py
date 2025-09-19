@@ -5,57 +5,8 @@ import pandas as pd
 from sqlalchemy import text
 from load.trendline.trendline_utils import *
 from core.gsheet_utils import *
-from rapidfuzz import process, fuzz
 from core.sql_utils import get_connection
-import re
 
-def mapping_vehicle_type(type_car, oem_name, model_name, db_df, battery_capacity=None):
-    """Map a given vehicle to the closest model identifier in the database.
-    Args:
-        type_car (str): type car to find match
-        oem_name (str): oem car
-        model_name (str): model car
-        db_df (pd.DataFrame): db with all the model from dbeaver
-        battery_capacity (str, optional): capacity car battery. Defaults to None.
-
-    Returns:
-        str: closest type found in the db 
-    """
-   
-    oem_name = oem_name.lower()
-    type_car = type_car.lower()
-    try:
-        if len(model_name) > 4:
-            d = re.findall('\d*', model_name)
-            d.sort()
-            model_name = d[-1]
-    except:
-        model_name = model_name.lower()
-        
-    subset = db_df[db_df['oem_name'] == oem_name].copy()
-
-    match_model = process.extractOne(model_name, subset['model_name'], scorer=fuzz.token_sort_ratio, score_cutoff=.1)
-    if match_model :
-        match_model_name, _, _ = match_model
-        subset = subset[subset['model_name']==match_model_name]
-        try:
-            if battery_capacity:
-                battery_target = float(battery_capacity.lower().replace('kwh', '').strip())
-                subset["distance"] = (subset["capacity"] - battery_target).abs()
-                closest_rows = subset[subset["distance"] == subset["distance"].min()]
-            else:
-                closest_rows = subset
-
-            match_type = process.extractOne(type_car, closest_rows['type'], scorer=fuzz.token_sort_ratio)
-            if match_type:
-                _, _, index = match_type
-                return closest_rows.iloc[index]["type"]
-        except:
-            match_type = process.extractOne(type_car, subset['type'], scorer=fuzz.token_sort_ratio)
-            _, _, index = match_type
-            return subset.loc[index, "type"]
-        
-    raise Exception("unknown model")
 
 def generate_trendline_functions(df, odometer_column, soh_column):
     """
