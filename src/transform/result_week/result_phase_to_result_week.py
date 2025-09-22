@@ -65,15 +65,6 @@ class ResultPhaseToResultWeek:
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].ffill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].bfill()
 
-        rweek["CONSUMPTION"] = rweek.apply(
-            lambda row: (
-                row["CONSUMPTION"] * row["SOH"]
-                if row["SOH"] is not None
-                else row["CONSUMPTION"]
-            ),
-            axis=1,
-        )
-
         return rweek
 
     def _replace_inf_soh(self, df):
@@ -138,9 +129,6 @@ class ResultPhaseToResultWeek:
 
             result = (v * w).sum() / w.sum()
 
-            soh_vals = pd.to_numeric(results.loc[idx, "SOH"], errors="coerce").dropna()
-            if not soh_vals.empty and soh_vals.median() > 0:
-                result *= soh_vals.median()
 
             return result
 
