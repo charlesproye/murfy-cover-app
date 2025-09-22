@@ -34,8 +34,8 @@ class CarPricePredictor:
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.random_state = random_state
-        self.categorical_features = categorical_features or ['make', 'battery_chemistry']
-        self.feature_columns = ['make','autonomy','battery_chemistry','net_capacity', 'odometer', 'year', 'soh']
+        self.categorical_features = categorical_features or ['make_name', 'battery_chemistry']
+        self.feature_columns = ['make_name','autonomy','battery_chemistry','net_capacity', 'odometer', 'year', 'soh']
 
         # Model initialization
         self.model = RandomForestRegressor(
@@ -149,7 +149,7 @@ class CarPricePredictor:
             # Select the right columns in the right order
             data_subset = data[self.feature_names_]
 
-            # Make predictions
+            # predictions
             predictions = self.pipeline.predict(data_subset)
 
             return predictions
@@ -239,7 +239,7 @@ class CarPricePredictor:
         """
         df_scrapping = load_excel_data("Courbes de tendance", "Courbes OS")
         df_scrapping = pd.DataFrame(columns=df_scrapping[:1][0], data=df_scrapping[1:])
-        df_scrapping = df_scrapping.rename(columns={'OEM': 'make', 'SoH':'soh', 'Odomètre (km)': 'odometer', 'Année': 'year'})  # lowercase for consistency
+        df_scrapping = df_scrapping.rename(columns={'OEM': 'make_name', 'SoH':'soh', 'Odomètre (km)': 'odometer', 'Année': 'year'})  # lowercase for consistency
 
         engine = get_sqlalchemy_engine()
         df_dbeaver = pd.read_sql(
@@ -260,10 +260,10 @@ class CarPricePredictor:
             left_on=['Modèle', 'Type'],
             how='left'
         )[
-            ['make', 'Modèle', 'Type', 'version', 'autonomy',
+            ['make_name', 'Modèle', 'Type', 'version', 'autonomy',
              'battery_chemistry', 'net_capacity',
              'odometer', 'year', 'soh', 'price']
-        ].drop_duplicates(subset=['make', 'Modèle', 'odometer', 'year', 'soh', 'price'])
+        ].drop_duplicates(subset=['make_name', 'Modèle', 'odometer', 'year', 'soh', 'price'])
 
         # Clean numeric values
         df_info['price'] = df_info['price'].replace('', np.nan).astype(float)
