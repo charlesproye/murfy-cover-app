@@ -8,10 +8,6 @@ import requests
 import pandas as pd
 import numpy as np
 from bs4 import BeautifulSoup
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium import webdriver
 from core.gsheet_utils import load_excel_data, export_to_excel
 from core.sql_utils import get_connection
 from activation.config.mappings import mapping_vehicle_type
@@ -92,10 +88,8 @@ def extract_autonomy_wltp(soup):
     return None
 
 def extract_capacity_useful(soup):
-    # Trouver le bloc Batterie, puis la ligne “Capacité utile”
     node = soup.find("h3", string=re.compile("Informations Batterie", re.IGNORECASE))
     if node:
-        # chercher dans ce bloc jusqu'à la fin ou jusqu’au bloc suivant
         nexts = node.find_next_siblings()
         for sib in nexts:
             text = sib.get_text(strip=True)
@@ -109,12 +103,10 @@ def extract_capacity_useful(soup):
     return None
 
 def extract_mileage(soup):
-    # chercher le texte “Kilométrage : X km”
     text = soup.get_text(separator=" ", strip=True)
     m = re.search(r"Kilométrage\s*[:\-]?\s*([0-9\u00A0\s\.,]+)\s*km", text, re.IGNORECASE)
     if m:
         raw = m.group(1)
-        # supprimer espaces, points, etc.
         cleaned = re.sub(r"[^\d]", "", raw)
         if cleaned.isdigit():
             return int(cleaned)
