@@ -42,12 +42,11 @@ class AsyncS3:
         """Returns (folders, files)"""
         folders = set()
         files = []
-        async with self._sem:
-            async with self._client() as client:  # type: ignore
-                paginator = client.get_paginator("list_objects_v2")
-                async for page in paginator.paginate(
-                    Bucket=self.bucket, Prefix=path, Delimiter="/"
-                ):
+        async with self._client() as client:  # type: ignore
+            paginator = client.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(Bucket=self.bucket, Prefix=path, Delimiter="/"):
+                # On ne protège que le traitement des objets/pages
+                async with self._sem:
                     for cp in page.get("CommonPrefixes", []):
                         folders.add(cp.get("Prefix"))
                     for content in page.get("Contents", []):

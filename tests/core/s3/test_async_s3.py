@@ -2,6 +2,9 @@ import json
 import pytest
 import time
 from core.s3.async_s3 import AsyncS3
+from unittest.mock import AsyncMock, patch
+import asyncio
+
 
 @pytest.mark.asyncio
 async def test_download_folder_in_batches():
@@ -23,3 +26,27 @@ async def test_download_folder_in_batches():
     
     if total_files > 100:  # Only check performance for substantial datasets
         assert elapsed < 10, f"Download took {elapsed:.2f}s, expected < 10s for {total_files} files"
+
+
+@pytest.mark.asyncio
+async def test_list_content():
+
+    s3 = AsyncS3(max_concurrency=200)
+    folders, files = await s3.list_content("response/stellantis/")
+
+    assert len(folders) > 1
+
+    all_files = []
+
+    tasks = [s3.list_content(f"{vin_path}temp/") for vin_path in folders]
+
+    for i, coro in enumerate(asyncio.as_completed(tasks), 1):
+        folders_files = await coro
+        _, files = folders_files
+        all_files.extend(files)
+        print(f"Progress: {i}/{len(tasks)} folders processed")
+
+    assert len(all_files) > 0
+
+
+
