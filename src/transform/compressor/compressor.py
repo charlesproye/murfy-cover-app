@@ -74,7 +74,11 @@ class Compressor(ABC):
         gc.collect()
 
     async def _compress_temp_vin_data_buffer(
-        self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2
+        self, 
+        vin_folder_path: str, 
+        max_retries: int = 3, 
+        retry_delay: int = 2,
+        upload: bool = True,
     ):
         attempt = 0
         first_item = True
@@ -110,11 +114,14 @@ class Compressor(ABC):
 
         if buf.getvalue() != b"[]":
             buf.seek(0)
-            await self._s3.upload_file(
-                path=f"{vin_folder_path}{self._filename()}", file=buf.getvalue()
-            )
-
-        await self._s3.delete_folder(f"{vin_folder_path}temp/")
+            if upload:
+                await self._s3.upload_file(
+                    path=f"{vin_folder_path}{self._filename()}", file=buf.getvalue()
+                )
+            else:
+                return buf.getvalue()
+        if upload:
+            await self._s3.delete_folder(f"{vin_folder_path}temp/")
 
         buf.close()
         gc.collect()
