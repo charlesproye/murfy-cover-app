@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
     # Core dependencies used across all modules
     "python-dotenv==1.0.0",
-    "pandas==2.2.2",
+    "pandas==2.2.2", # Adds 150MB to images, might be worth to install only in needed modules
     "msgspec==0.18.6",
     "schedule==1.2.2",
     "rich==13.5.2",
@@ -76,7 +76,6 @@ web = [
     "uvicorn",
     "pydantic>=1.10.13",
     "pydantic-settings==2.2.1",
-    "plotly==5.19.0",
     "python-multipart>=0.0.18",
     "orjson==3.8.5",
 ]

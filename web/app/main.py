@@ -1,9 +1,10 @@
 import logging
+
 from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .volksvagen_router import volkswagen_router
 from .bmw_router import bmw_router
+from .volksvagen_router import volkswagen_router
 
 app = FastAPI(
     title="Vehicle Data Receiver",

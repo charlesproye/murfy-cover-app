@@ -637,7 +637,6 @@ transform = [
 web = [
     { name = "fastapi" },
     { name = "orjson" },
-    { name = "plotly" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-multipart" },
@@ -675,7 +674,6 @@ requires-dist = [
     { name = "pandas", specifier = "==2.2.2" },
     { name = "plotly", marker = "extra == 'eda'", specifier = "==5.19.0" },
     { name = "plotly", marker = "extra == 'results'", specifier = "==5.19.0" },
-    { name = "plotly", marker = "extra == 'web'", specifier = "==5.19.0" },
     { name = "psycopg2-binary", marker = "extra == 'activation'", specifier = ">=2.9.9" },
     { name = "psycopg2-binary", marker = "extra == 'load'", specifier = ">=2.9.9" },
     { name = "psycopg2-binary", marker = "extra == 'results'", specifier = ">=2.9.9" },

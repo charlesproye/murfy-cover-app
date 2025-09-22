@@ -1,17 +1,18 @@
 import logging
-from fastapi import APIRouter, Depends, Request
-from .schemas import (
-    Trip,
-    Maintenance,
-    Location,
-    CruisingRange,
-    EnergyLevel,
-    DashboardErrorWarning,
-    ChargingState,
-    ChargingRemainingTime,
-)
-from .response_storage import ResponseStorageDep
 
+from fastapi import APIRouter, Depends, Request
+
+from .response_storage import ResponseStorageDep
+from .schemas import (
+    ChargingRemainingTime,
+    ChargingState,
+    CruisingRange,
+    DashboardErrorWarning,
+    EnergyLevel,
+    Location,
+    Maintenance,
+    Trip,
+)
 
 # # TODO:
 # - remove useless logs
