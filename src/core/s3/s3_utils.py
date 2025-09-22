@@ -7,7 +7,6 @@ from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 import boto3
-from fastapi import Depends
 import pandas as pd
 from pandas import Series
 import pyarrow.parquet as pq
@@ -456,4 +455,3 @@ class S3Service():
 def get_s3():
     return S3Service()
 
-S3Dep = Annotated[S3Service,Depends(get_s3)]

@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import os 
@@ -40,31 +39,41 @@ vehicle_models = pd.DataFrame(get_vehicle_models(), columns=["model_name", "type
                                                              "soh_oem_data" ,"trendline_bib" , "commissioning_date" , "end_of_life_date"
 ])
 
+# Initialisation du DataFrame filtré
 filtered_df = vehicle_models.copy()
+
+# Filtres
 oem_choices = sorted(filtered_df['oem_name'].dropna().unique())
 selected_oem = st.selectbox("Choisir un OEM", [""] + oem_choices)
 
-filtered_df = filtered_df[filtered_df['oem_name'] == selected_oem] if selected_oem else filtered_df
+if selected_oem:
+    filtered_df = filtered_df[filtered_df['oem_name'] == selected_oem]
+
 make_choices = sorted(filtered_df['make_name'].dropna().unique())
 selected_make = st.selectbox("Choisir un Make", [""] + make_choices)
 
-filtered_df = filtered_df[filtered_df['make_name'] == selected_make] if selected_make else filtered_df
+if selected_make:
+    filtered_df = filtered_df[filtered_df['make_name'] == selected_make]
+
 model_choices = sorted(filtered_df['model_name'].dropna().unique())
 selected_model = st.selectbox("Choisir un Modèle", [""] + model_choices)
 
-filtered_df = filtered_df[filtered_df['model_name'] == selected_model] if selected_model else filtered_df
+if selected_model:
+    filtered_df = filtered_df[filtered_df['model_name'] == selected_model]
+
 type_choices = sorted(filtered_df['type'].dropna().unique())
 selected_type = st.selectbox("Choisir un Type", [""] + type_choices)
 
-filtered_df = filtered_df[filtered_df['type'] == selected_type] if type_choices else filtered_df
-type_choices = sorted(filtered_df['version'].dropna().unique())
-selected_version = st.selectbox("Choisir une Version", [""] + type_choices)
+if selected_type:
+    filtered_df = filtered_df[filtered_df['type'] == selected_type]
 
-# Last filter used
+version_choices = sorted(filtered_df['version'].dropna().unique())
+
+selected_version = st.selectbox("Choisir une Version", [""] + version_choices)
 if selected_version:
     filtered_df = filtered_df[filtered_df['version'] == selected_version]
 
-# vizualisation 
+# AFFICHAGE DU TABLEAU - APRÈS TOUS LES FILTRES
 st.subheader("📋 Données filtrées")
 st.dataframe(filtered_df, use_container_width=True)
 
@@ -107,4 +116,3 @@ if st.button("show graph scrapping"):
                          filtered_df['trendline'].values[0], filtered_df['trendline_max'].values[0],
                          filtered_df['trendline_min'].values[0], selected_type, "Odomètre (km)", 'SoH')
     st.plotly_chart(fig)
-
