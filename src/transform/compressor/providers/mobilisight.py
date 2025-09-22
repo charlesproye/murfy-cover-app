@@ -4,9 +4,8 @@ import io
 import msgspec
 
 from core.s3.async_s3 import AsyncS3
+from ingestion.mobilisights.schema import CarState, MergedCarState
 from transform.compressor.compressor import Compressor
-from transform.compressor.providers.schemas.mobilisight import (CarState,
-                                                                MergedCarState)
 
 
 class MobilisightCompressor(Compressor):
