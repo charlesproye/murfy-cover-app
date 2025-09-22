@@ -1,9 +1,41 @@
+# Version control and config
 .git/
+.gitignore
+*.md
+README*
+
+# Docker files
 *.Dockerfile
 docker-compose.yaml
-*.log
-*.md
-.gitignore
-__pycache__/
-*.ipynb
+docker-compose.yml
 
+# Logs and temporary files
+*.log
+build.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.tox/
+.coverage
+.pytest_cache/
+
+# Development files
+.vscode/
+.idea/
+*.ipynb
+.env
+.env.local
+.venv/
+
+# Large directories we don't need in production
+src/eda/
+processed_phases/
+tests/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

@@ -5,8 +5,9 @@ from fastapi import Depends
 import msgspec
 from pydantic import BaseModel
 from .schemas import BaseModelWithVin
-from core.s3.async_s3 import AsyncS3Dep, AsyncS3
+from core.s3.async_s3 import AsyncS3, get_async_s3
 
+AsyncS3Dep = Annotated[AsyncS3,Depends(get_async_s3)]
 
 class ResponseStorage:
     def __init__(self, s3: AsyncS3 | None = None) -> None:

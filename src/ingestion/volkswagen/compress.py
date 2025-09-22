@@ -1,7 +1,7 @@
 import asyncio
 
 import msgspec
-from src.core.compressor import Compressor
+from core.compressor import Compressor
 
 
 class VolkswagenCompressor(Compressor):
