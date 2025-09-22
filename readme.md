@@ -35,7 +35,7 @@ conda env update -f conda-env.yaml
 
 #If you need to reset all the conda environnment
  conda env remove --name data_ev && conda env create --name data_ev --file conda-env.yaml
-# to launch immediatly the environment:
+# to launch immediately the environment:
 conda env remove --name data_ev && conda env create --name data_ev --file conda-env.yaml && conda activate data_ev
 ```
 
@@ -51,7 +51,7 @@ uv sync --locked --extra transform
 
 ### Core:
 
-`core` implments the code that is common to any data pipeline.  
+`core` implements the code that is common to any data pipeline.
 See [core documentation](src/core/readme.md).
 
 ### EDA:
@@ -112,4 +112,24 @@ s3://bucket/
 - Buffer flush interval: 30 seconds
 - Daily compression reduces system load during operational hours
 - Parquet format provides better query performance and compression ratio
+
+
+### Code format
+
+We use ruff as linter and formatter:
+```bash
+uv run ruff format
+uv run ruff check --format
+```
+
+You can add this to VSCode on save (`cmd + shift + P` -> `Open User Settings (JSON)`):
+```json
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    }
+```
 
