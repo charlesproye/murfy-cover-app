@@ -1,28 +1,24 @@
+import json
 import logging
+import time
 from typing import Optional, Tuple
-import logging
+
 import aiohttp
 import pandas as pd
 
-from core.sql_utils import get_connection
-
 from activation.api.bmw_client import BMWApi
 from activation.api.hm_client import HMApi
+from activation.api.kia_client import KiaApi
 from activation.api.renault_client import RenaultApi
 from activation.api.stellantis_client import StellantisApi
 from activation.api.volkswagen_client import VolkswagenApi
-from activation.api.kia_client import KiaApi
-from activation.config.settings import ACTIVATION_TIMEOUT
-from activation.services.google_sheet_service import \
-    update_vehicle_activation_data
-from core.sql_utils import get_connection
 from activation.config.config import REASON_MAPPING
-import time
-import json
+from activation.config.settings import ACTIVATION_TIMEOUT
+from activation.services.google_sheet_service import update_vehicle_activation_data
+from core.sql_utils import get_connection
 
 
 class VehicleActivationService:
-
     def __init__(
         self,
         bmw_api: BMWApi,
@@ -41,39 +37,41 @@ class VehicleActivationService:
         self.fleet_info_df = fleet_info_df
         self.volkswagen_api = volkswagen_api
 
-    async def _get_current_states_kia(self, session: aiohttp.ClientSession, vins: list[str]):
+    async def _get_current_states_kia(
+        self, session: aiohttp.ClientSession, vins: list[str]
+    ):
         """Get the current states of a list of vins."""
-        
+
         current_states_vehicle = await self.kia_api._get_status_consent_type(
-            session, ['vehicle']
-        )['body']['results']
+            session, ["vehicle"]
+        )
 
         current_states_dtc = await self.kia_api._get_status_consent_type(
-            session, ['dtcInfo']
-        )['body']['results']
-
+            session, ["dtcInfo"]
+        )
 
         merged = {}
 
         for vin in vins:
-            merged[vin] = {'vehicle': False, 'dtcInfo': False}
-
+            merged[vin] = {"vehicle": False, "dtcInfo": False}
 
         for el in current_states_vehicle:
-            merged[el["vin"]]['vehicle'] = True
+            merged[el["vin"]]["vehicle"] = True
         for el in current_states_dtc:
-            merged[el["vin"]]['dtcInfo'] = True
-        
+            merged[el["vin"]]["dtcInfo"] = True
+
         for vin in merged.keys():
-            merged[vin]['status_bool'] = True if merged[vin]['vehicle'] and merged[vin]['dtcInfo'] else False
-            if merged[vin]['vehicle'] and (not merged[vin]['dtcInfo']):
-                merged[vin]['reason'] = 'Package véhicule activé mais pas dtcInfo'
-            elif merged[vin]['dtcInfo'] and (not merged[vin]['vehicle']):
-                merged[vin]['reason'] = 'Package dtcInfo activé mais pas véhicule'
-            elif(not merged[vin]['dtcInfo']) and (not merged[vin]['vehicle']):
-                merged[vin]['reason'] = 'Package dtcInfo activé mais pas véhicule'
+            merged[vin]["status_bool"] = (
+                True if merged[vin]["vehicle"] and merged[vin]["dtcInfo"] else False
+            )
+            if merged[vin]["vehicle"] and (not merged[vin]["dtcInfo"]):
+                merged[vin]["reason"] = "Package véhicule activé mais pas dtcInfo"
+            elif merged[vin]["dtcInfo"] and (not merged[vin]["vehicle"]):
+                merged[vin]["reason"] = "Package dtcInfo activé mais pas véhicule"
+            elif (not merged[vin]["dtcInfo"]) and (not merged[vin]["vehicle"]):
+                merged[vin]["reason"] = "Package dtcInfo activé mais pas véhicule"
             else:
-                merged[vin]['reason'] = ''
+                merged[vin]["reason"] = ""
 
         return merged
 
@@ -111,7 +109,9 @@ class VehicleActivationService:
                     if fleet.get("name", "").lower() == "bib":
                         target_fleet_id_bib = fleet["fleet_id"]
                         break
-                warning_msg = f"Fleet {target_fleet_name} not found, adding to bib fleet"
+                warning_msg = (
+                    f"Fleet {target_fleet_name} not found, adding to bib fleet"
+                )
                 logging.warning(warning_msg)
                 target_fleet_id = target_fleet_id_bib
 
@@ -130,7 +130,7 @@ class VehicleActivationService:
                 logging.info(f"Vehicle {vin} already in fleet")
                 return True, None
             if status_code == 429:
-                if result['message'] == 'Too Many Requests':
+                if result["message"] == "Too Many Requests":
                     time.sleep(1)
                     return await self._add_to_fleet(vin, session)
             else:
@@ -201,18 +201,24 @@ class VehicleActivationService:
                     return False, fleet_error
                 return True, None
             elif "message" in result.keys():
-                if result["message"] == 'Too Many Requests':
+                if result["message"] == "Too Many Requests":
                     time.sleep(1)
                     return await self._activate_bmw(session, vin)
                 else:
                     pass
-            elif status_code == 403 and result['logErrorId'] == 'BMWFD_VEHICLE_ALREADY_EXISTS':
+            elif (
+                status_code == 403
+                and result["logErrorId"] == "BMWFD_VEHICLE_ALREADY_EXISTS"
+            ):
                 logging.info(f"BMW vehicle {vin} already added")
                 fleet_success, fleet_error = await self._add_to_fleet(vin, session)
                 return True, None
-            elif status_code == 412 and result['logErrorId'] == 'BMWFD_VEHICLE_NOT_ALLOWED':
+            elif (
+                status_code == 412
+                and result["logErrorId"] == "BMWFD_VEHICLE_NOT_ALLOWED"
+            ):
                 logging.info(f"BMW vehicle {vin} is not allowed to be activated")
-                return False, REASON_MAPPING['bmw']['BMWFD_VEHICLE_NOT_ALLOWED']
+                return False, REASON_MAPPING["bmw"]["BMWFD_VEHICLE_NOT_ALLOWED"]
             else:
                 error_msg = f"L'activation du véhicule a échoué: Code d'erreur {status_code}, Response: {result['logErrorId']}"
                 return False, error_msg
@@ -238,7 +244,7 @@ class VehicleActivationService:
                         "Eligibility": False,
                         "Real_Activation": False,
                         "Activation_Error": "Not eligible",
-                        "API_Detail": "Le VIN est non éligible à l'activation sur Stellantis"
+                        "API_Detail": "Le VIN est non éligible à l'activation sur Stellantis",
                     }
                     if desired_state:
                         logging.info(
@@ -273,9 +279,11 @@ class VehicleActivationService:
                         status_code, error_msg = await self.stellantis_api.deactivate(
                             contract_id, session
                         )
-                        real_state, contract_id, _ = await self.stellantis_api.get_status(
-                            vin, session
-                        )
+                        (
+                            real_state,
+                            contract_id,
+                            _,
+                        ) = await self.stellantis_api.get_status(vin, session)
                         if status_code in [200, 204]:
                             logging.info(
                                 f"Stellantis vehicle {vin} deactivated successfully"
@@ -317,9 +325,11 @@ class VehicleActivationService:
                     status_code, result = await self.stellantis_api.activate(
                         vin, session
                     )
-                    real_state, contract_id, status = await self.stellantis_api.get_status(
-                        vin, session
-                    )
+                    (
+                        real_state,
+                        contract_id,
+                        status,
+                    ) = await self.stellantis_api.get_status(vin, session)
                     if status_code in [200, 201, 204]:
                         logging.info(f"Stellantis vehicle {vin} activated successfully")
                         vehicle_data = {
@@ -336,8 +346,10 @@ class VehicleActivationService:
                             "vin": vin,
                             "Eligibility": real_state,
                             "Real_Activation": real_state,
-                            "Activation_Error": status, 
-                            "API_Detail": REASON_MAPPING['stellantis'][status] if status in REASON_MAPPING['stellantis'].keys() else f"La description du statut {status} est inconnue, voir avec l'équipe TECH."
+                            "Activation_Error": status,
+                            "API_Detail": REASON_MAPPING["stellantis"][status]
+                            if status in REASON_MAPPING["stellantis"].keys()
+                            else f"La description du statut {status} est inconnue, voir avec l'équipe TECH.",
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -349,7 +361,7 @@ class VehicleActivationService:
                             "Eligibility": real_state,
                             "Real_Activation": real_state,
                             "Activation_Error": error_msg,
-                            "API_Detail": f"Erreur de l'API lors de l'activation du véhicule."
+                            "API_Detail": f"Erreur de l'API lors de l'activation du véhicule.",
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -365,7 +377,9 @@ class VehicleActivationService:
             for _, row in df_bmw.iterrows():
                 vin = row["vin"]
                 desired_state = row["activation"]
-                current_state, fleet = await self.bmw_api.check_vehicle_status(vin, session)
+                current_state, fleet = await self.bmw_api.check_vehicle_status(
+                    vin, session
+                )
 
                 if desired_state == current_state:
                     if not fleet and desired_state:
@@ -402,7 +416,7 @@ class VehicleActivationService:
                             "Eligibility": False,
                             "Real_Activation": False,
                             "Activation_Error": "Activation failed",
-                            "API_Detail": api_detail
+                            "API_Detail": api_detail,
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -473,8 +487,10 @@ class VehicleActivationService:
     async def activation_hm(self):
         """Process High Mobility vehicle activation/deactivation."""
         df_hm = self.fleet_info_df[
-            self.fleet_info_df["oem"].isin(["renault", 'ford', 'mercedes', 'volvo', 'kia'])
-        ] 
+            self.fleet_info_df["oem"].isin(
+                ["renault", "ford", "mercedes", "volvo", "kia"]
+            )
+        ]
         status_data = []
         async with aiohttp.ClientSession() as session:
             for _, row in df_hm.iterrows():
@@ -521,24 +537,36 @@ class VehicleActivationService:
                                     f"High Mobility vehicle {vin} activation failed"
                                 )
                                 _, response = await self.hm_api.get_status(vin, session)
-                                
-                                response['status'] if response['status'] is not None else ''
-                                api_detail = response['changelog'][-1]['reason'] if 'reason' in response['changelog'][-1] is not None else ''
 
-                                if api_detail in REASON_MAPPING['high-mobility'].keys():
-                                    api_detail_trad = REASON_MAPPING['high-mobility'][api_detail]
-                                elif response['status'] == "pending":
+                                response["status"] if response[
+                                    "status"
+                                ] is not None else ""
+                                api_detail = (
+                                    response["changelog"][-1]["reason"]
+                                    if "reason" in response["changelog"][-1] is not None
+                                    else ""
+                                )
+
+                                if api_detail in REASON_MAPPING["high-mobility"].keys():
+                                    api_detail_trad = REASON_MAPPING["high-mobility"][
+                                        api_detail
+                                    ]
+                                elif response["status"] == "pending":
                                     api_detail_trad = "En attente que le véhicule émette des données pour qu'il soit activé"
-                                elif response['status'] == "rejected":
-                                    api_detail_trad = REASON_MAPPING['high-mobility']['unspecified']
+                                elif response["status"] == "rejected":
+                                    api_detail_trad = REASON_MAPPING["high-mobility"][
+                                        "unspecified"
+                                    ]
                                 else:
-                                    api_detail_trad = ''
+                                    api_detail_trad = ""
 
                                 vehicle_data = {
                                     "vin": vin,
                                     "Eligibility": False,
                                     "Real_Activation": False,
-                                    "Activation_Error": response['status'] if response['status'] is not None else '',
+                                    "Activation_Error": response["status"]
+                                    if response["status"] is not None
+                                    else "",
                                     "API_Detail": api_detail_trad,
                                 }
 
@@ -673,7 +701,9 @@ class VehicleActivationService:
                 )
                 vehicle_data = {
                     "vin": vin,
-                    "Eligibility": safe_bool(info["current_state"]),  # VW confond eligibility & activation
+                    "Eligibility": safe_bool(
+                        info["current_state"]
+                    ),  # VW confond eligibility & activation
                     "Real_Activation": safe_bool(info["current_state"]),
                     "Activation_Error": "",
                     "API_Detail": "",
@@ -693,13 +723,15 @@ class VehicleActivationService:
                 )
 
                 if not info.get("status_bool"):
-                    if info.get("status") in REASON_MAPPING['volkswagen'].keys():
-                        api_detail = REASON_MAPPING['volkswagen'][info.get("status")]
+                    if info.get("status") in REASON_MAPPING["volkswagen"].keys():
+                        api_detail = REASON_MAPPING["volkswagen"][info.get("status")]
                     else:
-                        api_detail = "Statut inconnu, voir avec l'équipe TECH pour le définir."
+                        api_detail = (
+                            "Statut inconnu, voir avec l'équipe TECH pour le définir."
+                        )
                 else:
                     api_detail = ""
-                
+
                 vehicle_data = {
                     "vin": vin,
                     "Eligibility": safe_bool(info.get("status_bool")),
@@ -707,9 +739,7 @@ class VehicleActivationService:
                     "Activation_Error": (
                         str(info.get("status")) if not info.get("status_bool") else ""
                     ),
-                    "API_Detail": (
-                        api_detail
-                    ),
+                    "API_Detail": (api_detail),
                 }
                 status_data.append(vehicle_data)
 
@@ -768,8 +798,8 @@ class VehicleActivationService:
             merged_states = {
                 vin: {
                     "desired_state": desired_states[vin]["desired_state"],
-                    "current_state": merged[vin]['status_bool'],
-                    "current_state_status": merged[vin]['reason'],
+                    "current_state": merged[vin]["status_bool"],
+                    "current_state_status": merged[vin]["reason"],
                 }
                 for vin in merged.keys()
             }
@@ -799,7 +829,9 @@ class VehicleActivationService:
                 )
                 vehicle_data = {
                     "vin": vin,
-                    "Eligibility": safe_bool(info["current_state"]),  # VW confond eligibility & activation
+                    "Eligibility": safe_bool(
+                        info["current_state"]
+                    ),  # VW confond eligibility & activation
                     "Real_Activation": safe_bool(info["current_state"]),
                     "Activation_Error": "",
                     "API_Detail": "",
@@ -808,12 +840,12 @@ class VehicleActivationService:
 
             # --- Activation ---
             logging.info("KIA ACTIVATION : Starting")
-            
-            await self.kia_api._activate_vins(
+
+            await self.kia_api._activate_vins(session, vins_to_activate)
+
+            activated_current_states = await self._get_current_states_kia(
                 session, vins_to_activate
             )
-
-            activated_current_states = await self._get_current_states_kia(session, vins_to_activate)
 
             for vin in vins_to_activate:
                 logging.info(
@@ -825,14 +857,14 @@ class VehicleActivationService:
                         "vin": vin,
                         "Eligibility": False,
                         "Real_Activation": False,
-                        "Activation_Error":"vin not eligible for data sharing",
+                        "Activation_Error": "vin not eligible for data sharing",
                         "API_Detail": "Le vin n'est pas éligible pour le partage de données, VIN erroné ou d'une version non prise en charge",
                     }
-                
+
                 else:
                     info = activated_current_states[vin]
 
-                    if info['status_bool']:
+                    if info["status_bool"]:
                         vehicle_data = {
                             "vin": vin,
                             "Eligibility": True,
@@ -845,8 +877,8 @@ class VehicleActivationService:
                             "vin": vin,
                             "Eligibility": True,
                             "Real_Activation": False,
-                            "Activation_Error": info['reason'],
-                            "API_Detail": info['reason'],
+                            "Activation_Error": info["reason"],
+                            "API_Detail": info["reason"],
                         }
                 status_data.append(vehicle_data)
 
@@ -873,8 +905,6 @@ class VehicleActivationService:
         status_df = status_df.where(pd.notnull(status_df), "")
 
         await update_vehicle_activation_data(status_df)
-
-
 
     # async def activation_tesla(self):
     #     """Process Tesla vehicle activation/deactivation.
@@ -991,3 +1021,4 @@ class VehicleActivationService:
 
     #             status_df = pd.DataFrame(status_data)
     #             await update_vehicle_activation_data(status_df)
+

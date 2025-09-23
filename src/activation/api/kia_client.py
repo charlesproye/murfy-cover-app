@@ -106,7 +106,11 @@ class KiaApi:
                 f"{self.base_url}/consent/{consent_type}", headers=headers
             ) as response:
                 response.raise_for_status()
-                return await response.json()
+                data = await response.json()
+
+                # 🔽 ici tu choisis ce que ton client expose
+                return data.get("body", {}).get("results", None)
+
         except Exception as e:
             print(f"Error getting status for package {consent_type}:", e)
             return None
