@@ -1,15 +1,21 @@
 import logging
-from pickle import TRUE
 import sys
+
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
-from transform.result_phases.processed_phase_to_result_phase import ProcessedPhaseToResultPhase
+from transform.result_phases.processed_phase_to_result_phase import (
+    ProcessedPhaseToResultPhase,
+)
 from transform.result_phases.providers.renault import RenaultProcessedPhaseToResultPhase
-from transform.result_phases.providers.volvo import VolvoProcessedPhaseToResultPhase
-from transform.result_phases.providers.stellantis import StellantisProcessedPhaseToResultPhase
-from transform.result_phases.providers.tesla_fleet_telemetry import TeslaFTProcessedPhaseToResultPhase
+from transform.result_phases.providers.stellantis import (
+    StellantisProcessedPhaseToResultPhase,
+)
 from transform.result_phases.providers.tesla import TeslaProcessedPhaseToResultPhase
+from transform.result_phases.providers.tesla_fleet_telemetry import (
+    TeslaFTProcessedPhaseToResultPhase,
+)
+from transform.result_phases.providers.volvo import VolvoProcessedPhaseToResultPhase
 
 ORCHESTRATED_MAKES = {
     "bmw": (False, ProcessedPhaseToResultPhase),
@@ -46,3 +52,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
