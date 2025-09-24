@@ -12,15 +12,15 @@ from transform.raw_tss.providers.volkswagen import VolkswagenResponseToRaw
 from transform.raw_tss.providers.tesla import TeslaResponseToRaw
 
 ORCHESTRATED_MAKES = {
-    "bmw": (False, BMWResponseToRaw),
-    "mercedes-benz": (False, HighMobilityResponseToRaw),
-    "renault": (False, HighMobilityResponseToRaw),
-    "volvo-cars": (False, HighMobilityResponseToRaw),
-    "stellantis": (False, MobilisightResponseToRaw),
-    "kia": (False, HighMobilityResponseToRaw),
-    "ford": (False, HighMobilityResponseToRaw),
-    "tesla-fleet-telemetry": (False, TeslaFTResponseToRawTss),
-    "volkswagen": (False, VolkswagenResponseToRaw),
+    "bmw": (True, BMWResponseToRaw),
+    "mercedes-benz": (True, HighMobilityResponseToRaw),
+    "renault": (True, HighMobilityResponseToRaw),
+    "volvo-cars": (True, HighMobilityResponseToRaw),
+    "stellantis": (True, MobilisightResponseToRaw),
+    "kia": (True, HighMobilityResponseToRaw),
+    "ford": (True, HighMobilityResponseToRaw),
+    "tesla-fleet-telemetry": (True, TeslaFTResponseToRawTss),
+    "volkswagen": (True, VolkswagenResponseToRaw),
     "tesla": (False, TeslaResponseToRaw),
 }
 

@@ -66,6 +66,7 @@ class MercedesBenzRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
+            F.first('range', ignorenulls=True).alias('RANGE'),
             # Mercedes specific features / Might be able to handle with config
             (F.sum("weighted_charging_rate") / F.sum("duration_minutes")).alias("CHARGING_RATE_MEAN"),
             F.last('total_charging_duration', ignorenulls=True).alias('CHARGING_DURATION_OEM'),
