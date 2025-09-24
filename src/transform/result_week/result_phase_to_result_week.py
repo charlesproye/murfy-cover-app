@@ -7,6 +7,7 @@ from pyspark.sql import SparkSession
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
+<<<<<<< HEAD
 from core.stats_utils import (
     estimate_cycles,
     force_decay,
@@ -17,6 +18,16 @@ from transform.result_week.config import SOH_FILTER_EVAL_STRINGS, UPDATE_FREQUEN
 
 
 class ResultPhaseToResultWeek:
+=======
+from core.stats_utils import (force_decay,
+                              mask_out_outliers_by_interquartile_range)
+from transform.result_phases.main import *
+from transform.result_week.config import *
+
+
+class ResultPhaseToResultWeek:
+
+>>>>>>> origin/dev
     def __init__(
         self,
         make: str,
@@ -61,8 +72,11 @@ class ResultPhaseToResultWeek:
             .sort_values(["VIN", "DATE"])
         )
 
+<<<<<<< HEAD
         rweek = self.compute_cycles(rweek)
 
+=======
+>>>>>>> origin/dev
         if self.has_soh:
             rweek["SOH"] = rweek.groupby("VIN", observed=True)["SOH"].ffill()
             rweek["SOH"] = rweek.groupby("VIN", observed=True)["SOH"].bfill()
@@ -92,7 +106,11 @@ class ResultPhaseToResultWeek:
         nb_negative_levels = negative_charge_levels.sum().sum()
         if nb_negative_levels > 0:
             self.logger.warning(
+<<<<<<< HEAD
                 f"There are {nb_negative_levels}({100 * nb_negative_levels / len(results):2f}%) negative charge levels, setting them to 0."
+=======
+                f"There are {nb_negative_levels}({100*nb_negative_levels/len(results):2f}%) negative charge levels, setting them to 0."
+>>>>>>> origin/dev
             )
         results[["LEVEL_1", "LEVEL_2", "LEVEL_3"]] = results[
             ["LEVEL_1", "LEVEL_2", "LEVEL_3"]
@@ -101,6 +119,13 @@ class ResultPhaseToResultWeek:
         return results
 
     def _agg_results_by_update_frequency(self, results: pd.DataFrame) -> pd.DataFrame:
+<<<<<<< HEAD
+=======
+        """
+        Aggregate results per VIN and date, with weighted consumption.
+        """
+
+>>>>>>> origin/dev
         results["DATE"] = (
             pd.to_datetime(results["DATETIME_BEGIN"], format="mixed")
             .dt.floor(UPDATE_FREQUENCY)
@@ -117,19 +142,43 @@ class ResultPhaseToResultWeek:
             "LEVEL_1": ("LEVEL_1", "sum"),
             "LEVEL_2": ("LEVEL_2", "sum"),
             "LEVEL_3": ("LEVEL_3", "sum"),
+<<<<<<< HEAD
             "CONSUMPTION": ("CONSUMPTION", "median"),
             "RANGE": ("RANGE", "first"),
+=======
+>>>>>>> origin/dev
         }
 
-        # Ne garder que les colonnes présentes
+        def weighted_consumption(series: pd.Series):
+            idx = series.index
+            v = pd.to_numeric(series, errors="coerce")
+            w = pd.to_numeric(results.loc[idx, "ODOMETER_DIFF"], errors="coerce")
+
+            if w.sum() == 0:
+                return None
+
+            result = (v * w).sum() / w.sum()
+
+
+            return result
+
         agg_dict = {
             new_col: pd.NamedAgg(src_col, func)
             for src_col, (new_col, func) in agg_spec.items()
             if src_col in results.columns
         }
 
-        assign_cols = ["LEVEL_1", "LEVEL_2", "LEVEL_3"]
+        if self.make != "bmw":
+            agg_dict["CONSUMPTION"] = pd.NamedAgg(
+                "CONSUMPTION", weighted_consumption
+            )  # Ponderate consumption by ODOMETER_DIFF
+        else:
+            agg_dict["CONSUMPTION"] = pd.NamedAgg("CONSUMPTION", "median")
 
+<<<<<<< HEAD
+=======
+        assign_cols = ["LEVEL_1", "LEVEL_2", "LEVEL_3"]
+>>>>>>> origin/dev
         num_cols = [
             "SOH",
             "SOH_OEM",
@@ -138,6 +187,10 @@ class ResultPhaseToResultWeek:
             "LEVEL_2",
             "LEVEL_3",
             "ODOMETER_LAST",
+<<<<<<< HEAD
+=======
+            "ODOMETER_DIFF",
+>>>>>>> origin/dev
         ]
 
         for col in num_cols:
@@ -147,7 +200,11 @@ class ResultPhaseToResultWeek:
         return (
             results.assign(
                 **{
+<<<<<<< HEAD
                     col: results[col].fillna(0)  # ou autre traitement
+=======
+                    col: results[col].fillna(0)
+>>>>>>> origin/dev
                     for col in assign_cols
                     if col in results.columns
                 }
@@ -161,9 +218,15 @@ class ResultPhaseToResultWeek:
             return df
         if df["SOH"].count() > 3:
             outliser_mask = mask_out_outliers_by_interquartile_range(df["SOH"])
+<<<<<<< HEAD
             assert outliser_mask.any(), (
                 f"There seems to be only outliers???:\n{df['SOH']}."
             )
+=======
+            assert (
+                outliser_mask.any()
+            ), f"There seems to be only outliers???:\n{df['SOH']}."
+>>>>>>> origin/dev
             df = df[outliser_mask].copy()
         if df["SOH"].count() >= 2:
             df["SOH"] = force_decay(df[["SOH", "ODOMETER"]])
