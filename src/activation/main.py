@@ -10,12 +10,13 @@ from activation.config.credentials import *
 from activation.api.bmw_client import BMWApi
 from activation.api.hm_client import HMApi
 from activation.api.stellantis_client import StellantisApi
-from activation.api.tesla_client import TeslaApi
-from activation.api.tesla_particulier import TeslaParticulierApi
 from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
 from activation.fleet_info import read_fleet_info as fleet_info
 from activation.api.renault_client import RenaultApi
+from activation.api.volkswagen_client import VolkswagenApi
+from activation.api.kia_client import KiaApi
+
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -44,16 +45,15 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             fleet_id=STELLANTIS_FLEET_ID,
             company_id=STELLANTIS_COMPANY_ID
         )
-        tesla_api = TeslaApi(
-            base_url=TESLA_BASE_URL,
-            slack_token=SLACK_TOKEN,
-            slack_channel_id=SLACK_CHANNEL_ID
+
+        kia_api = KiaApi(
+            auth_url=KIA_AUTH_URL,
+            base_url=KIA_BASE_URL,
+            client_username=KIA_API_USERNAME,
+            client_pwd=KIA_API_PWD,
+            api_key=KIA_API_KEY
         )
-        tesla_particulier_api = TeslaParticulierApi(
-            base_url=TESLA_BASE_URL,
-            token_url= TESLA_TOKEN_URL,
-            client_id=TESLA_CLIENT_ID,
-        )
+
         renault_api = RenaultApi(
             kid=RENAULT_KID,
             aud=RENAULT_AUD,
@@ -61,49 +61,74 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             scope=RENAULT_SCOPE,
             pwd=RENAULT_PWD
         )
+
+        volkswagen_api = VolkswagenApi(
+            auth_url=VW_AUTH_URL,
+            base_url=VW_BASE_URL,
+            organization_id=VW_ORGANIZATION_ID,
+            client_username=VW_CLIENT_USERNAME,
+            client_password=VW_CLIENT_PASSWORD
+        )
+
+        # tesla_api = TeslaApi(
+        #     base_url=TESLA_BASE_URL,
+        #     slack_token=SLACK_TOKEN,
+        #     slack_channel_id=SLACK_CHANNEL_ID
+        # )
+        # tesla_particulier_api = TeslaParticulierApi(
+        #     base_url=TESLA_BASE_URL,
+        #     token_url= TESLA_TOKEN_URL,
+        #     client_id=TESLA_CLIENT_ID,
+        # )
+
         # Get initial fleet info
         df = await fleet_info(owner_filter=owner_filter)
+
         # Initialize activation service
         activation_service = VehicleActivationService(
             bmw_api=bmw_api,
             hm_api=hm_api,
             stellantis_api=stellantis_api,
-            tesla_api=tesla_api,
-            tesla_particulier_api=tesla_particulier_api,
+            # tesla_api=tesla_api,
+            # tesla_api=None,
+            # tesla_particulier_api=tesla_particulier_api,
+            # tesla_particulier_api=None,
             renault_api=renault_api,
+            volkswagen_api=volkswagen_api,
+            kia_api=kia_api,
             fleet_info_df=df
         )
 
         # Process all brands in parallel
         await asyncio.gather(
-            # activation_service.activation_tesla(),
             activation_service.activation_bmw(),
             activation_service.activation_hm(),
             activation_service.activation_stellantis(),
-            activation_service.activation_tesla_particulier()
+            activation_service.activation_volkswagen()
+            # activation_service.activation_kia()
         )
+
 
         # Get updated fleet info after activation"""
         logging.info('-------------------------------Activation completed-------------------------------')
-        df = await fleet_info(owner_filter=owner_filter)
+    #     df = await fleet_info(owner_filter=owner_filter)
         
-        # # # Process vehicles with updated info
+    #     # # # Process vehicles with updated info
         vehicle_processor = VehicleProcessor(
             bmw_api=bmw_api,
             hm_api=hm_api,
             stellantis_api=stellantis_api,
-            tesla_api=tesla_api,
-            tesla_particulier_api=tesla_particulier_api,
             renault_api=renault_api,
+            volkswagen_api=volkswagen_api,
+            kia_api=kia_api,
             df=df
         )
+
         await asyncio.gather(
             vehicle_processor.process_other_vehicles(),
-            vehicle_processor.process_tesla(),
             vehicle_processor.process_renault(),
             vehicle_processor.process_deactivated_vehicles(),
-            vehicle_processor.process_bmw(),
-            vehicle_processor.process_tesla_particulier()
+            vehicle_processor.process_bmw()
             )
         
         #await vehicle_processor.delete_unused_models()
