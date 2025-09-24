@@ -29,6 +29,7 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
+            F.first('range', ignorenulls=True).alias('RANGE'),
             # Stellantis specific features / Might be able to handle with config
             F.expr("percentile_approx(soh_oem, 0.5)").alias('SOH_OEM'),
         ]

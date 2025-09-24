@@ -3,6 +3,8 @@ import asyncio
 import msgspec
 from transform.compressor.compressor import Compressor
 from core.s3.async_s3 import AsyncS3
+from botocore.exceptions import ClientError
+import gc
 
 
 class BMWCompressor(Compressor):

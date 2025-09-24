@@ -24,17 +24,18 @@ def get_google_sheet_data(max_retries=MAX_RETRIES, initial_delay=INITIAL_RETRY_D
     """Récupère les données de la Google Sheet avec gestion des rate limits et des erreurs."""
     client = get_google_client()
     delay = initial_delay
+
     last_error = None
     
     for attempt in range(max_retries):
         try:
             sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+
             # Get all values including headers
             data = sheet.get_all_records()
             
             # Get headers from first row and use them as column names
             df = pd.DataFrame(data)
-            print(df)
             
             logger.info(f"Successfully fetched {len(df)} rows from Google Sheets")
             return df
@@ -175,7 +176,7 @@ def standardize_model_type(df: pd.DataFrame, oem_col='oem', model_col='model', t
     
     return df
 
-async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
+async def read_fleet_info(fleet_filter: Optional[str] = None) -> pd.DataFrame:
     """Read fleet information from Google Sheets."""
     # try:
     logger.info("Starting to read fleet information...")
@@ -190,27 +191,27 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     # Clean column names
     df.columns = [col if col == "EValue" else col.lower().strip().replace(' ', '_') for col in df.columns]
 
-    # Handle potential variations of the owner column name
-    owner_column_variants = ['owner', 'ownership', 'ownership_', 'fleet_owner', 'fleet']
-    owner_col = None
-    for variant in owner_column_variants:
+    # Handle potential variations of the fleet column name
+    fleet_column_variants = ['owner', 'ownership', 'ownership_', 'fleet_owner', 'fleet']
+    fleet_col = None
+    for variant in fleet_column_variants:
         if variant in df.columns:
-            owner_col = variant
-            logger.info(f"Found owner column: {variant}")
+            fleet_col = variant
+            logger.info(f"Found fleet column: {variant}")
             break
             
-    if owner_col is None:
-        raise ValueError(f"Could not find owner column. Available columns: {df.columns.tolist()}")
+    if fleet_col is None:
+        raise ValueError(f"Could not find fleet column. Available columns: {df.columns.tolist()}")
 
-    # Rename the owner column to 'owner' for consistency
-    df = df.rename(columns={owner_col: 'owner'})
+    # Rename the fleet column to 'fleet' for consistency
+    df = df.rename(columns={fleet_col: 'fleet'})
     
-    # Apply owner filter if provided
-    if owner_filter:
-        logger.info(f"Filtering by owner: {owner_filter}")
+    # Apply fleet filter if provided
+    if fleet_filter:
+        logger.info(f"Filtering by fleet: {fleet_filter}")
         initial_count = len(df)
-        df = df[df['owner'].str.lower() == owner_filter.lower()]
-        logger.info(f"Found {len(df)} vehicles for owner {owner_filter} (filtered from {initial_count})")
+        df = df[df['fleet'].str.lower() == fleet_filter.lower()]
+        logger.info(f"Found {len(df)} vehicles for fleet {fleet_filter} (filtered from {initial_count})")
     
 
     # Clean and standardize data
@@ -237,12 +238,16 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
         if col not in df.columns:
             logger.warning(f"Missing column {col}, adding empty column")
             df[col] = None
+
+
     # Add this before safe_astype
-    df = df.pipe(safe_astype, COL_DTYPES)
+    df = df.pipe(safe_astype_activation, COL_DTYPES)
     df = df.pipe(clean_version, model_col='model', version_col='type')
     df = df.pipe(format_licence_plate, licence_plate_col='licence_plate')
     df = df.pipe(standardize_model_type, oem_col='oem', model_col='model', type_col='type')
     logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
+
+    print(df.columns)
     
     return df
         
@@ -251,4 +256,4 @@ async def read_fleet_info(owner_filter: Optional[str] = None) -> pd.DataFrame:
     #     raise
 
 if __name__ == "__main__":
-    df = asyncio.run(read_fleet_info(owner_filter=''))
+    df = asyncio.run(read_fleet_info(fleet_filter=''))

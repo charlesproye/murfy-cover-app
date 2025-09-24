@@ -10,6 +10,15 @@ services:
     container_name: data_ev
     env_file:
       - .env
+  activation_service:
+    platform: linux/amd64
+    image: rg.fr-par.scw.cloud/bib-images/activation:latest
+    build:
+      context: .
+      dockerfile: activation.Dockerfile
+    container_name: activation
+    env_file:
+      - .env
 
   tesla_ingestion_service:
     build:
