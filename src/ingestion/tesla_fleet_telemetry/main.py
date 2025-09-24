@@ -19,13 +19,13 @@ from botocore.client import Config
 warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<socket.socket.*>")
 
 # Fix relative imports to use absolute paths
-from src.ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
-from src.ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
-from src.ingestion.tesla_fleet_telemetry.core.s3_handler import (
+from ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
+from ingestion.tesla_fleet_telemetry.utils.data_processor import process_telemetry_data
+from ingestion.tesla_fleet_telemetry.core.s3_handler import (
      save_data_to_s3, cleanup_clients,
     sync_time_with_aws, force_time_sync
 )
-from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
+from ingestion.tesla_fleet_telemetry.config.settings import get_settings
 
 # Logging configuration
 logging.basicConfig(
