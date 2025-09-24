@@ -14,7 +14,7 @@ from functools import wraps
 import aioboto3
 import boto3
 
-from src.ingestion.tesla_fleet_telemetry.config.settings import get_settings
+from ingestion.tesla_fleet_telemetry.config.settings import get_settings
 
 # Silence the checksum validation messages
 logging.getLogger('botocore.httpchecksum').setLevel(logging.WARNING)

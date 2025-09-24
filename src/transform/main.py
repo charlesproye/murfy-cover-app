@@ -17,7 +17,7 @@ from transform.raw_results.main import update_all_raw_tss
 from transform.processed_results.main import update_vehicle_data_table
 from transform.processed_results.demo_data.ingest_demo import ingest_demo
 from transform.activation.main import VehicleInfoProcessor
-from src.results.scoring.update_scoring import FrontUtils
+from results.scoring.update_scoring import FrontUtils
 
 logger = getLogger("transform.main")
 

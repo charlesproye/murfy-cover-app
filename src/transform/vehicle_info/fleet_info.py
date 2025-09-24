@@ -9,14 +9,14 @@ from gspread import Cell
 import re
 
 
-from src.core.pandas_utils import *
-from src.core.s3.s3_utils import S3Service
-from src.core.singleton_s3_bucket import S3
-from src.core.config import *
-from src.activation.config.credentials import SPREADSHEET_ID 
-from src.activation.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
-from src.activation.config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
-from src.activation.utils.google_sheets_utils import get_google_client
+from core.pandas_utils import *
+from core.s3.s3_utils import S3Service
+from core.singleton_s3_bucket import S3
+from core.config import *
+from activation.config.credentials import SPREADSHEET_ID 
+from activation.config.mappings import OEM_MAPPING, COUNTRY_MAPPING, COL_DTYPES, suffixes_to_remove, mappings
+from activation.config.settings import MAX_RETRIES, INITIAL_RETRY_DELAY, MAX_RETRY_DELAY
+from activation.utils.google_sheets_utils import get_google_client
 
 logger = getLogger("ingestion.vehicle_info")
  
