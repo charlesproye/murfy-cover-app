@@ -54,8 +54,8 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
             .withColumn(
                 "CONSUMPTION",
                 F.when(F.col("PHASE_STATUS") == "discharging",
-                (- 1 * F.col("SOC_DIFF"))
-                * (F.col("BATTERY_NET_CAPACITY")) * F.col("SOH")
+                (- 1 * F.col("SOC_DIFF")
+                * F.col("BATTERY_NET_CAPACITY"))
                 / F.col("ODOMETER_DIFF"),
                 ).otherwise(None)
             )
