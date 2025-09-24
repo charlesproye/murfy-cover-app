@@ -38,6 +38,7 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
+            F.first('range', ignorenulls=True).alias('RANGE'),
             # Renault specific features / Might be able to handle with config
             F.sum('battery_energy').alias('BATTERY_ENERGY'),
             F.sum('expected_battery_energy').alias('EXPECTED_BATTERY_ENERGY'),

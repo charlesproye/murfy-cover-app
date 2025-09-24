@@ -98,5 +98,6 @@ echo "Démarrage du module tesla-fleet-telemetry..."
 python -m src.ingestion.tesla_fleet_telemetry.main \
     --bootstrap-servers "$KAFKA_BOOTSTRAP_SERVERS" \
     --topic "$KAFKA_TOPIC" \
+    --compress-now \
     --group-id "$KAFKA_GROUP_ID" \
     "$@"    
