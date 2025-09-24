@@ -1,5 +1,6 @@
 import logging
 import sys
+from tkinter import FALSE
 from core.console_utils import main_decorator
 from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session
@@ -16,7 +17,7 @@ from transform.processed_phases.providers.bmw import BMWRawTsToProcessedPhases
 ORCHESTRATED_MAKES = {
     "bmw": (False, BMWRawTsToProcessedPhases),
     "mercedes-benz": (False, MercedesBenzRawTsToProcessedPhases),
-    "renault": (False, RenaultRawTsToProcessedPhases),
+    "renault": (True, RenaultRawTsToProcessedPhases),
     "volvo-cars": (False, VolvoRawTsToProcessedPhases),
     "stellantis": (False, StellantisRawTsToProcessedPhases),
     "kia": (False, RawTsToProcessedPhases),

@@ -22,14 +22,8 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
     def compute_specific_features_before_aggregation(self, phase_df):
         phase_df = phase_df.withColumn('battery_energy', F.col('battery_energy').cast('double'))
 
-        phase_df_charging = phase_df.filter(F.col("PHASE_STATUS") == "charging")
-
-        max_battery_energy = phase_df_charging.groupBy(["net_capacity", "soc"]).agg(
-            F.expr("percentile_approx(battery_energy, 0.9)").alias("max_battery_energy")
-        )
-
-        df = phase_df.join(max_battery_energy, on=["net_capacity", "soc"], how="left")
-        df = df.withColumn('max_battery_energy', F.col('max_battery_energy').cast('double'))
+        df = phase_df.withColumn('soh', F.col('battery_energy') * 100 / (F.col('net_capacity') * F.col('soc')))
+        df = df.withColumn('soh', F.col('soh').cast('double'))
 
         return df
 
@@ -43,9 +37,9 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
+            F.first('range', ignorenulls=True).alias('RANGE'),
             # Ford specific features / Might be able to handle with config
-            F.sum('battery_energy').alias('BATTERY_ENERGY_SUM'),
-            F.sum('max_battery_energy').alias('MAX_BATTERY_ENERGY_SUM')
+            F.mean('soh').alias('SOH')
         ]
 
 

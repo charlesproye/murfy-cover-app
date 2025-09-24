@@ -29,6 +29,7 @@ class TeslaRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
+            F.first('range', ignorenulls=True).alias('RANGE'),
             # Tesla specific features / Might be able to handle with config
             F.expr("percentile_approx(charging_power, 0.5)").alias('CHARGING_POWER'),
             F.first("tesla_code", ignorenulls=True).alias("TESLA_CODE"),
@@ -36,7 +37,6 @@ class TeslaRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.last("charge_energy_added").alias("ENERGY_ADDED_END"),
             F.mean('inside_temp').alias('INSIDE_TEMP_MEAN'),
             F.mean('outside_temp').alias('OUTSIDE_TEMP_MEAN'),
-            F.first('range').alias('RANGE_FIRST')
         ]
 
         if "consumption" in phase_df.columns:
