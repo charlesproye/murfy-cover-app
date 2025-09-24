@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 from core.gsheet_utils import load_excel_data
 from core.sql_utils import get_connection, get_sqlalchemy_engine
-from load.trendline.trendline_utils import *  # noqa: F403
+from load.trendline.trendline_utils import *  
 
 
 def generate_trendline_functions(df, odometer_column, soh_column):
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         df_temp = df_merge[(df_merge["id"] == model_car)].copy()
         try:
             if filtrer_trendlines(
-                df_temp, "Odomètre (km)", "lien", 50_000, 50_000, 50, 20, 10
+                df_temp, "Odomètre (km)", "lien", 0, 0, 20, 0, 0
             ):
                 mean_trend, upper_bound, lower_bound = generate_trendline_functions(
                     df_temp, "Odomètre (km)", "SoH"
