@@ -4,7 +4,15 @@ import logging
 from typing import Annotated, Iterable
 import aioboto3
 from botocore.exceptions import ClientError
+
 from .settings import S3Settings
+from typing import AsyncGenerator
+from typing import TypeVar
+
+import time
+
+T = TypeVar("T")
+
 
 class AsyncS3:
     def __init__(self, settings: S3Settings | None = None, max_concurrency: int = 200):
@@ -35,12 +43,11 @@ class AsyncS3:
         """Returns (folders, files)"""
         folders = set()
         files = []
-        async with self._sem:
-            async with self._client() as client:  # type: ignore
-                paginator = client.get_paginator("list_objects_v2")
-                async for page in paginator.paginate(
-                    Bucket=self.bucket, Prefix=path, Delimiter="/"
-                ):
+        async with self._client() as client:  # type: ignore
+            paginator = client.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(Bucket=self.bucket, Prefix=path, Delimiter="/"):
+                # On ne protège que le traitement des objets/pages
+                async with self._sem:
                     for cp in page.get("CommonPrefixes", []):
                         folders.add(cp.get("Prefix"))
                     for content in page.get("Contents", []):
@@ -61,28 +68,38 @@ class AsyncS3:
                         return None
                     raise
 
-    async def get_files(self, paths:Iterable[str]) ->dict[str,bytes]:
+    async def get_files(self, paths: Iterable[str]) -> dict[str, bytes]:
         paths_list = list(paths)
-        self.logger.info(f"GETTING FILES for path {paths_list[:5]}")
-        batch_size:int = self.max_concurrency
-        results: dict[str, bytes] = {}
-        for batch_index in range(0,len(paths_list), batch_size):
-            self.logger.info(f"({batch_index}-{batch_index+batch_size}):Started")
-            batch = paths_list[batch_index:batch_index+batch_size]
-            results.update(await self._get_files_no_limit(batch))
-            self.logger.info(f"({batch_index}-{batch_index+batch_size}):Finished")
+        self.logger.info(f"GETTING FILES for {len(paths_list)} files, first 5: {paths_list[:5]}")
+        
+        start_time = time.time()
+        results = await self._get_files_optimized(paths_list)
+        elapsed = time.time() - start_time
+        
+        self.logger.info(f"Downloaded {len(results)} files in {elapsed:.2f}s ({len(results)/elapsed:.1f} files/s)")
         return results
     
-    async def _get_files_no_limit(self, paths: Iterable[str]) -> dict[str,bytes]:
+    async def _get_files_optimized(self, paths: list[str]) -> dict[str, bytes]:
+        """Optimized download using single client with proper concurrency control"""
         results: dict[str, bytes] = {}
-
-        async def download(key: str):
-            async with self._sem:
-                data = await self.get_file(key)
-                if data is not None:
-                    results[key] = data
-        await asyncio.gather(*(download(f) for f in paths))
+        
+        async with self._client() as client:
+            async def download_single(key: str):
+                async with self._sem:
+                    try:
+                        response = await client.get_object(Bucket=self.bucket, Key=key)
+                        async with response["Body"] as stream:
+                            data = await stream.read()
+                            results[key] = data
+                    except ClientError as e:
+                        if e.response["Error"]["Code"] != "NoSuchKey":
+                            self.logger.error(f"Failed to download {key}: {e}")
+            
+            # Process all downloads concurrently with semaphore limiting
+            await asyncio.gather(*(download_single(path) for path in paths), return_exceptions=True)
+        
         return results
+
 
     async def upload_file(self, path: str, file: bytes) -> None:
         async with self._client() as client:  # type: ignore
@@ -103,6 +120,26 @@ class AsyncS3:
         _, files = await self.list_content(folder_path)
         self.logger.info(f"{len(files) = }: {files[:10] = }")
         return await self.get_files(files)
+
+    async def download_folder_in_batches(
+        self, folder_path: str, batch_size: int = 1000
+    ) -> AsyncGenerator[dict[str, bytes], None]:
+        """
+        Download folder in batches. The batch_size now refers to how many files 
+        to yield at once, not a concurrency limit (which is controlled by max_concurrency).
+        """
+        _, files = await self.list_content(folder_path)
+        self.logger.info(f"Found {len(files)} files to download from {folder_path}")
+
+        # For smaller datasets, just download everything at once
+        if len(files) <= self.max_concurrency:
+            yield await self.get_files(files)
+            return
+            
+        # For larger datasets, process in chunks to avoid memory issues
+        for i in range(0, len(files), batch_size):
+            batch = files[i:i + batch_size]
+            yield await self.get_files(batch)
         
     async def delete_folder(self, prefix: str) -> int:
         deleted_count = 0
@@ -129,4 +166,3 @@ class AsyncS3:
 
 def get_async_s3() -> AsyncS3:
     return AsyncS3()
-

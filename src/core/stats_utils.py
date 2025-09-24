@@ -185,3 +185,30 @@ def estimate_cycles(total_range:float=0, initial_range:float=1, soh:float=1.0):
 
 def log_function(x, a ,b, c):
     return a + b * np.log1p(x / c)
+
+def compute_confidence_interval(df):
+    n = df.size
+    mean = df.mean()
+    std = df.std()
+    median = df.median()
+    
+    if n == 0:
+        return pd.Series({
+            'lower': np.nan,
+            'upper': np.nan,
+            'number_charges': 0,
+            'soh_median': np.nan,
+            'ic_point_diff': np.nan
+        })
+
+    margin = 1.96 * std / np.sqrt(n)
+    lower = round(mean - margin, 4)
+    upper = round(mean + margin, 4)
+    
+    return pd.Series({
+        'lower': lower,
+        'upper': upper,
+        'number_charges': n,
+        'soh_median': median,
+        'ic_point_diff': round(upper - lower, 4)
+    })
