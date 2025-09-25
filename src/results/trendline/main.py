@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 from core.gsheet_utils import load_excel_data
 from core.sql_utils import get_connection, get_sqlalchemy_engine
-from load.trendline.trendline_utils import *  
+from results.trendline.trendline_utils import *  
 
 
 def generate_trendline_functions(df, odometer_column, soh_column):
