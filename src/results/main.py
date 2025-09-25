@@ -3,7 +3,7 @@ from results.soh_scrapping.scrapping_aramis import main as scrapping_aramis
 from results.soh_scrapping.scrapping_autospherre import main as scrapping_autospherre
 from core.gsheet_utils import clean_gsheet
 from results.forecast.price_predictor import train_and_save
-from results.trendline.main import main as update_trendline
+from results.trendline.main import update_trendline_oem, update_trendline_from_bib, update_trendline_from_scrapping
 
 if __name__ == "__main__":
     #Front 
@@ -13,7 +13,9 @@ if __name__ == "__main__":
     scrapping_aramis()
     # scrapping_autospherre()
     # #Calculate Trendlines
-    update_trendline()
+    update_trendline_oem()
+    update_trendline_from_bib()
+    update_trendline_from_scrapping()
     # price forecast
     train_and_save('model_price.pkl')
 
