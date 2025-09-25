@@ -83,7 +83,8 @@ class MergedFordCharging(msgspec.Struct):
     battery_energy: list[HMApiValue[DataWithUnit[float]]] = []
     battery_level: list[HMApiValue[float]] = []
     charge_limit: list[HMApiValue[float]] = []
-    charger_voltage: list[HMApiValue[float]] = []
+    charger_voltage: list[HMApiValue[DataWithUnit[float]]] = []
+    charging_current: list[HMApiValue[DataWithUnit[float]]] = []
     time_to_complete_charge: list[HMApiValue[DataWithUnit[float]]] = []  # Changed
     status: list[HMApiValue[str]] = []
     battery_performance_status: list[HMApiValue[str]] = []
