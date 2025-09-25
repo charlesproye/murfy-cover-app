@@ -4,7 +4,7 @@ import logging
 from typing import Annotated, Any, Optional
 from datetime import datetime
 from io import BytesIO
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 import boto3
 import pandas as pd
@@ -12,15 +12,14 @@ from pandas import Series
 import pyarrow.parquet as pq
 from pandas import DataFrame as DF
 
-from ..config import *
-from ..pandas_utils import str_split_and_retain_src
-from .settings import S3Settings
-import tempfile
+from core.config import *
+from core.pandas_utils import str_split_and_retain_src
+from core.s3.settings import S3Settings
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import regexp_extract, col
-from ..spark_utils import align_dataframes_for_union
+from core.spark_utils import align_dataframes_for_union
 from botocore.exceptions import ClientError
 import yaml
+import joblib 
 
 class S3Service():
     def __init__(self, settings:S3Settings|None = None):
@@ -398,8 +397,8 @@ class S3Service():
         if not prefix.endswith("/"):
             prefix += "/"
         pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
-        for pages in pages:
-            for obj in pages["Contents"]:
+        for page in pages:
+            for obj in page["Contents"]:
                 if obj['Key'] in prefix_to_exclude or (exclude_temp and "/temp/" in obj['Key']):
                     continue
                 objects.append(obj['Size'])
@@ -449,6 +448,33 @@ class S3Service():
             raise
         except Exception as e:
             self.logger.error(f"Error reading YAML file {path}: {e}")
+            raise
+        
+    def save_as_pickle(self, obj, key: str) -> None:
+        buffer = BytesIO()
+        try:
+            joblib.dump(obj, buffer)
+            buffer.seek(0)
+        
+            self._s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=buffer.getvalue()
+            )
+            self.logger.info(f"File save on s3://{self.bucket_name}/{key}")
+        except Exception as e:
+            self.logger.error(f"Error saving pickle file s3://{self.bucket_name}/{key}: {e}")
+            raise
+        
+    def load_pickle(self, key):
+        
+        try:
+            response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            buffer = BytesIO(response["Body"].read())
+            model = joblib.load(buffer)
+            return model
+        except Exception as e:
+            self.logger.error(f"Error reading pickle file s3://{self.bucket_name}/{key}: {e}")
             raise
 
 @lru_cache

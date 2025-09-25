@@ -1,0 +1,50 @@
+name: data_ev_activation
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11.3
+  - pip=23.1.2
+  - python-dotenv=1.0.0
+  - pandas=2.2.2
+  - aiohttp=3.11.11
+  - gspread
+  - oauth2client
+  - httpx=0.23.3
+  - orjson=3.8.5
+  - python-dateutil=2.8.2
+  - tqdm=4.66.5
+  - rich=13.5.2
+  - msgspec=0.18.6
+  - aioboto3=13.4.0
+  - pyarrow=19.0.0
+  - psycopg2-binary=2.9.3
+  - asyncpg=0.27.0
+  - minio=7.1.13
+  - pillow=9.4.0
+  - plotly=5.19.0
+  - nbformat=5.10.4
+  - nbstripout=0.8.1
+  - fastapi=0.115.12
+  - alembic=1.9.1
+  - email-validator=2.2.0
+  - inflection=0.5.1
+  - python-jose=3.3.0
+  - python-multipart=0.0.18
+  - passlib=1.7.4
+  - bcrypt=4.0.1
+  - sqlmodel=0.0.24
+  - rapidfuzz=3.13.0
+  - streamlit=1.47.0
+
+  - pip:
+      - pydantic>=2.3.0
+      - pydantic-settings==2.2.1
+      - redis==5.2.1
+      - requests>=2.30.0
+      - apscheduler==3.10.4
+      - aiokafka==0.10.0
+      - uuid6==2022.10.25
+      - fastapi-pagination==0.11.1
+      - hypercorn==0.14.3
+

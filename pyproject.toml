@@ -49,7 +49,7 @@ transform = [
 
 # EDA module dependencies - for exploratory data analysis notebooks
 eda = [
-    "plotly==5.19.0", 
+    "plotly==5.19.0",
     "matplotlib==3.7.2",
     "scipy==1.10.1",
     "scikit-learn==1.5.1",
@@ -64,7 +64,7 @@ eda = [
 load = [
     "rapidfuzz==3.13.0",
     "gspread",
-    "oauth2client", 
+    "oauth2client",
     "psycopg2-binary>=2.9.9",
     "asyncpg==0.27.0",
     "sqlmodel==0.0.24",
@@ -109,52 +109,45 @@ scraping = [
 dev = [
     "data_ev[activation,transform,eda,load,web,results,ingestion]",
     "pytest",
-    "black",
     "ruff",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.black]
-line-length = 88
-target-version = ["py311"]
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
-
 [tool.ruff]
 target-version = "py311"
 line-length = 88
+extend-exclude = ["*.ipynb", "*.csv"]
+
+[tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
+    "E", # pycodestyle (error)
+    "F", # pyflakes
+    "B", # bugbear
+    "B9",
     "C4", # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "I", # isort
     "UP", # pyupgrade
+    "PIE", # flake8-pie
+    "PGH", # pygrep-hooks
+    "PYI", # flake8-pyi
+    "RUF",
 ]
+
 ignore = [
-    "E501",  # line too long, handled by black
-    "B008",  # do not perform function calls in argument defaults
-    "C901",  # too complex
+    # only relevant if you run a script with `python -0`,
+    # which seems unlikely for any of the scripts in this repo
+    "B011",
+    # Leave it to the formatter to split long lines and
+    # the judgement of all of us.
+    "E501"
 ]
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["core", "activation", "transform", "eda", "load", "web", "results"]
 

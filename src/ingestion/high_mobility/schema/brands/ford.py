@@ -2,12 +2,7 @@ from typing import Annotated, Optional, Self, cast
 
 import msgspec
 
-from .. import (
-    DataWithUnit,
-    HMApiResponse,
-    HMApiValue,
-    is_new_value,
-)
+from .. import DataWithUnit, HMApiResponse, HMApiValue, is_new_value
 from ..factory import register_brand, register_merged
 
 
@@ -32,6 +27,7 @@ class FordCharging(msgspec.Struct):
 class FordUsage(msgspec.Struct):
     last_trip_battery_regenerated: Optional[HMApiValue[DataWithUnit[float]]] = None
     electric_distance_last_trip: Optional[HMApiValue[DataWithUnit[float]]] = None
+
 
 @register_brand(rate_limit=36)
 class FordInfo(HMApiResponse):
@@ -63,20 +59,32 @@ class MergedFordDiagnostics(msgspec.Struct):
     def merge(self, other: Optional[FordDiagnostics]):
         if other is not None:
             if is_new_value(self.odometer, other.odometer):
-                self.odometer.append(cast(HMApiValue[DataWithUnit[float]], other.odometer))
+                self.odometer.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.odometer)
+                )
             if is_new_value(self.fuel_level, other.fuel_level):
-                self.fuel_level.append(cast(HMApiValue[DataWithUnit[float]], other.fuel_level))
+                self.fuel_level.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.fuel_level)
+                )
             if is_new_value(self.speed, other.speed):
                 self.speed.append(cast(HMApiValue[DataWithUnit[float]], other.speed))
-            if is_new_value(self.engine_coolant_temperature, other.engine_coolant_temperature):
-                self.engine_coolant_temperature.append(cast(HMApiValue[DataWithUnit[float]], other.engine_coolant_temperature))
+            if is_new_value(
+                self.engine_coolant_temperature, other.engine_coolant_temperature
+            ):
+                self.engine_coolant_temperature.append(
+                    cast(
+                        HMApiValue[DataWithUnit[float]],
+                        other.engine_coolant_temperature,
+                    )
+                )
 
 
 class MergedFordCharging(msgspec.Struct):
     battery_energy: list[HMApiValue[DataWithUnit[float]]] = []
     battery_level: list[HMApiValue[float]] = []
     charge_limit: list[HMApiValue[float]] = []
-    charger_voltage: list[HMApiValue[float]] = []
+    charger_voltage: list[HMApiValue[DataWithUnit[float]]] = []
+    charging_current: list[HMApiValue[DataWithUnit[float]]] = []
     time_to_complete_charge: list[HMApiValue[DataWithUnit[float]]] = []  # Changed
     status: list[HMApiValue[str]] = []
     battery_performance_status: list[HMApiValue[str]] = []
@@ -108,13 +116,25 @@ class MergedFordCharging(msgspec.Struct):
             if is_new_value(self.status, other.status):
                 self.status.append(cast(HMApiValue[str], other.status))
             if is_new_value(self.battery_energy, other.battery_energy):
-                self.battery_energy.append(cast(HMApiValue[DataWithUnit[float]], other.battery_energy))
+                self.battery_energy.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.battery_energy)
+                )
             if is_new_value(self.charger_voltage, other.charger_voltage):
-                self.charger_voltage.append(cast(HMApiValue[float], other.charger_voltage))
-            if is_new_value(self.time_to_complete_charge, other.time_to_complete_charge):
-                self.time_to_complete_charge.append(cast(HMApiValue[DataWithUnit[float]], other.time_to_complete_charge))  # Changed
-            if is_new_value(self.battery_performance_status, other.battery_performance_status):
-                self.battery_performance_status.append(cast(HMApiValue[str], other.battery_performance_status))
+                self.charger_voltage.append(
+                    cast(HMApiValue[float], other.charger_voltage)
+                )
+            if is_new_value(
+                self.time_to_complete_charge, other.time_to_complete_charge
+            ):
+                self.time_to_complete_charge.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.time_to_complete_charge)
+                )  # Changed
+            if is_new_value(
+                self.battery_performance_status, other.battery_performance_status
+            ):
+                self.battery_performance_status.append(
+                    cast(HMApiValue[str], other.battery_performance_status)
+                )
 
 
 class MergedFordUsage(msgspec.Struct):
@@ -126,7 +146,9 @@ class MergedFordUsage(msgspec.Struct):
         ret = cls()
         if initial is not None:
             if initial.last_trip_battery_regenerated is not None:
-                ret.last_trip_battery_regenerated = [initial.last_trip_battery_regenerated]
+                ret.last_trip_battery_regenerated = [
+                    initial.last_trip_battery_regenerated
+                ]
             if initial.electric_distance_last_trip is not None:
                 ret.electric_distance_last_trip = [initial.electric_distance_last_trip]
         return ret
@@ -137,7 +159,10 @@ class MergedFordUsage(msgspec.Struct):
                 self.last_trip_battery_regenerated, other.last_trip_battery_regenerated
             ):
                 self.last_trip_battery_regenerated.append(
-                    cast(HMApiValue[DataWithUnit[float]], other.last_trip_battery_regenerated)
+                    cast(
+                        HMApiValue[DataWithUnit[float]],
+                        other.last_trip_battery_regenerated,
+                    )
                 )
             if is_new_value(
                 self.electric_distance_last_trip, other.electric_distance_last_trip
@@ -172,3 +197,4 @@ class MergedFordInfo(msgspec.Struct):
         self.diagnostics.merge(other.diagnostics)
         self.charging.merge(other.charging)
         self.usage.merge(other.usage)
+

@@ -1,10 +1,15 @@
 import asyncio
+import io
+
 import msgspec
-from transform.compressor.compressor import Compressor
+
 from core.s3.async_s3 import AsyncS3
+from ingestion.mobilisights.schema import CarState, MergedCarState
+from transform.compressor.compressor import Compressor
+
 
 class MobilisightCompressor(Compressor):
-    def __init__(self, make='stellantis') -> None:
+    def __init__(self, make="stellantis") -> None:
         super().__init__()
         self.make = make
         self._s3 = AsyncS3()
@@ -16,11 +21,10 @@ class MobilisightCompressor(Compressor):
     def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
         data = []
         for file in new_files.values():
-            decoded = msgspec.json.decode(file)
-            if isinstance(decoded,str):
-                decoded = msgspec.json.decode(decoded.encode())
+            decoded = msgspec.json.decode(file, type=CarState)
             data.append(decoded)
-        return msgspec.json.encode(data)
+        merged_data = MergedCarState.from_list(data)
+        return msgspec.json.encode(merged_data)
 
     @classmethod
     async def compress(cls, make: str):
@@ -28,3 +32,4 @@ class MobilisightCompressor(Compressor):
         asyncio.get_event_loop().set_debug(False)
         compressor = cls(make)
         await compressor.run()
+
