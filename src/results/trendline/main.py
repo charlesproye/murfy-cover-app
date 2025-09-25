@@ -37,11 +37,8 @@ def generate_trendline_functions(df, odometer_column, soh_column):
         lower_bound = compute_lower_bound(df_clean, mean, coef_mean)
     return mean, upper_bound, lower_bound
 
-
-if __name__ == "__main__":
-    ######## Compute trendline from scrapping SoH ####################
-
-    #### Get data from scrapping
+def main():
+     #### Get data from scrapping
 
     df_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(
@@ -187,3 +184,8 @@ if __name__ == "__main__":
         else:
             logging.info(f"Can't compute trendline for oem: {oem}")
 
+    
+
+
+if __name__ == "__main__":
+   main()
