@@ -22,7 +22,7 @@ def generate_trendline_functions(df, odometer_column, soh_column):
     Returns:
     --------
     tupple
-        trendlines moyenne, borne supérieure et inférieure
+        trendlines mean, upper and lower bound
     """
     df_clean = clean_battery_data(df, odometer_column, soh_column)
     if df_clean.shape[0] < 20:
