@@ -3,6 +3,7 @@ import logging
 import pandas as pd
 from sqlalchemy import text
 
+from activation.config.mappings import mapping_vehicle_type
 from core.gsheet_utils import load_excel_data
 from core.sql_utils import get_connection, get_sqlalchemy_engine
 from results.trendline.trendline_utils import *
@@ -50,7 +51,7 @@ def load_all_data():
             "year",
             "odometer",
             "soh",
-            "link",
+            "vin",
             "battery_capacity",
         ],
     )
@@ -101,7 +102,10 @@ def load_all_data():
             ],
             how="left",
         )
-
+    df_merge["vehicle_model_id"] = df_merge.apply(
+        lambda x: mapping_vehicle_type(x["type"], x["make_name"], x["model_name"], df),
+        axis=1,
+    )
     df_all = pd.concat((df, df_merge), ignore_index=True)
     return df_all
 
@@ -111,9 +115,7 @@ def update_trendline_oem():
 
     for oem in df_all.oem_id.unique():
         df_temp = df_all[df_all["oem_id"] == oem]
-        if filtrer_trendlines(
-            df_temp, "odometer", "odometer", 50_000, 50_000, 50, 10, 10
-        ):
+        if filtrer_trendlines(df_temp, "odometer", "soh", 50_000, 50_000, 50, 10, 10):
             mean_trend, upper_bound, lower_bound = generate_trendline_functions(
                 df_temp, "odometer", "soh"
             )
@@ -132,9 +134,9 @@ def update_trendline_model():
     for model_car in load_all_data()["id"].unique():
         df_temp = load_all_data()[(load_all_data()["id"] == model_car)].copy()
         try:
-            if filtrer_trendlines(df_temp, "Odomètre (km)", "lien", 0, 0, 20, 0, 0):
+            if filtrer_trendlines(df_temp, "odometer", "vin", 0, 0, 20, 0, 0):
                 mean_trend, upper_bound, lower_bound = generate_trendline_functions(
-                    df_temp, "Odomètre (km)", "SoH"
+                    df_temp, "odometer", "soh"
                 )
                 update_database_trendlines(
                     model_car, mean_trend, upper_bound, lower_bound, False
