@@ -287,13 +287,13 @@ def compute_lower_bound(df, trendlines, coef_mean):
 
 def filtrer_trendlines(
     df,
-    col_odometer="odometer",
-    col_vin="vin",
-    km_lower=80000,
-    km_upper=100000,
-    vin_total=50,
-    nbr_under=20,
-    nbr_upper=10,
+    col_odometer,
+    col_vin,
+    km_lower,
+    km_upper,
+    vin_total,
+    nbr_under,
+    nbr_upper,
 ):
     """
     Filters models based on mileage and the number of unique listings.
