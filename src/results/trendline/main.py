@@ -91,19 +91,24 @@ def load_all_data():
     con = engine.connect()
     with engine.connect() as connection:
         dbeaver_df = pd.read_sql(
-            text("""SELECT m.make_name, o.id as oem_id, o.oem_name, m.id as make_id FROM make m
-                                    join oem o on o.id=m.oem_id;"""),
+            text("""SELECT vm.model_name, vm.id as id, vm.type, m.make_name, o.oem_name, o.id as oem_id, m.id as make_id FROM vehicle_model vm
+            JOIN oem o ON o.id = vm.oem_id
+            JOIN make m on m.id = vm.make_id
+            and o.id not in (uuid('fe6fba2f-1e10-43a7-b8b0-2aa021f97c3f'), uuid('1b093647-0d1b-409f-8b37-871bc81ac9ca'), uuid('5d2e8c26-d2bb-4c24-812e-59c3a7508213'), uuid('fc285a82-f5ea-44a0-8f2e-706cd5f8c868'))
+        ;"""),
             con,
         )
         df_merge = df_sheet.merge(
-            dbeaver_df,
+            dbeaver_df[["make_name", "oem_id", "oem_name"]].drop_duplicates(),
             on=[
                 "make_name",
             ],
             how="left",
         )
     df_merge["vehicle_model_id"] = df_merge.apply(
-        lambda x: mapping_vehicle_type(x["type"], x["make_name"], x["model_name"], df),
+        lambda x: mapping_vehicle_type(
+            x["type"], x["make_name"], x["model_name"], dbeaver_df
+        ),
         axis=1,
     )
     df_all = pd.concat((df, df_merge), ignore_index=True)
@@ -131,8 +136,8 @@ def update_trendline_model():
 
     logging.info("Starting trendline update from gsheet")
 
-    for model_car in load_all_data()["id"].unique():
-        df_temp = load_all_data()[(load_all_data()["id"] == model_car)].copy()
+    for model_car in df_all["id"].unique():
+        df_temp = df_all[(load_all_data()["id"] == model_car)].copy()
         try:
             if filtrer_trendlines(df_temp, "odometer", "vin", 0, 0, 20, 0, 0):
                 mean_trend, upper_bound, lower_bound = generate_trendline_functions(
