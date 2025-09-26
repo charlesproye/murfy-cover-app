@@ -7,12 +7,12 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-dev --extra transform
+    uv sync --locked --no-install-project --no-dev --extra activation
 
 COPY . /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --extra transform
+    uv sync --locked --no-dev --extra activation
 
 FROM python:3.11-slim-bookworm
 
@@ -24,8 +24,8 @@ COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
-
 USER app
 
-CMD ["./start_transform.sh"]
+# Entrypoint
+CMD ["python", "src/activation/main.py"]
 
