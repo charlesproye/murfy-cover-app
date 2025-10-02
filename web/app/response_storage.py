@@ -1,13 +1,18 @@
+from collections.abc import Sequence
 from datetime import datetime
 from functools import lru_cache
-from typing import Annotated, Sequence
-from fastapi import Depends
+from typing import Annotated
+
 import msgspec
+from fastapi import Depends
 from pydantic import BaseModel
-from .schemas import BaseModelWithVin
+
 from core.s3.async_s3 import AsyncS3, get_async_s3
 
-AsyncS3Dep = Annotated[AsyncS3,Depends(get_async_s3)]
+from .schemas import BaseModelWithVin
+
+AsyncS3Dep = Annotated[AsyncS3, Depends(get_async_s3)]
+
 
 class ResponseStorage:
     def __init__(self, s3: AsyncS3 | None = None) -> None:

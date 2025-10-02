@@ -2,7 +2,7 @@
 # scw init
 
 # create image 
-docker compose -f web/docker-compose.yml build    
+docker compose -f ../docker-compose.yaml build ingestion-web-app
 
 # login first time only 
 # docker login rg.fr-par.scw.cloud/bib-images -u nologin --password-stdin <<< "$SCW_SECRET_KEY"
