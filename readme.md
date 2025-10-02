@@ -21,25 +21,6 @@ The goal of this package is to handle every step of the data analytics service o
 
 ## Install depenedencies
 
-Conda is used for dedendency management.
-
-if you want to manage python environment yourself with conda for example, the workflow is as follows:
-
-- Create a conda env
-- Activate conda env before performing any actions
-
-You need to install all dependencies with conda
-
-```bash
-conda env update -f conda-env.yaml
-
-#If you need to reset all the conda environnment
- conda env remove --name data_ev && conda env create --name data_ev --file conda-env.yaml
-# to launch immediately the environment:
-conda env remove --name data_ev && conda env create --name data_ev --file conda-env.yaml && conda activate data_ev
-```
-
-
 Install [uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation)
 ```bash
 # To install all deps

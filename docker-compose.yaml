@@ -15,7 +15,7 @@ services:
     image: rg.fr-par.scw.cloud/bib-images/activation:latest
     build:
       context: .
-      dockerfile: activation.Dockerfile
+      dockerfile: docker/activation.Dockerfile
     container_name: activation
     env_file:
       - .env
