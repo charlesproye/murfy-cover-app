@@ -667,6 +667,7 @@ requires-dist = [
     { name = "minio", marker = "extra == 'transform'", specifier = "==7.1.13" },
     { name = "msgspec", specifier = "==0.18.6" },
     { name = "nbformat", marker = "extra == 'eda'", specifier = "==5.10.4" },
+    { name = "nbstripout", marker = "extra == 'dev'" },
     { name = "nbstripout", marker = "extra == 'eda'", specifier = "==0.8.1" },
     { name = "oauth2client", marker = "extra == 'activation'" },
     { name = "oauth2client", marker = "extra == 'load'" },

@@ -110,6 +110,7 @@ dev = [
     "data_ev[activation,transform,eda,load,web,results,ingestion]",
     "pytest",
     "ruff",
+    "nbstripout",
 ]
 
 [tool.setuptools.packages.find]

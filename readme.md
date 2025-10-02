@@ -114,3 +114,9 @@ You can add this to VSCode on save (`cmd + shift + P` -> `Open User Settings (JS
     }
 ```
 
+#### Notebooks cleanup
+
+Do not commit large notebooks to the repo, try to strip output before commit.
+If you've enabled pre-commit (`pre-commit install`), `nbstripout` will run automatically.
+Otherise, you can run `find . -name '*.ipynb' -exec uv run nbstripout {} +` to clean all notebook outputs in the repo.
+
