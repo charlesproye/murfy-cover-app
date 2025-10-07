@@ -14,6 +14,7 @@ class Compressor(ABC):
 
     def __init__(self, s3: AsyncS3 | None = None) -> None:
         self._s3 = s3 or AsyncS3()
+        self._s3_dev = AsyncS3(env="dev")
 
     @property
     @abstractmethod
@@ -31,7 +32,7 @@ class Compressor(ABC):
                 vins_with_temps.append(vins_folders[i])
         for i, vin_path in enumerate(vins_with_temps):
             print(f"DOWNLOAD VIN: {vin_path}")
-            print(f"{(i/len(vins_with_temps) * 100):.2f}%")
+            print(f"{(i / len(vins_with_temps) * 100):.2f}%")
             if self.brand_prefix in [
                 "stellantis",
                 "ford",
@@ -66,6 +67,10 @@ class Compressor(ABC):
             path=f"{vin_folder_path}{self._filename()}", file=encoded_data
         )
 
+        await self._s3_dev.upload_file(
+            path=f"{vin_folder_path}{self._filename()}", file=encoded_data
+        )
+
         await self._s3.delete_folder(f"{vin_folder_path}temp/")
 
         # Emptying memory
@@ -74,9 +79,9 @@ class Compressor(ABC):
         gc.collect()
 
     async def _compress_temp_vin_data_buffer(
-        self, 
-        vin_folder_path: str, 
-        max_retries: int = 3, 
+        self,
+        vin_folder_path: str,
+        max_retries: int = 3,
         retry_delay: int = 2,
         upload: bool = True,
     ):
@@ -116,6 +121,9 @@ class Compressor(ABC):
             buf.seek(0)
             if upload:
                 await self._s3.upload_file(
+                    path=f"{vin_folder_path}{self._filename()}", file=buf.getvalue()
+                )
+                await self._s3_dev.upload_file(
                     path=f"{vin_folder_path}{self._filename()}", file=buf.getvalue()
                 )
             else:
