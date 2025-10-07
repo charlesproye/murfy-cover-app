@@ -12,7 +12,7 @@ dependencies = [
     # Core dependencies used across all modules
     "python-dotenv==1.0.0",
     "pandas==2.2.2", # Adds 150MB to images, might be worth to install only in needed modules
-    "msgspec==0.18.6",
+    "msgspec==0.19.0",
     "schedule==1.2.2",
     "rich==13.5.2",
     "requests==2.30.0",
@@ -105,12 +105,15 @@ scraping = [
     "lxml==6.0.1",
 ]
 
+[dependency-groups]
 # Full development environment with all dependencies
 dev = [
     "data_ev[activation,transform,eda,load,web,results,ingestion]",
     "pytest",
     "ruff",
     "nbstripout",
+    "fakeredis>=2.31.3",
+    "py-spy>=0.4.1",
 ]
 
 [tool.setuptools.packages.find]
@@ -146,7 +149,7 @@ ignore = [
     "E501"
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]

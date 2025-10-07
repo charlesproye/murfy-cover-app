@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from hashlib import blake2s
-from typing import Optional
-import logging
 from urllib.parse import quote, urlencode
 
 import requests
@@ -17,7 +16,7 @@ class MSApi:
     __auth_api_route = "api"
     __fleet_api_route = "connected-fleet/api"
 
-    __token: Optional[str] = None
+    __token: str | None = None
     __token_exp = float("inf")
 
     def __init__(
@@ -31,7 +30,7 @@ class MSApi:
         self.__fetch_token()
 
     def __format_datetime(self, datetime: datetime) -> str:
-        return f"{datetime.year:02d}-{datetime.month:02d}-{datetime.day:02d}T{datetime.hour:02d}:{datetime.minute:02d}:{datetime.second:02d}.{datetime.microsecond/1000:03.0f}Z"
+        return f"{datetime.year:02d}-{datetime.month:02d}-{datetime.day:02d}T{datetime.hour:02d}:{datetime.minute:02d}:{datetime.second:02d}.{datetime.microsecond / 1000:03.0f}Z"
 
     def __fetch_token(self):
         r = requests.post(
@@ -40,14 +39,14 @@ class MSApi:
         ).json()
         self.__token = r.get("authToken")
         timestamp = (
-            datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
+            datetime.now(tz=UTC) - datetime(1970, 1, 1, tzinfo=UTC)
         ).total_seconds()
         expires_in = 14 * 24 * 60 * 60  # 14 jours
         self.__token_exp = timestamp + expires_in
 
     def __get_token(self):
         timestamp = (
-            datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
+            datetime.now(tz=UTC) - datetime(1970, 1, 1, tzinfo=UTC)
         ).total_seconds()
         if timestamp > self.__token_exp:
             self.__fetch_token()
@@ -58,7 +57,7 @@ class MSApi:
     ):
         # Generate a 24 alphanumeric characters id
         id = blake2s(vin.encode(), digest_size=12).hexdigest()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_fmt = self.__format_datetime(now)
         to_fmt = self.__format_datetime(now + duration)
         token = self.__get_token()
@@ -76,7 +75,7 @@ class MSApi:
         )
         return result.status_code, result.json()
 
-    def export_car_info(self):
+    def export_car_info(self) -> tuple[int, Iterator[bytes]]:
         fleet_filter = {"fleets": [self.__fleet_id]}
         encoded_filter = urlencode(
             {"conditions": fleet_filter}, quote_via=quote

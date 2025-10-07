@@ -1,12 +1,14 @@
 import concurrent.futures
+import json
 import logging
 import os
 import signal
 import time
+from collections.abc import Callable
 from datetime import datetime
 from queue import Empty, Queue
 from types import FrameType
-from typing import Any, Callable, Optional
+from typing import Any
 
 import boto3
 import dotenv
@@ -14,6 +16,8 @@ import msgspec
 import schedule
 from botocore.credentials import threading
 from botocore.exceptions import ClientError
+
+from ingestion.ingestion_cache import IngestionCache
 from ingestion.mobilisights.api import MSApi
 from ingestion.mobilisights.schema import CarState, ErrorMesage
 
@@ -33,15 +37,10 @@ class MobilisightsIngester:
 
     __shutdown_requested = threading.Event()
 
-    rate_limit: int = 36
     upload_interval: int = 60
     max_workers: int = 8
 
-    def __init__(
-        self,
-        rate_limit: Optional[int] = 36,
-        max_workers: Optional[int] = 8
-    ):
+    def __init__(self, rate_limit: int = 60, max_workers: int | None = 8):
         """
         Parameters
         ----------
@@ -54,7 +53,11 @@ class MobilisightsIngester:
         """
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
-        self.__is_compressing = False 
+        self.__is_compressing = False
+        self.__ingestion_cache: IngestionCache = IngestionCache(
+            make="mobilisights", keys_to_ignore=["_id", "datetimeSending", "*.datetime"]
+        )
+        self.__decoder = msgspec.json.Decoder(CarState)
 
         dotenv.load_dotenv()
         MS_BASE_URL = os.getenv("MS_BASE_URL")
@@ -105,20 +108,19 @@ class MobilisightsIngester:
             aws_access_key_id=S3_KEY,
             aws_secret_access_key=S3_SECRET,
             config=boto3.session.Config(
-                signature_version='s3',
-                s3={'addressing_style': 'path'}
-            )
+                signature_version="s3", s3={"addressing_style": "path"}
+            ),
         )
         self.__bucket = S3_BUCKET
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.__job_queue = Queue()
-        self.rate_limit = rate_limit or self.rate_limit
+        self.rate_limit = rate_limit
         self.max_workers = max_workers or self.max_workers
 
         signal.signal(signal.SIGTERM, self.__handle_shutdown_signal)
         signal.signal(signal.SIGINT, self.__handle_shutdown_signal)
 
-    def __handle_shutdown_signal(self, signum: int, _frame: Optional[FrameType]):
+    def __handle_shutdown_signal(self, signum: int, _frame: FrameType | None):
         self.__ingester_logger.warn(
             f"Received signal {signal.Signals(signum).name}, shutting down"
         )
@@ -137,7 +139,8 @@ class MobilisightsIngester:
         self.__ingester_logger.info("Starting processing job queue")
         while not self.__shutdown_requested.is_set():
             try:
-                job = self.__job_queue.get_nowait()
+                # Avoid get_nowait to prevent using 100% CPU
+                job = self.__job_queue.get(timeout=0.1)
                 self.__executor.submit(job)
                 self.__job_queue.task_done()
             except Empty:
@@ -145,22 +148,41 @@ class MobilisightsIngester:
         self.__ingester_logger.info("Stopping worker thread")
         return
 
-    def __process_vehicle(self, data: Any):
+    def _parse_car_state_with_cache(self, data: bytes) -> CarState | None:
+        json_data = json.loads(data)
+
         try:
-            car_state = msgspec.json.decode(data, type=CarState)
+            car_state = self.__decoder.decode(data)
         except (msgspec.ValidationError, msgspec.DecodeError) as e:
-            self.__ingester_logger.error(f"Failed to parse car data: {e}")
+            vin = json_data.get("vin")
+            self.__ingester_logger.error(
+                f"[{vin}] Failed to parse car data: {e}. Data: {data}"
+            )
             return
-        self.__ingester_logger.info(f"Parsed data for VIN {car_state.vin} successfully")
+
+        if self.__ingestion_cache.json_in_db(vin=car_state.vin, json_data=json_data):
+            self.__ingester_logger.debug(
+                f"[{car_state.vin}] Car state already in cache"
+            )
+            return
+
+        self.__ingestion_cache.set_json_in_db(vin=car_state.vin, json_data=json_data)
+        self.__ingester_logger.info(f"[{car_state.vin}] Successfully parsed data")
+
+        return car_state
+
+    def __process_vehicle(self, data: Any):
+        car_state = self._parse_car_state_with_cache(data)
+
+        if car_state is None:
+            # If None, the car state is already in the cache or there was an error parsing the data
+            return
+
         filename = f"response/stellantis/{car_state.vin}/temp/{int(datetime.now().timestamp())}.json"
-        try:
-            encoded = msgspec.json.encode(car_state)
-        except msgspec.EncodeError as e:
-            self.__ingester_logger.error(f"Failed to reencode car data: {e}")
-            return
+
         try:
             uploaded = self.__s3.put_object(
-                Body=encoded,
+                Body=msgspec.json.encode(car_state),
                 Bucket=self.__bucket,
                 Key=filename,
             )
@@ -196,12 +218,13 @@ class MobilisightsIngester:
                         f"Encountered error {error.name} while fetching vehicle data: {error.message}"
                     )
 
-
     def __schedule_tasks(self):
         self.__fetch_scheduler.every(self.rate_limit).seconds.do(
             self.__job_queue.put, self.__fetch_vehicles
         ).tag("fetch")
-        self.__scheduler_logger.info(f"Scheduled vehicle fetch every {self.rate_limit} seconds")
+        self.__scheduler_logger.info(
+            f"Scheduled vehicle fetch every {self.rate_limit} seconds"
+        )
 
         # Run initial fetch
         self.__scheduler_logger.info("Starting initial fetch")

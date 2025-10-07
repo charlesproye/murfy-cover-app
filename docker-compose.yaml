@@ -93,8 +93,11 @@ services:
     env_file:
       - ./.env
       - ./.python.env
-    volumes:
-      - ./src:/app/src
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_USER=bib
+      - REDIS_PASSWORD=bibpwd
     depends_on:
       - redis
 
@@ -113,16 +116,16 @@ services:
 
   redis:
     image: redis:alpine
-    command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - ./redis.conf:/usr/local/etc/redis/redis.conf
-      - redis_data:/data
+      - ./redis-acl.conf:/usr/local/etc/redis/users.acl
     ports:
       - "6379:6379"
-    env_file:
-      - ./.env
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+        --port 6379
+        --protected-mode no
+        --aclfile /usr/local/etc/redis/users.acl
     deploy:
       restart_policy:
         condition: on-failure
@@ -130,7 +133,7 @@ services:
   ingestion-web-app:
     platform: linux/amd64
     image: rg.fr-par.scw.cloud/bib-images/ingestion-web-app:latest
-    build: 
+    build:
       dockerfile: docker/webapp.Dockerfile
       context: .
     ports:
