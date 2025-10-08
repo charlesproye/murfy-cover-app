@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: results-config
+data:
+  DB_DATA_EV_HOST: "195.154.70.203"
+  DB_DATA_EV_PORT: "1462"
+  DB_DATA_EV_NAME: "rdb"
+  S3_BUCKET: "bib-platform-dev-data"
+  S3_KEY: "SCW68HH2T2FRENB5T5JT"
+  S3_ENDPOINT: "https://s3.fr-par.scw.cloud"
+  S3_REGION: "fr-par"

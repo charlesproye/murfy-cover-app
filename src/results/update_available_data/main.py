@@ -1,10 +1,11 @@
-from sqlalchemy.engine import Engine
 from sqlalchemy import text
-from core.sql_utils import get_sqlalchemy_engine
+from sqlalchemy.engine import Engine
+
 from core.console_utils import main_decorator
+from core.sql_utils import get_sqlalchemy_engine
 
+COLUMNS_TO_CHECK = ["odometer", "soh", "soh_oem"]
 
-COLUMNS_TO_CHECK = ['odometer', 'soh', 'soh_oem']
 
 def check_columns_from_model(model_id, column_list, engine):
     """Returns a list of column names from vehicle_data that contain at least one non-null value
@@ -18,7 +19,7 @@ def check_columns_from_model(model_id, column_list, engine):
     Returns:
         list of str: Column names from `column_list` that have at least one non-null value
                      for vehicles matching the given model_id.
-                     """
+    """
     query_parts = []
     params = {}
 
@@ -42,7 +43,10 @@ def check_columns_from_model(model_id, column_list, engine):
         result = conn.execute(text(full_query), params)
         return [row[0] for row in result.fetchall()]
 
-def update_model_columns(model_id, available_columns: list, all_columns: list, engine: Engine):
+
+def update_model_columns(
+    model_id, available_columns: list, all_columns: list, engine: Engine
+):
     """
     Updates the boolean columns of vehicle_model with TRUE/FALSE
     based on their presence in available_columns.
@@ -63,7 +67,7 @@ def update_model_columns(model_id, available_columns: list, all_columns: list, e
 
     update_sql = f"""
         UPDATE vehicle_model
-        SET {', '.join(update_clauses)}
+        SET {", ".join(update_clauses)}
         WHERE id = :model_id
     """
 
@@ -72,21 +76,25 @@ def update_model_columns(model_id, available_columns: list, all_columns: list, e
 
 
 @main_decorator
-def run(engine: Engine):
-    with engine.begin() as conn:
+def update_available_data():
+    engine = get_sqlalchemy_engine()
+
+    with engine.connect() as conn:
         result = conn.execute(text("SELECT id FROM vehicle_model"))
         model_ids = [row[0] for row in result.fetchall()]
 
     for model_id in model_ids:
         try:
             print(f"Checking {model_id}...")
-            available_columns = check_columns_from_model(model_id, COLUMNS_TO_CHECK, engine)
+            available_columns = check_columns_from_model(
+                model_id, COLUMNS_TO_CHECK, engine
+            )
             update_model_columns(model_id, available_columns, COLUMNS_TO_CHECK, engine)
-            print(f"✅ {model_id} updated with : {available_columns}")
+            print(f"✅ {model_id} updated with: {available_columns}")
         except Exception as e:
-            print(f"❌ Error for {model_id} : {e}")
+            print(f"❌ Error for {model_id}: {e}")
+
 
 if __name__ == "__main__":
-    con = get_sqlalchemy_engine()
-    run(con)
+    update_available_data()
 

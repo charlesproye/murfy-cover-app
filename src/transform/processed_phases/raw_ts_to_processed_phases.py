@@ -65,6 +65,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
         # Load the raw tss dataframe
         self.logger.info(f"Running for {self.make}")
 
+
         if self.bucket.check_spark_file_exists(
             f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet"
         ):
