@@ -393,6 +393,7 @@ class VehicleActivationService:
                         "Eligibility": current_state,
                         "Real_Activation": current_state,
                         "Activation_Error": None,
+                        "API_Detail": None,
                     }
                     status_data.append(vehicle_data)
                     continue
@@ -406,6 +407,7 @@ class VehicleActivationService:
                             "Eligibility": True,
                             "Real_Activation": True,
                             "Activation_Error": None,
+                            "API_Detail": None,
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -453,6 +455,7 @@ class VehicleActivationService:
                                     "Eligibility": True,
                                     "Real_Activation": False,
                                     "Activation_Error": "Deactivation seemed successful but vehicle is still active",
+                                    "API_Detail": None,
                                 }
                                 status_data.append(vehicle_data)
                                 continue
@@ -739,7 +742,7 @@ class VehicleActivationService:
                     "Activation_Error": (
                         str(info.get("status")) if not info.get("status_bool") else ""
                     ),
-                    "API_Detail": (api_detail),
+                    "API_Detail": api_detail,
                 }
                 status_data.append(vehicle_data)
 
