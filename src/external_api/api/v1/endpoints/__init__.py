@@ -1,0 +1,2 @@
+# Initialisation du package endpoints
+

@@ -146,6 +146,35 @@ services:
       S3_KEY: ${S3_KEY}
       S3_SECRET: ${S3_SECRET}
 
+  external_api:
+    build:
+      context: .
+      dockerfile: docker/external_api.Dockerfile
+    image: rg.fr-par.scw.cloud/bib-images/external-api:latest
+    container_name: external_api
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      #REDIS_HOST: redis
+      #REDIS_PORT: 6379
+      ALGORITHM: HS256
+      SECRET_KEY: ${SECRET_KEY}
+      ENCRYPT_KEY: ${ENCRYPT_KEY}
+      DB_DATA_EV_USER: root
+      DB_DATA_EV_PASSWORD: ${EXTERNAL_DB_DATA_EV_PASSWORD}
+      DB_DATA_EV_HOST: 195.154.70.203
+      DB_DATA_EV_PORT: 1462
+      DB_DATA_EV_NAME: rdb
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
 volumes:
   redis_data:
     driver: local
