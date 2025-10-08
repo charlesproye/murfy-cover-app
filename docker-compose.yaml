@@ -20,6 +20,16 @@ services:
     env_file:
       - .env
 
+  ev_database_service:
+    platform: linux/amd64
+    image: rg.fr-par.scw.cloud/bib-images/ev_database:latest
+    build:
+      context: .
+      dockerfile: docker/ev_database.Dockerfile
+    container_name: ev_database
+    env_file:
+      - .env
+
   tesla_ingestion_service:
     build:
       context: .
