@@ -941,10 +941,12 @@ async def get_soh_by_groups(fleet_id: str, group: str, page: int, db: AsyncSessi
 
 async def get_extremum_soh(
     fleet_id: str,
-    extremum: str,
     brand: str | None,
     page: int | None,
     page_size: int | None,
+    extremum: str | None,
+    sorting_column: str | None,
+    sorting_order: str | None,
     db: AsyncSession = None,
 ):
     # Handle pagination parameters
@@ -964,10 +966,17 @@ async def get_extremum_soh(
         page_size = 1  # Will be overridden in query
         offset = 0
 
-    is_best = extremum == "Best"
-
     # Build the limit clause based on pagination
     limit_clause = "LIMIT :page_size OFFSET :offset" if use_pagination else ""
+
+    # Build the sorting clause based on the sorting column/order and extremum/quality
+    sorting_clause = ""
+    if sorting_column!='':
+        sorting_clause = f"ORDER BY {sorting_column} {sorting_order}"
+    elif extremum=='Worst':
+        sorting_clause = "ORDER BY soh_comparison ASC"
+    else:
+        sorting_clause = "ORDER BY soh_comparison DESC"
 
     query = text(f"""
         WITH brands_list AS (
@@ -1037,9 +1046,7 @@ async def get_extremum_soh(
                 score,
                 soh_comparison
             FROM scored_vehicles
-            ORDER BY
-                CASE WHEN :is_best THEN soh_comparison END DESC,
-                CASE WHEN NOT :is_best THEN soh_comparison END ASC
+            {sorting_clause}
             {limit_clause}
         )
         SELECT json_build_object(
@@ -1077,7 +1084,6 @@ async def get_extremum_soh(
         {
             "fleet_id": fleet_id,
             "offset": offset,
-            "is_best": is_best,
             "brand": brand if brand and brand != "undefined" and brand != "All" else "",
             "page": page,
             "page_size": page_size,
