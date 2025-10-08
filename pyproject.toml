@@ -79,6 +79,7 @@ web = [
     "pydantic-settings~=2.11",
     "python-multipart>=0.0.18",
     "orjson==3.8.5",
+    "greenlet==3.2.2",
 ]
 
 # Results/visualization module dependencies
