@@ -3,10 +3,10 @@
 import logging
 import time
 
+from external_api.core.cookie_auth import get_current_user_from_cookie
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from external_api.core.security import get_current_user
 from external_api.db.session import get_db
 from external_api.schemas.api import ApiUserRead as ApiUser
 from external_api.services.api_pricing import get_api_user_pricing, log_api_call
@@ -23,7 +23,7 @@ router = APIRouter()
 async def check_rate_limit(
     vin: str,
     endpoint: str,
-    api_user: ApiUser = Depends(get_current_user),
+    api_user: ApiUser = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """

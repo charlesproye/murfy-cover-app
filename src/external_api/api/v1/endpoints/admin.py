@@ -10,7 +10,7 @@ from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from external_api.core.security import get_current_user
+from external_api.core.cookie_auth import get_current_user_from_cookie
 from external_api.db.session import get_db
 from external_api.schemas.api import (
     ApiPricingPlanCreate,
@@ -31,7 +31,7 @@ router = APIRouter()
 
 # Vérification que l'utilisateur API est un admin
 async def get_admin_api_user(
-    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    user: User = Depends(get_current_user_from_cookie), db: AsyncSession = Depends(get_db)
 ) -> ApiUser:
     """Vérifie que l'utilisateur API a les droits d'administration"""
     # Récupérer l'utilisateur interne associé
