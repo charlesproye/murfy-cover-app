@@ -84,11 +84,18 @@ web = [
 
 # Results/visualization module dependencies
 results = [
-    "streamlit==1.47.0",
     "plotly==5.19.0",
     "psycopg2-binary>=2.9.9",
     "gspread",
     "oauth2client",
+    "scikit-learn==1.5.1",
+    "pyarrow==19.0.0",
+    "pydantic>=1.10.13",
+    "pydantic-settings~=2.11",
+    "pyspark==3.5.5",
+    "pyyaml>=6.0",
+    "sqlalchemy>=2.0.0",
+    "rapidfuzz==3.13.0",
 ]
 
 # Ingestion module dependencies - for data ingestion from various sources
@@ -100,6 +107,11 @@ ingestion = [
 
 # Scraping module dependencies
 scraping = [
+    "google-auth==2.24.0",
+    "rapidfuzz==3.13.0",
+    "tqdm==4.66.5",
+    "gspread",
+    "oauth2client",
     "beautifulsoup4==4.13.4",
     "selenium==4.33.0",
     "PyPDF2==3.0.1",

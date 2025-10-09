@@ -1,31 +1,34 @@
-from functools import lru_cache
 import json
 import logging
-from typing import Annotated, Any, Optional
-from datetime import datetime
-from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from functools import lru_cache
+from io import BytesIO
+from typing import Annotated, Any, Optional
 
 import boto3
+import joblib
 import pandas as pd
-from pandas import Series
 import pyarrow.parquet as pq
+import yaml
+from botocore.exceptions import ClientError
 from pandas import DataFrame as DF
+from pandas import Series
+from pyspark.sql import SparkSession
+from pyspark.sql import types as T
+from pyspark.sql.functions import col
 
 from core.config import *
 from core.pandas_utils import str_split_and_retain_src
 from core.s3.settings import S3Settings
-from pyspark.sql import SparkSession
 from core.spark_utils import align_dataframes_for_union
-from botocore.exceptions import ClientError
-import yaml
-import joblib 
 
-class S3Service():
-    def __init__(self, settings:S3Settings|None = None):
+
+class S3Service:
+    def __init__(self, settings: S3Settings | None = None):
         settings = settings or S3Settings()
         self._settings = settings
-        self._s3_client =  boto3.client(
+        self._s3_client = boto3.client(
             "s3",
             region_name=settings.S3_REGION,
             endpoint_url=settings.S3_ENDPOINT,
@@ -34,7 +37,6 @@ class S3Service():
         )
         self.bucket_name = settings.S3_BUCKET
         self.logger = logging.getLogger("S3_BUCKET")
-
 
     def save_df_as_parquet(self, df: DF, key: str):
         out_buffer = BytesIO()
@@ -75,26 +77,50 @@ class S3Service():
             else:
                 raise e
 
-    def save_df_as_parquet_spark(self, df: DF, key: str, spark, repartition_key: Optional[str] = 'vin'):
+    def save_df_as_parquet_spark(
+        self, df: DF, key: str, spark, repartition_key: Optional[str] = "vin"
+    ):
         """
-        Censée faire une concat de ce qui existe et écraser les fichiers déjà présents dans scaleway.
-        Aucune idée de la rapidité ni de la viabilité.
+        Intended to concatenate existing data and overwrite files already present in scaleway.
+        No idea about speed or viability.
         """
 
         s3_path = f"s3a://{self.bucket_name}/{key}"
 
         try:
-            # Essayer de lire le fichier existant
+            # Try to read the existing file
             processed = spark.read.parquet(s3_path)
 
-            # Vérifier si le DataFrame n'est pas vide
+            # Check if the DataFrame is not empty
             if processed.count() > 0:
                 processed, df = align_dataframes_for_union(
                     processed, df, strategy="union"
                 )
 
-                if 'DATETIME_BEGIN' in processed.columns and 'DATETIME_BEGIN' in df.columns:
-                    df_write = processed.union(df).dropDuplicates(['VIN', 'DATETIME_BEGIN'])
+                if (
+                    "DATETIME_BEGIN" in processed.columns
+                    and "DATETIME_BEGIN" in df.columns
+                ):
+                    processed = processed.withColumn(
+                        "DATETIME_BEGIN",
+                        col("DATETIME_BEGIN").cast(T.TimestampType()),
+                    )
+
+                    df = df.withColumn(
+                        "DATETIME_BEGIN",
+                        col("DATETIME_BEGIN").cast(T.TimestampType()),
+                    )
+
+                    # Remove from processed the duplicates already in df
+                    processed_filtered = processed.join(
+                        df.select("VIN", "DATETIME_BEGIN").dropDuplicates(),
+                        on=["VIN", "DATETIME_BEGIN"],
+                        how="left_anti",
+                    )
+
+                    df_write = processed_filtered.unionByName(
+                        df, allowMissingColumns=True
+                    )
                 else:
                     df_write = processed.union(df).dropDuplicates()
 
@@ -102,7 +128,7 @@ class S3Service():
                 df_write = df
 
         except Exception as e:
-            # Si le fichier n'existe pas ou est corrompu
+            # If the file doesn't exist or is corrupted
             if (
                 "PATH_NOT_FOUND" in str(e)
                 or "does not exist" in str(e)
@@ -110,15 +136,19 @@ class S3Service():
             ):
                 df_write = df
             else:
-                # Autre erreur, on la relance
+                # Other error, re-raise it
                 raise e
 
-        # Écriture optimisée
-        df_write.repartition(repartition_key).coalesce(32).write.mode("overwrite").option("parquet.compression", "snappy").option(
+        # Optimized writing
+        df_write.repartition(repartition_key).coalesce(32).write.mode(
+            "overwrite"
+        ).option("parquet.compression", "snappy").option(
             "parquet.block.size", 67108864
         ).partitionBy(repartition_key).parquet(s3_path)
 
-    def append_spark_df_to_parquet(self, df: DF, key: str, repartition: Optional[str] = None):
+    def append_spark_df_to_parquet(
+        self, df: DF, key: str, repartition: Optional[str] = None
+    ):
         s3_path = f"s3a://{self.bucket_name}/{key}"
 
         if repartition:
@@ -143,7 +173,7 @@ class S3Service():
             self.logger.info(EMTPY_S3_KEYS_WARNING_MSG.format(keys_prefix=brand))
             return DF(None, columns=KEY_LIST_COLUMN_NAMES)
         # Only retain .json responses
-        # Reponses are organized as follow: response/brand_name/vin/date-of-response.json
+        # Responses are organized as follows: response/brand_name/vin/date-of-response.json
         keys = str_split_and_retain_src(keys, "/")
         self.logger.debug(f"Keys ending in .json:\n{keys}")
         # Remove files in temp directory
@@ -299,13 +329,13 @@ class S3Service():
                     "starts-with",
                     "$Content-Type",
                     "",
-                ],  # Accepte tous les types de contenu
-                {"acl": "private"},  # Fichiers privés
+                ],  # Accept all content types
+                {"acl": "private"},  # Private files
                 [
                     "content-length-range",
                     0,
                     1000485760,
-                ],  # Limite la taille des fichiers (ici 10MB)
+                ],  # Limit file size (here 10MB)
             ],
         )
 
@@ -373,39 +403,45 @@ class S3Service():
             Key=filename,
         )
 
-    def get_object_size(self, prefix, prefix_to_exclude: Optional[list[str]] = [], exclude_temp: bool = True):
+    def get_object_size(
+        self,
+        prefix,
+        prefix_to_exclude: Optional[list[str]] = [],
+        exclude_temp: bool = True,
+    ):
         """
-        Calcule la taille totale et le nombre d'objets dans un path S3.
-        
-        Cette méthode parcourt récursivement tous les objets dans le bucket S3
-        qui correspondent au préfixe donné et retourne la somme de leurs tailles
-        ainsi que leur nombre total.
-        
+        Calculate the total size and number of objects in an S3 path.
+
+        This method recursively traverses all objects in the S3 bucket
+        that match the given prefix and returns the sum of their sizes
+        as well as their total number.
+
         Args:
-            prefix (str): Le path S3 (chemin) pour lequel calculer la taille.
-                        Par exemple: 'response/tesla/' ou 'data/2024/01/'
-        
+            prefix (str): The S3 path for which to calculate the size.
+                        For example: 'response/tesla/' or 'data/2024/01/'
+
         Returns:
-            tuple: Un tuple contenant (taille_totale, nombre_objets) où :
-                - taille_totale (int): La somme des tailles de tous les objets en octets
-                - nombre_objets (int): Le nombre total d'objets trouvés
+            tuple: A tuple containing (total_size, object_count) where:
+                - total_size (int): The sum of all object sizes in bytes
+                - object_count (int): The total number of objects found
         """
 
         # try:
         objects = []
-        paginator = self._s3_client.get_paginator('list_objects_v2')
+        paginator = self._s3_client.get_paginator("list_objects_v2")
         if not prefix.endswith("/"):
             prefix += "/"
         pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
         for page in pages:
             for obj in page["Contents"]:
-                if obj['Key'] in prefix_to_exclude or (exclude_temp and "/temp/" in obj['Key']):
+                if obj["Key"] in prefix_to_exclude or (
+                    exclude_temp and "/temp/" in obj["Key"]
+                ):
                     continue
-                objects.append(obj['Size'])
+                objects.append(obj["Size"])
         return (sum(objects), len(objects))
 
-
-    def list_files(self, path: str = "", type_file:str = ""):
+    def list_files(self, path: str = "", type_file: str = ""):
         files = []
         paginator = self._s3_client.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=self.bucket_name, Prefix=path):
@@ -428,20 +464,20 @@ class S3Service():
     def read_yaml_file(self, path: str) -> dict[str, Any] | None:
         """
         Read and parse a YAML file from S3.
-        
+
         Args:
             path: S3 path to the YAML file
-            
+
         Returns:
             Parsed YAML content as dictionary, or None if file doesn't exist
         """
         file_content = self.get_file(path)
         if file_content is None:
             return None
-        
+
         try:
             # Decode bytes to string and parse YAML
-            yaml_content = file_content.decode('utf-8')
+            yaml_content = file_content.decode("utf-8")
             return yaml.safe_load(yaml_content)
         except yaml.YAMLError as e:
             self.logger.error(f"Error parsing YAML file {path}: {e}")
@@ -449,33 +485,35 @@ class S3Service():
         except Exception as e:
             self.logger.error(f"Error reading YAML file {path}: {e}")
             raise
-        
+
     def save_as_pickle(self, obj, key: str) -> None:
         buffer = BytesIO()
         try:
             joblib.dump(obj, buffer)
             buffer.seek(0)
-        
+
             self._s3_client.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=buffer.getvalue()
+                Bucket=self.bucket_name, Key=key, Body=buffer.getvalue()
             )
             self.logger.info(f"File save on s3://{self.bucket_name}/{key}")
         except Exception as e:
-            self.logger.error(f"Error saving pickle file s3://{self.bucket_name}/{key}: {e}")
+            self.logger.error(
+                f"Error saving pickle file s3://{self.bucket_name}/{key}: {e}"
+            )
             raise
-        
+
     def load_pickle(self, key):
-        
         try:
             response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
             buffer = BytesIO(response["Body"].read())
             model = joblib.load(buffer)
             return model
         except Exception as e:
-            self.logger.error(f"Error reading pickle file s3://{self.bucket_name}/{key}: {e}")
+            self.logger.error(
+                f"Error reading pickle file s3://{self.bucket_name}/{key}: {e}"
+            )
             raise
+
 
 @lru_cache
 def get_s3():

@@ -82,7 +82,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
         # )
 
         # Get initial fleet info
-        df = await fleet_info(owner_filter=owner_filter)
+        df = await fleet_info(fleet_filter=owner_filter)
 
         # Initialize activation service
         activation_service = VehicleActivationService(
@@ -123,6 +123,7 @@ async def process_vehicles(owner_filter: Optional[str] = None):
             kia_api=kia_api,
             df=df
         )
+
 
         await asyncio.gather(
             vehicle_processor.process_other_vehicles(),

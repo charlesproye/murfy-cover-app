@@ -58,9 +58,13 @@ async def update_vehicle_activation_data(df: pd.DataFrame) -> bool:
         
         # Create a set of existing VINs for faster lookup
         existing_vins = set(existing_df['vin'].astype(str))
+
+        print(df.columns)
         
         for _, row in df.iterrows():
             vin = str(row['vin'])
+
+            print(row['API_Detail'])
             
             # Check if account_owner exists in the DataFrame columns
             account_owner_value = row.get('account_owner', "") if 'account_owner' in df.columns else ""

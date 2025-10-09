@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ing-scraping-marketplaces
+  namespace: bib
+spec:
+  schedule: "0 8 * * 1"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: ing-scraping-marketplaces
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ing-scraping-marketplaces-1
+              image: rg.fr-par.scw.cloud/bib-images/scraping_soh:latest
+              imagePullPolicy: Always
+              command: ["python", "src/ingestion/soh_scraping/main.py"]
+              args: ["spoticar", "autospherre", "aramis", "ev_market"]
+              env:
+                - name: DB_DATA_EV_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_PASSWORD
+                - name: DB_DATA_EV_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_NAME
+                - name: DB_DATA_EV_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_HOST
+                - name: DB_DATA_EV_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_PORT
+                - name: DB_DATA_EV_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_USER
+                - name: GOOGLE_PRIVATE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: google-secret
+                      key: GOOGLE_PRIVATE_KEY
+              resources:
+                limits:
+                  memory: "4Gi"
+                  cpu: "2"
+                requests:
+                  memory: "2Gi"
+                  cpu: "1"
+

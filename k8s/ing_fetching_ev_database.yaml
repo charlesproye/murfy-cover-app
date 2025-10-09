@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ing-fetching-ev-database
+  namespace: bib
+spec:
+  schedule: "0 8 * * 1"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: ing-fetching-ev-database
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ing-fetching-ev-database-1
+              image: rg.fr-par.scw.cloud/bib-images/ev_database:latest
+              imagePullPolicy: Always
+              command: ["python", "src/ingestion/ev_database/ev_database.py"]
+              env:
+                - name: EV_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ev-database-secret
+                      key: EV_DATABASE_URL
+                - name: DB_DATA_EV_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_PASSWORD
+                - name: DB_DATA_EV_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_NAME
+                - name: DB_DATA_EV_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_HOST
+                - name: DB_DATA_EV_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_PORT
+                - name: DB_DATA_EV_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_USER
+              resources:
+                limits:
+                  memory: "2Gi"
+                  cpu: "1"
+                requests:
+                  memory: "2Gi"
+                  cpu: "1"
+
+

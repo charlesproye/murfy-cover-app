@@ -20,13 +20,13 @@ from transform.result_phases.providers.volvo import VolvoProcessedPhaseToResultP
 ORCHESTRATED_MAKES = {
     "bmw": (False, ProcessedPhaseToResultPhase),
     "mercedes-benz": (False, ProcessedPhaseToResultPhase),
-    "renault": (False, RenaultProcessedPhaseToResultPhase),
+    "renault": (True, RenaultProcessedPhaseToResultPhase),
     "volvo-cars": (False, VolvoProcessedPhaseToResultPhase),
     "stellantis": (False, StellantisProcessedPhaseToResultPhase),
     "kia": (False, ProcessedPhaseToResultPhase),
     "ford": (False, ProcessedPhaseToResultPhase),
-    "tesla-fleet-telemetry": (True, TeslaFTProcessedPhaseToResultPhase),
-    "volkswagen": (True, ProcessedPhaseToResultPhase),
+    "tesla-fleet-telemetry": (False, TeslaFTProcessedPhaseToResultPhase),
+    "volkswagen": (False, ProcessedPhaseToResultPhase),
     "tesla": (False, TeslaProcessedPhaseToResultPhase),
 }
 

@@ -6,7 +6,15 @@ from sqlalchemy import text
 from activation.config.mappings import mapping_vehicle_type
 from core.gsheet_utils import load_excel_data
 from core.sql_utils import get_connection, get_sqlalchemy_engine
-from results.trendline.trendline_utils import *
+from results.trendline.trendline_utils import (
+    clean_battery_data,
+    compute_lower_bound,
+    compute_main_trendline,
+    compute_upper_bound,
+    filtrer_trendlines,
+    prepare_data_for_fitting,
+    update_database_trendlines,
+)
 
 
 def generate_trendline_functions(df, odometer_column, soh_column):
@@ -62,7 +70,7 @@ def load_all_data():
     )
     df_sheet["odometer"] = (
         df_sheet["odometer"]
-        .apply(lambda x: str(x).replace(",", "").strip())
+        .apply(lambda x: str(x).replace(",", "").replace(" ", "").strip())
         .astype(float)
     )
     logging.info("Starting trendline update for oem")
@@ -133,11 +141,12 @@ def update_trendline_oem():
 
 def update_trendline_model():
     df_all = load_all_data()
+    print(df_all.columns)
 
     logging.info("Starting trendline update from gsheet")
 
-    for model_car in df_all["id"].unique():
-        df_temp = df_all[(load_all_data()["id"] == model_car)].copy()
+    for model_car in df_all["vehicle_model_id"].unique():
+        df_temp = df_all[(load_all_data()["vehicle_model_id"] == model_car)].copy()
         try:
             if filtrer_trendlines(df_temp, "odometer", "vin", 0, 0, 20, 0, 0):
                 mean_trend, upper_bound, lower_bound = generate_trendline_functions(

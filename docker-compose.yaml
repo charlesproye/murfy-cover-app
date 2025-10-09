@@ -20,6 +20,16 @@ services:
     env_file:
       - .env
 
+  ev_database_service:
+    platform: linux/amd64
+    image: rg.fr-par.scw.cloud/bib-images/ev_database:latest
+    build:
+      context: .
+      dockerfile: docker/ev_database.Dockerfile
+    container_name: ev_database
+    env_file:
+      - .env
+
   tesla_ingestion_service:
     build:
       context: .
@@ -45,6 +55,37 @@ services:
   #     - .:/app
   #   depends_on:
   #     - redis
+
+  scraping_soh_service:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: docker/scraping_soh.Dockerfile
+    image: rg.fr-par.scw.cloud/bib-images/scraping_soh:latest
+    container_name: scraping_soh
+    env_file:
+      - ./.env
+      - ./.python.env
+
+  results_service:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: docker/results.Dockerfile
+    image: rg.fr-par.scw.cloud/bib-images/results:latest
+    container_name: results
+    env_file:
+      - .env
+
+  results_service_dev:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: docker/results.Dockerfile
+    image: rg.fr-par.scw.cloud/bib-images-dev/results:latest
+    container_name: results
+    env_file:
+      - .env
 
   hm_ingestion_service:
     build:
