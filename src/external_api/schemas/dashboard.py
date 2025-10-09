@@ -13,7 +13,7 @@ from external_api.services.dashboard import (
     get_scatter_plot_regions,
     get_soh_by_groups,
     get_table_brand,
-    get_trendline_brands,
+    get_trendline_brand,
     search_vin,
 )
 
@@ -93,10 +93,10 @@ class DashboardCrud:
             fleet_ids, brands, regions, fleets, pinned_vehicles, db
         )
 
-    async def trendline_brands(
-        self, fleet_id: str, brands: str, db: AsyncSession | None = None
+    async def trendline_brand(
+        self, fleet_id: str, brand: str, db: AsyncSession | None = None
     ):
-        return await get_trendline_brands(fleet_id=fleet_id, brands=brands, db=db)
+        return await get_trendline_brand(fleet_id=fleet_id, brand=brand, db=db)
 
     async def brands(self, fleet_id: str, db: AsyncSession | None = None):
         return await get_brands(fleet_id, db)

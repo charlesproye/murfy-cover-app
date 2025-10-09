@@ -181,14 +181,14 @@ async def global_table(
     return response
 
 
-@router.get("/individual/trendline_brands", include_in_schema=False)
-async def trendline_brands(
+@router.get("/individual/trendline_brand", include_in_schema=False)
+async def trendline_brand(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     brand: str = Query(None, description="The brand"),
     user: UserWithFleet = Depends(get_current_user_with_fleet()),
 ):
-    response = await DashboardCrud().trendline_brands(fleet_id, brand, db)
+    response = await DashboardCrud().trendline_brand(fleet_id, brand, db)
     return response
 
 
