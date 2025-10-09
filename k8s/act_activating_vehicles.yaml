@@ -1,0 +1,181 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: act-activating-vehicles
+  namespace: bib
+spec:
+  schedule: "0 0 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: act-activating-vehicles
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: act-activating-vehicles-1
+              image: rg.fr-par.scw.cloud/bib-images/activation:latest
+              imagePullPolicy: Always
+              command: ["python","-m", "src/activation/main.py"]
+              env:
+                - name: DB_DATA_EV_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_PASSWORD
+                - name: DB_DATA_EV_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_NAME
+                - name: DB_DATA_EV_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_HOST
+                - name: DB_DATA_EV_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_PORT
+                - name: DB_DATA_EV_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-data-ev-secret
+                      key: DB_DATA_EV_USER
+                - name: GOOGLE_PRIVATE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: google-secret
+                      key: GOOGLE_PRIVATE_KEY
+                - name: SPREADSHEET_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: google-secret
+                      key: SPREADSHEET_ID
+                - name: VW_AUTH_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: vw-secret
+                      key: VW_AUTH_URL
+                - name: VW_BASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: vw-secret
+                      key: VW_BASE_URL
+                - name: VW_CLIENT_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: vw-secret
+                      key: VW_CLIENT_USERNAME
+                - name: VW_CLIENT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: vw-secret
+                      key: VW_CLIENT_PASSWORD
+                - name: VW_ORGANIZATION_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: vw-secret
+                      key: VW_ORGANIZATION_ID
+                - name: BMW_BASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: bmw-secret
+                      key: BMW_BASE_URL
+                - name: BMW_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: bmw-secret
+                      key: BMW_CLIENT_ID
+                - name: BMW_CLIENT_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: bmw-secret
+                      key: BMW_CLIENT_USERNAME
+                - name: BMW_CLIENT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: bmw-secret
+                      key: BMW_CLIENT_PASSWORD
+                - name: BMW_AUTH_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: bmw-secret
+                      key: BMW_AUTH_URL
+                - name: MS_BASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ms-secret
+                      key: MS_BASE_URL
+                - name: MS_EMAIL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ms-secret
+                      key: MS_EMAIL
+                - name: MS_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ms-secret
+                      key: MS_PASSWORD
+                - name: RENAULT_API_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: renault-secret
+                      key: RENAULT_API_URL
+                - name: RENAULT_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: renault-secret
+                      key: RENAULT_API_KEY
+                - name: RENAULT_PWD
+                  valueFrom:
+                    secretKeyRef:
+                      name: renault-secret
+                      key: RENAULT_PWD
+                - name: RENAULT_KID
+                  valueFrom:
+                    secretKeyRef:
+                      name: renault-secret
+                      key: RENAULT_KID
+                - name: RENAULT_AUD
+                  valueFrom:
+                    secretKeyRef:
+                      name: renault-secret
+                      key: RENAULT_AUD
+                - name: RENAULT_CLIENT
+                  valueFrom:
+                    secretKeyRef:
+                      name: renault-secret
+                      key: RENAULT_CLIENT
+                - name: RENAULT_SCOPE
+                  valueFrom:
+                    secretKeyRef:
+                      name: renault-secret
+                      key: RENAULT_SCOPE
+                - name: HM_BASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: hm-secret
+                      key: HM_BASE_URL
+                - name: HM_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: hm-secret
+                      key: HM_CLIENT_ID
+                - name: HM_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: hm-secret
+                      key: HM_CLIENT_SECRET
+              resources:
+                limits:
+                  memory: "2Gi"
+                  cpu: "1"
+                requests:
+                  memory: "2Gi"
+                  cpu: "1"
+

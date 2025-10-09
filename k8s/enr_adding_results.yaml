@@ -1,0 +1,81 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enr-adding-results
+  namespace: bib
+spec:
+  template:
+    metadata:
+      labels:
+        app: results-job
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: results
+          image: rg.fr-par.scw.cloud/bib-images/results:latest
+          imagePullPolicy: Always
+          command: ["python", "src/results/main.py"]
+          env:
+            - name: DB_DATA_EV_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_PASSWORD
+            - name: DB_DATA_EV_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_NAME
+            - name: DB_DATA_EV_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_HOST
+            - name: DB_DATA_EV_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_PORT
+            - name: DB_DATA_EV_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_USER
+            - name: GOOGLE_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: google-secret
+                  key: GOOGLE_PRIVATE_KEY
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_BUCKET
+            - name: S3_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_KEY
+            - name: S3_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_SECRET
+            - name: S3_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_REGION
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_ENDPOINT              
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+

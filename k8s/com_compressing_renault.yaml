@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: com-compressing-renault
+  namespace: bib
+spec:
+  schedule: "0 0 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: com-compressing-renault
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: com-compressing-renault-1
+              image: rg.fr-par.scw.cloud/bib-images/data_ev:latest
+              imagePullPolicy: Always
+              command: ["python", "-m",  "src.transform.compressor.main"]
+              args: ["renault"]
+              env:
+                - name: S3_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret
+                      key: S3_BUCKET
+                - name: S3_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret
+                      key: S3_KEY
+                - name: S3_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret
+                      key: S3_SECRET
+                - name: S3_REGION
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret
+                      key: S3_REGION
+                - name: S3_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret
+                      key: S3_ENDPOINT 
+              resources:
+                limits:
+                  memory: "2Gi"
+                  cpu: "1"
+                requests:
+                  memory: "2Gi"
+                  cpu: "1"
+
+

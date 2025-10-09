@@ -66,21 +66,6 @@ services:
     env_file:
       - ./.env
       - ./.python.env
-    volumes:
-      - ./src:/app/src
-
-  scraping_soh_service_dev:
-    platform: linux/amd64
-    build:
-      context: .
-      dockerfile: docker/scraping_soh.Dockerfile
-    image: rg.fr-par.scw.cloud/bib-images-dev/scraping_soh:latest
-    container_name: scraping_soh
-    env_file:
-      - ./.env
-      - ./.python.env
-    volumes:
-      - ./src:/app/src
 
   results_service:
     platform: linux/amd64

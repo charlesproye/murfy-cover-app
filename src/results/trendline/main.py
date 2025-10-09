@@ -6,7 +6,15 @@ from sqlalchemy import text
 from activation.config.mappings import mapping_vehicle_type
 from core.gsheet_utils import load_excel_data
 from core.sql_utils import get_connection, get_sqlalchemy_engine
-from results.trendline.trendline_utils import *
+from results.trendline.trendline_utils import (
+    clean_battery_data,
+    compute_lower_bound,
+    compute_main_trendline,
+    compute_upper_bound,
+    filtrer_trendlines,
+    prepare_data_for_fitting,
+    update_database_trendlines,
+)
 
 
 def generate_trendline_functions(df, odometer_column, soh_column):
