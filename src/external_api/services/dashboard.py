@@ -971,7 +971,7 @@ async def get_extremum_soh(
 
     # Build the sorting clause based on the sorting column/order and extremum/quality
     sorting_clause = ""
-    if sorting_column!='':
+    if sorting_column is not None and sorting_column != '':
         sorting_clause = f"ORDER BY {sorting_column} {sorting_order}"
     elif extremum=='Worst':
         sorting_clause = "ORDER BY soh_comparison ASC"
