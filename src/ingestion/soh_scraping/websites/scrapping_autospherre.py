@@ -8,10 +8,9 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import unquote
 
+import numpy as np
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
-from pandas.core.config_init import data_manager_doc
 from PyPDF2 import PdfReader
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -20,7 +19,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
 
 from activation.config.mappings import mapping_vehicle_type
-from core.gsheet_utils import *
+from core.gsheet_utils import export_to_excel, load_excel_data
 from core.sql_utils import get_connection
 
 BASE_URL = "https://www.autosphere.fr"
@@ -56,7 +55,8 @@ def get_all_vehicle_links():
                     )
                 )
 
-                data = set(el.get_attribute("href") for el in elements)
+                data = {el.get_attribute("href") for el in elements}
+
                 new_links.update(data)
 
                 added_count = len(new_links - all_links)
@@ -303,7 +303,7 @@ def main():
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0, :7], data=data_sheet[1:, :7])
     try:
-        with open(PATH_FILE, "r", encoding="utf-8") as f:
+        with open(PATH_FILE, encoding="utf-8") as f:
             link_already_try = {line.strip() for line in f if line.strip()}
     except FileNotFoundError:
         link_already_try = set()
@@ -369,7 +369,7 @@ def main():
     )["type"]
     infos_clean["Type"] = [
         mapped if mapped != "unknown" else old
-        for old, mapped in zip(infos_clean["Type"], type_mapping)
+        for old, mapped in zip(infos_clean["Type"], type_mapping, strict=False)
     ]
     infos_clean.drop(columns="id", inplace=True)
     infos_clean["Odomètre (km)"] = infos_clean["Odomètre (km)"].astype(float)
