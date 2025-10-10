@@ -90,15 +90,9 @@ class CookieAuth:
         session_data = {
             "user": {
                 **user_data, 
-                "id": str(user_data.get("id")), 
-                "created_at": str(user_data.get("created_at")),
-                "updated_at": str(user_data.get("updated_at")),
             },
             "company": {
                 **company_data, 
-                "id": str(company_data.get("id")),
-                "created_at": str(company_data.get("created_at")),
-                "updated_at": str(company_data.get("updated_at"))
             }
         }
         
@@ -255,27 +249,23 @@ async def get_user_with_fleet(email: str, db: AsyncSession):
             u.id,
             u.role_id,
             u.email,
-            json_agg(json_build_object('id', f.id, 'name', f.fleet_name)) as fleet_ids,
-            (SELECT f2.id FROM "user_fleet" uf2
-             JOIN "fleet" f2 ON uf2.fleet_id = f2.id
-             WHERE uf2.user_id = u.id
-             LIMIT 1) as fleet_id
+            json_agg(json_build_object('id', f.id, 'name', f.fleet_name) ORDER BY f.fleet_name) FILTER (WHERE f.id IS NOT NULL) as fleets
         FROM "user" u
         LEFT JOIN "user_fleet" uf ON u.id = uf.user_id
         LEFT JOIN "fleet" f ON uf.fleet_id = f.id
         WHERE u.email = :email
         GROUP BY u.company_id, u.id, u.role_id, u.email
     """)
-    result = await db.exec(query, {"email": email})
+    result = await db.execute(query, {"email": email})
     if result:
         user_data = result.mappings().first()
         if user_data:
             user_data = dict(user_data)
-            # Si fleet_ids est None ou contient un seul élément null, initialiser avec une liste vide
-            if user_data["fleet_ids"] is None or (
-                len(user_data["fleet_ids"]) == 1 and user_data["fleet_ids"][0] is None
+            # Si fleets est None ou contient un seul élément null, initialiser avec une liste vide
+            if user_data["fleets"] is None or (
+                len(user_data["fleets"]) == 1 and user_data["fleets"][0] is None
             ):
-                user_data["fleet_ids"] = []
+                user_data["fleets"] = []
             return user_data
     return None
 
@@ -333,9 +323,11 @@ async def get_user_with_company_with_email(email: str, db: AsyncSession):
                 'phone', u.phone,
                 'last_connection', u.last_connection,
                 'is_active', u.is_active,
+                'created_at', u.created_at,
+                'updated_at', u.updated_at,
                 'role', JSON_BUILD_OBJECT(
                     'id', r.id,
-                    'role_name', r.role_name
+                    'name', r.role_name
                 ),
                 'fleets', COALESCE(
                     JSON_AGG(
@@ -343,7 +335,7 @@ async def get_user_with_company_with_email(email: str, db: AsyncSession):
                             WHEN f.id IS NOT NULL THEN
                                 JSON_BUILD_OBJECT(
                                     'id', f.id,
-                                    'fleet_name', f.fleet_name
+                                    'name', f.fleet_name
                                 )
                             ELSE NULL
                         END

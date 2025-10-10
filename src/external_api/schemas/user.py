@@ -105,8 +105,7 @@ class UserWithFleet(BaseModel):
     id: UUID4
     role_id: UUID4
     email: str
-    fleet_id: UUID4 | None
-    fleet_ids: list[FleetInfo] | None
+    fleets: list[FleetInfo] | None
 
 
 # Company Models
@@ -139,14 +138,4 @@ class ApiUser(ApiUserBase):
 
     class Config:
         from_attributes = True
-
-
-class LoginResponse(BaseModel):
-    """Schéma pour la réponse d'authentification"""
-
-    access_token: str
-    refresh_token: str
-    token_type: str
-    user: "GlobalUser"
-    company: "Company"
 

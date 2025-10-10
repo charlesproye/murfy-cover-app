@@ -26,7 +26,7 @@ async def login(
 ) -> Any:
     """Login endpoint that uses httpOnly cookies for security"""
     result = await login_with_cookies(form_data=body, db=db)
-    
+
     # Set secure cookies
     CookieAuth.set_auth_cookies(
         response=response,

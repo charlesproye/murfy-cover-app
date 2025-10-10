@@ -21,37 +21,36 @@ from external_api.services.dashboard import (
 class DashboardCrud:
     async def kpis(
         self,
-        fleet_ids: list[str],
+        fleets: list[str],
         brands: list[str],
         regions: list[str],
-        fleets: list[str],
         pinned_vehicles: bool,
         db: AsyncSession | None = None,
     ):
-        return await get_kpis(fleet_ids, brands, regions, fleets, pinned_vehicles, db)
+        return await get_kpis(fleets, brands, regions, pinned_vehicles, db)
 
     async def scatter_plot_brands(
         self,
-        fleet_ids: list[str],
-        brands: list[str],
         fleets: list[str],
+        brands: list[str],
+        fleets_input_list: list[str],
         pinned_vehicles: bool,
         db: AsyncSession | None = None,
     ):
         return await get_scatter_plot_brands(
-            fleet_ids, brands, fleets, pinned_vehicles, db
+            fleets, brands, fleets_input_list, pinned_vehicles, db
         )
 
     async def scatter_plot_regions(
         self,
-        fleet_ids: list[str],
-        regions: list[str],
         fleets: list[str],
+        regions: list[str],
+        fleets_input_list: list[str],
         pinned_vehicles: bool,
         db: AsyncSession | None = None,
     ):
         return await get_scatter_plot_regions(
-            fleet_ids, regions, fleets, pinned_vehicles, db
+            fleets, regions, fleets_input_list, pinned_vehicles, db
         )
 
     async def filter(
@@ -82,15 +81,14 @@ class DashboardCrud:
 
     async def global_table(
         self,
-        fleet_ids: list[str],
+        fleets: list[str],
         brands: list[str],
         regions: list[str],
-        fleets: list[str],
         pinned_vehicles: bool,
         db: AsyncSession | None = None,
     ):
         return await get_global_table(
-            fleet_ids, brands, regions, fleets, pinned_vehicles, db
+            fleets, brands, regions, pinned_vehicles, db
         )
 
     async def trendline_brands(
