@@ -3,17 +3,20 @@ Secure cookie-based authentication utilities
 Provides httpOnly cookie support for enhanced security
 """
 
-from external_api.db.session import get_db
-from fastapi import Response, Request, HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
-from typing import Callable, Optional, Dict, Any
-from datetime import datetime, timedelta, timezone
 import os
-from external_api.core.config import settings
-from sqlmodel.ext.asyncio.session import AsyncSession
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import bcrypt
+from fastapi import Depends, HTTPException, Request, Response, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 from sqlmodel import text
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from external_api.core.config import settings
+from external_api.db.session import get_db
 
 # Configuration JWT
 ALGORITHM = settings.ALGORITHM
@@ -30,10 +33,12 @@ COOKIE_HTTPONLY = True
 COOKIE_SAMESITE = "strict"
 COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", None)
 
+
 def sanitize_user(user: Any) -> Any:
     user_dict = dict(user)  # Convertir l'objet en dictionnaire
     user_dict.pop("password", None)
     return user_dict
+
 
 async def get_user(email: str, db: AsyncSession):
     query = text("""
@@ -41,27 +46,29 @@ async def get_user(email: str, db: AsyncSession):
     """)
     result = await db.execute(query, {"email": email})
     return result.mappings().first()
-    
-    
+
+
 class CookieAuth:
     """Handles secure cookie-based authentication"""
-    
+
     @staticmethod
     def set_auth_cookies(
         response: Response,
         access_token: str,
         refresh_token: str,
-        user_data: Dict[str, Any],
-        company_data: Dict[str, Any],
-        access_expires_delta: Optional[timedelta] = None,
-        refresh_expires_delta: Optional[timedelta] = None
+        user_data: dict[str, Any],
+        company_data: dict[str, Any],
+        access_expires_delta: timedelta | None = None,
+        refresh_expires_delta: timedelta | None = None,
     ) -> None:
         """Set secure authentication cookies"""
-        
+
         # Calculate expiration times
-        access_expire = datetime.now(timezone.utc) + (access_expires_delta or timedelta(hours=1))
-        refresh_expire = datetime.now(timezone.utc) + (refresh_expires_delta or timedelta(days=30))
-        
+        access_expire = datetime.now(UTC) + (access_expires_delta or timedelta(hours=1))
+        refresh_expire = datetime.now(UTC) + (
+            refresh_expires_delta or timedelta(days=30)
+        )
+
         # Set access token cookie
         response.set_cookie(
             key=COOKIE_NAME_ACCESS,
@@ -71,9 +78,9 @@ class CookieAuth:
             httponly=COOKIE_HTTPONLY,
             samesite=COOKIE_SAMESITE,
             domain=COOKIE_DOMAIN,
-            path="/"
+            path="/",
         )
-        
+
         # Set refresh token cookie
         response.set_cookie(
             key=COOKIE_NAME_REFRESH,
@@ -83,26 +90,22 @@ class CookieAuth:
             httponly=COOKIE_HTTPONLY,
             samesite=COOKIE_SAMESITE,
             domain=COOKIE_DOMAIN,
-            path="/"
+            path="/",
         )
-        
+
         # Set session data cookie (non-sensitive user info only)
         session_data = {
             "user": {
-                **user_data, 
+                **user_data,
             },
             "company": {
-                **company_data, 
-            }
+                **company_data,
+            },
         }
-        
+
         # Encode session data as JWT for integrity
-        session_token = jwt.encode(
-            session_data,
-            SECRET_KEY,
-            algorithm=ALGORITHM
-        )
-        
+        session_token = jwt.encode(session_data, SECRET_KEY, algorithm=ALGORITHM)
+
         response.set_cookie(
             key=COOKIE_NAME_SESSION,
             value=session_token,
@@ -111,77 +114,94 @@ class CookieAuth:
             httponly=False,  # Allow client-side access for non-sensitive data
             samesite=COOKIE_SAMESITE,
             domain=COOKIE_DOMAIN,
-            path="/"
+            path="/",
         )
-    
+
     @staticmethod
     def clear_auth_cookies(response: Response) -> None:
         """Clear all authentication cookies"""
-        
-        cookies_to_clear = [COOKIE_NAME_ACCESS, COOKIE_NAME_REFRESH, COOKIE_NAME_SESSION]
-        
+
+        cookies_to_clear = [
+            COOKIE_NAME_ACCESS,
+            COOKIE_NAME_REFRESH,
+            COOKIE_NAME_SESSION,
+        ]
+
         for cookie_name in cookies_to_clear:
             response.delete_cookie(
                 key=cookie_name,
                 secure=COOKIE_SECURE,
-                httponly=COOKIE_HTTPONLY if cookie_name != COOKIE_NAME_SESSION else False,
+                httponly=COOKIE_HTTPONLY
+                if cookie_name != COOKIE_NAME_SESSION
+                else False,
                 samesite=COOKIE_SAMESITE,
                 domain=COOKIE_DOMAIN,
-                path="/"
+                path="/",
             )
-    
+
     @staticmethod
-    def get_token_from_cookie(request: Request, token_type: str = "access") -> Optional[str]:
+    def get_token_from_cookie(
+        request: Request, token_type: str = "access"
+    ) -> str | None:
         """Extract token from httpOnly cookie"""
-        cookie_name = COOKIE_NAME_ACCESS if token_type == "access" else COOKIE_NAME_REFRESH
+        cookie_name = (
+            COOKIE_NAME_ACCESS if token_type == "access" else COOKIE_NAME_REFRESH
+        )
         return request.cookies.get(cookie_name)
-    
+
     @staticmethod
-    def get_session_data_from_cookie(request: Request) -> Optional[Dict[str, Any]]:
+    def get_session_data_from_cookie(request: Request) -> dict[str, Any] | None:
         """Extract and verify session data from cookie"""
-        
+
         session_token = request.cookies.get(COOKIE_NAME_SESSION)
         if not session_token:
             return None
-        
+
         try:
             payload = jwt.decode(session_token, SECRET_KEY, algorithms=[ALGORITHM])
             return payload
         except JWTError:
             return None
 
+
 class CookieAuthBearer(HTTPBearer):
     """Custom HTTPBearer that supports both Authorization header and cookies"""
-    
-    async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
+
+    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:
         # First try to get token from Authorization header
         auth_header = await super().__call__(request)
         if auth_header:
             return auth_header
-        
+
         # If no header, try to get from cookie
         token = CookieAuth.get_token_from_cookie(request, "access")
         if token:
             return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
-        
+
         return None
+
 
 # Create instance for dependency injection
 cookie_auth_bearer = CookieAuthBearer(auto_error=False)
 
+# Module-level dependency to avoid function call in defaults
+_db_dependency = Depends(get_db)
+
+
 def get_current_user_from_cookie(getUserFunction: Callable = get_user):
     """Dependency to get current user from cookie or header"""
+
     async def current_user(
         request: Request,
-        credentials: Optional[HTTPAuthorizationCredentials] = None,
-        db=Depends(get_db),
+        credentials: HTTPAuthorizationCredentials | None = None,
+        db: AsyncSession = _db_dependency,
     ):
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
         token = None
 
         # Try to get token from credentials (header) or cookie
@@ -189,41 +209,43 @@ def get_current_user_from_cookie(getUserFunction: Callable = get_user):
             token = credentials.credentials
         else:
             token = CookieAuth.get_token_from_cookie(request, "access")
-        
+
         if not token:
             raise credentials_exception
-        
+
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             email: str = payload.get("sub")
             if email is None:
                 raise credentials_exception
         except JWTError:
-            raise credentials_exception
-        
+            raise credentials_exception from JWTError
+
         user = await getUserFunction(email, db)
         if user is None:
             raise credentials_exception
-        
+
         return sanitize_user(user)
-    
+
     return current_user
+
 
 def get_current_user_with_refresh_from_cookie():
     """Dependency to refresh token using httpOnly cookies"""
+
     async def current_user_refresh(
         request: Request,
-        credentials: Optional[HTTPAuthorizationCredentials] = None,
-        db=Depends(get_db),
+        credentials: HTTPAuthorizationCredentials | None = None,
+        db: AsyncSession = _db_dependency,
     ):
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials (refresh)",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
         token = None
-        
+
         # Try to get refresh token from credentials (header)
         if credentials:
             token = credentials.credentials
@@ -233,12 +255,12 @@ def get_current_user_with_refresh_from_cookie():
 
         if not token:
             raise credentials_exception
-        
+
         new_tokens_and_email = await get_new_tokens_and_email(token, db)
         if new_tokens_and_email is None:
             raise credentials_exception
         return new_tokens_and_email
-    
+
     return current_user_refresh
 
 
@@ -272,13 +294,19 @@ async def get_user_with_fleet(email: str, db: AsyncSession):
 
 ### Helper functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+    )
 
 
-def create_tokens(data: dict, access_expires_delta: Optional[timedelta] = None, refresh_expires_delta: Optional[timedelta] = None):
+def create_tokens(
+    data: dict,
+    access_expires_delta: timedelta | None = None,
+    refresh_expires_delta: timedelta | None = None,
+):
     to_encode = data.copy()
-    access_expire = datetime.now(timezone.utc) + (access_expires_delta or timedelta(days=7))
-    refresh_expire = datetime.now(timezone.utc) + (refresh_expires_delta or timedelta(days=30))
+    access_expire = datetime.now(UTC) + (access_expires_delta or timedelta(days=7))
+    refresh_expire = datetime.now(UTC) + (refresh_expires_delta or timedelta(days=30))
 
     to_encode.update({"exp": access_expire})
     access_token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -292,12 +320,17 @@ def create_tokens(data: dict, access_expires_delta: Optional[timedelta] = None, 
 async def get_new_tokens_and_email(refresh_token: str, db: AsyncSession):
     try:
         # Decode the refresh token without verifying expiration
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        payload = jwt.decode(
+            refresh_token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+            options={"verify_exp": False},
+        )
         email: str = payload.get("sub")
 
         # Check if the refresh token has expired
         exp = payload.get("exp")
-        if exp and datetime.fromtimestamp(exp, tz=timezone.utc) <= datetime.now(timezone.utc):
+        if exp and datetime.fromtimestamp(exp, tz=UTC) <= datetime.now(UTC):
             return None  # Refresh token has expired
 
         user = await get_user(email, db)
@@ -308,11 +341,12 @@ async def get_new_tokens_and_email(refresh_token: str, db: AsyncSession):
         new_tokens = create_tokens(data={"sub": email})
         return {**new_tokens, "email": email}
     except JWTError as e:
-        print(f"JWT Error: {str(e)}")
+        print(f"JWT Error: {e!s}")
         return None
 
+
 async def get_user_with_company_with_email(email: str, db: AsyncSession):
-    query = text(f"""
+    query = text("""
         SELECT
             JSON_BUILD_OBJECT(
                 'id', u.id,
@@ -331,7 +365,7 @@ async def get_user_with_company_with_email(email: str, db: AsyncSession):
                 ),
                 'fleets', COALESCE(
                     JSON_AGG(
-                        CASE 
+                        CASE
                             WHEN f.id IS NOT NULL THEN
                                 JSON_BUILD_OBJECT(
                                     'id', f.id,
@@ -354,21 +388,23 @@ async def get_user_with_company_with_email(email: str, db: AsyncSession):
         LEFT JOIN "role" r ON u.role_id = r.id
         LEFT JOIN "user_fleet" uf ON u.id = uf.user_id
         LEFT JOIN "fleet" f ON uf.fleet_id = f.id
-        WHERE u.email = '{email}'
+        WHERE u.email = :email
         GROUP BY u.id, c.id, r.id
     """)
-    result = await db.exec(query)
+    result = await db.execute(query, {"email": email})
     row = result.mappings().first()
-    user = row['user']
-    company = row['company']
+    user = row["user"]
+    company = row["company"]
     return user, company
+
 
 async def authenticate_user(email: str, password: str, db: AsyncSession):
     user, company = await get_user_with_company_with_email(email, db)
-    if not user or not verify_password(password, user['password']):
+    if not user or not verify_password(password, user["password"]):
         return False
     sanitized_user = sanitize_user(user)
     return {"user": sanitized_user, "company": company}
+
 
 async def get_authenticated_user(email: str, db: AsyncSession):
     user, company = await get_user_with_company_with_email(email, db)
