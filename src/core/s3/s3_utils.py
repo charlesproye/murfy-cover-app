@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import lru_cache
 from io import BytesIO
-from typing import Annotated, Any, Optional
+from typing import Any
 
 import boto3
 import joblib
@@ -18,7 +18,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import types as T
 from pyspark.sql.functions import col
 
-from core.config import *
+from core.config import EMTPY_S3_KEYS_WARNING_MSG, KEY_LIST_COLUMN_NAMES
 from core.pandas_utils import str_split_and_retain_src
 from core.s3.settings import S3Settings
 from core.spark_utils import align_dataframes_for_union
@@ -68,9 +68,7 @@ class S3Service:
             response = self._s3_client.list_objects_v2(
                 Bucket=self.bucket_name, Prefix=prefix
             )
-            if "Contents" not in response:
-                return False
-            return True
+            return "Contents" in response
         except Exception as e:
             if e.response["Error"]["Code"] == "404":
                 return False
@@ -78,7 +76,7 @@ class S3Service:
                 raise e
 
     def save_df_as_parquet_spark(
-        self, df: DF, key: str, spark, repartition_key: Optional[str] = "vin"
+        self, df: DF, key: str, spark, repartition_key: str | None = "vin"
     ):
         """
         Intended to concatenate existing data and overwrite files already present in scaleway.
@@ -147,7 +145,7 @@ class S3Service:
         ).partitionBy(repartition_key).parquet(s3_path)
 
     def append_spark_df_to_parquet(
-        self, df: DF, key: str, repartition: Optional[str] = None
+        self, df: DF, key: str, repartition: str | None = None
     ):
         s3_path = f"s3a://{self.bucket_name}/{key}"
 
@@ -193,7 +191,7 @@ class S3Service:
         )
         keys["is_valid_file"] &= keys["vin"].str.len() != 0
         self.logger.debug(f"set is_valid_file column:\n{keys}")
-        keys = keys.query(f"is_valid_file")
+        keys = keys.query("is_valid_file")
         keys["date"] = keys["file"].str[:-5]
 
         return keys
@@ -406,7 +404,7 @@ class S3Service:
     def get_object_size(
         self,
         prefix,
-        prefix_to_exclude: Optional[list[str]] = [],
+        prefix_to_exclude: list[str] | None = None,
         exclude_temp: bool = True,
     ):
         """
@@ -426,7 +424,8 @@ class S3Service:
                 - object_count (int): The total number of objects found
         """
 
-        # try:
+        to_exclude = prefix_to_exclude or []
+
         objects = []
         paginator = self._s3_client.get_paginator("list_objects_v2")
         if not prefix.endswith("/"):
@@ -434,7 +433,7 @@ class S3Service:
         pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
         for page in pages:
             for obj in page["Contents"]:
-                if obj["Key"] in prefix_to_exclude or (
+                if obj["Key"] in to_exclude or (
                     exclude_temp and "/temp/" in obj["Key"]
                 ):
                     continue
@@ -513,6 +512,23 @@ class S3Service:
                 f"Error reading pickle file s3://{self.bucket_name}/{key}: {e}"
             )
             raise
+
+    def list_content(self, bucket: str, path: str = "") -> tuple[list[str], list[str]]:
+        """Returns (folders, files) for a given S3 path"""
+        paginator = self._s3_client.get_paginator("list_objects_v2")
+
+        folders = set()
+        files = []
+
+        for page in paginator.paginate(Bucket=bucket, Prefix=path, Delimiter="/"):
+            for cp in page.get("CommonPrefixes", []):
+                folders.add(cp.get("Prefix"))
+            for content in page.get("Contents", []):
+                key = content["Key"]
+                if key != path:
+                    files.append(key)
+
+        return sorted(folders), sorted(files)
 
 
 @lru_cache

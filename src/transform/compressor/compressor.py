@@ -1,49 +1,107 @@
 import asyncio
 import gc
 import io
+import multiprocessing as mp
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 
 from botocore.exceptions import ClientError
+from rich.progress import track
 
 from core.s3.async_s3 import AsyncS3
+from core.s3.s3_utils import S3Service
+
+COMPRESSION_N_PROCESSES = int(os.getenv("COMPRESSION_N_PROCESSES", 1))
+
+
+def _process_vin_chunk_worker(args):
+    """Standalone worker function for multiprocessing that can be pickled."""
+    chunk, brand_prefix, compressor_class = args
+
+    # Create new event loop for this process
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Create compressor instance for this process
+    compressor = compressor_class()
+
+    try:
+        loop.run_until_complete(
+            _process_chunk_async_worker(chunk, brand_prefix, compressor)
+        )
+    finally:
+        loop.close()
+
+
+async def _process_chunk_async_worker(chunk, brand_prefix, compressor):
+    """Async worker function to process a chunk of VIN paths."""
+    for _, vin_path in enumerate(chunk):
+        print(f"DOWNLOAD VIN: {vin_path}")
+        if brand_prefix in [
+            "stellantis",
+            "ford",
+            "kia",
+            "renault",
+            "volvo-cars",
+            "mercedes-benz",
+        ]:
+            await compressor._compress_temp_vin_data_buffer(vin_path)
+        else:
+            await compressor._compress_temp_vin_data(vin_path)
 
 
 class Compressor(ABC):
-    """Compressor class that could be extended or modified easily to be used for all car brand compression"""
+    """Compressor class that could be extended or modified easily to be used for all car brand compression
+    COMPRESSION_N_PROCESSES (default 1): Number of processes to use for compression. Set to -1 to use all available processes.
+    """
 
     def __init__(self, s3: AsyncS3 | None = None) -> None:
         self._s3 = s3 or AsyncS3()
         self._s3_dev = AsyncS3(env="dev")
+        self._sync_s3 = S3Service()
 
     @property
     @abstractmethod
     def brand_prefix(self) -> str:
         pass
 
-    async def run(self):
-        vins_folders, _ = await self._s3.list_content(f"response/{self.brand_prefix}/")
-        r = await asyncio.gather(
-            *(self._s3.list_content(f"{vin_path}temp/") for vin_path in vins_folders)
+    async def run(
+        self,
+        chunk_size: int | None = None,
+        num_processes: int = COMPRESSION_N_PROCESSES,
+    ):
+        # async listing fails sometimes, so we use the sync version
+        vins_folders, _ = self._sync_s3.list_content(
+            self._s3.bucket, f"response/{self.brand_prefix}/"
         )
+        folders_files = []
+        for vin_path in track(vins_folders, description="Temp files listing..."):
+            folders_files.append(
+                self._sync_s3.list_content(self._s3.bucket, f"{vin_path}temp/")
+            )
+
         vins_with_temps: list[str] = []
-        for i, (_, files) in enumerate(r):
+        for i, (_, files) in enumerate(folders_files):
             if len(files) > 0:
                 vins_with_temps.append(vins_folders[i])
-        for i, vin_path in enumerate(vins_with_temps):
-            print(f"DOWNLOAD VIN: {vin_path}")
-            print(f"{(i / len(vins_with_temps) * 100):.2f}%")
-            if self.brand_prefix in [
-                "stellantis",
-                "ford",
-                "kia",
-                "renault",
-                "volvo-cars",
-                "mercedes-benz",
-            ]:
-                await self._compress_temp_vin_data_buffer(vin_path)
-            else:
-                await self._compress_temp_vin_data(vin_path)
+
+        if num_processes == -1:
+            num_processes = mp.cpu_count()
+        if chunk_size is None:
+            chunk_size = max(1, len(vins_with_temps) // num_processes)
+
+        # Split VINs into chunks
+        chunks = self._chunk_list(vins_with_temps, chunk_size)
+
+        print(
+            f"Processing {len(vins_with_temps)} VINs in {len(chunks)} chunks using {num_processes} processes"
+        )
+
+        # Process chunks in parallel
+        worker_args = [(chunk, self.brand_prefix, self.__class__) for chunk in chunks]
+        with mp.Pool(processes=num_processes) as pool:
+            pool.map(_process_vin_chunk_worker, worker_args)
 
     async def _compress_temp_vin_data(
         self, vin_folder_path: str, max_retries: int = 3, retry_delay: int = 2
@@ -140,4 +198,8 @@ class Compressor(ABC):
 
     def _filename(self):
         return f"{datetime.now().strftime('%Y-%m-%d')}.json"
+
+    def _chunk_list(self, lst: list, chunk_size: int) -> list[list]:
+        """Split a list into chunks of specified size."""
+        return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 

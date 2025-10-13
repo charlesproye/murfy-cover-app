@@ -21,6 +21,7 @@ dependencies = [
     "aiohttp==3.11.11",
     "aioboto3>=13.4.0",
     "boto3>=1.36",
+    "joblib>=1.5.2",
 ]
 
 [project.optional-dependencies]
@@ -138,7 +139,7 @@ external_api = [
     "oauth2client~=4.1.3", # Pour l'authentification avec Google API "
     "boto3~=1.36", # S3 integration",
     "pandas~=2.2", # Data analysis",
-    "joblib==1.3.2", # Joblib for machine learning"
+    "joblib>=1.3.2", # Joblib for machine learning"
     "asteval>=1.0.6",
     "gspread>=6.1.4",
 ]
