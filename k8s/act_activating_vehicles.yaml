@@ -19,7 +19,7 @@ spec:
             - name: act-activating-vehicles-1
               image: rg.fr-par.scw.cloud/bib-images/activation:latest
               imagePullPolicy: Always
-              command: ["python","-m", "src/activation/main.py"]
+              command: ["python", "src/activation/main.py"]
               env:
                 - name: DB_DATA_EV_PASSWORD
                   valueFrom:

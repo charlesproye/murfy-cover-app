@@ -46,7 +46,32 @@ spec:
                   valueFrom:
                     secretKeyRef:
                       name: s3-secret
-                      key: S3_ENDPOINT 
+                      key: S3_ENDPOINT
+                - name: S3_BASE_PATH
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret
+                      key: S3_BASE_PATH
+                - name: S3_BUCKET_DEV
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret-dev
+                      key: S3_BUCKET_DEV
+                - name: S3_KEY_DEV
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret-dev
+                      key: S3_KEY_DEV
+                - name: S3_SECRET_DEV
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret-dev
+                      key: S3_SECRET_DEV
+                - name: S3_ENDPOINT_DEV
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-secret-dev
+                      key: S3_ENDPOINT_DEV
               resources:
                 limits:
                   memory: "2Gi"
@@ -54,5 +79,4 @@ spec:
                 requests:
                   memory: "2Gi"
                   cpu: "1"
-
 
