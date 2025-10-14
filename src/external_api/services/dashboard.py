@@ -339,6 +339,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
             JOIN vehicle v ON vd.vehicle_id = v.id
             WHERE v.fleet_id = :fleet_id
             AND v.is_displayed = true
+            AND vd.timestamp > (CURRENT_DATE - INTERVAL '1 month')
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
         SELECT
@@ -365,6 +366,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
             WHERE v.fleet_id = :fleet_id
             AND v.is_displayed = true
             AND vd.timestamp < (CURRENT_DATE - INTERVAL '1 month')
+            AND vd.timestamp > (CURRENT_DATE - INTERVAL '2 month')
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
         SELECT
