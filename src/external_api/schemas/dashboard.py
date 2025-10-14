@@ -109,11 +109,13 @@ class DashboardCrud:
     async def get_extremum_soh(
         self,
         fleet_id: str,
-        extremum: str,
         brand: str | None = None,
         page: int | None = None,
         page_size: int | None = None,
+        extremum: str | None = None,
+        sorting_column: str | None = None,
+        sorting_order: str | None = None,
         db: AsyncSession | None = None,
     ):
-        return await get_extremum_soh(fleet_id, extremum, brand, page, page_size, db)
+        return await get_extremum_soh(fleet_id, brand, page, page_size, extremum, sorting_column, sorting_order, db)
 

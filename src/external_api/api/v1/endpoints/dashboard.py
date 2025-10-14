@@ -218,7 +218,6 @@ async def get_soh_by_groups(
 async def get_extremum_soh(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    extremum: str = Query("Worst", description="The extremum"),
     brand: str = Query(None, description="The brand"),
     page: int | None = Query(
         None,
@@ -227,10 +226,13 @@ async def get_extremum_soh(
     page_size: int | None = Query(
         None, description="Items per page, None for page and page_size sends all data"
     ),
+    extremum: str = Query("Worst", description="The extremum"),
+    sorting_column: str = Query(None, description="The sorting column"),
+    sorting_order: str = Query(None, description="The sorting order"),
     user: UserWithFleet = Depends(get_current_user_with_fleet()),
 ):
     response = await DashboardCrud().get_extremum_soh(
-        fleet_id, extremum, brand, page, page_size, db
+        fleet_id, brand, page, page_size, extremum, sorting_column, sorting_order, db
     )
     return response
 
