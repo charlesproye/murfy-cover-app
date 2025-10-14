@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from dotenv import load_dotenv
 from pydantic import Field
@@ -13,7 +14,7 @@ class S3Settings(BaseSettings):
     S3_BUCKET: str = Field(default=...)
     S3_KEY: str = Field(default=...)
     S3_SECRET: str = Field(default=...)
-    S3_BASE_PATH: str = Field(default=None)
+    S3_BASE_PATH: Optional[str] = None
 
     def __init__(self, **data):
         super().__init__(**data)
