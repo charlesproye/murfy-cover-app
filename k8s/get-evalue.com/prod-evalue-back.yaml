@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-api
+  namespace: evalue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: external-api
+  template:
+    metadata:
+      labels:
+        app: external-api
+    spec:
+      containers:
+      - name: external-api
+        image: rg.fr-par.scw.cloud/bib-images/external-api:latest
+        ports:
+        - containerPort: 4000
+        resources:
+          requests:
+            memory: 250M
+            cpu: 500m
+          limits:
+            memory: 2G
+            cpu: 1
+        env:
+        - name: ALGORITHM
+          value: HS256
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: evalue-back-secret
+              key: SECRET_KEY
+        - name: ENCRYPT_KEY
+          valueFrom:
+            secretKeyRef:
+              name: evalue-back-secret
+              key: ENCRYPT_KEY
+        - name: DB_DATA_EV_HOST
+          value: 172.16.20.9 # Private IP
+        - name: DB_DATA_EV_NAME
+          valueFrom:
+            secretKeyRef:
+              name: evalue-back-secret
+              key: DB_DATA_EV_NAME
+        - name: DB_DATA_EV_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: evalue-back-secret
+              key: DB_DATA_EV_PASSWORD
+        - name: DB_DATA_EV_PORT
+          value: "5432"
+        - name: DB_DATA_EV_USER
+          valueFrom:
+            secretKeyRef:
+              name: evalue-back-secret
+              key: DB_DATA_EV_USER
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-api
+  namespace: evalue
+spec:
+  selector:
+    app: external-api
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-api-ingress
+  namespace: evalue
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/rewrite-target: /api/v1/
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - get-evalue.com
+    secretName: evalue-back-tls
+  rules:
+  - host: get-evalue.com
+    http:
+      paths:
+      - path: /api/v1/
+        pathType: Prefix
+        backend:
+          service:
+            name: external-api
+            port:
+              number: 4000
+
