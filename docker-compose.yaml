@@ -195,6 +195,7 @@ services:
     image: rg.fr-par.scw.cloud/bib-images/external-api:latest
     container_name: external_api
     restart: unless-stopped
+    platform: linux/amd64
     ports:
       - "4000:4000"
     environment:
