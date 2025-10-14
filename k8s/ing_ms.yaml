@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-ingestion
+  namespace: bib
+  labels:
+    app: ms-ingestion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-ingestion
+  template:
+    metadata:
+      labels:
+        app: ms-ingestion
+    spec:
+      containers:
+        - name: ms-ingestion
+          image: rg.fr-par.scw.cloud/bib-images/ms-ingestion:latest
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          envFrom:
+            - secretRef:
+                name: ms-secret
+            - secretRef:
+                name: s3-secret
+          env:
+            - name: REDIS_HOST
+              value: valkey.bib.svc
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_DB_INGESTION
+              value: "1"
+

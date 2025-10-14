@@ -130,6 +130,7 @@ services:
     build:
       context: .
       dockerfile: docker/mobilisights.Dockerfile
+    image: rg.fr-par.scw.cloud/bib-images/ms-ingestion:latest
     container_name: ms-ingestion
     env_file:
       - ./.env
