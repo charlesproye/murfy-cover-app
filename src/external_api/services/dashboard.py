@@ -697,12 +697,9 @@ async def get_table_brand(fleet_id: str, filter: str, db: AsyncSession):
     return result.mappings().all()
 
 
-async def get_trendline_brands(
-    fleet_id: str, db: AsyncSession, brands: str | None = None
+async def get_trendline_brand(
+    fleet_id: str, db: AsyncSession, brand: str | None = None
 ):
-    if brands == "undefined":
-        brands = None
-
     query = text("""
         WITH first_brand AS (
             SELECT DISTINCT ON (vm.oem_id)
@@ -754,7 +751,7 @@ async def get_trendline_brands(
             FROM vehicle v
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            WHERE vm.oem_id = COALESCE(:brands, (SELECT oem_id FROM first_brand))
+            WHERE vm.oem_id = COALESCE(:brand, (SELECT oem_id FROM first_brand))
             AND v.is_displayed = true
             ORDER BY v.id, vd.timestamp DESC
         )
@@ -770,9 +767,9 @@ async def get_trendline_brands(
             lvd.vin,
             lvd.in_fleet,
             lvd.score,
-            CASE WHEN b.oem_id = COALESCE(:brands, (SELECT oem_id FROM first_brand)) THEN 0 ELSE 1 END as sort_order
+            CASE WHEN b.oem_id = COALESCE(:brand, (SELECT oem_id FROM first_brand)) THEN 0 ELSE 1 END as sort_order
         FROM brands_with_data b
-        LEFT JOIN latest_vehicle_data lvd ON b.oem_id = COALESCE(:brands, (SELECT oem_id FROM first_brand))
+        LEFT JOIN latest_vehicle_data lvd ON b.oem_id = COALESCE(:brand, (SELECT oem_id FROM first_brand))
         ORDER BY
             sort_order,
             b.first_data ASC NULLS LAST,
@@ -783,7 +780,7 @@ async def get_trendline_brands(
         query,
         {
             "fleet_id": fleet_id,
-            "brands": brands if brands and brands != "undefined" else None,
+            "brand": brand if brand and brand != "undefined" and brand != "null" and brand != "All" else None,
         },
     )
     rows = result.mappings().all()
@@ -1064,8 +1061,6 @@ async def get_extremum_soh(
                     )
                 )
                 FROM (
-                    SELECT NULL::uuid as oem_id, 'All' as oem_name
-                    UNION ALL
                     SELECT oem_id, oem_name FROM brands_list
                     ORDER BY oem_name
                 ) all_brands
