@@ -154,6 +154,7 @@ dev = [
     "nbstripout",
     "fakeredis>=2.31.3",
     "py-spy>=0.4.1",
+    "pytest-asyncio>=1.2.0",
 ]
 
 [tool.setuptools.packages.find]

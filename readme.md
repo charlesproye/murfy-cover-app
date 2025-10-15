@@ -94,6 +94,13 @@ s3://bucket/
 - Daily compression reduces system load during operational hours
 - Parquet format provides better query performance and compression ratio
 
+### Testing strategy
+
+- Tests are defined in the [tests](./tests/) folder.
+- We use **pytest** and the settings defined in [.vscode/settings.json](./.vscode/settings.json) to run tests (either from the CLI or directly in VS Code).
+- To debug scripts or APIs, you can use the VS Code launcher configured in [.vscode/launch.json](./.vscode/launch.json).
+  We usually store API entries and scripts that require specific parameters in this file; otherwise, Python scripts that don’t need parameters can be run on the fly in VS Code.
+
 
 ### Code format
 

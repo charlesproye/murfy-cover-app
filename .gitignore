@@ -158,8 +158,8 @@ cython_debug/
 # MacOS
 .DS_Store
 
-#File 
-.csv 
+#File
+.csv
 .png
 *.parquet
 
@@ -224,4 +224,12 @@ Thumbs.db
 src/ingestion/vehicle_info/api/pkcs12.txt
 *.p12
 *.pfx
+
+# VSCode
+.vscode/**/*
+
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 
