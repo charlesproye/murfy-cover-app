@@ -978,15 +978,33 @@ class Maintenance(
     odometer: TimestampedValueWithUnit[float, DistanceUnit] | None = None
 
 
+class Rear(
+    msgspec.Struct, forbid_unknown_fields=True, omit_defaults=True, rename="camel"
+):
+    need_repair: TimestampedValue[bool]
+
+
+class MergedRear(
+    msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"
+):
+    need_repair: list[TimestampedValue[bool]] = []
+
+    @classmethod
+    def from_list(cls, lst: list[Rear]) -> Self:
+        res = cls()
+        res.need_repair = TimestampedValue.merge_list(
+            [x for x in (e.need_repair for e in lst) if x is not None]
+        )
+        return res
+
+
 class Crash(
     msgspec.Struct, forbid_unknown_fields=False, omit_defaults=True, rename="camel"
 ):
     auto_ecall: TimestampedValue[bool] | None = None
     pedestrian: TimestampedValue[bool] | None = None
     tipped_over: TimestampedValue[bool] | None = None
-    rear: dict | None = (
-        None  # Changed to dict to accept any fields without timestamp requirement
-    )
+    rear: Rear | None = None
 
 
 class MergedCrash(
@@ -995,7 +1013,7 @@ class MergedCrash(
     auto_ecall: list[TimestampedValue[bool]] = []
     pedestrian: list[TimestampedValue[bool]] = []
     tipped_over: list[TimestampedValue[bool]] = []
-    rear: list[TimestampedValue[bool | dict]] = []
+    rear: MergedRear | None = None
 
     @classmethod
     def from_list(cls, lst: list[Crash]) -> Self:
@@ -1009,7 +1027,7 @@ class MergedCrash(
         res.tipped_over = TimestampedValue.merge_list(
             [x for x in (e.tipped_over for e in lst) if x is not None]
         )
-        res.rear = TimestampedValue.merge_list(
+        res.rear = MergedRear.from_list(
             [x for x in (e.rear for e in lst) if x is not None]
         )
         return res

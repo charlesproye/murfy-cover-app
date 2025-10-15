@@ -34,7 +34,7 @@ def _process_vin_chunk_worker(args):
         loop.close()
 
 
-async def _process_chunk_async_worker(chunk, brand_prefix, compressor):
+async def _process_chunk_async_worker(chunk, brand_prefix, compressor: "Compressor"):
     """Async worker function to process a chunk of VIN paths."""
     for _, vin_path in enumerate(chunk):
         print(f"DOWNLOAD VIN: {vin_path}")

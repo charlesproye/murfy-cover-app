@@ -143,6 +143,7 @@ migrations = [
 dev = [
     "data_ev[activation,transform,eda,load,web,results,ingestion,external_api,migrations]",
     "pytest",
+    "pytest-asyncio",
     "ruff",
     "nbstripout",
     "fakeredis>=2.31.3",
