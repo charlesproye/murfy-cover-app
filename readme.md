@@ -35,6 +35,24 @@ uv sync --locked --extra transform
 `core` implements the code that is common to any data pipeline.
 See [core documentation](src/core/readme.md).
 
+### DB Models
+All database models are defined in [src/db_models](./src/db_models/) and defined with SQLAlchemy.
+You can check migrations with:
+```bash
+uv run alembic -c src/db_models/alembic.ini current
+uv run alembic -c src/db_models/alembic.ini heads
+```
+
+Run migrations with:
+```bash
+uv run alembic -c src/db_models/alembic.ini upgrade head
+```
+
+Generate alembic commits:
+```bash
+uv run alembic -c src/db_models/alembic.ini revision --autogenerate -m "<COMMIT_MESSAGE>"
+```
+
 ### EDA:
 
 `EDA` contains the code to analyze the data(mostly notebooks) and to explain the reasoning steps behind the implementations in `transform`.

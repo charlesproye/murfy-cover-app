@@ -6,9 +6,10 @@ from typing import Any
 
 import fastapi
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from db_models.vehicle import VehicleModel
 from external_api.core import utils
 from external_api.core.cookie_auth import get_current_user_from_cookie
 from external_api.db.session import get_db
@@ -396,22 +397,19 @@ async def get_model_soh_trendline(
             vin=vin, endpoint=request.scope["route"].path, user=user, db=db
         )
 
-        query = text("""
-        SELECT
-            vm.trendline->>'trendline' as trendline,
-            vm.trendline_min->>'trendline' as trendline_min,
-            vm.trendline_max->>'trendline' as trendline_max,
-            vm.commissioning_date as commissioning_date,
-            vm.end_of_life_date as end_of_life_date
-        FROM vehicle_model vm
-        WHERE
-            vm.model_name = :model_name
-            AND vm.type = :model_type
-            AND vm.trendline is not null
-        """)
-        trendline_result = await db.execute(
-            query, {"model_name": model, "model_type": model_type}
+        query = select(
+            VehicleModel.trendline["trendline"].as_string().label("trendline"),
+            VehicleModel.trendline_min["trendline"].as_string().label("trendline_min"),
+            VehicleModel.trendline_max["trendline"].as_string().label("trendline_max"),
+            VehicleModel.commissioning_date,
+            VehicleModel.end_of_life_date,
+        ).where(
+            VehicleModel.model_name == model,
+            VehicleModel.type == model_type,
+            VehicleModel.trendline.is_not(None),
         )
+
+        trendline_result = await db.execute(query)
         trendline = trendline_result.fetchone()
 
         if not trendline:

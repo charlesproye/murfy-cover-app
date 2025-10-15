@@ -10,18 +10,20 @@ readme = "readme.md"
 requires-python = ">=3.11"
 dependencies = [
     # Core dependencies used across all modules
-    "python-dotenv==1.0.0",
+    "python-dotenv>=1.0.0",
     "pandas==2.2.2", # Adds 150MB to images, might be worth to install only in needed modules
     "msgspec==0.19.0",
     "schedule==1.2.2",
     "rich==13.5.2",
     "requests==2.30.0",
     "redis>=6.0.0",
-    "asyncio-mqtt",
     "aiohttp==3.11.11",
     "aioboto3>=13.4.0",
     "boto3>=1.36",
     "joblib>=1.5.2",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.11",
 ]
 
 [project.optional-dependencies]
@@ -32,7 +34,6 @@ activation = [
     "psycopg2-binary>=2.9.9",
     "asyncpg~=0.30",
     "uuid6==2022.10.25",
-    "sqlalchemy>=2.0.0",
 ]
 
 # Transform module dependencies - handles ETL pipeline with Spark
@@ -43,10 +44,7 @@ transform = [
     "psycopg2-binary>=2.9.9",
     "asyncpg~=0.30",
     "minio==7.1.13",
-    "pydantic>=1.10.13",
-    "pydantic-settings~=2.11",
     "pyyaml>=6.0",
-    "sqlalchemy>=2.0.0",
 ]
 
 # EDA module dependencies - for exploratory data analysis notebooks
@@ -76,8 +74,6 @@ load = [
 web = [
     "fastapi~=0.118",
     "uvicorn",
-    "pydantic>=1.10.13",
-    "pydantic-settings~=2.11",
     "python-multipart>=0.0.18",
     "orjson==3.8.5",
     "greenlet==3.2.2",
@@ -91,11 +87,8 @@ results = [
     "oauth2client",
     "scikit-learn==1.5.1",
     "pyarrow==19.0.0",
-    "pydantic>=1.10.13",
-    "pydantic-settings~=2.11",
     "pyspark==3.5.5",
     "pyyaml>=6.0",
-    "sqlalchemy>=2.0.0",
     "rapidfuzz==3.13.0",
 ]
 
@@ -127,11 +120,7 @@ external_api = [
     "python-jose[cryptography]~=3.3.0",
     "python-multipart~=0.0.6",
     "passlib[bcrypt]==1.7.4",
-    "pydantic~=2.11",
     "pydantic[email]~=2.11",
-    "pydantic-settings~=2.11",
-    "sqlalchemy~=2.0.20",
-    "sqlmodel~=0.0.8",
     "asyncpg~=0.30",
     "psycopg2-binary~=2.9.7",
     "redis~=6.0.0",
@@ -145,10 +134,14 @@ external_api = [
     "gspread>=6.1.4",
 ]
 
+migrations = [
+    "alembic>=1.17",
+]
+
 [dependency-groups]
 # Full development environment with all dependencies
 dev = [
-    "data_ev[activation,transform,eda,load,web,results,ingestion,external_api]",
+    "data_ev[activation,transform,eda,load,web,results,ingestion,external_api,migrations]",
     "pytest",
     "ruff",
     "nbstripout",
