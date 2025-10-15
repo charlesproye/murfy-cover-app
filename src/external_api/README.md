@@ -23,7 +23,7 @@ API providing access to vehicle data with authentication system and billing per 
 - **Redis**: Cache and rate limiter manager
 - **Pydantic**: Data validation and serialization
 - **Docker/Docker Compose**: Containerization and orchestration
-- **Conda**: Python environment management
+- **UV**: Python environment management
 - **Structlog**: Structured logging
 
 ## 📋 Prerequisites
@@ -47,7 +47,7 @@ cp .env.example .env
 docker-compose up -d external_api
 ```
 
-### Local Development with Conda
+### Local Development with UV
 
 ```bash
 # Start application in development mode
@@ -59,12 +59,15 @@ uv run uvicorn src.external_api.app:app --reload --port 4000
 Copy the `.env.example` file to `.env` and adjust values according to your environment:
 
 # Redis
+
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
 # Security
+
 SECRET_KEY=your-secret-key
 ACCESS_TOKEN_EXPIRE_MINUTES=60
+
 ```
 
 ## 🔍 API Documentation
@@ -107,16 +110,6 @@ Logs are emitted in structured JSON format, facilitating their integration with 
 
 The API exposes a `/health` endpoint for health checks, compatible with Kubernetes and other monitoring systems.
 
-## 🧪 Tests
-
-```bash
-# Activate environment
-conda activate api-externe
-
-# Run tests
-pytest
-```
-
 ## 📈 Pricing Plans
 
 | Plan       | Requests/day | Price per request |
@@ -132,4 +125,5 @@ This project is under MIT license. See the `LICENSE` file for more details.
 ## 📮 Contact
 
 For any questions or support, please contact the BIB Batteries team.
+```
 
