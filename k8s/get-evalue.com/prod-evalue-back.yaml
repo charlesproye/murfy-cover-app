@@ -20,11 +20,11 @@ spec:
         - containerPort: 4000
         resources:
           requests:
-            memory: 250M
-            cpu: 500m
+            memory: "0.25G"
+            cpu: "0.25"
           limits:
-            memory: 2G
-            cpu: 1
+            memory: "1G"
+            cpu: "1"
         env:
         - name: ALGORITHM
           value: HS256
