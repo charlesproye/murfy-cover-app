@@ -1,4 +1,3 @@
-import logging
 from datetime import timedelta
 
 from fastapi import Depends, HTTPException, status
@@ -10,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from external_api.core.cookie_auth import authenticate_user, create_tokens
 from external_api.schemas.user import GlobalUser, User, UserLogin
 
-logger = logging.getLogger(__name__)
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="token")
 
 

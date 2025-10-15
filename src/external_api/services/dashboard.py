@@ -28,7 +28,6 @@ async def get_kpis(
     Returns:
         List of KPIs
     """
-    print("\n\nfleets", fleets)
     # Extract fleet IDs from FleetInfo objects
     fleet_id_list = [fleet.get("id") for fleet in fleets] if fleets else []
 
