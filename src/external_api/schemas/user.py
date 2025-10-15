@@ -4,8 +4,6 @@ from datetime import datetime
 
 from pydantic import UUID4, BaseModel, EmailStr
 
-# from services.user import authenticate_user
-
 
 # Base Models
 class UserBase(BaseModel):
@@ -39,10 +37,8 @@ class ApiUserBase(BaseModel):
 
 
 # Authentication Models
-class Login(BaseModel):
-    """Schéma pour l'authentification"""
-
-    email: str
+class UserLogin(BaseModel):
+    email: EmailStr
     password: str
 
 
@@ -110,8 +106,7 @@ class UserWithFleet(BaseModel):
     id: UUID4
     role_id: UUID4
     email: str
-    fleet_id: UUID4 | None
-    fleet_ids: list[FleetInfo] | None
+    fleets: list[FleetInfo] | None
 
 
 # Company Models
@@ -144,14 +139,4 @@ class ApiUser(ApiUserBase):
 
     class Config:
         from_attributes = True
-
-
-class LoginResponse(BaseModel):
-    """Schéma pour la réponse d'authentification"""
-
-    access_token: str
-    refresh_token: str
-    token_type: str
-    user: "GlobalUser"
-    company: "Company"
 

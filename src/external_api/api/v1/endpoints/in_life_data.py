@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from external_api.core.security import get_current_user
+from external_api.core.cookie_auth import get_current_user_from_cookie
 from external_api.core.utils import add_vehicles_to_google_sheet
 from external_api.db.session import get_db
 from external_api.schemas.user import User
@@ -60,7 +60,7 @@ def is_tesla_vin(vin: str) -> bool:
 async def check_rate_limit(
     vin: str,
     endpoint: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
@@ -129,7 +129,7 @@ async def check_vehicle_eligibility_endpoint(
     vin: str = Path(
         ..., description="VIN of the vehicle to check", min_length=10, max_length=25
     ),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
@@ -191,13 +191,13 @@ async def check_vehicle_eligibility_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error during vehicle eligibility check: {error_detail}",
-        )
+        ) from e
 
 
 @router.post("/activate", response_model=VehicleActivationResponse)
 async def activate_vehicles(
     activation: VehicleActivationRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
@@ -458,7 +458,7 @@ async def activate_vehicles(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error during vehicle activation: {error_detail}",
-        )
+        ) from e
 
 
 # @router.get("/static/{vin}", response_model=StaticVehicleData)
@@ -591,7 +591,7 @@ async def get_dynamic_vehicle(
         ..., description="VIN of the vehicle", min_length=10, max_length=25
     ),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
 ) -> Any:
     """
     Get dynamic data for a vehicle by its VIN.
@@ -705,7 +705,7 @@ async def get_dynamic_vehicle(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error during access rights check.",
-        )
+        ) from e
 
     # Get vehicle data
     try:
@@ -717,6 +717,5 @@ async def get_dynamic_vehicle(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Dynamic data not available for this vehicle.",
-            )
-        raise
+            ) from e
 

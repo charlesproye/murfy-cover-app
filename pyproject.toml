@@ -185,6 +185,9 @@ ignore = [
     # only relevant if you run a script with `python -0`,
     # which seems unlikely for any of the scripts in this repo
     "B011",
+    # B008: Do not perform function call in argument defaults
+    # Disabled for FastAPI Depends() which is designed to work this way
+    "B008",
     # Leave it to the formatter to split long lines and
     # the judgement of all of us.
     "E501"

@@ -1,19 +1,16 @@
 """Endpoints for vehicle data access"""
 
-import hashlib
 import logging
 import time
 from typing import Any
 
 import fastapi
-import requests
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from external_api.core import utils
-from external_api.core.config import settings
-from external_api.core.security import get_current_user
+from external_api.core.cookie_auth import get_current_user_from_cookie
 from external_api.db.session import get_db
 from external_api.schemas.model import ModelWarrantyData
 from external_api.schemas.static_data import ModelTrendline, ModelType, SOHWithTrendline
@@ -55,7 +52,7 @@ def is_tesla_vin(vin: str) -> bool:
 async def check_rate_limit(
     vin: str,
     endpoint: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
@@ -119,109 +116,111 @@ async def check_rate_limit(
         )
 
 
-def decode_vin(vin) -> dict:
-    """
-    Decode a VIN and return the make, model, and year
-    """
-    api_prefix = "https://api.vindecoder.eu/3.2"
-    api_key = settings.VIN_DECODER_API_KEY
-    secret_key = settings.VIN_DECODER_SECRET_KEY
-    id = "decode"
+# LS TODO: VinDecoderResponse is not defined, seems like this function never been used
+# def decode_vin(vin) -> dict:
+#     """
+#     Decode a VIN and return the make, model, and year
+#     """
+#     api_prefix = "https://api.vindecoder.eu/3.2"
+#     api_key = settings.VIN_DECODER_API_KEY
+#     secret_key = settings.VIN_DECODER_SECRET_KEY
+#     id = "decode"
 
-    # Calculate control sum (first 10 characters of SHA1 hash)
-    control_sum = hashlib.sha1(
-        (vin.upper() + "|" + id + "|" + api_key + "|" + secret_key).encode("utf-8")
-    ).hexdigest()[:10]
+#     # Calculate control sum (first 10 characters of SHA1 hash)
+#     control_sum = hashlib.sha1(
+#         (vin.upper() + "|" + id + "|" + api_key + "|" + secret_key).encode("utf-8")
+#     ).hexdigest()[:10]
 
-    # Build the URL
-    url = (
-        api_prefix
-        + "/"
-        + api_key
-        + "/"
-        + control_sum
-        + "/"
-        + id
-        + "/"
-        + vin.upper()
-        + ".json"
-    )
+#     # Build the URL
+#     url = (
+#         api_prefix
+#         + "/"
+#         + api_key
+#         + "/"
+#         + control_sum
+#         + "/"
+#         + id
+#         + "/"
+#         + vin.upper()
+#         + ".json"
+#     )
 
-    # Make the request
-    response = requests.get(url)
+#     # Make the request
+#     response = requests.get(url)
 
-    # Parse JSON response
-    if response.status_code == 200:
-        result = response.json()
-        vehicle_data = result.get("decode", {})
+#     # Parse JSON response
+#     if response.status_code == 200:
+#         result = response.json()
+#         vehicle_data = result.get("decode", {})
 
-        return VinDecoderResponse(
-            vin=vin,
-            make=vehicle_data.get("make"),
-            model=vehicle_data.get("model"),
-            version=vehicle_data.get("version"),
-            year=vehicle_data.get("year"),
-            body_type=vehicle_data.get("body_type"),
-            engine_type=vehicle_data.get("engine_type"),
-            transmission=vehicle_data.get("transmission"),
-            fuel_type=vehicle_data.get("fuel_type"),
-        )
-        return result
-    else:
-        raise Exception(f"API request failed with status code: {response.status_code}")
+#         return VinDecoderResponse(
+#             vin=vin,
+#             make=vehicle_data.get("make"),
+#             model=vehicle_data.get("model"),
+#             version=vehicle_data.get("version"),
+#             year=vehicle_data.get("year"),
+#             body_type=vehicle_data.get("body_type"),
+#             engine_type=vehicle_data.get("engine_type"),
+#             transmission=vehicle_data.get("transmission"),
+#             fuel_type=vehicle_data.get("fuel_type"),
+#         )
+#         return result
+#     else:
+#         raise Exception(f"API request failed with status code: {response.status_code}")
 
 
-async def check_model_eligibility(db: AsyncSession, model: str) -> dict:
-    """
-    Check if we have some data on this model
+# LS TODO: vin is not defined (x2), seems like this function never been used
+# async def check_model_eligibility(db: AsyncSession, model: str) -> dict:
+#     """
+#     Check if we have some data on this model
 
-    Args:
-        db: Session de base de données asynchrone
-        model: name of the model
+#     Args:
+#         db: Session de base de données asynchrone
+#         model: name of the model
 
-    Returns:
-        Dictionnaire contenant les informations sur l'existence, l'éligibilité et l'activation du véhicule
-    """
-    logger.info(f"Vérification de l'éligibilité pour le VIN {model}")
+#     Returns:
+#         Dictionnaire contenant les informations sur l'existence, l'éligibilité et l'activation du véhicule
+#     """
+#     logger.info(f"Vérification de l'éligibilité pour le VIN {model}")
 
-    try:
-        # Vérifier si le véhicule existe et récupérer son statut d'éligibilité et d'activation
-        query = text("""
-        SELECT
-            v.id,
-            v.is_eligible,
-            v.activation_status
-        FROM vehicle v
-        WHERE v.vin = :vin
-        """)
+#     try:
+#         # Vérifier si le véhicule existe et récupérer son statut d'éligibilité et d'activation
+#         query = text("""
+#         SELECT
+#             v.id,
+#             v.is_eligible,
+#             v.activation_status
+#         FROM vehicle v
+#         WHERE v.vin = :vin
+#         """)
 
-        result = await db.execute(query, {"vin": vin})
-        record = result.fetchone()
+#         result = await db.execute(query, {"vin": vin})
+#         record = result.fetchone()
 
-        if not record:
-            # Le véhicule n'existe pas dans la base de données
-            return {"exists": False, "is_eligible": False, "is_activated": False}
+#         if not record:
+#             # Le véhicule n'existe pas dans la base de données
+#             return {"exists": False, "is_eligible": False, "is_activated": False}
 
-        # Le véhicule existe, vérifier son éligibilité et son statut d'activation
-        return {
-            "exists": True,
-            "is_eligible": bool(record.is_eligible),
-            "is_activated": bool(record.activation_status),
-        }
+#         # Le véhicule existe, vérifier son éligibilité et son statut d'activation
+#         return {
+#             "exists": True,
+#             "is_eligible": bool(record.is_eligible),
+#             "is_activated": bool(record.activation_status),
+#         }
 
-    except Exception as e:
-        logger.error(
-            f"Erreur lors de la vérification de l'éligibilité pour le VIN {vin}: {e!s}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erreur lors de la vérification de l'éligibilité du véhicule",
-        )
+#     except Exception as e:
+#         logger.error(
+#             f"Erreur lors de la vérification de l'éligibilité pour le VIN {vin}: {e!s}"
+#         )
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Erreur lors de la vérification de l'éligibilité du véhicule",
+#         ) from e
 
 
 @router.get("/models-with-data", response_model=list[ModelType])
 async def get_model_with_data(
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     query = text("""
@@ -255,7 +254,7 @@ async def get_model_with_data(
 @router.get("/{model}/trendline", response_model=ModelTrendline)
 async def get_model_trendline(
     model: str = Path(..., description="Model name"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> ModelTrendline:
     """
@@ -308,20 +307,18 @@ async def get_model_trendline(
             comment=comment,
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error retrieving trendline data for model {model}: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving model data",
-        )
+        ) from e
 
 
 @router.get("/{model}/warranty", response_model=ModelWarrantyData)
 async def get_model_warranty(
     model: str = Path(..., description="Model name"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
@@ -363,14 +360,12 @@ async def get_model_warranty(
 
         return ModelWarrantyData(**data)
 
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error retrieving warranty data for model {model}: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving model data",
-        )
+        ) from e
 
 
 @router.get("/{vin}/flash-soh", response_model=SOHWithTrendline)
@@ -380,7 +375,7 @@ async def get_model_soh_trendline(
     model: str = Query(..., description="Model name"),
     odometer: int = Query(..., ge=0, description="Odometer in km"),
     model_type: str = Query(..., description="Type of the model"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> SOHWithTrendline:
     """
@@ -437,8 +432,6 @@ async def get_model_soh_trendline(
             end_of_life_date=trendline.end_of_life_date,
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
         logger.exception(
             f"Error retrieving soh data for model {model} + model_type {model_type}: {e!s}"
@@ -446,5 +439,5 @@ async def get_model_soh_trendline(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving model data",
-        )
+        ) from e
 

@@ -1,117 +1,71 @@
 import logging
-from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Body, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from external_api.core.config import settings
-from external_api.core.security import (
-    create_access_token,
-    get_current_user,
+from external_api.core.cookie_auth import (
+    CookieAuth,
+    get_authenticated_user,
+    get_current_user_with_refresh_from_cookie,
 )
 from external_api.core.utils import CrudTesla
 from external_api.db.session import get_db
-from external_api.schemas.token import Token
-from external_api.schemas.user import GlobalUser, Login, LoginResponse, User
-from external_api.services.user import authenticate_user
+from external_api.schemas.user import UserLogin
+from external_api.services.user import (
+    login_with_cookies,
+)
 
 router = APIRouter()
-
 logger = logging.getLogger(__name__)
 
 
-class LoginForm(BaseModel):
-    """Formulaire de connexion utilisant l'email"""
-
-    email: EmailStr
-    password: str
-
-
-@router.post("/login", response_model=LoginResponse, include_in_schema=False)
+@router.post("/login")
 async def login(
-    # form_data: OAuth2PasswordRequestForm = Depends(),
+    response: Response,
     db: AsyncSession = Depends(get_db),
-    body: Login = Body(...),
+    body: UserLogin = Body(...),
 ) -> Any:
-    """
-    OAuth2 compatible token login, get an access token for future requests.
+    """Login endpoint that uses httpOnly cookies for security"""
+    result = await login_with_cookies(form_data=body, db=db)
 
-    This endpoint is used by the OAuth2PasswordBearer for authentication.
-    """
-    user, company = await authenticate_user(body.email, body.password, db)
-    if not user:
-        logger.warning(f"Failed login attempt for email {body.email}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    refresh_token_expires = timedelta(days=7)  # Refresh token lasts 7 days
-
-    access_token = create_access_token(
-        user["email"], expires_delta=access_token_expires
-    )
-    refresh_token = create_access_token(
-        user["email"], expires_delta=refresh_token_expires
-    )
-    logger.info(f"Successful login for email {body.email}")
-    response: LoginResponse = {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "hello": "world",
-        "token_type": "bearer",
-        "user": user,
-        "company": company,
-    }
-    return response
-
-
-@router.post("/token", response_model=Token, include_in_schema=False)
-async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
-) -> Any:
-    """
-    OAuth2 compatible token endpoint for Swagger UI authorization.
-    """
-    user, _company = await authenticate_user(form_data.username, form_data.password, db)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        user["email"], expires_delta=access_token_expires
+    # Set secure cookies
+    CookieAuth.set_auth_cookies(
+        response=response,
+        access_token=result["tokens"]["access_token"],
+        refresh_token=result["tokens"]["refresh_token"],
+        user_data=result["user"],
+        company_data=result["company"],
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Return user data without tokens
+    return {"user": result["user"], "company": result["company"]}
 
 
-@router.get("/me", response_model=User)
-async def read_users_me(
-    current_user: GlobalUser = Depends(get_current_user),
-) -> Any:
-    """
-    Get the current user's information.
-    """
-    logger.info(f"Getting user information for {current_user.email}")
-    return current_user
+@router.post("/logout")
+async def logout(response: Response):
+    """Logout endpoint that clears httpOnly cookies"""
+    CookieAuth.clear_auth_cookies(response)
+    return {"message": "Logged out successfully"}
 
 
-# @router.post("/login")
-# async def login(
-#     db = Depends(deps.get_db_by_schema),
-#     body: Login = Body(...)
-# ):
-#     response: LoginResponse = await User().login(body, db)
-#     return response
+@router.post("/refresh")
+async def refresh_token(
+    response: Response,
+    tokens_and_emails: dict = Depends(get_current_user_with_refresh_from_cookie()),
+    db=Depends(get_db),
+):
+    data = await get_authenticated_user(tokens_and_emails["email"], db)
+
+    # Set secure cookies
+    CookieAuth.set_auth_cookies(
+        response=response,
+        access_token=tokens_and_emails["access_token"],
+        refresh_token=tokens_and_emails["refresh_token"],
+        user_data=data["user"],
+        company_data=data["company"],
+    )
+    return {"ok": True}
 
 
 ##### For personnal telsa vehicle, we need to get the bearer token to get the activation

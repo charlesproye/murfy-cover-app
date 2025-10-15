@@ -9,10 +9,9 @@ from external_api.schemas.user import FleetInfo
 
 
 async def get_kpis(
-    fleet_ids: list[FleetInfo],
+    fleets: list[FleetInfo],
     brands: list[UUID4] | None = None,
     regions: list[UUID4] | None = None,
-    fleets: list[UUID4] | None = None,
     pinned_vehicles: bool = False,
     db: AsyncSession = None,
 ) -> list[dict]:
@@ -20,18 +19,18 @@ async def get_kpis(
     Get KPIs for the dashboard
 
     Args:
-        fleet_ids: List of fleet IDs
+        fleets: List of fleet IDs
         brands: List of brand IDs
         regions: List of region IDs
-        fleets: List of fleet IDs
         pinned_vehicles: Whether to only show pinned vehicles
         db: Database session
 
     Returns:
         List of KPIs
     """
+    print("\n\nfleets", fleets)
     # Extract fleet IDs from FleetInfo objects
-    fleet_id_list = [fleet.id for fleet in fleet_ids] if fleet_ids else []
+    fleet_id_list = [fleet.get("id") for fleet in fleets] if fleets else []
 
     query = text("""
         WITH latest_vehicle_data AS (
@@ -77,14 +76,18 @@ async def get_kpis(
 
 
 async def get_scatter_plot_brands(
-    fleet_ids: list[str],
-    brands: list[str] | None,
     fleets: list[str],
+    brands: list[str] | None,
+    fleets_input_list: list[str],
     pinned_vehicles: bool = False,
     db: AsyncSession = None,
 ):
     brands_list = brands if brands else None
-    fleet_list = fleet_ids if not fleets or fleets[0].lower() == "all" else fleets
+    fleet_list = (
+        fleets
+        if not fleets_input_list or fleets_input_list[0].lower() == "all"
+        else fleets_input_list
+    )
 
     query = text("""
         WITH latest_vehicle_data AS (
@@ -153,14 +156,18 @@ async def get_scatter_plot_brands(
 
 
 async def get_scatter_plot_regions(
-    fleet_ids: list[str],
-    regions: list[str] | None,
     fleets: list[str],
+    regions: list[str] | None,
+    fleets_input_list: list[str],
     pinned_vehicles: bool = False,
     db: AsyncSession = None,
 ):
     regions_list = regions if regions else None
-    fleet_list = fleet_ids if not fleets or fleets[0].lower() == "all" else fleets
+    fleet_list = (
+        fleets
+        if not fleets_input_list or fleets_input_list[0].lower() == "all"
+        else fleets_input_list
+    )
 
     query = text("""
         WITH latest_vehicle_data AS (
@@ -232,11 +239,10 @@ async def get_global_table(
     fleet_ids: list[FleetInfo],
     brands: list[UUID4] | None = None,
     regions: list[UUID4] | None = None,
-    fleets: list[UUID4] | None = None,
     pinned_vehicles: bool = False,
     db: AsyncSession = None,
 ) -> list[dict]:
-    fleet_id_list = [fleet.id for fleet in fleet_ids] if fleet_ids else []
+    fleet_id_list = [fleet.get("id") for fleet in fleet_ids] if fleet_ids else []
 
     query = text("""
         WITH latest_vehicle_data AS (
@@ -421,7 +427,7 @@ async def get_filter(
         List of filter data
     """
     # Extract fleet IDs from FleetInfo objects
-    fleet_id_list = [fleet.id for fleet in base_fleet] if base_fleet else []
+    fleet_id_list = [fleet.get("id") for fleet in base_fleet] if base_fleet else []
 
     query = text("""
         WITH brands AS (
@@ -780,7 +786,9 @@ async def get_trendline_brand(
         query,
         {
             "fleet_id": fleet_id,
-            "brand": brand if brand and brand != "undefined" and brand != "null" and brand != "All" else None,
+            "brand": brand
+            if brand and brand != "undefined" and brand != "null" and brand != "All"
+            else None,
         },
     )
     rows = result.mappings().all()
@@ -970,9 +978,9 @@ async def get_extremum_soh(
 
     # Build the sorting clause based on the sorting column/order and extremum/quality
     sorting_clause = ""
-    if sorting_column is not None and sorting_column.strip() != '':
+    if sorting_column is not None and sorting_column.strip() != "":
         sorting_clause = f"ORDER BY {sorting_column} {sorting_order}"
-    elif extremum == 'Worst':
+    elif extremum == "Worst":
         sorting_clause = "ORDER BY soh_comparison ASC"
     else:
         sorting_clause = "ORDER BY soh_comparison DESC"
