@@ -1,33 +1,35 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ingestion-ms
+  name: ingestion-hm
   namespace: bib
   labels:
-    app: ingestion-ms
+    app: ingestion-hm
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ingestion-ms
+      app: ingestion-hm
   template:
     metadata:
       labels:
-        app: ingestion-ms
+        app: ingestion-hm
     spec:
       containers:
-        - name: ingestion-ms
-          image: rg.fr-par.scw.cloud/bib-images/ms-ingestion:latest
+        - name: ingestion-hm
+          image: rg.fr-par.scw.cloud/bib-images/hm-ingestion:latest
+          imagePullPolicy: Always
+          command: ["python", "src/ingestion/high_mobility/__main__.py", "--max_workers", "8"]
           resources:
             requests:
               cpu: 100m
               memory: 128Mi
             limits:
-              cpu: 500m
+              cpu: "1"
               memory: 512Mi
           envFrom:
             - secretRef:
-                name: ms-secret
+                name: hm-secret
             - secretRef:
                 name: s3-secret
           env:

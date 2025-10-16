@@ -33,6 +33,9 @@ spec:
             - "--redis.addr=redis://localhost:6379"
           ports:
             - containerPort: 9121
+          env:
+            - name: REDIS_EXPORTER_COUNT_KEYS
+              value: "db1=mobilisights:*,db1=highmobility:*"
           resources:
             requests:
               cpu: 50m

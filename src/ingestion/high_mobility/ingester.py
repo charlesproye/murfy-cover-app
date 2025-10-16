@@ -1,24 +1,23 @@
 import concurrent.futures
+import json
 import logging
 import os
 import signal
 import threading
-import time
 from datetime import datetime
-from queue import Empty, Queue
 from types import FrameType
-from typing import Callable, Optional
 
 import boto3
 import dotenv
 import msgspec
-import queue
 import schedule
 from botocore.client import ClientError
+
 from ingestion.high_mobility.api import HMApi
 from ingestion.high_mobility.schema import all_brands
 from ingestion.high_mobility.schema.brands import decode_vehicle_info
 from ingestion.high_mobility.vehicle import Vehicle
+from ingestion.ingestion_cache import IngestionCache
 
 
 class HMIngester:
@@ -30,23 +29,12 @@ class HMIngester:
     __bucket: str
 
     __fetch_scheduler = schedule.Scheduler()
-    __vehicles: set[Vehicle] = set()
-    __worker_thread: threading.Thread
-    __executor: concurrent.futures.ThreadPoolExecutor
-    __job_queue: Queue[Callable]
-
     __shutdown_requested = threading.Event()
-
-    refresh_interval: int = 2 * 60
-    upload_interval: int = 60
-    max_workers: int = 8
-    batch_size: int = 25
 
     def __init__(
         self,
-        refresh_interval: Optional[int] = 2 * 60,
-        max_workers: Optional[int] = 4,
-        batch_size: Optional[int] = 25,
+        refresh_interval: int = 2 * 60,
+        max_workers: int = 4,
     ):
         """
         Parameters
@@ -57,9 +45,6 @@ class HMIngester:
         max_workers: int, optional
             The maximum numbers of workers (limited by the S3 bucket options)
             default: 4
-        batch_size: int, optional
-            Number of files to process in a single batch
-            default: 25
         """
         dotenv.load_dotenv()
         HM_BASE_URL = os.getenv("HM_BASE_URL")
@@ -99,7 +84,7 @@ class HMIngester:
 
         self.__ingester_logger = logging.getLogger("INGESTER")
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
-        
+
         self.__api = HMApi(HM_BASE_URL, HM_CLIENT_ID, HM_CLIENT_SECRET)
         self.__s3 = boto3.client(
             "s3",
@@ -108,40 +93,38 @@ class HMIngester:
             aws_access_key_id=S3_KEY,
             aws_secret_access_key=S3_SECRET,
             config=boto3.session.Config(
-                signature_version='s3',
-                s3={'addressing_style': 'path'}
-            )
+                signature_version="s3", s3={"addressing_style": "path"}
+            ),
         )
         self.__bucket = S3_BUCKET
-        self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        self.__executor: concurrent.futures.ThreadPoolExecutor = (
+            concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        )
+        self.__ingestion_cache: IngestionCache = IngestionCache(
+            make="highmobility", keys_to_ignore=["request_id", "*.timestamp"]
+        )
+        self.__vehicles: set[Vehicle] = set()
 
-        self.__job_queue = Queue()
-        self.refresh_interval = refresh_interval or self.refresh_interval
-        self.max_workers = max_workers or self.max_workers
-        self.batch_size = batch_size
+        self.refresh_interval: int = refresh_interval
+        self.max_workers: int = max_workers
 
         signal.signal(signal.SIGTERM, self.__handle_shutdown_signal)
         signal.signal(signal.SIGINT, self.__handle_shutdown_signal)
 
-    def __handle_shutdown_signal(self, signum: int, _frame: Optional[FrameType]):
+    def __handle_shutdown_signal(self, signum: int, _frame: FrameType | None):
         self.__ingester_logger.warn(
             f"Received signal {signal.Signals(signum).name}, shutting down"
         )
-        self.__request_shutdown()
-
-    def __request_shutdown(self):
         self.__shutdown_requested.set()
 
     def __shutdown(self):
-        self.__worker_thread.join()
-        self.__ingester_logger.info("Worker thread stopped")
         self.__fetch_scheduler.clear()
         self.__ingester_logger.info("Canceled all jobs")
         self.__executor.shutdown(wait=True, cancel_futures=True)
         self.__ingester_logger.info("Cleared threadpool")
         self.__ingester_logger.info("Main thread stopped")
 
-    def __fetch_clearances(self) -> list[Vehicle] | None:
+    def _fetch_clearances(self) -> list[Vehicle] | None:
         error, info = self.__api.list_clearances(status="approved")
         match error:
             case 401:
@@ -179,10 +162,10 @@ class HMIngester:
                 return
 
     def __update_vehicles_initial(self) -> None:
-        clearances = self.__fetch_clearances()
+        clearances = self._fetch_clearances()
         if clearances is None:
             return
-        vehicles = set(
+        vehicles = {
             Vehicle(
                 vin=clearance.vin,
                 brand=clearance.brand,
@@ -190,92 +173,118 @@ class HMIngester:
                 clearance_status=clearance.clearance_status,
             )
             for clearance in clearances
-        )
+        }
         self.__ingester_logger.info(
             f"Fetched {len(vehicles)} with an approved clearance"
         )
         self.__vehicles.update(vehicles)
         for vehicle in vehicles:
             self.__fetch_scheduler.every(vehicle.rate_limit).seconds.do(
-                self.__job_queue.put, lambda v=vehicle: self.__process_vehicle(v)
+                self.__executor.submit,
+                self._process_vehicle,
+                vehicle,
             ).tag(vehicle.vin)
             self.__scheduler_logger.info(
                 f"Adding vehicle with VIN {vehicle.vin} (brand {vehicle.brand}) to the scheduler (interval: {vehicle.rate_limit} seconds)"
             )
         self.__fetch_scheduler.every(self.refresh_interval).minutes.do(
-            self.__job_queue.put,
-            self.__update_vehicles,
+            self.__update_vehicles
         ).tag("refresh")
         self.__scheduler_logger.info(
             f"Scheduled refresh of vehicle list in {self.refresh_interval} minutes"
         )
 
     def __update_vehicles(self) -> None:
-        clearances = self.__fetch_clearances()
+        clearances = self._fetch_clearances()
         if clearances is None:
             return
-        updated_vehicles = set(
-            [
-                Vehicle(
-                    vin=clearance.vin,
-                    brand=clearance.brand,
-                    rate_limit=all_brands[clearance.brand].rate_limit,
-                    clearance_status=clearance.clearance_status,
-                )
-                for clearance in clearances
-            ]
-        )
+        updated_vehicles = {
+            Vehicle(
+                vin=clearance.vin,
+                brand=clearance.brand,
+                rate_limit=all_brands[clearance.brand].rate_limit,
+                clearance_status=clearance.clearance_status,
+            )
+            for clearance in clearances
+        }
         vehicles_to_add = updated_vehicles.difference(self.__vehicles)
         vehicles_to_remove = self.__vehicles.difference(updated_vehicles)
         self.__vehicles.update(vehicles_to_add)
         self.__vehicles.difference_update(vehicles_to_remove)
         self.__ingester_logger.info(
-            f"Updating VINs: {len(vehicles_to_remove)} to remove, {len(vehicles_to_add)} to add"
+            f"Updating VINs: {len(vehicles_to_remove)} to remove, {len(vehicles_to_add)} to add. "
+            f"Currently {len(self.__fetch_scheduler.jobs)} scheduled jobs"
         )
         for v in vehicles_to_add:
             self.__scheduler_logger.info(
                 f"Adding vehicle with VIN {v.vin} (brand {v.brand}) to scheduler (interval {v.rate_limit} seconds)"
             )
             self.__fetch_scheduler.every(v.rate_limit).seconds.do(
-                self.__executor.submit, lambda vv=v: self.__process_vehicle(vv)
-            )
+                self.__executor.submit,
+                self._process_vehicle,
+                v,
+            ).tag(v.vin)
         for v in vehicles_to_remove:
             self.__scheduler_logger.info(
                 f"Removing task for vehicle with VIN {v.vin} (brand {v.brand})"
             )
-            schedule.clear(v.vin)
+            self.__fetch_scheduler.clear(v.vin)
 
-    def __process_vehicle(self, vehicle: Vehicle) -> None:
-        self.__ingester_logger.info(
+    def _parse_car_state_with_cache(
+        self, vehicle: Vehicle, data: bytes
+    ) -> bytes | None:
+        json_data = json.loads(data)
+
+        self.__ingester_logger.debug(
+            f"Fetched vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
+        )
+        try:
+            msgspec_data = decode_vehicle_info(data, vehicle.brand)
+        except (msgspec.ValidationError, msgspec.DecodeError) as e:
+            self.__ingester_logger.error(
+                f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): response {data} does not fit schema ({e})"
+            )
+            return
+
+        self.__ingester_logger.debug(
+            f"Parsed response for vehicle with VIN {vehicle.vin} correctly"
+        )
+
+        if self.__ingestion_cache.json_in_db(vin=vehicle.vin, json_data=json_data):
+            self.__ingester_logger.debug(f"[{vehicle.vin}] Car state already in cache")
+            return
+
+        self.__ingestion_cache.set_json_in_db(vin=vehicle.vin, json_data=json_data)
+        self.__ingester_logger.debug(f"[{vehicle.vin}] Successfully parsed data")
+
+        try:
+            return msgspec.json.encode(msgspec_data)
+        except msgspec.EncodeError as e:
+            self.__ingester_logger.error(f"Failed to encode vehicle data: {e}")
+            return
+
+    def _process_vehicle(
+        self, vehicle: Vehicle, auto_upload: bool = True
+    ) -> None | bytes:
+        self.__ingester_logger.debug(
             f"Starting processing for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
         )
-        error, info = self.__api.get_vehicle_info(vehicle.vin)
+        status_code, info = self.__api.get_vehicle_info(vehicle.vin)
+
         def log_error(info):
             self.__ingester_logger.error(
                 f"Error getting info for VIN {vehicle.vin} (brand {vehicle.brand}) (request {info['request_id']}): {info['errors'][0]['title']} - {info['errors'][0]['detail']}"
             )
 
-        match error:
+        match status_code:
             case 200:
-                self.__ingester_logger.info(
-                    f"Fetched vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand})"
-                )
-                try:
-                    decoded = decode_vehicle_info(info, vehicle.brand)
-                except (msgspec.ValidationError, msgspec.DecodeError) as e:
-                    self.__ingester_logger.error(
-                        f"Unable to parse vehicle info for vehicle with VIN {vehicle.vin} (brand {vehicle.brand}): response {info} does not fit schema ({e})"
-                    )
-                    return
-                self.__ingester_logger.info(
-                    f"Parsed response for vehicle with VIN {vehicle.vin} correctly"
-                )
+                encoded = self._parse_car_state_with_cache(vehicle=vehicle, data=info)
+
+                if (not auto_upload) or (not encoded):
+                    return encoded
+
                 filename = f"response/{vehicle.brand}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
-                try:
-                    encoded = msgspec.json.encode(decoded)
-                except msgspec.EncodeError as e:
-                    self.__ingester_logger.error(f"Failed to encode vehicle data: {e}")
-                    return
+
                 try:
                     uploaded = self.__s3.put_object(
                         Body=encoded,
@@ -295,35 +304,34 @@ class HMIngester:
                     self.__ingester_logger.error(
                         f"Error uploading info for vehicle with VIN {vehicle.vin}: {e.response['Error']['Message']}"
                     )
-                return
+                return encoded
             case _:
                 log_error(info)
                 return
 
-
-    def __process_job_queue(self):
-        while not self.__shutdown_requested.is_set():
-            try:
-                job = self.__job_queue.get(timeout=1)
-                self.__executor.submit(job)
-                self.__job_queue.task_done()
-            except queue.Empty:
-                pass
-
     def run(self):
-            self.__schedule_tasks()
-            self.__worker_thread = threading.Thread(target=self.__process_job_queue)
-            self.__ingester_logger.info("Starting worker thread")
-            self.__worker_thread.start()
-            self.__scheduler_logger.info("Starting scheduler")
-            
-            while not self.__shutdown_requested.is_set():
-                self.__fetch_scheduler.run_pending()
-                time.sleep(1)
-            
-            self.__shutdown()
+        self.__schedule_tasks()
+        self.__scheduler_logger.info("Starting scheduler")
+
+        while not self.__shutdown_requested.is_set():
+            idle_seconds = self.__fetch_scheduler.idle_seconds
+            # Sleep for the minimum of idle time or 10 seconds, but at least 0.1 seconds
+            sleep_time = max(
+                0.1, min(idle_seconds if idle_seconds is not None else 10, 10)
+            )
+
+            if self.__shutdown_requested.wait(timeout=sleep_time):
+                break
+
+            self.__fetch_scheduler.run_pending()
+
+        self.__shutdown()
 
     def __schedule_tasks(self):
         self.__update_vehicles_initial()
-        self.__scheduler_logger.info("Starting initial scheduler run")
+        self.__scheduler_logger.info(
+            f"Starting initial scheduler run with {self.max_workers} workers "
+            f"and {self.refresh_interval}min refresh interval"
+        )
         self.__fetch_scheduler.run_all()
+

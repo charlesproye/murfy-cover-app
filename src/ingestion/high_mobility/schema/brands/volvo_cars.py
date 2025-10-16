@@ -1,4 +1,4 @@
-from typing import Optional, Self, cast
+from typing import Self, cast
 
 import msgspec
 
@@ -6,38 +6,38 @@ from .. import (
     DataWithUnit,
     HMApiResponse,
     HMApiValue,
-    Time,
     is_new_value,
 )
 from ..factory import register_brand, register_merged
 
 
 class VolvoDiagnostics(msgspec.Struct):
-    odometer: Optional[HMApiValue[DataWithUnit[float]]] = None
-    distance_since_reset: Optional[HMApiValue[DataWithUnit[float]]] = None
-    estimated_range: Optional[HMApiValue[DataWithUnit[int]]] = None
-    fuel_volume: Optional[HMApiValue[DataWithUnit[float]]] = None
+    odometer: HMApiValue[DataWithUnit[float]] | None = None
+    distance_since_reset: HMApiValue[DataWithUnit[float]] | None = None
+    estimated_range: HMApiValue[DataWithUnit[int]] | None = None
+    fuel_volume: HMApiValue[DataWithUnit[float]] | None = None
 
 
 class VolvoCharging(msgspec.Struct):
-    status: Optional[HMApiValue[str]] = None
-    estimated_range: Optional[HMApiValue[DataWithUnit[int]]] = None
-    time_to_complete_charge: Optional[HMApiValue[DataWithUnit[int]]] = None
-    battery_level: Optional[HMApiValue[float]] = None
-    plugged_in: Optional[HMApiValue[str]] = None
+    status: HMApiValue[str] | None = None
+    estimated_range: HMApiValue[DataWithUnit[int]] | None = None
+    time_to_complete_charge: HMApiValue[DataWithUnit[int]] | None = None
+    battery_level: HMApiValue[float] | None = None
+    plugged_in: HMApiValue[str] | None = None
 
 
 class VolvoUsage(msgspec.Struct):
-    average_speed: Optional[HMApiValue[DataWithUnit[float]]] = None
-    average_fuel_consumption: Optional[HMApiValue[DataWithUnit[float]]] = None
-    electric_consumption_average: Optional[HMApiValue[DataWithUnit[float]]] = None
+    average_speed: HMApiValue[DataWithUnit[float]] | None = None
+    average_fuel_consumption: HMApiValue[DataWithUnit[float]] | None = None
+    electric_consumption_average: HMApiValue[DataWithUnit[float]] | None = None
 
 
-@register_brand(rate_limit=36)  
+# https://docs.high-mobility.com/oem-guides/volvo-cars#refresh-rate
+@register_brand(rate_limit=125)
 class VolvoInfo(HMApiResponse):
-    diagnostics: Optional[VolvoDiagnostics] = None
-    charging: Optional[VolvoCharging] = None
-    usage: Optional[VolvoUsage] = None
+    diagnostics: VolvoDiagnostics | None = None
+    charging: VolvoCharging | None = None
+    usage: VolvoUsage | None = None
 
 
 class MergedVolvoDiagnostics(msgspec.Struct):
@@ -47,7 +47,7 @@ class MergedVolvoDiagnostics(msgspec.Struct):
     fuel_volume: list[HMApiValue[DataWithUnit[float]]] = []
 
     @classmethod
-    def from_initial(cls, initial: Optional[VolvoDiagnostics]) -> Self:
+    def from_initial(cls, initial: VolvoDiagnostics | None) -> Self:
         ret = cls()
         if initial is None:
             return ret
@@ -61,16 +61,24 @@ class MergedVolvoDiagnostics(msgspec.Struct):
             ret.fuel_volume = [initial.fuel_volume]
         return ret
 
-    def merge(self, other: Optional[VolvoDiagnostics]):
+    def merge(self, other: VolvoDiagnostics | None):
         if other is not None:
             if is_new_value(self.odometer, other.odometer):
-                self.odometer.append(cast(HMApiValue[DataWithUnit[float]], other.odometer))
+                self.odometer.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.odometer)
+                )
             if is_new_value(self.distance_since_reset, other.distance_since_reset):
-                self.distance_since_reset.append(cast(HMApiValue[DataWithUnit[float]], other.distance_since_reset))
+                self.distance_since_reset.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.distance_since_reset)
+                )
             if is_new_value(self.estimated_range, other.estimated_range):
-                self.estimated_range.append(cast(HMApiValue[DataWithUnit[int]], other.estimated_range))
+                self.estimated_range.append(
+                    cast(HMApiValue[DataWithUnit[int]], other.estimated_range)
+                )
             if is_new_value(self.fuel_volume, other.fuel_volume):
-                self.fuel_volume.append(cast(HMApiValue[DataWithUnit[float]], other.fuel_volume))
+                self.fuel_volume.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.fuel_volume)
+                )
 
 
 class MergedVolvoCharging(msgspec.Struct):
@@ -81,24 +89,40 @@ class MergedVolvoCharging(msgspec.Struct):
     plugged_in: list[HMApiValue[str]] = []
 
     @classmethod
-    def from_initial(cls, initial: Optional[VolvoCharging]) -> Self:
+    def from_initial(cls, initial: VolvoCharging | None) -> Self:
         ret = cls()
         if initial is not None:
             ret.status = [initial.status] if initial.status is not None else []
-            ret.estimated_range = [initial.estimated_range] if initial.estimated_range is not None else []
-            ret.time_to_complete_charge = [initial.time_to_complete_charge] if initial.time_to_complete_charge is not None else []
-            ret.battery_level = [initial.battery_level] if initial.battery_level is not None else []
-            ret.plugged_in = [initial.plugged_in] if initial.plugged_in is not None else []
+            ret.estimated_range = (
+                [initial.estimated_range] if initial.estimated_range is not None else []
+            )
+            ret.time_to_complete_charge = (
+                [initial.time_to_complete_charge]
+                if initial.time_to_complete_charge is not None
+                else []
+            )
+            ret.battery_level = (
+                [initial.battery_level] if initial.battery_level is not None else []
+            )
+            ret.plugged_in = (
+                [initial.plugged_in] if initial.plugged_in is not None else []
+            )
         return ret
 
-    def merge(self, other: Optional[VolvoCharging]):
+    def merge(self, other: VolvoCharging | None):
         if other is not None:
             if is_new_value(self.status, other.status):
                 self.status.append(cast(HMApiValue[str], other.status))
             if is_new_value(self.estimated_range, other.estimated_range):
-                self.estimated_range.append(cast(HMApiValue[DataWithUnit[int]], other.estimated_range))
-            if is_new_value(self.time_to_complete_charge, other.time_to_complete_charge):
-                self.time_to_complete_charge.append(cast(HMApiValue[DataWithUnit[int]], other.time_to_complete_charge))
+                self.estimated_range.append(
+                    cast(HMApiValue[DataWithUnit[int]], other.estimated_range)
+                )
+            if is_new_value(
+                self.time_to_complete_charge, other.time_to_complete_charge
+            ):
+                self.time_to_complete_charge.append(
+                    cast(HMApiValue[DataWithUnit[int]], other.time_to_complete_charge)
+                )
             if is_new_value(self.battery_level, other.battery_level):
                 self.battery_level.append(cast(HMApiValue[float], other.battery_level))
             if is_new_value(self.plugged_in, other.plugged_in):
@@ -111,22 +135,47 @@ class MergedVolvoUsage(msgspec.Struct):
     electric_consumption_average: list[HMApiValue[DataWithUnit[float]]] = []
 
     @classmethod
-    def from_initial(cls, initial: Optional[VolvoUsage]) -> Self:
+    def from_initial(cls, initial: VolvoUsage | None) -> Self:
         ret = cls()
         if initial is not None:
-            ret.average_speed = [initial.average_speed] if initial.average_speed is not None else []
-            ret.average_fuel_consumption = [initial.average_fuel_consumption] if initial.average_fuel_consumption is not None else []
-            ret.electric_consumption_average = [initial.electric_consumption_average] if initial.electric_consumption_average is not None else []
+            ret.average_speed = (
+                [initial.average_speed] if initial.average_speed is not None else []
+            )
+            ret.average_fuel_consumption = (
+                [initial.average_fuel_consumption]
+                if initial.average_fuel_consumption is not None
+                else []
+            )
+            ret.electric_consumption_average = (
+                [initial.electric_consumption_average]
+                if initial.electric_consumption_average is not None
+                else []
+            )
         return ret
 
-    def merge(self, other: Optional[VolvoUsage]):
+    def merge(self, other: VolvoUsage | None):
         if other is not None:
             if is_new_value(self.average_speed, other.average_speed):
-                self.average_speed.append(cast(HMApiValue[DataWithUnit[float]], other.average_speed))
-            if is_new_value(self.average_fuel_consumption, other.average_fuel_consumption):
-                self.average_fuel_consumption.append(cast(HMApiValue[DataWithUnit[float]], other.average_fuel_consumption))
-            if is_new_value(self.electric_consumption_average, other.electric_consumption_average):
-                self.electric_consumption_average.append(cast(HMApiValue[DataWithUnit[float]], other.electric_consumption_average))
+                self.average_speed.append(
+                    cast(HMApiValue[DataWithUnit[float]], other.average_speed)
+                )
+            if is_new_value(
+                self.average_fuel_consumption, other.average_fuel_consumption
+            ):
+                self.average_fuel_consumption.append(
+                    cast(
+                        HMApiValue[DataWithUnit[float]], other.average_fuel_consumption
+                    )
+                )
+            if is_new_value(
+                self.electric_consumption_average, other.electric_consumption_average
+            ):
+                self.electric_consumption_average.append(
+                    cast(
+                        HMApiValue[DataWithUnit[float]],
+                        other.electric_consumption_average,
+                    )
+                )
 
 
 @register_merged

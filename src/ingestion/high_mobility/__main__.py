@@ -4,7 +4,9 @@ import os
 import textwrap
 
 import dotenv
+
 from ingestion.high_mobility.ingester import HMIngester
+
 
 def main():
     dotenv.load_dotenv()
@@ -61,18 +63,11 @@ def main():
         action=argparse.BooleanOptionalAction,
         help="run the compresser in threaded mode",
     )
-    parser.add_argument(
-        "--batch_size",
-        type=int,
-        default=25,
-        help="number of files to process in a single batch (reduces memory usage with smaller values)",
-    )
     args = parser.parse_args()
 
     ingester = HMIngester(
         refresh_interval=args.refresh_interval,
         max_workers=args.max_workers,
-        batch_size=args.batch_size,
     )
 
     ingester.run()

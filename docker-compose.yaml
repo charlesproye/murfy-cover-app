@@ -91,40 +91,18 @@ services:
     build:
       context: .
       dockerfile: docker/hm.Dockerfile
+    image: rg.fr-par.scw.cloud/bib-images/hm-ingestion:latest
     container_name: hm-ingestion
     env_file:
       - ./.env
       - ./.python.env
-    volumes:
-      - ./src:/app/src
     depends_on:
       - redis
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: "1.5"
-        reservations:
-          memory: 512M
-          cpus: "0.5"
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
-        window: 120s
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-      memlock:
-        soft: -1
-        hard: -1
     environment:
-      - PYTHONMALLOC=debug
-      - PYTHONFAULTHANDLER=1
-      - PYTHONOPTIMIZE=2
-      - PYTHONIOENCODING=utf-8
-      - BATCH_SIZE=15
-      #- max_workers=3
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_USER=bib
+      - REDIS_PASSWORD=bibpwd
 
   ms_ingestion_service:
     build:
