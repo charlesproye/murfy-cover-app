@@ -97,7 +97,8 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
             ).withColumn(
                 "CONSUMPTION",
                 F.when(
-                    F.col("PHASE_STATUS") == "discharging",
+                    (F.col("PHASE_STATUS") == "discharging")
+                    & (F.col("ODOMETER_DIFF") > 5),
                     (-1 * F.col("SOC_DIFF"))
                     * (F.col("BATTERY_NET_CAPACITY"))
                     / F.col("ODOMETER_DIFF"),

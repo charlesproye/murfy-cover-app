@@ -11,6 +11,7 @@ from core.stats_utils import (
     estimate_cycles,
     force_decay,
     mask_out_outliers_by_interquartile_range,
+    weighted_mean,
 )
 from transform.result_phases.main import ORCHESTRATED_MAKES
 from transform.result_week.config import SOH_FILTER_EVAL_STRINGS, UPDATE_FREQUENCY
@@ -101,6 +102,7 @@ class ResultPhaseToResultWeek:
         return results
 
     def _agg_results_by_update_frequency(self, results: pd.DataFrame) -> pd.DataFrame:
+        results.reset_index(drop=True, inplace=True)
         results["DATE"] = (
             pd.to_datetime(results["DATETIME_BEGIN"], format="mixed")
             .dt.floor(UPDATE_FREQUENCY)
@@ -121,18 +123,6 @@ class ResultPhaseToResultWeek:
             "RANGE": ("RANGE", "first"),
         }
 
-        def weighted_consumption(series: pd.Series):
-            idx = series.index
-            v = pd.to_numeric(series, errors="coerce")
-            w = pd.to_numeric(results.loc[idx, "ODOMETER_DIFF"], errors="coerce")
-
-            if w.sum() == 0:
-                return None
-
-            result = (v * w).sum() / w.sum()
-
-            return result
-
         agg_dict = {
             new_col: pd.NamedAgg(src_col, func)
             for src_col, (new_col, func) in agg_spec.items()
@@ -140,9 +130,13 @@ class ResultPhaseToResultWeek:
         }
 
         if self.make != "bmw":
+            mask = results["CONSUMPTION"] <= 100  # mask to drop consumption over 100
             agg_dict["CONSUMPTION"] = pd.NamedAgg(
-                "CONSUMPTION", weighted_consumption
-            )  # Ponderate consumption by ODOMETER_DIFF
+                "CONSUMPTION",
+                lambda x: weighted_mean(
+                    x[mask], results.loc[x.index, "ODOMETER_DIFF"][mask]
+                ),
+            )
         else:
             agg_dict["CONSUMPTION"] = pd.NamedAgg("CONSUMPTION", "median")
 
