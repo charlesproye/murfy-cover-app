@@ -188,6 +188,17 @@ services:
       S3_KEY: ${S3_KEY}
       S3_SECRET: ${S3_SECRET}
 
+  data-catalog:
+    build:
+      context: .
+      dockerfile: docker/data_catalog.Dockerfile
+    container_name: data-catalog
+    restart: always
+    ports:
+      - "8501:8501"
+    env_file:
+      - ./src/streamlit/data-catalog/.env
+
   external_api:
     build:
       context: .

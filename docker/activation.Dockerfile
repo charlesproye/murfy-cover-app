@@ -26,6 +26,3 @@ ENV PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
 USER app
 
-# Entrypoint
-CMD ["python", "src/activation/main.py"]
-
