@@ -1,14 +1,13 @@
 import asyncio
 
 import msgspec
-from transform.compressor.compressor import Compressor
+
 from core.s3.async_s3 import AsyncS3
-from botocore.exceptions import ClientError
-import gc
+from transform.compressor.compressor import Compressor
 
 
 class BMWCompressor(Compressor):
-    def __init__(self, make='bmw') -> None:
+    def __init__(self, make="bmw") -> None:
         super().__init__()
         self.make = make
         self._s3 = AsyncS3()
@@ -21,7 +20,7 @@ class BMWCompressor(Compressor):
         data = []
         for file in new_files.values():
             decoded = msgspec.json.decode(file)
-            if isinstance(decoded,str):
+            if isinstance(decoded, str):
                 decoded = msgspec.json.decode(decoded.encode())
             data.append(decoded)
         return msgspec.json.encode({"data": data})
@@ -35,5 +34,5 @@ class BMWCompressor(Compressor):
 
 
 if __name__ == "__main__":
-    asyncio.run(BMWCompressor.compress('bmw'))
+    asyncio.run(BMWCompressor.compress("bmw"))
 

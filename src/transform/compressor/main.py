@@ -25,8 +25,8 @@ if __name__ == "__main__":
     parser.add_argument("arg", type=str, help="")
     args = parser.parse_args()
 
-    if args.arg in COMPRESSORS.keys():
+    if args.arg in COMPRESSORS:
         main(args.arg)
     else:
-        raise ValueError(f"Argument not found or OEM not supported.")
+        raise ValueError("Argument not found or OEM not supported.")
 

@@ -1,10 +1,13 @@
 import asyncio
+
 import msgspec
-from transform.compressor.compressor import Compressor
+
 from core.s3.async_s3 import AsyncS3
+from transform.compressor.compressor import Compressor
+
 
 class TeslaFTCompressor(Compressor):
-    def __init__(self, make='tesla-fleet-telemetry') -> None:
+    def __init__(self, make="tesla-fleet-telemetry") -> None:
         super().__init__()
         self.make = make
         self._s3 = AsyncS3()
@@ -30,3 +33,4 @@ class TeslaFTCompressor(Compressor):
         asyncio.get_event_loop().set_debug(False)
         compressor = cls(make)
         await compressor.run()
+

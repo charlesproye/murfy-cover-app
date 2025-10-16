@@ -19,12 +19,10 @@ def _process_vin_chunk_worker(args):
     """Standalone worker function for multiprocessing that can be pickled."""
     chunk, brand_prefix, compressor_class = args
 
-    # Create new event loop for this process
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # Create compressor instance for this process
-    compressor = compressor_class()
+    compressor = compressor_class(brand_prefix)
 
     try:
         loop.run_until_complete(

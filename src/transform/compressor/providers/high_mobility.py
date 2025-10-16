@@ -18,7 +18,6 @@ class HighMobilityCompressor(Compressor):
     def __init__(self, make) -> None:
         self.make = make
         self._s3 = AsyncS3()
-        self._s3_dev = AsyncS3(env="dev")
         self.schemas = {
             "kia": (KiaInfo, MergedKiaInfo),
             "ford": (FordInfo, MergedFordInfo),
@@ -26,6 +25,7 @@ class HighMobilityCompressor(Compressor):
             "renault": (RenaultInfo, MergedRenaultInfo),
             "volvo-cars": (VolvoInfo, MergedVolvoInfo),
         }
+        super().__init__()
 
     @property
     def brand_prefix(self) -> str:

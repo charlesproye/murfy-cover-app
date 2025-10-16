@@ -1,14 +1,13 @@
 import asyncio
 
 import msgspec
-from transform.compressor.compressor import Compressor
+
 from core.s3.async_s3 import AsyncS3
-from botocore.exceptions import ClientError
-import gc
+from transform.compressor.compressor import Compressor
 
 
 class VolkswagenCompressor(Compressor):
-    def __init__(self, make='volkswagen') -> None:
+    def __init__(self, make="volkswagen") -> None:
         super().__init__()
         self.make = make
         self._s3 = AsyncS3()
@@ -18,10 +17,9 @@ class VolkswagenCompressor(Compressor):
         return self.make
 
     def _temp_data_to_daily_file(self, new_files: dict[str, bytes]) -> bytes:
-        return msgspec.json.encode({
-            "data": [msgspec.json.decode(file) for file in new_files.values()]
-        })
-
+        return msgspec.json.encode(
+            {"data": [msgspec.json.decode(file) for file in new_files.values()]}
+        )
 
     @classmethod
     async def compress(cls, make):
