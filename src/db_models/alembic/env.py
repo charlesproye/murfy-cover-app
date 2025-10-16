@@ -26,7 +26,7 @@ def process_revision_directives(context, revision, directives):
     script = directives[0]
     tables = target_metadata.tables.values()
     if tables:
-        t = tables[-1]
+        t = list(tables)[-1]
         if t.schema is not None and script.upgrade_ops.ops:
             script.upgrade_ops.ops.insert(
                 0,

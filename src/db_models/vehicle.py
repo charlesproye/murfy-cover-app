@@ -318,3 +318,13 @@ class ApiBilling(BaseUUIDModel):
         Index("ix_api_billing_paid", "paid"),
     )
 
+
+class FlashReportCombination(BaseUUIDModel):
+    __tablename__ = "flash_report_combination"
+    make: str = Column(String, nullable=False)
+    model: str = Column(String, nullable=False)
+    type: str = Column(String, nullable=False)
+    version: str = Column(String, nullable=True)
+    odometer: int = Column(Integer, nullable=False)
+    token: str = Column(String, nullable=False, unique=True)
+
