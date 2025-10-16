@@ -5,6 +5,7 @@ from external_api.api.v1.endpoints import (
     auth,
     billing,
     dashboard,
+    flash_report,
     in_life_data,
     individual,
     model,
@@ -36,6 +37,9 @@ hidden_router = APIRouter(include_in_schema=False)
 hidden_router.include_router(passport.router, prefix="/passport", tags=["passport"])
 # Les routes d'administration sont incluses mais ne sont pas exposées dans la documentation OpenAPI
 hidden_router.include_router(admin.router, prefix="/admin", tags=["Administration"])
+hidden_router.include_router(
+    flash_report.router, prefix="/flash-report", tags=["Flash Report"]
+)
 
 api_router.include_router(hidden_router)
 
