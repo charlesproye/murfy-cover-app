@@ -2,27 +2,27 @@ from logging import Logger
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+
 from transform.result_phases.config import LEVEL_1_MAX_POWER, LEVEL_2_MAX_POWER
-from transform.result_phases.processed_phase_to_result_phase import ProcessedPhaseToResultPhase
+from transform.result_phases.processed_phase_to_result_phase import (
+    ProcessedPhaseToResultPhase,
+)
 
 
 class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
-
     def __init__(
         self,
         make="tesla-fleet-telemetry",
         spark: SparkSession = None,
         force_update: bool = False,
         logger: Logger = None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(
             make, spark=spark, force_update=force_update, logger=logger, **kwargs
         )
 
-    
     def compute_specific_features(self, df_aggregated):
-
         df_aggregated = df_aggregated.withColumn(
             "CHARGING_POWER",
             F.coalesce(F.col("AC_CHARGING_POWER_MEDIAN"), F.lit(0))
@@ -42,23 +42,19 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         )
 
         return df_aggregated
-    
+
     def compute_consumption(self, phase_df):
         """
         Compute the consumption
         """
-        
-        phase_df = (
-            phase_df
-            .withColumn("ODOMETER_DIFF", F.col("ODOMETER_LAST") - F.col("ODOMETER_FIRST"))
-            .withColumn(
-                "CONSUMPTION",
-                F.when(F.col("PHASE_STATUS") == "discharging",
-                (- 1 * F.col("SOC_DIFF")
-                * F.col("BATTERY_NET_CAPACITY"))
+
+        phase_df = phase_df.withColumn(
+            "CONSUMPTION",
+            F.when(
+                F.col("PHASE_STATUS") == "discharging",
+                (-1 * F.col("SOC_DIFF") * F.col("BATTERY_NET_CAPACITY"))
                 / F.col("ODOMETER_DIFF"),
-                ).otherwise(None)
-            )
+            ).otherwise(None),
         )
 
         return phase_df
@@ -89,7 +85,6 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
                 / 100,
             )
         )
-    
 
     def compute_soh(self, df_aggregated):
         """
@@ -98,7 +93,9 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
 
         df_aggregated = df_aggregated.withColumn(
             "SOH",
-            F.col("ENERGY_ADDED") / (F.col("SOC_DIFF") / 100.0 * F.col("BATTERY_NET_CAPACITY")),
+            F.col("ENERGY_ADDED")
+            / (F.col("SOC_DIFF") / 100.0 * F.col("BATTERY_NET_CAPACITY")),
         )
 
         return df_aggregated
+

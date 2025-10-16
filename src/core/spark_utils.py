@@ -1,19 +1,21 @@
 # Spark utils function
 
 import os
+
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, lit
+from pyspark.sql.functions import col, lit, when
+from pyspark.sql.functions import sum as spark_sum
 from pyspark.sql.types import (
-    FloatType,
-    TimestampType,
-    StringType,
     BooleanType,
-    IntegerType,
     DoubleType,
+    FloatType,
+    IntegerType,
+    StringType,
+    TimestampType,
 )
 
-
 LIST_COL_TO_DROP = ["model"]
+
 
 def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
     """
@@ -23,17 +25,22 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
         "--packages org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0 pyspark-shell"
     )
 
-    
     spark = (
         SparkSession.builder.appName("Scaleway S3 Read JSON")
-        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0")
+        .config(
+            "spark.jars.packages",
+            "org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0",
+        )
         .config("spark.hadoop.fs.s3a.endpoint", "https://s3.fr-par.scw.cloud")
         .config("spark.hadoop.fs.s3a.access.key", access_key)
         .config("spark.hadoop.fs.s3a.secret.key", secret_key)
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .config("spark.driver.host", "localhost")
-        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
+        .config(
+            "spark.hadoop.fs.s3a.aws.credentials.provider",
+            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+        )
         # Nouvelles configurations pour résoudre le ClassNotFoundException
         .config("spark.hadoop.fs.s3a.experimental.input.fadvise", "normal")
         .config("spark.hadoop.fs.s3a.connection.maximum", "1000")
@@ -109,7 +116,6 @@ def timedelta_to_interval(td):
 
 
 def safe_astype_spark_with_error_handling(tss):
-
     existing_columns = set(tss.columns)
     result_df = tss
     COL_DTYPES = {
@@ -282,7 +288,6 @@ def safe_astype_spark_with_error_handling_results(ptss):
     return result_df
 
 
-
 def align_dataframes_for_union(df1, df2, strategy="intersection"):
     """
     Aligne deux DataFrames pour l'union
@@ -340,44 +345,75 @@ def align_dataframes_for_union(df1, df2, strategy="intersection"):
 def get_optimal_nb_partitions(file_size_bytes: float, nb_vin: int) -> int:
     """
     Calcule le nombre idéal de partitions Spark basé sur la taille du fichier et le nombre de VINs.
-    
+
     Cette fonction détermine le nombre optimal de partitions pour optimiser les performances
     Spark en fonction de la taille moyenne par VIN et de la recommandation de 128MB par partition.
-    
+
     Args:
         file_size_bytes (float): Taille totale du fichier en octets
         nb_vin (int): Nombre de VINs (véhicules) dans le fichier
-    
+
     Returns:
         int: Nombre idéal de partitions Spark
-        
+
     Raises:
         ValueError: Si file_size_bytes ou nb_vin sont négatifs ou nuls
     """
     # Validation des paramètres
     if file_size_bytes <= 0 or nb_vin <= 0:
         raise ValueError("file_size_bytes et nb_vin doivent être positifs")
-    
+
     # Calcul de la taille moyenne par VIN
     size_file_mb = file_size_bytes / (1024 * 1024)
     print(f"📁 Taille du fichier: {size_file_mb:.2f} MB")
-    
+
     avg_size_file_vin_mb = size_file_mb / nb_vin
-    
+
     # Calcul du nombre idéal de VINs par partition (basé sur 128MB recommandé)
     nb_vin_ideal_size = 128 / avg_size_file_vin_mb
 
     # Logique de décision
     if nb_vin_ideal_size < 0.5:
         return nb_vin
-    elif nb_vin_ideal_size < 1:
+    if nb_vin_ideal_size < 1:
         return nb_vin
+
+    optimal_partitions = int(nb_vin / nb_vin_ideal_size)
+    if int(optimal_partitions) == 0:
+        return 1
+    if optimal_partitions % 2 == 0:
+        pass
     else:
-        optimal_partitions = int(nb_vin / nb_vin_ideal_size)
-        if int(optimal_partitions) == 0:
-            return 1
-        elif optimal_partitions % 2 == 0:
-            pass
-        else:
-            optimal_partitions += 1
-        return optimal_partitions
+        optimal_partitions += 1
+    return optimal_partitions
+
+
+def weighted_mean_spark(df, group_col: str, value_col: str, weight_col: str):
+    """
+    Calculates weighted average by group with Spark.
+
+    Args:
+        df: Source Spark DataFrame
+        group_col: Grouping column
+        value_col: Value column to average
+        weight_col: Weight column
+
+    Returns:
+        Spark DataFrame with weighted averages
+    """
+    # Calculate weighted sum and sum of weights by group
+    weighted_summary = df.groupBy(group_col).agg(
+        spark_sum(col(value_col) * col(weight_col)).alias("weighted_sum"),
+        spark_sum(col(weight_col)).alias("weight_sum"),
+    )
+
+    # Calculate weighted average
+    weighted_avg = weighted_summary.withColumn(
+        f"weighted_avg_{value_col}",
+        when(col("weight_sum") > 0, col("weighted_sum") / col("weight_sum")).otherwise(
+            lit(None)
+        ),
+    ).select(group_col, f"weighted_avg_{value_col}")
+
+    return weighted_avg
+
