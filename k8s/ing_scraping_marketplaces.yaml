@@ -21,37 +21,11 @@ spec:
               imagePullPolicy: Always
               command: ["python", "src/ingestion/soh_scraping/main.py"]
               args: ["spoticar", "autospherre", "aramis", "ev_market"]
-              env:
-                - name: DB_DATA_EV_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_PASSWORD
-                - name: DB_DATA_EV_NAME
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_NAME
-                - name: DB_DATA_EV_HOST
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_HOST
-                - name: DB_DATA_EV_PORT
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_PORT
-                - name: DB_DATA_EV_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_USER
-                - name: GOOGLE_PRIVATE_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: google-secret
-                      key: GOOGLE_PRIVATE_KEY
+              envFrom:
+                - secretRef:
+                    name: db-data-ev-secret
+                - secretRef:
+                    name: s3-secret
               resources:
                 limits:
                   memory: "4Gi"

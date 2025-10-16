@@ -20,37 +20,11 @@ spec:
               image: rg.fr-par.scw.cloud/bib-images/ev_database:latest
               imagePullPolicy: Always
               command: ["python", "src/ingestion/ev_database/ev_database.py"]
-              env:
-                - name: EV_DATABASE_URL
-                  valueFrom:
-                    secretKeyRef:
-                      name: ev-database-secret
-                      key: EV_DATABASE_URL
-                - name: DB_DATA_EV_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_PASSWORD
-                - name: DB_DATA_EV_NAME
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_NAME
-                - name: DB_DATA_EV_HOST
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_HOST
-                - name: DB_DATA_EV_PORT
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_PORT
-                - name: DB_DATA_EV_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: db-data-ev-secret
-                      key: DB_DATA_EV_USER
+              envFrom:
+                - secretRef:
+                    name: db-data-ev-secret
+                - secretRef:
+                    name: ev-database-secret
               resources:
                 limits:
                   memory: "2Gi"
@@ -58,5 +32,4 @@ spec:
                 requests:
                   memory: "2Gi"
                   cpu: "1"
-
 

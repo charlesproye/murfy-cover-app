@@ -21,57 +21,11 @@ spec:
               imagePullPolicy: Always
               command: ["python", "-m", "src.transform.compressor.main"]
               args: ["bmw"]
-              env:
-                - name: S3_BUCKET
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret
-                      key: S3_BUCKET
-                - name: S3_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret
-                      key: S3_KEY
-                - name: S3_SECRET
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret
-                      key: S3_SECRET
-                - name: S3_REGION
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret
-                      key: S3_REGION
-                - name: S3_ENDPOINT
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret
-                      key: S3_ENDPOINT
-                - name: S3_BASE_PATH
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret
-                      key: S3_BASE_PATH
-                - name: S3_BUCKET_DEV
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret-dev
-                      key: S3_BUCKET_DEV
-                - name: S3_KEY_DEV
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret-dev
-                      key: S3_KEY_DEV
-                - name: S3_SECRET_DEV
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret-dev
-                      key: S3_SECRET_DEV
-                - name: S3_ENDPOINT_DEV
-                  valueFrom:
-                    secretKeyRef:
-                      name: s3-secret-dev
-                      key: S3_ENDPOINT_DEV
+              envFrom:
+                - secretRef:
+                    name: s3-secret
+                - secretRef:
+                    name: s3-secret-dev
               resources:
                 limits:
                   memory: "2Gi"
