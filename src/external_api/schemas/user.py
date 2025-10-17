@@ -137,11 +137,46 @@ class GetCurrentUser(BaseModel):
     phone: str | None = None
     role_id: UUID4 | None = None
     company_id: UUID4
-    last_connection: datetime | None = None
+    last_connection: str | None = None
     is_active: bool | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     fleets: list[FleetInfo] | None = None
+
+
+class RoleLoginResponse(BaseModel):
+    id: UUID4
+    name: str
+
+
+class UserLoginResponse(BaseModel):
+    id: UUID4
+    created_at: str
+    updated_at: str
+    email: EmailStr
+    first_name: str
+    last_name: str
+    last_connection: str | None = None
+    is_active: bool
+    phone: str
+    role: RoleLoginResponse
+    fleets: list[FleetInfo]
+
+
+class CompanyLoginResponse(BaseModel):
+    id: UUID4
+    name: str
+    description: str | None = None
+
+
+class LoginResponse(BaseModel):
+    user: UserLoginResponse
+    company: CompanyLoginResponse
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
 
 
 # API User Models

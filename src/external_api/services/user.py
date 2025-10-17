@@ -32,7 +32,7 @@ async def login_with_cookies(
     return {
         "user": data["user"],
         "company": data["company"],
-        "tokens": tokens,  # For backward compatibility if needed
+        "tokens": tokens,
     }
 
 
