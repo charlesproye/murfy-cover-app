@@ -1,6 +1,7 @@
 """Schémas Pydantic pour les utilisateurs"""
 
 from datetime import datetime
+
 from pydantic import UUID4, BaseModel, EmailStr
 
 
@@ -126,6 +127,21 @@ class Role(RoleBase):
 
     class Config:
         from_attributes = True
+
+
+class GetCurrentUser(BaseModel):
+    id: UUID4
+    email: EmailStr
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    role_id: UUID4 | None = None
+    company_id: UUID4
+    last_connection: datetime | None = None
+    is_active: bool | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    fleets: list[FleetInfo] | None = None
 
 
 # API User Models

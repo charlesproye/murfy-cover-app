@@ -15,7 +15,7 @@ from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
 from external_api.schemas.model import ModelWarrantyData
 from external_api.schemas.static_data import ModelTrendline, ModelType, SOHWithTrendline
-from external_api.schemas.user import User
+from external_api.schemas.user import GetCurrentUser
 from external_api.services.api_pricing import get_api_user_pricing, log_api_call
 from external_api.services.redis import (
     add_distinct_vin_and_check_limit,
@@ -53,7 +53,7 @@ def is_tesla_vin(vin: str) -> bool:
 async def check_rate_limit(
     vin: str,
     endpoint: str,
-    user: User = Depends(get_current_user_from_cookie(get_user)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
@@ -221,7 +221,7 @@ async def check_rate_limit(
 
 @router.get("/models-with-data", response_model=list[ModelType])
 async def get_model_with_data(
-    user: User = Depends(get_current_user_from_cookie(get_user)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     query = text("""
@@ -255,7 +255,7 @@ async def get_model_with_data(
 @router.get("/{model}/trendline", response_model=ModelTrendline)
 async def get_model_trendline(
     model: str = Path(..., description="Model name"),
-    user: User = Depends(get_current_user_from_cookie(get_user)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> ModelTrendline:
     """
@@ -319,7 +319,7 @@ async def get_model_trendline(
 @router.get("/{model}/warranty", response_model=ModelWarrantyData)
 async def get_model_warranty(
     model: str = Path(..., description="Model name"),
-    user: User = Depends(get_current_user_from_cookie(get_user)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
@@ -376,7 +376,7 @@ async def get_model_soh_trendline(
     model: str = Query(..., description="Model name"),
     odometer: int = Query(..., ge=0, description="Odometer in km"),
     model_type: str = Query(..., description="Type of the model"),
-    user: User = Depends(get_current_user_from_cookie(get_user)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> SOHWithTrendline:
     """

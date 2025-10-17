@@ -17,6 +17,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from external_api.core.config import settings
 from external_api.db.session import get_db
+from external_api.schemas.user import GetCurrentUser
 
 # Configuration JWT
 ALGORITHM = settings.ALGORITHM
@@ -188,9 +189,7 @@ cookie_auth_bearer = CookieAuthBearer(auto_error=False)
 _db_dependency = Depends(get_db)
 
 
-def get_current_user_from_cookie(
-    getUserFunction: Callable, security: HTTPBearer = HTTPBearer()
-):
+def get_current_user_from_cookie(getUserFunction: Callable):
     """
     Dependency to get current user from cookie or header.
 
@@ -205,7 +204,6 @@ def get_current_user_from_cookie(
 
     async def current_user(
         request: Request,
-        credentials: HTTPAuthorizationCredentials | None = Depends(security),
         db: AsyncSession = _db_dependency,
     ):
         credentials_exception = HTTPException(
@@ -215,6 +213,7 @@ def get_current_user_from_cookie(
         )
         token = None
 
+        credentials = extract_bearer_token_from_request(request)
         if credentials and credentials.credentials:
             token = credentials.credentials
         else:
@@ -235,7 +234,7 @@ def get_current_user_from_cookie(
         if user is None:
             raise credentials_exception
 
-        return sanitize_user(user)
+        return GetCurrentUser(**sanitize_user(user))
 
     return current_user
 
@@ -420,4 +419,23 @@ async def get_authenticated_user(email: str, db: AsyncSession):
     user, company = await get_user_with_company_with_email(email, db)
     sanitized_user = sanitize_user(user)
     return {"user": sanitized_user, "company": company}
+
+
+def extract_bearer_token_from_request(
+    request: Request,
+) -> HTTPAuthorizationCredentials | None:
+    """
+    Helper function to extract bearer token from request headers.
+    Returns None if no bearer token is found.
+    """
+    try:
+        # Try to extract bearer token from Authorization header
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token_value = auth_header[7:]  # Remove "Bearer " prefix
+            return HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials=token_value
+            )
+    except Exception:
+        return None
 
