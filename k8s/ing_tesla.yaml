@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion-tesla
+  namespace: bib
+  labels:
+    app: ingestion-tesla
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingestion-tesla
+  template:
+    metadata:
+      labels:
+        app: ingestion-tesla
+    spec:
+      containers:
+        - name: ingestion-tesla
+          image: rg.fr-par.scw.cloud/bib-images/tesla-ingestion:latest
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - >
+              python -m src.ingestion.tesla_fleet_telemetry.main
+              --bootstrap-servers 51.159.175.138:9092
+              --topic tesla_V
+              --buffer-flush-interval 1800
+              --group-id tesla-fleet-telemetry-consumer-${POD_NAME##*-}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: "500m"
+              memory: "500Mi"
+          envFrom:
+            - secretRef:
+                name: tesla-secret
+            - secretRef:
+                name: s3-secret
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
