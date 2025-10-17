@@ -188,7 +188,7 @@ cookie_auth_bearer = CookieAuthBearer(auto_error=False)
 _db_dependency = Depends(get_db)
 
 
-def get_current_user_from_cookie(getUserFunction: Callable = get_user):
+def get_current_user_from_cookie(getUserFunction: Callable):
     """Dependency to get current user from cookie or header"""
 
     async def current_user(

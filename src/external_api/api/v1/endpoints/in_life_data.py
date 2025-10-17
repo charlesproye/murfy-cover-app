@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from external_api.core.cookie_auth import get_current_user_from_cookie
+from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.core.utils import add_vehicles_to_google_sheet
 from external_api.db.session import get_db
 from external_api.schemas.user import User
@@ -60,7 +60,7 @@ def is_tesla_vin(vin: str) -> bool:
 async def check_rate_limit(
     vin: str,
     endpoint: str,
-    user: User = Depends(get_current_user_from_cookie()),
+    user: User = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
@@ -129,7 +129,7 @@ async def check_vehicle_eligibility_endpoint(
     vin: str = Path(
         ..., description="VIN of the vehicle to check", min_length=10, max_length=25
     ),
-    user: User = Depends(get_current_user_from_cookie()),
+    user: User = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
@@ -197,7 +197,7 @@ async def check_vehicle_eligibility_endpoint(
 @router.post("/activate", response_model=VehicleActivationResponse)
 async def activate_vehicles(
     activation: VehicleActivationRequest,
-    user: User = Depends(get_current_user_from_cookie()),
+    user: User = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
@@ -591,7 +591,7 @@ async def get_dynamic_vehicle(
         ..., description="VIN of the vehicle", min_length=10, max_length=25
     ),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user_from_cookie()),
+    user: User = Depends(get_current_user_from_cookie(get_user)),
 ) -> Any:
     """
     Get dynamic data for a vehicle by its VIN.
