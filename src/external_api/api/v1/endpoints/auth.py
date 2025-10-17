@@ -11,7 +11,7 @@ from external_api.core.cookie_auth import (
 )
 from external_api.core.utils import CrudTesla
 from external_api.db.session import get_db
-from external_api.schemas.user import UserLogin
+from external_api.schemas.user import LoginResponse, TokenResponse, UserLogin
 from external_api.services.user import (
     login_with_cookies,
 )
@@ -39,7 +39,21 @@ async def login(
     )
 
     # Return user data without tokens
-    return {"user": result["user"], "company": result["company"]}
+    return LoginResponse(user=result["user"], company=result["company"])
+
+
+@router.post("/token")
+async def get_token(
+    db: AsyncSession = Depends(get_db),
+    body: UserLogin = Body(...),
+) -> Any:
+    """Login endpoint that uses httpOnly cookies for security"""
+    result = await login_with_cookies(form_data=body, db=db)
+
+    # Return user data without tokens
+    return TokenResponse(
+        access_token=result["tokens"]["access_token"], token_type="bearer"
+    )
 
 
 @router.post("/logout")
