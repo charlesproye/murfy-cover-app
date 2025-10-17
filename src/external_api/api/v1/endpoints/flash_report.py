@@ -2,7 +2,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from external_api.db.session import get_db
+from external_api.schemas.flash_report import FlashReportFormType
 from external_api.services.flash_report.flash_report import (
+    insert_combination,
     send_email,
     send_flash_report_data,
     send_vehicle_specs,
@@ -26,10 +28,21 @@ async def decode_vin(
 
 @router.post("/send-email")
 async def send_report_email(
-    email: str = Body(...),
+    data: FlashReportFormType = Body(...),
+    db: AsyncSession = Depends(get_db),
 ):
-    await send_email(email)
-    return {"message": f"Mail sent to {email}"}
+    token = await insert_combination(
+        make=data.make,
+        model=data.model,
+        type=data.type,
+        version=data.version,
+        odometer=data.odometer,
+        db=db,
+    )
+
+    await send_email(data.email, token)
+
+    return {"message": f"Mail sent to {data.email}"}
 
 
 @router.get("/data")

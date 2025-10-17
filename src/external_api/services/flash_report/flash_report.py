@@ -1,10 +1,14 @@
 import hashlib
+import os
+import smtplib
+import ssl
 import uuid
-from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-import aiosmtplib
 import numpy as np
 import pandas as pd
+from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -143,57 +147,60 @@ async def insert_combination(
 
 
 # TODO:
-# - Mettre le comptee de service de bib à la place de no-reply@bib-batteries.fr
 # - Demander à Anna ou Jo une repasse sur le mail ->  En cours
-async def send_email(email: str, link: str):
-    message = EmailMessage()
-    message["From"] = "no-reply@bib-batteries.fr"
-    message["To"] = email
+async def send_email(email: str, token: str):
+    sender_email = os.getenv("SMTP_EMAIL")
+    password = os.getenv("SMTP_PASSWORD")
+    smtp_server = os.getenv("SMTP_HOST")
+    port = os.getenv("SMTP_PORT")
+    frontend_url = os.getenv("FRONTEND_URL")
+    link = f"{frontend_url}/flash-report/generation?token={token}"
+
+    message = MIMEMultipart("alternative")
     message["Subject"] = "Bib a estimé l'état de santé de la batterie de votre véhicule"
+    message["From"] = sender_email
+    message["To"] = email
 
-    message.set_content(f"""
-        Bonjour,
-
-        Votre Flash Report est prêt ! Cliquez sur le lien ci-dessous pour le consulter :
-
-        {link}
-
-        Merci !
-        """)
-
-    message.add_alternative(
-        f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-            <p>Bonjour,</p>
-            <p>Bonne nouvelle !L'estimation de l'état de santé de votre batterie est prête !</p>
-            <p>
-            <a href="{link}" style="
-                display: inline-block;
-                padding: 10px 20px;
-                font-size: 16px;
-                color: white;
-                background-color: #007bff;
-                text-decoration: none;
-                border-radius: 5px;">
-                Télécharger mon rapport
-            </a>
-            </p>
-            <p>Charles pour Bib !</p>
+    html = f"""\
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <p>Bonjour,</p>
+                    <p>Bonne nouvelle ! L'estimation de l'état de santé de votre batterie est prête !</p>
+                    <p>
+                    <a href="{link}" style="
+                        display: inline-block;
+                        padding: 10px 20px;
+                        font-size: 16px;
+                        color: white;
+                        background-color: #007bff;
+                        text-decoration: none;
+                        border-radius: 5px;">
+                        Télécharger mon rapport
+                    </a>
+                    </p>
+                <p>If you have any questions or encounter any issues, please don't hesitate to contact our support team.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #666; font-size: 14px;">
+                    Best regards,<br>
+                    The Bib BMT Team<br>
+                </p>
+            </div>
         </body>
-        </html>
-        """,
-        subtype="html",
-    )
+    </html>
+    """
 
-    await aiosmtplib.send(
-        message,
-        hostname="smtp.gmail.com",
-        port=587,
-        start_tls=True,
-        username="no-reply@bib-batteries.fr",
-        password="xksn lbxe ewlo oqda",
-    )
+    part = MIMEText(html, "html")
+    message.attach(part)
+    context = ssl.create_default_context()
+
+    try:
+        with smtplib.SMTP(smtp_server, port, timeout=10) as server:
+            server.starttls(context=context)
+            server.login(sender_email, password)
+            server.sendmail(sender_email, email, message.as_string())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Email error: {e!s}") from e
 
 
 async def get_soh_from_trendline(trendline: str, odometer: int):
