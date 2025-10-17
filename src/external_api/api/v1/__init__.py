@@ -38,7 +38,7 @@ hidden_router.include_router(passport.router, prefix="/passport", tags=["passpor
 # Les routes d'administration sont incluses mais ne sont pas exposées dans la documentation OpenAPI
 hidden_router.include_router(admin.router, prefix="/admin", tags=["Administration"])
 hidden_router.include_router(
-    flash_report.router, prefix="/flash-report", tags=["Flash Report"]
+    flash_report.router, prefix="/flash_report", tags=["Flash Report"]
 )
 
 api_router.include_router(hidden_router)

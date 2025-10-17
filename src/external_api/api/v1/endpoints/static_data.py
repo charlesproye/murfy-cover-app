@@ -14,7 +14,15 @@ from external_api.core import utils
 from external_api.core.cookie_auth import get_current_user_from_cookie
 from external_api.db.session import get_db
 from external_api.schemas.model import ModelWarrantyData
-from external_api.schemas.static_data import ModelTrendline, ModelType, SOHWithTrendline
+from external_api.schemas.static_data import (
+    AllMakesModelsInfo,
+    MakeInfo,
+    ModelInfo,
+    ModelTrendline,
+    ModelType,
+    SOHWithTrendline,
+    TypeInfo,
+)
 from external_api.schemas.user import User
 from external_api.services.api_pricing import get_api_user_pricing, log_api_call
 from external_api.services.redis import (
@@ -221,7 +229,6 @@ async def check_rate_limit(
 
 @router.get("/models-with-data", response_model=list[ModelType])
 async def get_model_with_data(
-    user: User = Depends(get_current_user_from_cookie()),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     query = text("""
@@ -241,6 +248,7 @@ async def get_model_with_data(
     vehicules_query = await db.execute(query)
     vehicules = vehicules_query.fetchall()
 
+    print(vehicules[0] if len(vehicules) > 0 else None)
     return [
         ModelType(
             model_name=vehicule.model_name,
@@ -250,6 +258,63 @@ async def get_model_with_data(
         )
         for vehicule in vehicules
     ]
+
+
+@router.get("/all-vehicle-models", response_model=AllMakesModelsInfo)
+async def get_all_vehicle_models(
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    query = text("""
+        SELECT
+            m.make_name,
+            vm.model_name,
+            vm.type,
+            vm.version
+        FROM vehicle_model vm
+        INNER JOIN make m ON vm.make_id = m.id
+        WHERE  vm.trendline->>'trendline' is not null
+        ORDER BY m.make_name, vm.model_name, vm.type, vm.version
+    """)
+    vehicules_query = await db.execute(query)
+    vehicules = vehicules_query.fetchall()
+
+    # Group data hierarchically: makes -> models -> types -> versions
+    makes_dict = {}
+
+    for vehicule in vehicules:
+        make_name = vehicule.make_name
+        model_name = vehicule.model_name
+        model_type = vehicule.type
+        version = vehicule.version
+
+        # Initialize make if not exists
+        if make_name not in makes_dict:
+            makes_dict[make_name] = {}
+
+        # Initialize model if not exists
+        if model_name not in makes_dict[make_name]:
+            makes_dict[make_name][model_name] = {}
+
+        # Initialize type if not exists
+        if model_type not in makes_dict[make_name][model_name]:
+            makes_dict[make_name][model_name][model_type] = []
+
+        # Add version if not already present
+        if version not in makes_dict[make_name][model_name][model_type]:
+            makes_dict[make_name][model_name][model_type].append(version)
+
+    # Convert to Pydantic models
+    makes = []
+    for make_name, models_dict in makes_dict.items():
+        models = []
+        for model_name, types_dict in models_dict.items():
+            types = []
+            for model_type, versions in types_dict.items():
+                types.append(TypeInfo(model_type=model_type, versions=versions))
+            models.append(ModelInfo(model_name=model_name, types=types))
+        makes.append(MakeInfo(make_name=make_name, models=models))
+
+    return AllMakesModelsInfo(makes=makes)
 
 
 @router.get("/{model}/trendline", response_model=ModelTrendline)
