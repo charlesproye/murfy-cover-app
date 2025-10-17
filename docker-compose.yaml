@@ -35,13 +35,10 @@ services:
       context: .
       dockerfile: docker/tesla.Dockerfile
     container_name: tesla-ingestion
+    image: rg.fr-par.scw.cloud/bib-images/tesla-ingestion:latest
     env_file:
       - ./.env
       - ./.python.env
-    volumes:
-      - ./src:/app/src
-    depends_on:
-      - redis
 
   # bmw_ingestion_service:
   #   build:
