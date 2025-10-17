@@ -188,12 +188,24 @@ cookie_auth_bearer = CookieAuthBearer(auto_error=False)
 _db_dependency = Depends(get_db)
 
 
-def get_current_user_from_cookie(getUserFunction: Callable):
-    """Dependency to get current user from cookie or header"""
+def get_current_user_from_cookie(
+    getUserFunction: Callable, security: HTTPBearer = HTTPBearer()
+):
+    """
+    Dependency to get current user from cookie or header.
+
+    This function now properly handles both:
+    1. Authorization Bearer tokens from headers
+    2. HttpOnly cookies as fallback
+
+    Args:
+        getUserFunction: Function to retrieve user from database
+        security: HTTPBearer instance for token extraction
+    """
 
     async def current_user(
         request: Request,
-        credentials: HTTPAuthorizationCredentials | None = None,
+        credentials: HTTPAuthorizationCredentials | None = Depends(security),
         db: AsyncSession = _db_dependency,
     ):
         credentials_exception = HTTPException(
@@ -201,11 +213,9 @@ def get_current_user_from_cookie(getUserFunction: Callable):
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
         token = None
 
-        # Try to get token from credentials (header) or cookie
-        if credentials:
+        if credentials and credentials.credentials:
             token = credentials.credentials
         else:
             token = CookieAuth.get_token_from_cookie(request, "access")

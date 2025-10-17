@@ -39,7 +39,11 @@ async def login(
     )
 
     # Return user data without tokens
-    return {"user": result["user"], "company": result["company"]}
+    return {
+        "user": result["user"],
+        "company": result["company"],
+        "token": result["tokens"]["access_token"],
+    }
 
 
 @router.post("/logout")
