@@ -1,11 +1,11 @@
 import logging
-import os
 from io import BytesIO
 
 import pandas as pd
 from joblib import load as joblib_load
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from external_api.core.config import settings
 from external_api.schemas.vehicle import DynamicVehicleData, StaticVehicleData
 from external_api.services.s3 import s3_client
 from external_api.services.vehicle import (
@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 def load_model():
     try:
         response = s3_client.get_object(
-            Bucket=os.getenv("S3_BUCKET_NAME"), Key="models/model_price.pkl"
+            Bucket=settings.S3_BUCKET_NAME, Key="models/model_price.pkl"
         )
         buffer = BytesIO(response["Body"].read())
         model = joblib_load(buffer)
         return model
     except Exception as e:
         logger.error(
-            f"Error reading pickle file s3://{os.getenv('S3_BUCKET_NAME')}/models/model_price.pkl: {e}"
+            f"Error reading pickle file s3://{settings.S3_BUCKET_NAME}/models/model_price.pkl: {e}"
         )
         raise
 

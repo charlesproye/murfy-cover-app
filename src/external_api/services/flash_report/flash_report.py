@@ -1,5 +1,4 @@
 import hashlib
-import os
 import smtplib
 import ssl
 import uuid
@@ -15,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from activation.config.mappings import mapping_vehicle_type
+from external_api.core.config import settings
 from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
     TeslaVinDecoder,
 )
@@ -78,7 +78,7 @@ async def get_db_names(
 async def send_vehicle_specs(vin: str, db: AsyncSession):
     if len(vin) != 17:
         return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": "VIN must be 17 characters long"},
         )
 
@@ -154,17 +154,21 @@ async def insert_combination(
 
 
 async def send_email(is_french: bool, email: str, token: str):
-    sender_email = os.getenv("SMTP_EMAIL")
-    password = os.getenv("SMTP_PASSWORD")
-    smtp_server = os.getenv("SMTP_HOST")
-    port = os.getenv("SMTP_PORT")
-    frontend_url = os.getenv("FRONTEND_URL")
+    sender_email = settings.SMTP_EMAIL
+    password = settings.SMTP_PASSWORD
+    smtp_server = settings.SMTP_HOST
+    port = settings.SMTP_PORT
+    frontend_url = settings.FRONTEND_URL
     link = f"{frontend_url}/flash-report/generation?token={token}"
     # /!\ Link is not sent if frontend does not include "https":
     # in dev the <a> element won't have a href in the email
 
     message = MIMEMultipart("alternative")
-    message["Subject"] = "Bib a estimé l'état de santé de la batterie de votre véhicule"
+    message["Subject"] = (
+        "Bib a estimé l'état de santé de la batterie de votre véhicule"
+        if is_french
+        else "Bib has estimated the health status of your battery"
+    )
     message["From"] = sender_email
     message["To"] = email
     message["Content-Type"] = "text/html; charset=UTF-8"

@@ -3,7 +3,6 @@ Secure cookie-based authentication utilities
 Provides httpOnly cookie support for enhanced security
 """
 
-import os
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -29,14 +28,14 @@ COOKIE_NAME_REFRESH = "evalue_refresh_token"
 COOKIE_NAME_SESSION = "evalue_session_data"
 
 # Cookie settings
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
+COOKIE_SECURE = settings.COOKIE_SECURE
 COOKIE_HTTPONLY = True
 COOKIE_SAMESITE = "strict"
-COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", None)
+COOKIE_DOMAIN = settings.COOKIE_DOMAIN
 
 
 def sanitize_user(user: Any) -> Any:
-    user_dict = dict(user)  # Convertir l'objet en dictionnaire
+    user_dict = dict(user)  # Convert the object to a dictionary
     user_dict.pop("password", None)
     return user_dict
 
@@ -292,7 +291,7 @@ async def get_user_with_fleet(email: str, db: AsyncSession):
         user_data = result.mappings().first()
         if user_data:
             user_data = dict(user_data)
-            # Si fleets est None ou contient un seul élément null, initialiser avec une liste vide
+            # If fleets is None or contains only one null element, initialize with an empty list
             if user_data["fleets"] is None or (
                 len(user_data["fleets"]) == 1 and user_data["fleets"][0] is None
             ):

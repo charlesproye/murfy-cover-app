@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db_models.vehicle import VehicleModel
+from db_models.vehicle import Make, VehicleModel
 from external_api.core import utils
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
@@ -264,18 +264,24 @@ async def get_model_with_data(
 @router.get("/all-vehicle-models", response_model=AllMakesModelsInfo)
 async def get_all_vehicle_models(
     db: AsyncSession = Depends(get_db),
-) -> Any:
-    query = text("""
-        SELECT
-            m.make_name,
-            vm.model_name,
-            vm.type,
-            vm.version
-        FROM vehicle_model vm
-        INNER JOIN make m ON vm.make_id = m.id
-        WHERE  vm.trendline->>'trendline' is not null
-        ORDER BY m.make_name, vm.model_name, vm.type, vm.version
-    """)
+) -> AllMakesModelsInfo:
+    query = (
+        select(
+            Make.make_name,
+            VehicleModel.model_name,
+            VehicleModel.type,
+            VehicleModel.version,
+        )
+        .select_from(VehicleModel)
+        .join(Make, VehicleModel.make_id == Make.id)
+        .where(VehicleModel.trendline["trendline"].isnot(None))
+        .order_by(
+            Make.make_name,
+            VehicleModel.model_name,
+            VehicleModel.type,
+            VehicleModel.version,
+        )
+    )
     vehicules_query = await db.execute(query)
     vehicules = vehicules_query.fetchall()
 
