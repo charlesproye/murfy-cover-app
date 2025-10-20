@@ -1,4 +1,11 @@
+from enum import Enum
+
 from pydantic import BaseModel, EmailStr
+
+
+class LanguageEnum(str, Enum):
+    en = "en"
+    fr = "fr"
 
 
 class FlashReportFormType(BaseModel):
@@ -9,4 +16,5 @@ class FlashReportFormType(BaseModel):
     version: str
     odometer: float
     email: EmailStr
+    language: LanguageEnum
 

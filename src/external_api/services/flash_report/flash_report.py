@@ -146,9 +146,7 @@ async def insert_combination(
     return token
 
 
-# TODO:
-# - Demander à Anna ou Jo une repasse sur le mail ->  En cours
-async def send_email(email: str, token: str):
+async def send_email(is_french: bool, email: str, token: str):
     sender_email = os.getenv("SMTP_EMAIL")
     password = os.getenv("SMTP_PASSWORD")
     smtp_server = os.getenv("SMTP_HOST")
@@ -161,36 +159,69 @@ async def send_email(email: str, token: str):
     message["From"] = sender_email
     message["To"] = email
 
-    html = f"""\
+    html_en = f"""\
     <html>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <p>Bonjour,</p>
-                    <p>Bonne nouvelle ! L'estimation de l'état de santé de votre batterie est prête !</p>
-                    <p>
-                    <a href="{link}" style="
-                        display: inline-block;
-                        padding: 10px 20px;
-                        font-size: 16px;
-                        color: white;
-                        background-color: #007bff;
-                        text-decoration: none;
-                        border-radius: 5px;">
-                        Télécharger mon rapport
-                    </a>
-                    </p>
-                <p>If you have any questions or encounter any issues, please don't hesitate to contact our support team.</p>
+                <p>Hello,</p>
+                <p>Good news! The health status estimation of your battery is ready!</p>
+                <p>
+                <a href="{link}" style="
+                    display: inline-block;
+                    padding: 10px 20px;
+                    font-size: 16px;
+                    color: white;
+                    background-color: #007bff;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin-bottom: 10px;"
+                >
+                    Download my report
+                </a>
+                </p>
+                <p>If you have any questions or encounter any issues, please don't hesitate to <a href="mailto:support@bib.com">contact our support team.</a></p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
                 <p style="color: #666; font-size: 14px;">
                     Best regards,<br>
-                    The Bib BMT Team<br>
+                    The Bib Team<br>
                 </p>
             </div>
         </body>
     </html>
     """
 
-    part = MIMEText(html, "html")
+    html_fr = f"""\
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <p>Bonjour,</p>
+                <p>Bonne nouvelle ! L'estimation de l'état de santé de votre batterie est prête !</p>
+                <p>
+                <a href="{link}" style="
+                    display: inline-block;
+                    padding: 10px 20px;
+                    font-size: 16px;
+                    color: white;
+                    background-color: #007bff;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin-bottom: 10px;"
+                >
+                    Télécharger mon rapport
+                </a>
+                </p>
+                <p>Pour toutes questions ou si vous rencontrez un problème, <a href="mailto:support@bib.com">contactez notre équipe de support.</a></p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #666; font-size: 14px;">
+                    Cordialement,<br>
+                    The Bib Team<br>
+                </p>
+            </div>
+        </body>
+    </html>
+    """
+
+    part = MIMEText(html_fr if is_french else html_en, "html")
     message.attach(part)
     context = ssl.create_default_context()
 

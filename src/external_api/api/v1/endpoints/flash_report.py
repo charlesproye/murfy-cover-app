@@ -40,7 +40,7 @@ async def send_report_email(
         db=db,
     )
 
-    await send_email(data.email, token)
+    await send_email(data.language.value == "fr", data.email, token)
 
     return {"message": f"Mail sent to {data.email}"}
 
