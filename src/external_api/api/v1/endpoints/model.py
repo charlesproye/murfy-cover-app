@@ -6,9 +6,9 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from external_api.core.cookie_auth import get_current_user_from_cookie
+from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
-from external_api.schemas.api import ApiUserRead as ApiUser
+from external_api.schemas.user import GetCurrentUser
 from external_api.services.api_pricing import get_api_user_pricing, log_api_call
 from external_api.services.redis import (
     add_distinct_vin_and_check_limit,
@@ -23,7 +23,7 @@ router = APIRouter()
 async def check_rate_limit(
     vin: str,
     endpoint: str,
-    api_user: ApiUser = Depends(get_current_user_from_cookie()),
+    api_user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """

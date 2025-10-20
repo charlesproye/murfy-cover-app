@@ -6,7 +6,7 @@ from external_api.core.cookie_auth import (
 )
 from external_api.db.session import get_db
 from external_api.schemas.dashboard import DashboardCrud
-from external_api.schemas.user import UserWithFleet
+from external_api.schemas.user import GetCurrentUser
 
 router = APIRouter()
 
@@ -18,7 +18,7 @@ async def kpis(
     Country: str = Query(None, description="The country"),
     _: str = Query(None, description="The fleets"),
     pinned_vehicles: bool = Query(False, description="The pinned vehicles"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     # fleets_input_list = (
     #     Fleets.split(",") if Fleets and "," in Fleets else [Fleets] if Fleets else None
@@ -43,7 +43,7 @@ async def scatter_plot_brands(
     Make: str = Query(None, description="The brands"),
     Fleets: str = Query(None, description="The fleets"),
     pinned_vehicles: bool = Query(False, description="The pinned vehicles"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     fleets_input_list = (
         Fleets.split(",") if Fleets and "," in Fleets else [Fleets] if Fleets else None
@@ -61,7 +61,7 @@ async def scatter_plot_regions(
     Country: str = Query(None, description="The country"),
     Fleets: str = Query(None, description="The fleets"),
     pinned_vehicles: bool = Query(False, description="The pinned vehicles"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     fleets_input_list = (
         Fleets.split(",") if Fleets and "," in Fleets else [Fleets] if Fleets else None
@@ -83,7 +83,7 @@ async def scatter_plot_regions(
 async def individual_kpis(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().individual_kpis(fleet_id, db)
     return response
@@ -93,7 +93,7 @@ async def individual_kpis(
 async def range_soh(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
     type: str = Query(None, description="The type"),
 ):
     response = await DashboardCrud().range_soh(fleet_id, type, db)
@@ -105,7 +105,7 @@ async def new_vehicles(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     period: str = Query(None, description="The period"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().new_vehicles(fleet_id, period, db)
     return response
@@ -116,7 +116,7 @@ async def table_brand(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     filter: str = Query(None, description="The filter"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().table_brand(fleet_id, filter, db)
     return response
@@ -126,7 +126,7 @@ async def table_brand(
 async def filters(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().filter(
         base_fleet=user.get("fleets"), fleet_id=fleet_id, db=db
@@ -138,7 +138,7 @@ async def filters(
 async def search_vin(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().search_vin(vin, user.get("fleets"), db)
     return response
@@ -151,7 +151,7 @@ async def global_table(
     Country: str = Query(None, description="The country"),
     _: str = Query(None, description="The fleets"),
     pinned_vehicles: bool = Query(False, description="The pinned vehicles"),
-    user: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     # fleet_ids_list = (
     #     Fleets.split(",") if Fleets and "," in Fleets else [Fleets] if Fleets else None
@@ -175,7 +175,7 @@ async def trendline_brand(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     brand: str = Query(None, description="The brand"),
-    _: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().trendline_brand(fleet_id, brand, db)
     return response
@@ -185,7 +185,7 @@ async def trendline_brand(
 async def brands(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    _: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().brands(fleet_id, db)
     return response
@@ -197,7 +197,7 @@ async def get_soh_by_groups(
     fleet_id: str = Query(..., description="The fleet id"),
     group: str = Query(..., description="The group"),
     page: int = Query(1, description="The page"),
-    _: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().get_soh_by_groups(fleet_id, group, page, db)
     return response
@@ -218,7 +218,7 @@ async def get_extremum_soh(
     extremum: str = Query("Worst", description="The extremum"),
     sorting_column: str = Query(None, description="The sorting column"),
     sorting_order: str = Query(None, description="The sorting order"),
-    _: UserWithFleet = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().get_extremum_soh(
         fleet_id, brand, page, page_size, extremum, sorting_column, sorting_order, db

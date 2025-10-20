@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from external_api.core.cookie_auth import get_current_user_from_cookie
+from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
 from external_api.schemas.api import ApiUserBillingInfo
 from external_api.schemas.api import ApiUserRead as ApiUser
@@ -25,7 +25,7 @@ router = APIRouter()
 @router.get("/usage", response_model=UserBillingInfo)
 async def get_billing_usage(
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user_from_cookie),
+    user: User = Depends(get_current_user_from_cookie(get_user)),
 ) -> Any:
     """
     Get the current user's billing information.
@@ -50,7 +50,7 @@ async def get_billing_usage(
 
 @router.get("/info", response_model=ApiUserBillingInfo)
 async def get_billing_info(
-    api_user: ApiUser = Depends(get_current_user_from_cookie),
+    api_user: ApiUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
