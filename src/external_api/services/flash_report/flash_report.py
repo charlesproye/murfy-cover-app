@@ -8,7 +8,8 @@ from email.mime.text import MIMEText
 
 import numpy as np
 import pandas as pd
-from fastapi import HTTPException
+from fastapi import HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,6 +76,12 @@ async def get_db_names(
 
 
 async def send_vehicle_specs(vin: str, db: AsyncSession):
+    if len(vin) != 17:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "VIN must be 17 characters long"},
+        )
+
     tesla_vin_decoder = TeslaVinDecoder()
     result = tesla_vin_decoder.decode(vin)
 
