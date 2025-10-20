@@ -153,33 +153,52 @@ async def send_email(is_french: bool, email: str, token: str):
     port = os.getenv("SMTP_PORT")
     frontend_url = os.getenv("FRONTEND_URL")
     link = f"{frontend_url}/flash-report/generation?token={token}"
+    # /!\ Link is not sent if frontend does not include "https":
+    # in dev the <a> element won't have a href in the email
 
     message = MIMEMultipart("alternative")
     message["Subject"] = "Bib a estimé l'état de santé de la batterie de votre véhicule"
     message["From"] = sender_email
     message["To"] = email
+    message["Content-Type"] = "text/html; charset=UTF-8"
+    message["X-Mailer"] = "Python SMTP"
 
     html_en = f"""\
+    <!DOCTYPE html>
     <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <p>Hello,</p>
                 <p>Good news! The health status estimation of your battery is ready!</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a
+                        href="{link}"
+                        style="
+                            display: inline-block;
+                            padding: 12px 24px;
+                            font-size: 16px;
+                            color: white !important;
+                            background-color: #007bff;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin-bottom: 10px;
+                            font-weight: bold;
+                        "
+                        target="_blank"
+                    >
+                        Download my report
+                    </a>
+                </div>
                 <p>
-                <a href="{link}" style="
-                    display: inline-block;
-                    padding: 10px 20px;
-                    font-size: 16px;
-                    color: white;
-                    background-color: #007bff;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    margin-bottom: 10px;"
-                >
-                    Download my report
-                </a>
+                    If you have any questions or encounter any issues, please don't hesitate to
+                    <a href="mailto:support@bib-batteries.fr" style="color: #007bff;">
+                        contact our support team.
+                    </a>
                 </p>
-                <p>If you have any questions or encounter any issues, please don't hesitate to <a href="mailto:support@bib.com">contact our support team.</a></p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
                 <p style="color: #666; font-size: 14px;">
                     Best regards,<br>
@@ -191,26 +210,41 @@ async def send_email(is_french: bool, email: str, token: str):
     """
 
     html_fr = f"""\
+    <!DOCTYPE html>
     <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <p>Bonjour,</p>
                 <p>Bonne nouvelle ! L'estimation de l'état de santé de votre batterie est prête !</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a
+                        href="{link}"
+                        style="
+                            display: inline-block;
+                            padding: 12px 24px;
+                            font-size: 16px;
+                            color: white !important;
+                            background-color: #007bff;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin-bottom: 10px;
+                            font-weight: bold;
+                        "
+                        target="_blank"
+                    >
+                        Télécharger mon rapport
+                    </a>
+                </div>
                 <p>
-                <a href="{link}" style="
-                    display: inline-block;
-                    padding: 10px 20px;
-                    font-size: 16px;
-                    color: white;
-                    background-color: #007bff;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    margin-bottom: 10px;"
-                >
-                    Télécharger mon rapport
-                </a>
+                    Pour toutes questions ou si vous rencontrez un problème,
+                    <a href="mailto:support@bib-batteries.fr" style="color: #007bff;">
+                    contactez notre équipe de support.
+                    </a>
                 </p>
-                <p>Pour toutes questions ou si vous rencontrez un problème, <a href="mailto:support@bib.com">contactez notre équipe de support.</a></p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
                 <p style="color: #666; font-size: 14px;">
                     Cordialement,<br>
