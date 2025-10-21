@@ -2,14 +2,13 @@
 
 import logging
 import time
-from typing import Any
 
 import fastapi
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db_models.vehicle import Make, VehicleModel
+from db_models.vehicle import Battery, Make, VehicleModel
 from external_api.core import utils
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
@@ -231,25 +230,26 @@ async def check_rate_limit(
 async def get_model_with_data(
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
-) -> Any:
-    query = text("""
-    SELECT
-        m.make_name,
-        vm.model_name,
-        vm.type,
-        vm.commissioning_date,
-        vm.end_of_life_date
-    FROM vehicle_model vm
-    INNER JOIN make m ON vm.make_id = m.id
-    INNER JOIN battery b ON vm.battery_id = b.id
-    WHERE
-        vm.trendline->>'trendline' is not null
-        AND b.capacity is not null
-    """)
+) -> list[ModelType]:
+    query = (
+        select(
+            Make.make_name,
+            VehicleModel.model_name,
+            VehicleModel.type,
+            VehicleModel.commissioning_date,
+            VehicleModel.end_of_life_date,
+        )
+        .select_from(VehicleModel)
+        .inner_join(Make, VehicleModel.make_id == Make.id)
+        .inner_join(Battery, VehicleModel.battery_id == Battery.id)
+        .where(
+            VehicleModel.trendline["trendline"].isnot(None),
+            Battery.capacity is not None,
+        )
+    )
     vehicules_query = await db.execute(query)
     vehicules = vehicules_query.fetchall()
 
-    print(vehicules[0] if len(vehicules) > 0 else None)
     return [
         ModelType(
             model_name=vehicule.model_name,
@@ -393,7 +393,7 @@ async def get_model_warranty(
     model: str = Path(..., description="Model name"),
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
-) -> Any:
+) -> ModelWarrantyData:
     """
     Get warranty data for a specific model.
 
