@@ -1,4 +1,3 @@
-import hashlib
 import smtplib
 import ssl
 import uuid
@@ -21,14 +20,14 @@ from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
 from external_api.services.flash_report.vin_decoder.vin_decoder import VinDecoder
 
 
-async def get_has_trendline(make: str, db: AsyncSession):
+async def get_make_has_trendline(make_name: str, db: AsyncSession):
     query_has_trendline = """
         SELECT count(*)
         FROM vehicle_model vm
-        left join oem o
-        on o.id = vm.oem_id
+        left join make m on m.id = vm.make_id
+        WHERE vm.trendline->>'trendline' is not null AND m.make_name = :make_name
     """
-    result = await db.execute(text(query_has_trendline), {"make": make})
+    result = await db.execute(text(query_has_trendline), {"make_name": make_name})
     return result.fetchone()[0] > 0
 
 
@@ -44,7 +43,7 @@ async def get_db_names(
         FROM vehicle_model vm
         LEFT JOIN make m ON vm.make_id = m.id
         LEFT JOIN battery b ON b.id = vm.battery_id
-        LEFT JOIN oem o ON o.id = vm.oem_id
+        LEFT JOIN make m ON m.id = vm.make_id
     """
     result = await db.execute(text(query_all_models))
     rows = result.fetchall()
@@ -59,11 +58,11 @@ async def get_db_names(
         return None, None
 
     query_model = """
-        SELECT o.oem_name, vm.model_name
+        SELECT m.make_name, vm.model_name
         FROM vehicle_model vm
         LEFT JOIN make m ON vm.make_id = m.id
         LEFT JOIN battery b ON b.id = vm.battery_id
-        LEFT JOIN oem o ON o.id = vm.oem_id
+        LEFT JOIN make m ON m.id = vm.make_id
         WHERE vm.id = :vehicle_model_id
     """
     result = await db.execute(text(query_model), {"vehicle_model_id": vehicle_model_id})
@@ -72,7 +71,7 @@ async def get_db_names(
     if not record:
         return None, None
 
-    return record["oem_name"], record["model_name"]
+    return record["make_name"], record["model_name"]
 
 
 async def send_vehicle_specs(vin: str, db: AsyncSession):
@@ -85,47 +84,46 @@ async def send_vehicle_specs(vin: str, db: AsyncSession):
     tesla_vin_decoder = TeslaVinDecoder()
     result = tesla_vin_decoder.decode(vin)
 
-    if not result or not result.get("Country"):
-        vin_decoder = VinDecoder()
-        make, model = vin_decoder.decode(vin)
+    if result and result.get("Country"):
+        make_db_name, model_db_name = await get_db_names(
+            "tesla",
+            result.get("Model"),
+            result.get("Type"),
+            db=db,
+        )
 
-        oem_name, model_name = await get_db_names(make, model, type=None, db=db)
-
-        has_trendline = await get_has_trendline(oem_name, db)
+        has_trendline = await get_make_has_trendline(make_db_name, db)
 
         return {
             "has_trendline": has_trendline,
-            "make": oem_name,
-            "model": model_name,
+            "make": "tesla",
+            "model": model_db_name,
+            "type": result.get("Type"),
+            "version": result.get("Version"),
+        }
+
+    else:
+        vin_decoder = VinDecoder()
+        make, model = vin_decoder.decode(vin)
+
+        make_db_name, model_db_name = await get_db_names(make, model, type=None, db=db)
+
+        has_trendline = await get_make_has_trendline(make_db_name, db)
+
+        return {
+            "has_trendline": has_trendline,
+            "make": make_db_name,
+            "model": model_db_name,
             "type": None,
             "version": None,
         }
-
-    oem_name, model_name = await get_db_names(
-        "tesla",
-        result.get("Model"),
-        result.get("Type"),
-        db=db,
-    )
-
-    has_trendline = await get_has_trendline(oem_name, db)
-
-    return {
-        "has_trendline": has_trendline,
-        "make": "tesla",
-        "model": model_name,
-        "type": result.get("Type"),
-        "version": result.get("Version"),
-    }
 
 
 async def insert_combination(
     make: str, model: str, type: str, version: str, odometer: int, db: AsyncSession
 ):
-    # Générer un token unique basé sur les valeurs de la combinaison
-    token_input = f"{make}-{model}-{type}-{version}-{odometer}"
-    token = hashlib.sha256(token_input.encode("utf-8")).hexdigest()
-
+    # Generate a unique token based on the combination values
+    token = str(uuid.uuid4())
     id = uuid.uuid4()
 
     insert_query = """

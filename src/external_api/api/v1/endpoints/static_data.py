@@ -160,8 +160,8 @@ async def get_model_with_data(
     ]
 
 
-@router.get("/all-vehicle-models", response_model=AllMakesModelsInfo)
-async def get_all_vehicle_models(
+@router.get("/all-models-with-trendline", response_model=AllMakesModelsInfo)
+async def get_all_models_with_trendline(
     db: AsyncSession = Depends(get_db),
 ) -> AllMakesModelsInfo:
     query = (
