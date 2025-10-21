@@ -120,7 +120,12 @@ async def send_vehicle_specs(vin: str, db: AsyncSession):
 
 
 async def insert_combination(
-    make: str, model: str, type: str, version: str, odometer: int, db: AsyncSession
+    make: str,
+    model: str,
+    type: str,
+    version: str | None,
+    odometer: int,
+    db: AsyncSession,
 ):
     # Generate a unique token based on the combination values
     token = str(uuid.uuid4())
