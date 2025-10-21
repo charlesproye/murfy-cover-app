@@ -13,7 +13,7 @@ class FlashReportFormType(BaseModel):
     make: str
     model: str
     type: str
-    version: str
+    version: str | None = None
     odometer: float
     email: EmailStr
     language: LanguageEnum

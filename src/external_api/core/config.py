@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     # Server
     BACKEND_CORS_ORIGINS: list[str] = ["*"]
     WEB_CONCURRENCY: int = int(os.getenv("WEB_CONCURRENCY", "4"))
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     # Database
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "20"))
@@ -73,6 +74,8 @@ class Settings(BaseSettings):
     # SMTP
     SMTP_EMAIL: str = os.getenv("SMTP_EMAIL", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", ""))
 
     # Default user
     FIRST_SUPERUSER_EMAIL: EmailStr | None = None

@@ -8,11 +8,12 @@ import numpy as np
 import pandas as pd
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from activation.config.mappings import mapping_vehicle_type
+from db_models.vehicle import Battery, Make, VehicleModel
 from external_api.core.config import settings
 from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
     TeslaVinDecoder,
@@ -37,15 +38,22 @@ async def get_db_names(
     type: str | None = None,
     db: AsyncSession = None,
 ):
-    query_all_models = """
-        SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date,
-               m.make_name, b.capacity
-        FROM vehicle_model vm
-        LEFT JOIN make m ON vm.make_id = m.id
-        LEFT JOIN battery b ON b.id = vm.battery_id
-        LEFT JOIN make m ON m.id = vm.make_id
-    """
-    result = await db.execute(text(query_all_models))
+    query_all_models = (
+        select(
+            VehicleModel.model_name,
+            VehicleModel.id,
+            VehicleModel.type,
+            VehicleModel.commissioning_date,
+            VehicleModel.end_of_life_date,
+            Make.make_name,
+            Battery.capacity,
+        )
+        .select_from(VehicleModel)
+        .join(Make, VehicleModel.make_id == Make.id, isouter=True)
+        .join(Battery, VehicleModel.battery_id == Battery.id, isouter=True)
+    )
+
+    result = await db.execute(query_all_models)
     rows = result.fetchall()
     columns = result.keys()
     model_existing = pd.DataFrame(rows, columns=columns)
@@ -62,7 +70,6 @@ async def get_db_names(
         FROM vehicle_model vm
         LEFT JOIN make m ON vm.make_id = m.id
         LEFT JOIN battery b ON b.id = vm.battery_id
-        LEFT JOIN make m ON m.id = vm.make_id
         WHERE vm.id = :vehicle_model_id
     """
     result = await db.execute(text(query_model), {"vehicle_model_id": vehicle_model_id})
