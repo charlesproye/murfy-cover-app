@@ -23,6 +23,7 @@ class AllMakesModelsInfo(BaseModel):
 
 
 class ModelType(BaseModel):
+    make: str = Field(..., description="Make (company that made the car)")
     model_name: str = Field(..., description="Model name")
     model_type: str = Field(..., description="Model type")
     commissioning_date: datetime | None = Field(..., description="Commissioning date")
