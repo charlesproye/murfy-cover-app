@@ -9,7 +9,7 @@ from external_api.core.config import settings
 S3_KEY_FORM = settings.S3_KEY
 S3_SECRET_FORM = settings.S3_SECRET
 S3_ENDPOINT = settings.S3_ENDPOINT
-S3_BUCKET_NAME = settings.S3_BUCKET_NAME
+S3_BUCKET_NAME = settings.S3_BUCKET
 
 s3_client = boto3.client(
     "s3",

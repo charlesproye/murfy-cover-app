@@ -64,9 +64,13 @@ class CookieAuth:
         """Set secure authentication cookies"""
 
         # Calculate expiration times
-        access_expire = datetime.now(UTC) + (access_expires_delta or timedelta(hours=1))
+        access_expire = datetime.now(UTC) + (
+            access_expires_delta
+            or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
         refresh_expire = datetime.now(UTC) + (
-            refresh_expires_delta or timedelta(days=30)
+            refresh_expires_delta
+            or timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
         )
 
         # Set access token cookie

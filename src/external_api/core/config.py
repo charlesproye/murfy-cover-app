@@ -19,10 +19,6 @@ class Settings(BaseSettings):
     # Environment of the app (proxy or local)
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "proxy")
 
-    # Authentication
-    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "true").lower() == "true"
-    COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "localhost")
-
     # API
     API_VERSION: str = "v1"
     API_V1_STR: str = f"/{API_VERSION}"
@@ -34,10 +30,12 @@ class Settings(BaseSettings):
     ENCRYPT_KEY: str = os.getenv("ENCRYPT_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
-    )  # 1 heure
+    )  # 1 hour
     REFRESH_TOKEN_EXPIRE_MINUTES: int = int(
         os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", "144000")
-    )  # 100 jours
+    )  # 100 days
+    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "true").lower() == "true"
+    COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "localhost")
 
     # Server
     BACKEND_CORS_ORIGINS: list[str] = ["*"]
@@ -65,6 +63,16 @@ class Settings(BaseSettings):
     REDIS_PORT: str = os.getenv("REDIS_PORT", "")
     REDIS_USER: str = os.getenv("REDIS_USER", "")
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
+
+    # S3
+    S3_BUCKET: str = os.getenv("S3_BUCKET", "")
+    S3_KEY: str = os.getenv("S3_KEY", "")
+    S3_SECRET: str = os.getenv("S3_SECRET", "")
+    S3_ENDPOINT: str = os.getenv("S3_ENDPOINT", "")
+
+    # SMTP
+    SMTP_EMAIL: str = os.getenv("SMTP_EMAIL", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
 
     # Default user
     FIRST_SUPERUSER_EMAIL: EmailStr | None = None
