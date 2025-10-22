@@ -8,8 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """
-    Configuration de l'application, chargée depuis les variables d'environnement
-    et les valeurs par défaut.
+    Application configuration, loaded from environment variables and default values.
     """
 
     dotenv.load_dotenv()
@@ -17,7 +16,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore", case_sensitive=True
     )
-    # Environnement of the app (proxy or local)
+    # Environment of the app (proxy or local)
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "proxy")
 
     # API
@@ -25,29 +24,32 @@ class Settings(BaseSettings):
     API_V1_STR: str = f"/{API_VERSION}"
     PROJECT_NAME: str = "EValue"
 
-    # Sécurité
+    # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY")
     ALGORITHM: str = os.getenv("ALGORITHM")
     ENCRYPT_KEY: str = os.getenv("ENCRYPT_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
-    )  # 1 heure
+    )  # 1 hour
     REFRESH_TOKEN_EXPIRE_MINUTES: int = int(
         os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", "144000")
-    )  # 100 jours
+    )  # 100 days
+    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "true").lower() == "true"
+    COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "localhost")
 
-    # Serveur
+    # Server
     BACKEND_CORS_ORIGINS: list[str] = ["*"]
     WEB_CONCURRENCY: int = int(os.getenv("WEB_CONCURRENCY", "4"))
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-    # Base de données
+    # Database
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "20"))
     POOL_SIZE: int = int(os.getenv("POOL_SIZE", "5"))
     MAX_OVERFLOW: int = int(os.getenv("MAX_OVERFLOW", "10"))
     POOL_TIMEOUT: int = int(os.getenv("POOL_TIMEOUT", "30"))
     POOL_RECYCLE: int = int(os.getenv("POOL_RECYCLE", "1800"))
 
-    # DB Data
+    # Database data
     DB_DATA_EV_USER: str = os.environ["DB_DATA_EV_USER"]
     DB_DATA_EV_PASSWORD: str = os.environ["DB_DATA_EV_PASSWORD"]
     DB_DATA_EV_HOST: str = os.environ["DB_DATA_EV_HOST"]
@@ -63,13 +65,21 @@ class Settings(BaseSettings):
     REDIS_USER: str = os.getenv("REDIS_USER", "")
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
 
-    # Utilisateur par défaut
+    # S3
+    S3_BUCKET: str = os.getenv("S3_BUCKET", "")
+    S3_KEY: str = os.getenv("S3_KEY", "")
+    S3_SECRET: str = os.getenv("S3_SECRET", "")
+    S3_ENDPOINT: str = os.getenv("S3_ENDPOINT", "")
+
+    # SMTP
+    SMTP_EMAIL: str = os.getenv("SMTP_EMAIL", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", ""))
+
+    # Default user
     FIRST_SUPERUSER_EMAIL: EmailStr | None = None
     FIRST_SUPERUSER_PASSWORD: str | None = None
-
-    # VIN Decoder
-    VIN_DECODER_API_KEY: str = os.getenv("VIN_DECODER_API_KEY", "")
-    VIN_DECODER_SECRET_KEY: str = os.getenv("VIN_DECODER_SECRET_KEY", "")
 
     @field_validator("ASYNC_DB_DATA_EV_URI", mode="before")
     @classmethod
@@ -119,6 +129,6 @@ class Settings(BaseSettings):
         raise ValueError(v)
 
 
-# Singleton pour les settings
+# Singleton for settings
 settings = Settings()
 

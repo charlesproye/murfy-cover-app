@@ -2,19 +2,26 @@
 
 import logging
 import time
-from typing import Any
 
 import fastapi
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db_models.vehicle import VehicleModel
+from db_models.vehicle import Battery, Make, VehicleModel
 from external_api.core import utils
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
 from external_api.schemas.model import ModelWarrantyData
-from external_api.schemas.static_data import ModelTrendline, ModelType, SOHWithTrendline
+from external_api.schemas.static_data import (
+    AllMakesModelsInfo,
+    MakeInfo,
+    ModelInfo,
+    ModelTrendline,
+    ModelType,
+    SOHWithTrendline,
+    TypeInfo,
+)
 from external_api.schemas.user import GetCurrentUser
 from external_api.services.api_pricing import get_api_user_pricing, log_api_call
 from external_api.services.redis import (
@@ -121,21 +128,23 @@ async def check_rate_limit(
 async def get_model_with_data(
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
-) -> Any:
-    query = text("""
-    SELECT
-        m.make_name,
-        vm.model_name,
-        vm.type,
-        vm.commissioning_date,
-        vm.end_of_life_date
-    FROM vehicle_model vm
-    INNER JOIN make m ON vm.make_id = m.id
-    INNER JOIN battery b ON vm.battery_id = b.id
-    WHERE
-        vm.trendline->>'trendline' is not null
-        AND b.capacity is not null
-    """)
+) -> list[ModelType]:
+    query = (
+        select(
+            Make.make_name,
+            VehicleModel.model_name,
+            VehicleModel.type,
+            VehicleModel.commissioning_date,
+            VehicleModel.end_of_life_date,
+        )
+        .select_from(VehicleModel)
+        .inner_join(Make, VehicleModel.make_id == Make.id)
+        .inner_join(Battery, VehicleModel.battery_id == Battery.id)
+        .where(
+            VehicleModel.trendline["trendline"].isnot(None),
+            Battery.capacity is not None,
+        )
+    )
     vehicules_query = await db.execute(query)
     vehicules = vehicules_query.fetchall()
 
@@ -149,6 +158,69 @@ async def get_model_with_data(
         )
         for vehicule in vehicules
     ]
+
+
+@router.get("/all-models-with-trendline", response_model=AllMakesModelsInfo)
+async def get_all_models_with_trendline(
+    db: AsyncSession = Depends(get_db),
+) -> AllMakesModelsInfo:
+    query = (
+        select(
+            Make.make_name,
+            VehicleModel.model_name,
+            VehicleModel.type,
+            VehicleModel.version,
+        )
+        .select_from(VehicleModel)
+        .join(Make, VehicleModel.make_id == Make.id)
+        .where(VehicleModel.trendline["trendline"].isnot(None))
+        .order_by(
+            Make.make_name,
+            VehicleModel.model_name,
+            VehicleModel.type,
+            VehicleModel.version,
+        )
+    )
+    vehicules_query = await db.execute(query)
+    vehicules = vehicules_query.fetchall()
+
+    # Group data hierarchically: makes -> models -> types -> versions
+    makes_dict = {}
+
+    for vehicule in vehicules:
+        make_name = vehicule.make_name
+        model_name = vehicule.model_name
+        model_type = vehicule.type
+        version = vehicule.version
+
+        # Initialize make if not exists
+        if make_name not in makes_dict:
+            makes_dict[make_name] = {}
+
+        # Initialize model if not exists
+        if model_name not in makes_dict[make_name]:
+            makes_dict[make_name][model_name] = {}
+
+        # Initialize type if not exists
+        if model_type not in makes_dict[make_name][model_name]:
+            makes_dict[make_name][model_name][model_type] = []
+
+        # Add version if not already present
+        if version not in makes_dict[make_name][model_name][model_type]:
+            makes_dict[make_name][model_name][model_type].append(version)
+
+    # Convert to Pydantic models
+    makes = []
+    for make_name, models_dict in makes_dict.items():
+        models = []
+        for model_name, types_dict in models_dict.items():
+            types = []
+            for model_type, versions in types_dict.items():
+                types.append(TypeInfo(model_type=model_type, versions=versions))
+            models.append(ModelInfo(model_name=model_name, types=types))
+        makes.append(MakeInfo(make_name=make_name, models=models))
+
+    return AllMakesModelsInfo(makes=makes)
 
 
 @router.get("/{model}/trendline", response_model=ModelTrendline)
@@ -220,7 +292,7 @@ async def get_model_warranty(
     model: str = Path(..., description="Model name"),
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
-) -> Any:
+) -> ModelWarrantyData:
     """
     Get warranty data for a specific model.
 

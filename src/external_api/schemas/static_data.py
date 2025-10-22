@@ -3,6 +3,25 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class TypeInfo(BaseModel):
+    model_type: str = Field(..., description="Model type")
+    versions: list[str] = Field(..., description="Versions")
+
+
+class ModelInfo(BaseModel):
+    model_name: str = Field(..., description="Model name")
+    types: list[TypeInfo] = Field(..., description="Types")
+
+
+class MakeInfo(BaseModel):
+    make_name: str = Field(..., description="Make name")
+    models: list[ModelInfo] = Field(..., description="Models")
+
+
+class AllMakesModelsInfo(BaseModel):
+    makes: list[MakeInfo] = Field(..., description="Makes")
+
+
 class ModelType(BaseModel):
     make: str = Field(..., description="Make (company that made the car)")
     model_name: str = Field(..., description="Model name")

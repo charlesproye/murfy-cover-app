@@ -1,20 +1,22 @@
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from external_api.db.session import get_db
+from external_api.schemas.flash_report import FlashReportFormType
 from external_api.services.flash_report.flash_report import (
+    insert_combination,
     send_email,
     send_flash_report_data,
     send_vehicle_specs,
 )
 
-router = APIRouter(prefix="/flash-report", tags=["Flash Report"])
+router = APIRouter()
 
 
-@router.get("/decode/{vin}")
+@router.post("/vin-decoder")
 async def decode_vin(
-    vin: str = Path(...),
-    db: AsyncSession = Depends(get_db),  # noqa: B008
+    vin: str = Body(..., description="VIN to decode"),
+    db: AsyncSession = Depends(get_db),
 ):
     result = await send_vehicle_specs(vin, db)
     if not result:
@@ -26,10 +28,21 @@ async def decode_vin(
 
 @router.post("/send-email")
 async def send_report_email(
-    email: str = Body(...),
+    data: FlashReportFormType = Body(...),
+    db: AsyncSession = Depends(get_db),
 ):
-    await send_email(email)
-    return {"message": f"Mail sent to {email}"}
+    token = await insert_combination(
+        make=data.make,
+        model=data.model,
+        type=data.type,
+        version=data.version,
+        odometer=data.odometer,
+        db=db,
+    )
+
+    await send_email(data.language.value == "fr", data.email, token)
+
+    return {"message": f"Mail sent to {data.email}"}
 
 
 @router.get("/data")
@@ -39,7 +52,7 @@ async def get_flash_report_data(
     type: str = Query(...),
     odometer: int = Query(...),
     version: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),  # noqa: B008
+    db: AsyncSession = Depends(get_db),
 ):
     result = await send_flash_report_data(make, model, type, odometer, version, db)
     if not result:

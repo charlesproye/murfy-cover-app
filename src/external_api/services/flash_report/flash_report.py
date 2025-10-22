@@ -1,29 +1,34 @@
-import hashlib
+import smtplib
+import ssl
 import uuid
-from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-import aiosmtplib
 import numpy as np
 import pandas as pd
-from sqlalchemy import text
+from fastapi import HTTPException, status
+from fastapi.responses import JSONResponse
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from activation.config.mappings import mapping_vehicle_type
+from db_models.vehicle import Battery, Make, VehicleModel
+from external_api.core.config import settings
 from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
     TeslaVinDecoder,
 )
 from external_api.services.flash_report.vin_decoder.vin_decoder import VinDecoder
 
 
-async def get_has_trendline(make: str, db: AsyncSession):
+async def get_make_has_trendline(make_name: str, db: AsyncSession):
     query_has_trendline = """
         SELECT count(*)
         FROM vehicle_model vm
-        left join oem o
-        on o.id = vm.oem_id
+        left join make m on m.id = vm.make_id
+        WHERE vm.trendline->>'trendline' is not null AND m.make_name = :make_name
     """
-    result = await db.execute(text(query_has_trendline), {"make": make})
+    result = await db.execute(text(query_has_trendline), {"make_name": make_name})
     return result.fetchone()[0] > 0
 
 
@@ -33,15 +38,22 @@ async def get_db_names(
     type: str | None = None,
     db: AsyncSession = None,
 ):
-    query_all_models = """
-        SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date,
-               m.make_name, b.capacity
-        FROM vehicle_model vm
-        LEFT JOIN make m ON vm.make_id = m.id
-        LEFT JOIN battery b ON b.id = vm.battery_id
-        LEFT JOIN oem o ON o.id = vm.oem_id
-    """
-    result = await db.execute(text(query_all_models))
+    query_all_models = (
+        select(
+            VehicleModel.model_name,
+            VehicleModel.id,
+            VehicleModel.type,
+            VehicleModel.commissioning_date,
+            VehicleModel.end_of_life_date,
+            Make.make_name,
+            Battery.capacity,
+        )
+        .select_from(VehicleModel)
+        .join(Make, VehicleModel.make_id == Make.id, isouter=True)
+        .join(Battery, VehicleModel.battery_id == Battery.id, isouter=True)
+    )
+
+    result = await db.execute(query_all_models)
     rows = result.fetchall()
     columns = result.keys()
     model_existing = pd.DataFrame(rows, columns=columns)
@@ -54,11 +66,10 @@ async def get_db_names(
         return None, None
 
     query_model = """
-        SELECT o.oem_name, vm.model_name
+        SELECT m.make_name, vm.model_name
         FROM vehicle_model vm
         LEFT JOIN make m ON vm.make_id = m.id
         LEFT JOIN battery b ON b.id = vm.battery_id
-        LEFT JOIN oem o ON o.id = vm.oem_id
         WHERE vm.id = :vehicle_model_id
     """
     result = await db.execute(text(query_model), {"vehicle_model_id": vehicle_model_id})
@@ -67,54 +78,64 @@ async def get_db_names(
     if not record:
         return None, None
 
-    return record["oem_name"], record["model_name"]
+    return record["make_name"], record["model_name"]
 
 
 async def send_vehicle_specs(vin: str, db: AsyncSession):
+    if len(vin) != 17:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": "VIN must be 17 characters long"},
+        )
+
     tesla_vin_decoder = TeslaVinDecoder()
     result = tesla_vin_decoder.decode(vin)
 
-    if not result or not result.get("Country"):
-        vin_decoder = VinDecoder()
-        make, model = vin_decoder.decode(vin)
+    if result and result.get("Country"):
+        make_db_name, model_db_name = await get_db_names(
+            "tesla",
+            result.get("Model"),
+            result.get("Type"),
+            db=db,
+        )
 
-        oem_name, model_name = await get_db_names(make, model, type=None, db=db)
-
-        has_trendline = await get_has_trendline(oem_name, db)
+        has_trendline = await get_make_has_trendline(make_db_name, db)
 
         return {
             "has_trendline": has_trendline,
-            "make": oem_name,
-            "model": model_name,
+            "make": "tesla",
+            "model": model_db_name,
+            "type": result.get("Type"),
+            "version": result.get("Version"),
+        }
+
+    else:
+        vin_decoder = VinDecoder()
+        make, model = vin_decoder.decode(vin)
+
+        make_db_name, model_db_name = await get_db_names(make, model, type=None, db=db)
+
+        has_trendline = await get_make_has_trendline(make_db_name, db)
+
+        return {
+            "has_trendline": has_trendline,
+            "make": make_db_name,
+            "model": model_db_name,
             "type": None,
             "version": None,
         }
 
-    oem_name, model_name = await get_db_names(
-        "tesla",
-        result.get("Model"),
-        result.get("Type"),
-        db=db,
-    )
-
-    has_trendline = await get_has_trendline(oem_name, db)
-
-    return {
-        "has_trendline": has_trendline,
-        "make": "tesla",
-        "model": model_name,
-        "type": result.get("Type"),
-        "version": result.get("Version"),
-    }
-
 
 async def insert_combination(
-    make: str, model: str, type: str, version: str, odometer: int, db: AsyncSession
+    make: str,
+    model: str,
+    type: str,
+    version: str | None,
+    odometer: int,
+    db: AsyncSession,
 ):
-    # Générer un token unique basé sur les valeurs de la combinaison
-    token_input = f"{make}-{model}-{type}-{version}-{odometer}"
-    token = hashlib.sha256(token_input.encode("utf-8")).hexdigest()
-
+    # Generate a unique token based on the combination values
+    token = str(uuid.uuid4())
     id = uuid.uuid4()
 
     insert_query = """
@@ -142,58 +163,130 @@ async def insert_combination(
     return token
 
 
-# TODO:
-# - Mettre le comptee de service de bib à la place de no-reply@bib-batteries.fr
-# - Demander à Anna ou Jo une repasse sur le mail ->  En cours
-async def send_email(email: str, link: str):
-    message = EmailMessage()
-    message["From"] = "no-reply@bib-batteries.fr"
+async def send_email(is_french: bool, email: str, token: str):
+    sender_email = settings.SMTP_EMAIL
+    password = settings.SMTP_PASSWORD
+    smtp_server = settings.SMTP_HOST
+    port = settings.SMTP_PORT
+    frontend_url = settings.FRONTEND_URL
+    link = f"{frontend_url}/flash-report/generation?token={token}"
+    # /!\ Link is not sent if frontend does not include "https":
+    # in dev the <a> element won't have a href in the email
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = (
+        "Bib a estimé l'état de santé de la batterie de votre véhicule"
+        if is_french
+        else "Bib has estimated the health status of your battery"
+    )
+    message["From"] = sender_email
     message["To"] = email
-    message["Subject"] = "Bib a estimé l'état de santé de la batterie de votre véhicule"
+    message["Content-Type"] = "text/html; charset=UTF-8"
+    message["X-Mailer"] = "Python SMTP"
 
-    message.set_content(f"""
-        Bonjour,
-
-        Votre Flash Report est prêt ! Cliquez sur le lien ci-dessous pour le consulter :
-
-        {link}
-
-        Merci !
-        """)
-
-    message.add_alternative(
-        f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-            <p>Bonjour,</p>
-            <p>Bonne nouvelle !L'estimation de l'état de santé de votre batterie est prête !</p>
-            <p>
-            <a href="{link}" style="
-                display: inline-block;
-                padding: 10px 20px;
-                font-size: 16px;
-                color: white;
-                background-color: #007bff;
-                text-decoration: none;
-                border-radius: 5px;">
-                Télécharger mon rapport
-            </a>
-            </p>
-            <p>Charles pour Bib !</p>
+    html_en = f"""\
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <p>Hello,</p>
+                <p>Good news! The health status estimation of your battery is ready!</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a
+                        href="{link}"
+                        style="
+                            display: inline-block;
+                            padding: 12px 24px;
+                            font-size: 16px;
+                            color: white !important;
+                            background-color: #007bff;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin-bottom: 10px;
+                            font-weight: bold;
+                        "
+                        target="_blank"
+                    >
+                        Download my report
+                    </a>
+                </div>
+                <p>
+                    If you have any questions or encounter any issues, please don't hesitate to
+                    <a href="mailto:support@bib-batteries.fr" style="color: #007bff;">
+                        contact our support team.
+                    </a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #666; font-size: 14px;">
+                    Best regards,<br>
+                    The Bib Team<br>
+                </p>
+            </div>
         </body>
-        </html>
-        """,
-        subtype="html",
-    )
+    </html>
+    """
 
-    await aiosmtplib.send(
-        message,
-        hostname="smtp.gmail.com",
-        port=587,
-        start_tls=True,
-        username="no-reply@bib-batteries.fr",
-        password="xksn lbxe ewlo oqda",
-    )
+    html_fr = f"""\
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <p>Bonjour,</p>
+                <p>Bonne nouvelle ! L'estimation de l'état de santé de votre batterie est prête !</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a
+                        href="{link}"
+                        style="
+                            display: inline-block;
+                            padding: 12px 24px;
+                            font-size: 16px;
+                            color: white !important;
+                            background-color: #007bff;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin-bottom: 10px;
+                            font-weight: bold;
+                        "
+                        target="_blank"
+                    >
+                        Télécharger mon rapport
+                    </a>
+                </div>
+                <p>
+                    Pour toutes questions ou si vous rencontrez un problème,
+                    <a href="mailto:support@bib-batteries.fr" style="color: #007bff;">
+                    contactez notre équipe de support.
+                    </a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #666; font-size: 14px;">
+                    Cordialement,<br>
+                    The Bib Team<br>
+                </p>
+            </div>
+        </body>
+    </html>
+    """
+
+    part = MIMEText(html_fr if is_french else html_en, "html")
+    message.attach(part)
+    context = ssl.create_default_context()
+
+    try:
+        with smtplib.SMTP(smtp_server, port, timeout=10) as server:
+            server.starttls(context=context)
+            server.login(sender_email, password)
+            server.sendmail(sender_email, email, message.as_string())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Email error: {e!s}") from e
 
 
 async def get_soh_from_trendline(trendline: str, odometer: int):
