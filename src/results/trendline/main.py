@@ -63,6 +63,10 @@ def load_all_data():
             "battery_capacity",
         ],
     )
+
+    df_sheet = df_sheet[
+        (df_sheet["soh"].notna()) & (df_sheet["soh"] != "")
+    ]  # Empty rows in gsheet
     df_sheet["model_name"] = df_sheet["model_name"].apply(str.lower)
     df_sheet["make_name"] = df_sheet["make_name"].apply(str.lower)
     df_sheet["soh"] = (
