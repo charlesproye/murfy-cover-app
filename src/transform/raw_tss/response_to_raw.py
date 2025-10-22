@@ -1,23 +1,22 @@
+import math
+import os
 import random
 import re
-import time
 from datetime import datetime
 from itertools import islice
 from logging import Logger
-from typing import Optional
-import os
-from dotenv import load_dotenv
-import math
 
+from dotenv import load_dotenv
 from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark.sql.types import StringType, StructField, StructType
 
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from core.spark_utils import get_optimal_nb_partitions
-from transform.raw_tss.config import S3_RAW_TSS_KEY_FORMAT, PARSE_TYPE_MAP
+from transform.raw_tss.config import PARSE_TYPE_MAP, S3_RAW_TSS_KEY_FORMAT
 
-load_dotenv() 
+load_dotenv()
+
 
 class ResponseToRawTss:
     """
@@ -27,9 +26,9 @@ class ResponseToRawTss:
     def __init__(
         self,
         make: str,
-        writing_mode: Optional[str] = "append",
-        spark: SparkSession = None,
-        logger: Logger = None,
+        writing_mode: str | None = "append",
+        spark: SparkSession | None = None,
+        logger: Logger | None = None,
         **kwargs,
     ):
         """
@@ -51,31 +50,31 @@ class ResponseToRawTss:
         self.raw_tss_path = S3_RAW_TSS_KEY_FORMAT.format(brand=self.make)
 
     def run(self):
-
         self.logger.info(f"Traitement débuté pour {self.make}")
 
-        keys_to_download_per_vin, paths_to_exclude = (
-            self._get_keys_to_download()
-        ) 
-
+        keys_to_download_per_vin, paths_to_exclude = self._get_keys_to_download()
 
         if len(keys_to_download_per_vin) == 0:
             self.logger.info(f"No VIN to process for {self.make}")
         else:
             optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
-                keys_to_download_per_vin, paths_to_exclude, int(os.environ.get("NB_CORES_CLUSTER"))
+                keys_to_download_per_vin,
+                paths_to_exclude,
+                int(os.environ.get("NB_CORES_CLUSTER")),
             )
 
-            print(f"Nombre de batchs = {math.ceil(len(keys_to_download_per_vin) / batch_size)}")
+            print(
+                f"Nombre de batchs = {math.ceil(len(keys_to_download_per_vin) / batch_size)}"
+            )
 
             for batch_num, batch in enumerate(
                 self._batch_dict_items(keys_to_download_per_vin, batch_size), 1
-            ): 
+            ):
                 self.logger.info(f"Batch {batch_num}:")
 
                 # Extract
                 raw_tss_unparsed = self._download_keys(batch)
-                
+
                 # Transform
                 raw_tss_parsed = self.parse_data(
                     raw_tss_unparsed, optimal_partitions_nb
@@ -193,12 +192,11 @@ class ResponseToRawTss:
 
         vins_paths_grouped = self._group_paths_by_vin(vins_paths)
 
-
         paths_to_exclude = []
 
         if last_parsed_date_dict:
             for vin, paths in vins_paths_grouped.items():
-                if vin in last_parsed_date_dict.keys():
+                if vin in last_parsed_date_dict:
                     vins_paths_grouped[vin] = [
                         path
                         for path in paths
@@ -207,7 +205,6 @@ class ResponseToRawTss:
                             str(last_parsed_date_dict[vin]).split()[0], "%Y-%m-%d"
                         )
                     ]
-
 
                     paths_to_exclude.extend(
                         [
@@ -219,7 +216,6 @@ class ResponseToRawTss:
                             )
                         ]
                     )
-
 
         vins_paths_grouped = {k: v for k, v in vins_paths_grouped.items() if v}
 
@@ -242,18 +238,30 @@ class ResponseToRawTss:
         for _, paths in batch.items():
             keys_to_download.extend(paths)
 
-
         keys_to_download_str = [
             f"{self.settings.S3_BASE_PATH}/{key}" for key in keys_to_download
-            ]
-
+        ]
 
         field_def = self.bucket.read_yaml_file(f"config/{self.make}.yaml")
 
-        if self.make != 'tesla-fleet-telemetry':
-            field_def = field_def['response_to_raw']
+        if self.make != "tesla-fleet-telemetry":
+            field_def = field_def["response_to_raw"]
 
         schema = self._get_dynamic_schema(field_def, PARSE_TYPE_MAP)
+
+        if self.make == "tesla-fleet-telemetry":
+            return (
+                self.spark.read.option(
+                    "multiline", "false"
+                )  # NDJSON : 1 JSON par ligne
+                .option(
+                    "badRecordsPath",
+                    f"{self.settings.S3_BASE_PATH}/response/{self.make}/corrupted_responses/",
+                )
+                .option("mode", "PERMISSIVE")
+                .schema(schema)
+                .json(keys_to_download_str)
+            )
 
         return (
             self.spark.read.option("multiline", "true")
@@ -316,10 +324,9 @@ class ResponseToRawTss:
             f"{self.settings.S3_BASE_PATH}/raw_ts/{self.make}/technical/tec_vin_last_parsed_date.parquet"
         )
 
-        pass
-
     def parse_data(self, df: DataFrame, optimal_partitions_nb: int) -> DataFrame:
         return df
 
     def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict) -> DataFrame:
         return StructType()
+
