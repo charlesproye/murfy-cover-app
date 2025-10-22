@@ -176,16 +176,16 @@ services:
       S3_KEY: ${S3_KEY}
       S3_SECRET: ${S3_SECRET}
 
-  data-catalog:
+
+  spark-transform-service:
+    platform: linux/amd64
     build:
       context: .
-      dockerfile: docker/data_catalog.Dockerfile
-    container_name: data-catalog
-    restart: always
-    ports:
-      - "8501:8501"
+      dockerfile: docker/spark.Dockerfile
+    image: rg.fr-par.scw.cloud/bib-images/spark:1
+    container_name: spark-transform
     env_file:
-      - ./src/streamlit/data-catalog/.env
+      - ./.env
 
   external_api:
     build:

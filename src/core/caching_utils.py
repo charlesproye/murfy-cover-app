@@ -1,21 +1,22 @@
-from typing import Callable, TypeVar, ParamSpec, List
-from os.path import exists, dirname
-from abc import ABC, abstractmethod
-from functools import wraps
-from os import makedirs
 import inspect
 import logging
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from functools import wraps
+from os import makedirs
+from os.path import dirname, exists
+from typing import ParamSpec, TypeVar
+
 import pandas as pd
 from pandas import DataFrame as DF
-
+from pyspark.sql import SparkSession
 
 from core.spark_utils import create_spark_session
-from pyspark.sql import SparkSession
-from .s3.s3_utils import S3Service
-from .singleton_s3_bucket import S3
-from .s3.settings import S3Settings
+
 from .config import *
-from typing import Optional
+from .s3.s3_utils import S3Service
+from .s3.settings import S3Settings
+from .singleton_s3_bucket import S3
 
 R = TypeVar("R")
 P = ParamSpec("P")
@@ -74,7 +75,7 @@ class CachedETL(DF, ABC):
     @abstractmethod
     def run(self) -> DF:
         """Abstract method to be implemented by subclasses to generate the DataFrame."""
-        pass
+
 
 class CachedETLSpark(ABC):
     def __init__(
@@ -85,8 +86,8 @@ class CachedETLSpark(ABC):
         bucket: S3Service = S3,
         settings: S3Settings = S3Settings(),
         spark: SparkSession = None,
-        writing_mode: Optional[str] = None,
-        repartition_key: Optional[str] = 'vin',
+        writing_mode: str | None = None,
+        repartition_key: str | None = "vin",
         **kwargs,
     ):
         """
@@ -103,10 +104,7 @@ class CachedETLSpark(ABC):
         """
 
         if spark is None:
-            spark = create_spark_session(
-                settings.S3_KEY,
-                settings.S3_SECRET
-            )
+            spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
         self._spark = spark
         assert on in [
             "s3",
@@ -125,9 +123,11 @@ class CachedETLSpark(ABC):
                 if writing_mode == "append":
                     bucket.append_spark_df_to_parquet(self.data, path, self.spark)
                 else:
-                    bucket.save_df_as_parquet_spark(self.data, path, self.spark, repartition_key)
+                    bucket.save_df_as_parquet_spark(
+                        self.data, path, self.spark, repartition_key
+                    )
             elif on == "local_storage":
-                self.data.write.parquet(path)
+                self.data.write.mode("overwrite").parquet(path)
         else:
             if on == "s3":
                 self.data = bucket.read_parquet_df_spark(spark, path, **kwargs)
@@ -138,10 +138,9 @@ class CachedETLSpark(ABC):
     @abstractmethod
     def run(self) -> DF:
         """Abstract method to be implemented by subclasses to generate the DataFrame."""
-        pass
 
 
-def cache_result(path_template: str, on: str, path_params: List[str] = []):
+def cache_result(path_template: str, on: str, path_params: list[str] = []):
     """
     Decorator to cache the results either locally or on S3 based on cache_type.
     Please take a look at the core/readme to see examples of how to use this decorator.
@@ -160,11 +159,10 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
         def wrapper(
             *args, force_update=False, read_parquet_kwargs={}, **kwargs
         ) -> pd.DataFrame:
-
             all_args = (
                 data_gen_func.__code__.co_varnames
             )  # Extract the argument names and their values from args and kwargs
-            arg_values = {**dict(zip(all_args, args)), **kwargs}
+            arg_values = {**dict(zip(all_args, args, strict=False)), **kwargs}
             format_dict = {param: str(arg_values[param]) for param in path_params}
             path = path_template.format(
                 **format_dict
@@ -176,8 +174,8 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
                 bucket, _ = get_bucket_from_func_args(
                     data_gen_func, *args, **kwargs
                 )  # Instantiate bucket if not provided
-                if force_update or not bucket.check_file_exists(
-                    path
+                if (
+                    force_update or not bucket.check_file_exists(path)
                 ):  # Check if we need to update the cache or if the cache does not exist
                     data: pd.DataFrame = data_gen_func(
                         *args, **kwargs
@@ -190,8 +188,8 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
                     file = bucket.read_parquet_df(path, **read_parquet_kwargs)
                     return file  # Read cached data from S3
             elif on == "local_storage":
-                if force_update or not exists(
-                    path
+                if (
+                    force_update or not exists(path)
                 ):  # Check if we need to update the cache or if the cache does not exist
                     data: pd.DataFrame = data_gen_func(
                         *args, **kwargs
@@ -207,7 +205,7 @@ def cache_result(path_template: str, on: str, path_params: List[str] = []):
     return decorator
 
 
-def cache_result_spark(path_template: str, on: str, path_params: List[str] = []):
+def cache_result_spark(path_template: str, on: str, path_params: list[str] = []):
     """
     Decorator to cache the results either locally or on S3 based on cache_type.
     Please take a look at the core/readme to see examples of how to use this decorator.
@@ -225,14 +223,14 @@ def cache_result_spark(path_template: str, on: str, path_params: List[str] = [])
         @wraps(data_gen_func)
         def wrapper(*args, force_update=False, read_parquet_kwargs={}, **kwargs):
             all_args = data_gen_func.__code__.co_varnames
-            arg_values = {**dict(zip(all_args, args)), **kwargs}
+            arg_values = {**dict(zip(all_args, args, strict=False)), **kwargs}
             format_dict = {param: str(arg_values[param]) for param in path_params}
             path = path_template.format(**format_dict)
             # self_obj = args[0]
             # path = path_template(self_obj, *args[1:], **kwargs)
-            assert path.endswith(
-                ".parquet"
-            ), f"Cache path must end with .parquet, got: {path}"
+            assert path.endswith(".parquet"), (
+                f"Cache path must end with .parquet, got: {path}"
+            )
             spark = arg_values.get("spark")
             assert isinstance(spark, SparkSession)
             if on == "s3":

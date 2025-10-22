@@ -7,7 +7,7 @@ name = "data_ev"
 version = "1.0.0"
 description = "Electric Vehicle Data Processing Pipeline"
 readme = "readme.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     # Core dependencies used across all modules
     "python-dotenv>=1.0.0",
@@ -40,13 +40,14 @@ activation = [
 
 # Transform module dependencies - handles ETL pipeline with Spark
 transform = [
-    "pyspark==3.5.5",
+    "pyspark-client==4.0.1",
     "pyarrow==19.0.0",
     "apscheduler==3.10.4",
     "psycopg2-binary>=2.9.9",
     "asyncpg~=0.30",
     "minio==7.1.13",
     "pyyaml>=6.0",
+    "click>=8.1.7",
 ]
 
 # EDA module dependencies - for exploratory data analysis notebooks
@@ -89,7 +90,7 @@ results = [
     "oauth2client",
     "scikit-learn==1.5.1",
     "pyarrow==19.0.0",
-    "pyspark==3.5.5",
+    "pyspark>=3.5.5",
     "pyyaml>=6.0",
     "rapidfuzz==3.13.0",
 ]
@@ -142,6 +143,9 @@ external_api = [
 
 migrations = [
     "alembic>=1.17",
+    "streamlit>=1.35.0",
+    "aiosmtplib>=1.2.0",
+    "sqlmodel>=0.0.24"
 ]
 
 visualization = [
@@ -173,6 +177,8 @@ dev = [
     "py-spy>=0.4.1",
     "pytest-asyncio>=1.2.0",
 ]
+
+local = ["pyspark==4.0.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

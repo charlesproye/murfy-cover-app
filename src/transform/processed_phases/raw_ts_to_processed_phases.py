@@ -1,7 +1,6 @@
 from logging import getLogger
-import os
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from pyspark.sql import DataFrame as DF
 from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
@@ -11,22 +10,24 @@ from core.caching_utils import CachedETLSpark
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
-from core.spark_utils import (get_optimal_nb_partitions,
-                              safe_astype_spark_with_error_handling)
+from core.spark_utils import (
+    get_optimal_nb_partitions,
+    get_spark_available_cores,
+    safe_astype_spark_with_error_handling,
+)
 from transform.fleet_info.main import fleet_info
 from transform.processed_phases.config import (
-                                            SCALE_SOC,
-                                            SOC_DIFF_THRESHOLD,
-                                            ODOMETER_MILES_TO_KM,
-                                            PROCESSED_PHASES_CACHE_KEY_TEMPLATE
-                                            )
-from transform.raw_tss.main import *
+    ODOMETER_MILES_TO_KM,
+    PROCESSED_PHASES_CACHE_KEY_TEMPLATE,
+    SCALE_SOC,
+    SOC_DIFF_THRESHOLD,
+)
+from transform.raw_tss.main import PROVIDERS
 
-load_dotenv() 
+load_dotenv()
 
 
 class RawTsToProcessedPhases(CachedETLSpark):
-
     def __init__(
         self,
         make: str,
@@ -50,7 +51,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
             "s3",
             force_update=force_update,
             spark=spark,
-            repartition_key='VIN',
+            repartition_key="VIN",
             **kwargs,
         )
 
@@ -65,7 +66,6 @@ class RawTsToProcessedPhases(CachedETLSpark):
         # Load the raw tss dataframe
         self.logger.info(f"Running for {self.make}")
 
-
         if self.bucket.check_spark_file_exists(
             f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet"
         ):
@@ -74,11 +74,11 @@ class RawTsToProcessedPhases(CachedETLSpark):
                 key=f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet",
             )
         else:
-            tss = ORCHESTRATED_MAKES[self.make][1](self.make, spark=self.spark).run()
+            tss = PROVIDERS[self.make](self.make, spark=self.spark).run()
 
         # Optimize the repartition of the tss dataframe
         optimal_partitions_nb, _ = self._set_optimal_spark_parameters(
-            tss, int(os.environ.get("NB_CORES_CLUSTER"))
+            tss, get_spark_available_cores(self.spark, self.logger)
         )  # Optimize partitions
         tss = tss.repartition("vin").coalesce(optimal_partitions_nb)
         tss = tss.cache()
@@ -88,18 +88,20 @@ class RawTsToProcessedPhases(CachedETLSpark):
         dynamic_config = self.bucket.read_yaml_file(f"config/{self.make}.yaml")
         if dynamic_config is None:
             raise ValueError(f"Config file config/{self.make}.yaml not found")
-        tss = tss.withColumnsRenamed(dynamic_config['raw_tss_to_processed_phase']['rename'])
-        tss = tss.select(*dynamic_config['raw_tss_to_processed_phase']['keep'])  # Reduce column volumetry
+        tss = tss.withColumnsRenamed(
+            dynamic_config["raw_tss_to_processed_phase"]["rename"]
+        )
+        tss = tss.select(
+            *dynamic_config["raw_tss_to_processed_phase"]["keep"]
+        )  # Reduce column volumetry
         tss = safe_astype_spark_with_error_handling(tss)
         tss = self._normalize_units_to_metric(tss)
         tss = tss.orderBy(["vin", "date"])
 
         # Compute the charging status index and aggregate the phases
-        tss_phase_idx = self.compute_charge_idx(
-            tss, SOC_DIFF_THRESHOLD[self.make]
-        )
+        tss_phase_idx = self.compute_charge_idx(tss, SOC_DIFF_THRESHOLD[self.make])
         tss_phase_idx = tss_phase_idx.cache()
-        tss_phase_idx.count() # Trigger caching lazy operations
+        tss_phase_idx.count()  # Trigger caching lazy operations
         phases = self.generate_phase(tss_phase_idx)
 
         # Join the time series stats to the tss dataframe
@@ -153,7 +155,9 @@ class RawTsToProcessedPhases(CachedETLSpark):
         return (4 * nb_cores, vin_per_batch)
 
     def _normalize_units_to_metric(self, tss):
-        tss = tss.withColumn("odometer", col("odometer") * ODOMETER_MILES_TO_KM.get(self.make, 1))
+        tss = tss.withColumn(
+            "odometer", col("odometer") * ODOMETER_MILES_TO_KM.get(self.make, 1)
+        )
         tss = tss.withColumn("soc", F.col("soc") * SCALE_SOC[self.make])
         return tss
 
@@ -210,27 +214,30 @@ class RawTsToProcessedPhases(CachedETLSpark):
         return df
 
     def compute_charge_idx(
-        self, tss: DF, total_soc_diff_threshold: float = 0.5, phase_delimiter_mn: int = 45
+        self,
+        tss: DF,
+        total_soc_diff_threshold: float = 0.5,
+        phase_delimiter_mn: int = 45,
     ) -> DF:
+        w = Window.partitionBy("vin").orderBy(
+            "date"
+        )  # Window partitioned by vin and sorted by date
 
-        w = Window.partitionBy("vin").orderBy("date") # Window partitioned by vin and sorted by date
-        
         # Remove rows with null values for the "soc" column, don't do forward fill to be able to distinguish real idles
-        tss = tss.na.drop(subset=["soc"]) 
+        tss = tss.na.drop(subset=["soc"])
 
         # Calculate soc_diff at each point
         tss = tss.withColumn(
             "soc_diff",
-            F.col("soc")- F.lag("soc").over(w),
+            F.col("soc") - F.lag("soc").over(w),
         )
 
         # Calculate time between two points
-        df = tss.withColumn("prev_date", F.lag("date").over(w)) \
-            .withColumn(
+        df = tss.withColumn("prev_date", F.lag("date").over(w)).withColumn(
             "time_gap_minutes",
             (F.unix_timestamp("date") - F.unix_timestamp("prev_date")) / 60,
         )
-        
+
         # Naively calculate the charging direction
         df = df.withColumn(
             "direction_raw",
@@ -261,16 +268,16 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
         w_phase = Window.partitionBy("vin", "phase_id")
 
-
-        # For Tesla 
+        # For Tesla
         # Total time of the useful phase, for Tesla
-        if self.make in ('tesla-fleet-telemetry'):
-            df = df.withColumn("total_phase_time", F.sum("time_gap_minutes").over(w_phase))
+        if self.make in ("tesla-fleet-telemetry"):
+            df = df.withColumn(
+                "total_phase_time", F.sum("time_gap_minutes").over(w_phase)
+            )
 
             df = self._reassign_short_phases(
                 df
             )  # Reassign short phases to previous valid phase (especially useful for tesla-fleet-telemetry noise)
-
 
         # Total soc gained or lost in the naive phase
         df = df.withColumn("total_soc_diff_phase", F.sum("soc_diff").over(w_phase))
@@ -284,8 +291,13 @@ class RawTsToProcessedPhases(CachedETLSpark):
         # If the phase lasts one point and the previous and next are of the same nature, we reassign them otherwise it's an idle
         df = df.withColumn(
             "charging_status",
-            F.when((F.col("total_soc_diff_phase") > total_soc_diff_threshold), "charging")
-            .when((F.col("total_soc_diff_phase") < -total_soc_diff_threshold), "discharging")
+            F.when(
+                (F.col("total_soc_diff_phase") > total_soc_diff_threshold), "charging"
+            )
+            .when(
+                (F.col("total_soc_diff_phase") < -total_soc_diff_threshold),
+                "discharging",
+            )
             .when(
                 (F.col("prev_phase") == F.col("next_phase"))
                 & (F.col("prev_phase") > 0),
@@ -300,25 +312,23 @@ class RawTsToProcessedPhases(CachedETLSpark):
         )
 
         # Make sure the previous phase starts at the right place
-        df = df.withColumn(
-            "next_status",
-            F.lead("charging_status").over(w)
-        )
-        
+        df = df.withColumn("next_status", F.lead("charging_status").over(w))
 
         # Set the phase before a charging/discharging phase as the phase to get the correct SOC diff
         df = df.withColumn(
             "charging_status",
-            F.when(F.col("next_status") == 'charging', "charging")
-            .when(F.col("next_status")== "discharging", "discharging")
-            .otherwise(col('charging_status'))
+            F.when(F.col("next_status") == "charging", "charging")
+            .when(F.col("next_status") == "discharging", "discharging")
+            .otherwise(col("charging_status")),
         )
 
         # Drop idles because we have no interest in identifying them and it will allow to properly cut phase numbers
         # But important to have identified them to not unnecessarily extend charging or discharging phases as time is important
         df = df.withColumn(
             "charging_status",
-            F.when(F.col("charging_status") == "idle", None).otherwise(F.col("charging_status"))
+            F.when(F.col("charging_status") == "idle", None).otherwise(
+                F.col("charging_status")
+            ),
         )
 
         df = df.na.drop(subset=["charging_status"])
@@ -329,9 +339,9 @@ class RawTsToProcessedPhases(CachedETLSpark):
                 F.col("charging_status") != F.lag("charging_status").over(w), 1
             ).otherwise(0),
         )
-        
+
         # Separate successive phases that are identical, only if the frequency is sufficient
-        if self.make in ('bmw', 'tesla-fleet-telemetry', 'renault'):
+        if self.make in ("bmw", "tesla-fleet-telemetry", "renault"):
             df = df.withColumn("prev_date", F.lag("date").over(w))
             df = df.withColumn(
                 "time_gap_minutes",
@@ -341,12 +351,11 @@ class RawTsToProcessedPhases(CachedETLSpark):
             df = df.withColumn(
                 "charging_status_change",
                 F.when(
-                    (F.col("charging_status_change") == 0) &
-                    (F.col("time_gap_minutes") > phase_delimiter_mn),
-                    F.lit(1)
-                ).otherwise(F.col("charging_status_change"))
+                    (F.col("charging_status_change") == 0)
+                    & (F.col("time_gap_minutes") > phase_delimiter_mn),
+                    F.lit(1),
+                ).otherwise(F.col("charging_status_change")),
             )
-
 
         df = df.withColumn(
             "charging_status_idx",
@@ -354,9 +363,8 @@ class RawTsToProcessedPhases(CachedETLSpark):
                 w.rowsBetween(Window.unboundedPreceding, 0)
             ),
         )
-        
-        return df
 
+        return df
 
     def generate_phase(self, df: DF) -> DF:
         """
@@ -367,8 +375,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
         # Aggregate per phase
         phase_stats = (
-            df
-            .orderBy("date")
+            df.orderBy("date")
             .groupBy("vin", "charging_status_idx")
             .agg(
                 F.first("soc", ignorenulls=True).alias("first_soc"),
@@ -376,7 +383,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
                 F.min("date").alias("first_date"),
                 F.max("date").alias("last_date"),
                 F.count("date").alias("count_points"),
-                F.first("charging_status").alias("charging_status")
+                F.first("charging_status").alias("charging_status"),
             )
             .withColumn("next_dt_begin", F.lead("first_date").over(w_phase_static))
             .withColumn("next_first_soc", F.lead("first_soc").over(w_phase_static))
@@ -384,30 +391,44 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
         # Reajust the phase end when charging end = discharging start (resp. start = end)
         condition = (
-            ((F.col("last_soc") < F.col("next_first_soc")) & (F.col("charging_status") == "charging")) |
-            ((F.col("last_soc") > F.col("next_first_soc")) & (F.col("charging_status") == "discharging"))
+            (F.col("last_soc") < F.col("next_first_soc"))
+            & (F.col("charging_status") == "charging")
+        ) | (
+            (F.col("last_soc") > F.col("next_first_soc"))
+            & (F.col("charging_status") == "discharging")
         )
 
         phase_stats = phase_stats.withColumn(
             "adjusted_last_date",
-            F.when(condition, F.col("next_dt_begin")).otherwise(F.col("last_date"))
+            F.when(condition, F.col("next_dt_begin")).otherwise(F.col("last_date")),
         ).withColumn(
             "adjusted_last_soc",
-            F.when(condition, F.col("next_first_soc")).otherwise(F.col("last_soc"))
+            F.when(condition, F.col("next_first_soc")).otherwise(F.col("last_soc")),
         )
 
-        phase_stats = phase_stats.drop('last_soc', 'last_date')
+        phase_stats = phase_stats.drop("last_soc", "last_date")
 
         phase_stats = phase_stats.withColumnRenamed("adjusted_last_soc", "last_soc")
         phase_stats = phase_stats.withColumnRenamed("adjusted_last_date", "last_date")
 
         # Compute the total soc diff and the total phase time
-        phase_stats = phase_stats.withColumn('total_soc_diff', col('last_soc') - col('first_soc'))
-        phase_stats = phase_stats.withColumn('total_phase_time_minutes', 
-        (F.unix_timestamp(col('last_date')) - F.unix_timestamp(col('first_date'))) / 60
+        phase_stats = phase_stats.withColumn(
+            "total_soc_diff", col("last_soc") - col("first_soc")
+        )
+        phase_stats = phase_stats.withColumn(
+            "total_phase_time_minutes",
+            (F.unix_timestamp(col("last_date")) - F.unix_timestamp(col("first_date")))
+            / 60,
         )
 
-        phase_stats = phase_stats.withColumn('is_usable_phase', F.when((F.col('count_points') > 1) & (F.col('total_phase_time_minutes') <= 1440), F.lit(1)).otherwise(0))
+        phase_stats = phase_stats.withColumn(
+            "is_usable_phase",
+            F.when(
+                (F.col("count_points") > 1)
+                & (F.col("total_phase_time_minutes") <= 1440),
+                F.lit(1),
+            ).otherwise(0),
+        )
 
         return phase_stats
 
@@ -426,7 +447,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
             F.col("last_soc").alias("SOC_LAST"),
             F.col("total_soc_diff").alias("SOC_DIFF"),
             F.col("count_points").alias("NO_SOC_DATAPOINT"),
-            F.col("is_usable_phase").alias("IS_USABLE_PHASE")
+            F.col("is_usable_phase").alias("IS_USABLE_PHASE"),
         )
 
         ts = tss.alias("ts")
@@ -434,25 +455,28 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
         # Join condition
         join_condition = (
-            (ph["VIN_ph"] == ts["vin"]) &
-            (ts["date"] >= ph["datetime_begin"]) &
-            (ts["date"] <= ph["datetime_end"])
+            (ph["VIN_ph"] == ts["vin"])
+            & (ts["date"] >= ph["datetime_begin"])
+            & (ts["date"] <= ph["datetime_end"])
         )
 
-        # Join 
+        # Join
         tss_phased = ph.join(ts, on=join_condition, how="left")
 
-        tss_phased = tss_phased.join(self.spark.createDataFrame(fleet_info), "vin", "left").drop("vin").withColumnRenamed("VIN_ph", "VIN")
+        tss_phased = (
+            tss_phased.join(self.spark.createDataFrame(fleet_info), "vin", "left")
+            .drop("vin")
+            .withColumnRenamed("VIN_ph", "VIN")
+        )
 
         return tss_phased
-
 
     def compute_specific_features_before_aggregation(self, phase_df: DF) -> DF:
         """
         Compute the specific features before aggregation
         """
         return phase_df
-        
+
     def aggregate_stats(self, phase_df: DF) -> DF:
         """
         Aggregate the time series stats to the phase dataframe
@@ -464,15 +488,24 @@ class RawTsToProcessedPhases(CachedETLSpark):
             F.first("net_capacity", ignorenulls=True).alias("BATTERY_NET_CAPACITY"),
             F.first("odometer", ignorenulls=True).alias("ODOMETER_FIRST"),
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
-            F.first('range', ignorenulls=True).alias('RANGE')
+            F.first("range", ignorenulls=True).alias("RANGE"),
         ]
 
         if "consumption" in phase_df.columns:
             agg_columns.append(F.mean("consumption").alias("CONSUMPTION"))
 
-        df_final = (
-            phase_df.groupBy("VIN", "PHASE_INDEX", "DATETIME_BEGIN", "DATETIME_END", "PHASE_STATUS", "SOC_FIRST", "SOC_LAST", "SOC_DIFF", "NO_SOC_DATAPOINT", "IS_USABLE_PHASE")
-            .agg(*agg_columns)
-        )
+        df_final = phase_df.groupBy(
+            "VIN",
+            "PHASE_INDEX",
+            "DATETIME_BEGIN",
+            "DATETIME_END",
+            "PHASE_STATUS",
+            "SOC_FIRST",
+            "SOC_LAST",
+            "SOC_DIFF",
+            "NO_SOC_DATAPOINT",
+            "IS_USABLE_PHASE",
+        ).agg(*agg_columns)
 
         return df_final
+

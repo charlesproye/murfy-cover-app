@@ -22,26 +22,25 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
     Create a session spark with a connexion to scaleway
     """
     os.environ["PYSPARK_SUBMIT_ARGS"] = (
-        "--packages org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0 pyspark-shell"
+        "--packages org.apache.hadoop:hadoop-aws:3.4.1,org.apache.spark:spark-hadoop-cloud_2.13:4.0.1 pyspark-shell"
     )
 
     spark = (
         SparkSession.builder.appName("Scaleway S3 Read JSON")
         .config(
             "spark.jars.packages",
-            "org.apache.hadoop:hadoop-aws:3.3.4,org.apache.spark:spark-hadoop-cloud_2.12:3.4.0",
+            "org.apache.hadoop:hadoop-aws:3.4.1,org.apache.spark:spark-hadoop-cloud_2.13:4.0.1",
         )
         .config("spark.hadoop.fs.s3a.endpoint", "https://s3.fr-par.scw.cloud")
         .config("spark.hadoop.fs.s3a.access.key", access_key)
         .config("spark.hadoop.fs.s3a.secret.key", secret_key)
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.driver.host", "localhost")
         .config(
             "spark.hadoop.fs.s3a.aws.credentials.provider",
             "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
         )
-        # Nouvelles configurations pour résoudre le ClassNotFoundException
+        # S3A optimization configurations
         .config("spark.hadoop.fs.s3a.experimental.input.fadvise", "normal")
         .config("spark.hadoop.fs.s3a.connection.maximum", "1000")
         .config("spark.hadoop.fs.s3a.threads.max", "20")
@@ -50,15 +49,47 @@ def create_spark_session(access_key: str, secret_key: str) -> SparkSession:
         .config("spark.hadoop.fs.s3a.block.size", "134217728")  # 128MB
         .config("spark.hadoop.fs.s3a.multipart.size", "134217728")  # 128MB
         .config("spark.hadoop.fs.s3a.multipart.threshold", "134217728")  # 128MB
-        # Configuration pour éviter les problèmes de commit protocol
+        # Spark SQL adaptive configurations
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "64MB")
         .config("spark.sql.shuffle.partitions", "200")
         .config("spark.default.parallelism", "200")
-        .config("spark.executor.memory", "10g")
-        .config("spark.driver.memory", "10g")
-        .config("spark.driver.maxResultSize", "4g")
+        # Network configurations
+        .config("spark.driver.host", "localhost")
+        .config("spark.driver.bindAddress", "0.0.0.0")
+        .config("spark.driver.port", "0")
+        .config("spark.blockManager.port", "0")
         .getOrCreate()
+    )
+
+    return spark
+
+
+def create_spark_session_k8s(
+    s3_key: str, s3_secret: str, endpoint: str = "https://s3.fr-par.scw.cloud"
+) -> SparkSession:
+    """
+    Configure le SparkSession existant dans Kubernetes pour accéder à S3.
+
+    Args:
+        s3_key (str): Clé d'accès S3.
+        s3_secret (str): Secret S3.
+        endpoint (str, optional): Endpoint S3. Defaults to Scaleway S3.
+
+    Returns:
+        SparkSession: La session Spark configurée.
+    """
+    spark = SparkSession.builder.getOrCreate()
+    hadoop_conf = spark.sparkContext._jsc.hadoopConfiguration()
+
+    hadoop_conf.set("fs.s3a.access.key", s3_key)
+    hadoop_conf.set("fs.s3a.secret.key", s3_secret)
+    hadoop_conf.set("fs.s3a.endpoint", endpoint)
+    hadoop_conf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+    hadoop_conf.set("fs.s3a.path.style.access", "true")
+    hadoop_conf.set(
+        "fs.s3a.aws.credentials.provider",
+        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
     )
 
     return spark
@@ -93,9 +124,9 @@ def explode_data_spark(response: dict, spark: SparkSession):
                 value_dict = item.get("value", {})
                 if not value_dict:
                     continue
-                value = list(value_dict.values())[
-                    0
-                ]  # Récupère la valeur quel que soit le type
+                value = next(
+                    iter(value_dict.values())
+                )  # Récupère la valeur quel que soit le type
                 value = str(value)
                 row_data[key] = value
         flattened_data.append({**base, **row_data})
@@ -189,7 +220,6 @@ def safe_astype_spark_with_error_handling(tss):
         "LifetimeEnergyUsed": FloatType(),
         "ModuleTempMax": FloatType(),
         "ModuleTempMin": FloatType(),
-        "odometer": FloatType(),
         "OutsideTemp": FloatType(),
         "PackCurrent": FloatType(),
         "PackVoltage": FloatType(),
@@ -197,10 +227,6 @@ def safe_astype_spark_with_error_handling(tss):
         "RearDefrostEnabled": FloatType(),
         "VehicleSpeed": FloatType(),
         "ChargerVoltage": FloatType(),
-        "sec_time_diff": FloatType(),
-        "in_charge": BooleanType(),
-        "in_discharge": BooleanType(),
-        "in_charge_idx": IntegerType(),
         "in_discharge_idx": IntegerType(),
         "trimmed_in_charge": BooleanType(),
         "trimmed_in_discharge": BooleanType(),
@@ -416,4 +442,79 @@ def weighted_mean_spark(df, group_col: str, value_col: str, weight_col: str):
     ).select(group_col, f"weighted_avg_{value_col}")
 
     return weighted_avg
+
+
+# TODO: Check again the relevance of this method as it was vibe coded
+def get_spark_available_cores(spark_session: SparkSession, logger=None) -> int:
+    """
+    Get the number of available cores for the Spark cluster.
+
+    This function tries multiple approaches to determine available cores:
+    1. Use environment variable NB_CORES_CLUSTER if set
+    2. Calculate from Spark context configuration
+    3. Fall back to a reasonable default
+
+    Args:
+        spark_session: The active SparkSession
+        logger: Optional logger for informational messages
+
+    Returns:
+        int: Number of available cores
+    """
+    import os
+
+    # Method 1: Check environment variable (backwards compatibility)
+    env_cores = os.environ.get("NB_CORES_CLUSTER")
+    if env_cores:
+        try:
+            return int(env_cores)
+        except ValueError:
+            if logger:
+                logger.warning(f"Invalid NB_CORES_CLUSTER value: {env_cores}")
+
+    # Method 2: Calculate from Spark context
+    if spark_session:
+        try:
+            # Get executor instances and cores from Spark configuration
+            spark_conf = spark_session.sparkContext.getConf()
+
+            # Try to get executor instances and cores from configuration
+            executor_instances = spark_conf.get("spark.executor.instances")
+            executor_cores = spark_conf.get("spark.executor.cores")
+            driver_cores = spark_conf.get("spark.driver.cores", "1")
+
+            if executor_instances and executor_cores:
+                total_cores = int(driver_cores) + (
+                    int(executor_instances) * int(executor_cores)
+                )
+                if logger:
+                    logger.info(
+                        f"Calculated cores from Spark config: {total_cores} "
+                        f"(driver: {driver_cores}, executors: {executor_instances}x{executor_cores})"
+                    )
+                return total_cores
+
+            # Alternative: get default parallelism which is often cores * 2
+            default_parallelism = spark_session.sparkContext.defaultParallelism
+            if default_parallelism > 0:
+                estimated_cores = max(1, default_parallelism // 2)
+                if logger:
+                    logger.info(
+                        f"Estimated cores from default parallelism: {estimated_cores} "
+                        f"(parallelism: {default_parallelism})"
+                    )
+                return estimated_cores
+
+        except Exception as e:
+            if logger:
+                logger.warning(f"Failed to get cores from Spark context: {e}")
+
+    # Method 3: Fallback to reasonable default
+    default_cores = 4
+    if logger:
+        logger.warning(
+            f"Using default cores: {default_cores} "
+            f"(set NB_CORES_CLUSTER environment variable for better performance)"
+        )
+    return default_cores
 
