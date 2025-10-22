@@ -1,0 +1,138 @@
+# --- Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamlit-deployment
+  namespace: bib
+  labels:
+    app: streamlit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: streamlit
+  template:
+    metadata:
+      labels:
+        app: streamlit
+    spec:
+      containers:
+        - name: streamlit
+          image: rg.fr-par.scw.cloud/bib-images/data-catalog:latest
+          env:
+            - name: DB_DATA_EV_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_PASSWORD
+            - name: DB_DATA_EV_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_NAME
+            - name: DB_DATA_EV_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_HOST
+            - name: DB_DATA_EV_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_PORT
+            - name: DB_DATA_EV_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-data-ev-secret
+                  key: DB_DATA_EV_USER
+            - name: GOOGLE_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: google-secret
+                  key: GOOGLE_PRIVATE_KEY
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_BUCKET
+            - name: S3_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_KEY
+            - name: S3_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_SECRET
+            - name: S3_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_REGION
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_ENDPOINT
+            - name: S3_BASE_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: S3_BASE_PATH
+          ports:
+            - containerPort: 8501
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "100m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+
+---
+# --- Service ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamlit-service
+  namespace: bib
+spec:
+  type: ClusterIP
+  selector:
+    app: streamlit
+  ports:
+    - protocol: TCP
+      port: 8501
+      targetPort: 8501
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: streamlit-ingress
+  namespace: bib
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: internal-service-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Protected Streamlit"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - data-catalog.prod.bibers.fr
+      secretName: data-catalog-tls
+  rules:
+    - host: data-catalog.prod.bibers.fr
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: streamlit-service
+                port:
+                  number: 8501
+

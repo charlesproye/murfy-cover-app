@@ -140,6 +140,10 @@ external_api = [
     "pyspark==3.5.5"
 ]
 
+migrations = [
+    "alembic>=1.17",
+]
+
 visualization = [
     "streamlit>=1.28.0",
     "pyarrow>=12.0.0",
@@ -148,12 +152,14 @@ visualization = [
     "fastapi>=0.100.0",
     "plotly==5.19.0",
     "scipy==1.10.1",
-    "gspread"
+    "gspread",
+    "psycopg2-binary>=2.9.9",
+    "asyncpg~=0.30",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=1.10.13",
+    "pydantic-settings~=2.11",
 ]
 
-migrations = [
-    "alembic>=1.17",
-]
 
 [dependency-groups]
 # Full development environment with all dependencies
@@ -208,5 +214,5 @@ ignore = [
 "__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "activation", "transform", "eda", "load", "web", "results", "external_api"]
+known-first-party = ["core", "activation", "transform", "eda", "load", "web", "results", "external_api", "visualization"]
 

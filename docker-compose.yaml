@@ -131,6 +131,19 @@ services:
     depends_on:
       - redis
 
+  data-catalog:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: docker/data_catalog.Dockerfile
+    container_name: data-catalog
+    image: rg.fr-par.scw.cloud/bib-images/data-catalog:latest
+    restart: always
+    ports:
+      - "8501:8501"
+    env_file:
+      - ./.env
+
   redis:
     image: redis:alpine
     volumes:
