@@ -1,9 +1,11 @@
 import logging
+import os
 import sys
 
-from core.console_utils import main_decorator
+import click
+
 from core.s3.settings import S3Settings
-from core.spark_utils import create_spark_session
+from core.spark_utils import create_spark_session, create_spark_session_k8s
 from transform.result_phases.processed_phase_to_result_phase import (
     ProcessedPhaseToResultPhase,
 )
@@ -11,45 +13,77 @@ from transform.result_phases.providers.renault import RenaultProcessedPhaseToRes
 from transform.result_phases.providers.stellantis import (
     StellantisProcessedPhaseToResultPhase,
 )
-from transform.result_phases.providers.tesla import TeslaProcessedPhaseToResultPhase
 from transform.result_phases.providers.tesla_fleet_telemetry import (
     TeslaFTProcessedPhaseToResultPhase,
 )
 from transform.result_phases.providers.volvo import VolvoProcessedPhaseToResultPhase
 
-ORCHESTRATED_MAKES = {
-    "bmw": (False, ProcessedPhaseToResultPhase),
-    "mercedes-benz": (False, ProcessedPhaseToResultPhase),
-    "renault": (True, RenaultProcessedPhaseToResultPhase),
-    "volvo-cars": (False, VolvoProcessedPhaseToResultPhase),
-    "stellantis": (False, StellantisProcessedPhaseToResultPhase),
-    "kia": (False, ProcessedPhaseToResultPhase),
-    "ford": (False, ProcessedPhaseToResultPhase),
-    "tesla-fleet-telemetry": (False, TeslaFTProcessedPhaseToResultPhase),
-    "volkswagen": (False, ProcessedPhaseToResultPhase),
-    "tesla": (False, TeslaProcessedPhaseToResultPhase),
+PROVIDERS = {
+    "bmw": ProcessedPhaseToResultPhase,
+    "mercedes-benz": ProcessedPhaseToResultPhase,
+    "renault": RenaultProcessedPhaseToResultPhase,
+    "volvo-cars": VolvoProcessedPhaseToResultPhase,
+    "stellantis": StellantisProcessedPhaseToResultPhase,
+    "kia": ProcessedPhaseToResultPhase,
+    "ford": ProcessedPhaseToResultPhase,
+    "tesla-fleet-telemetry": TeslaFTProcessedPhaseToResultPhase,
+    "volkswagen": ProcessedPhaseToResultPhase,
 }
 
 
-@main_decorator
-def main():
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.argument("make", required=False)
+@click.option(
+    "--all",
+    "run_all",
+    is_flag=True,
+    help="Execute the processing for all makes",
+)
+def run(make: str, run_all: bool):
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         stream=sys.stdout,
     )
 
-    logger = logging.getLogger("ProcessedPhaseToResultPhase")
     settings = S3Settings()
-    spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
+    is_k8s = os.getenv("KUBERNETES_SERVICE_HOST") is not None
 
-    for make, (is_orchestrated, class_to_use) in ORCHESTRATED_MAKES.items():
-        if is_orchestrated:
-            class_to_use(make=make, spark=spark, logger=logger, force_update=True)
-        else:
-            pass
+    if is_k8s:
+        spark = create_spark_session_k8s(settings.S3_KEY, settings.S3_SECRET)
+    else:
+        spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
+
+    if run_all:
+        for make_name, parser_class in PROVIDERS.items():
+            logger_make = logging.getLogger(f"ProcessedPhaseToResultPhase[{make_name}]")
+            parser_class(
+                make=make_name,
+                spark=spark,
+                logger=logger_make,
+                force_update=True,
+            ).run()
+    else:
+        if not make:
+            raise click.UsageError("Veuillez préciser une marque")
+        make = make.lower()
+        if make not in PROVIDERS:
+            raise click.BadParameter(f"Marque inconnue: {make}")
+        logger_make = logging.getLogger(f"ProcessedPhaseToResultPhase[{make}]")
+        parser_class = PROVIDERS[make]
+        parser_class(
+            make=make,
+            spark=spark,
+            logger=logger_make,
+            force_update=True,
+        ).run()
 
 
 if __name__ == "__main__":
-    main()
+    cli()
 

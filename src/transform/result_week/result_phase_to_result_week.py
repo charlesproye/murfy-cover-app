@@ -13,7 +13,7 @@ from core.stats_utils import (
     mask_out_outliers_by_interquartile_range,
     weighted_mean,
 )
-from transform.result_phases.main import ORCHESTRATED_MAKES
+from transform.result_phases.main import PROVIDERS
 from transform.result_week.config import SOH_FILTER_EVAL_STRINGS, UPDATE_FREQUENCY
 
 
@@ -40,7 +40,7 @@ class ResultPhaseToResultWeek:
 
     def run(self):
         self.logger.info(f"Running {self.make}.")
-        cls = ORCHESTRATED_MAKES[self.make][1]
+        cls = PROVIDERS[self.make]
         rph = cls(make=self.make, spark=self.spark, logger=self.logger).data.toPandas()
 
         rweek = (

@@ -1,21 +1,17 @@
 import math
-import os
 import random
 import re
 from datetime import datetime
 from itertools import islice
 from logging import Logger
 
-from dotenv import load_dotenv
 from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark.sql.types import StringType, StructField, StructType
 
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
-from core.spark_utils import get_optimal_nb_partitions
+from core.spark_utils import get_optimal_nb_partitions, get_spark_available_cores
 from transform.raw_tss.config import PARSE_TYPE_MAP, S3_RAW_TSS_KEY_FORMAT
-
-load_dotenv()
 
 
 class ResponseToRawTss:
@@ -58,9 +54,7 @@ class ResponseToRawTss:
             self.logger.info(f"No VIN to process for {self.make}")
         else:
             optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
-                keys_to_download_per_vin,
-                paths_to_exclude,
-                int(os.environ.get("NB_CORES_CLUSTER")),
+                keys_to_download_per_vin, paths_to_exclude, self._get_available_cores()
             )
 
             print(
@@ -91,6 +85,15 @@ class ResponseToRawTss:
                 del raw_tss_parsed
 
         self.logger.info(f"Processing completed for {self.make}")
+
+    def _get_available_cores(self) -> int:
+        """
+        Get the number of available cores for the Spark cluster.
+
+        Returns:
+            int: Number of available cores
+        """
+        return get_spark_available_cores(self.spark, self.logger)
 
     def _set_optimal_spark_parameters(
         self,

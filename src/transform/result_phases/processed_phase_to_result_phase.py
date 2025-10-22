@@ -9,7 +9,7 @@ from core.caching_utils import CachedETLSpark
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
-from transform.processed_phases.main import *
+from transform.processed_phases.main import PROVIDERS
 from transform.result_phases.config import RESULT_PHASES_CACHE_KEY_TEMPLATE
 
 load_dotenv()
@@ -47,7 +47,7 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         # Load the raw tss dataframe
         self.logger.info(f"Running for {self.make}")
 
-        cls = ORCHESTRATED_MAKES[self.make][1]
+        cls = PROVIDERS[self.make]
 
         pph = cls(make=self.make, spark=self.spark, logger=self.logger).data
 
@@ -199,10 +199,10 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         df_result = df_result.withColumn(
             "km_range",
             F.when(F.col("ODOMETER_DIFF") < 10, "<10 km")
-            .when(F.col("ODOMETER_DIFF") < 25, "10–25 km")
-            .when(F.col("ODOMETER_DIFF") < 50, "25–50 km")
-            .when(F.col("ODOMETER_DIFF") < 100, "50–100 km")
-            .when(F.col("ODOMETER_DIFF") < 200, "100–200 km")
+            .when(F.col("ODOMETER_DIFF") < 25, "10-25 km")
+            .when(F.col("ODOMETER_DIFF") < 50, "25-50 km")
+            .when(F.col("ODOMETER_DIFF") < 100, "50-100 km")
+            .when(F.col("ODOMETER_DIFF") < 200, "100-200 km")
             .when(F.col("ODOMETER_DIFF") <= 1000, ">200 km")
             .otherwise(None),
         )

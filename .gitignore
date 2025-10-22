@@ -211,6 +211,9 @@ Thumbs.db
 *.exe
 *.war
 
+# Auth
+auth
+
 # Large media files
 *.mp4
 *.tiff
