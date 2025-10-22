@@ -9,7 +9,7 @@ from external_api.core.config import settings
 S3_KEY_FORM = settings.S3_KEY
 S3_SECRET_FORM = settings.S3_SECRET
 S3_ENDPOINT = settings.S3_ENDPOINT
-S3_BUCKET_NAME = settings.S3_BUCKET
+S3_BUCKET = settings.S3_BUCKET
 
 s3_client = boto3.client(
     "s3",
@@ -25,7 +25,7 @@ def get_file_url(file_full_path: str):
     try:
         return s3_client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": S3_BUCKET_NAME, "Key": file_full_path},
+            Params={"Bucket": S3_BUCKET, "Key": file_full_path},
             ExpiresIn=3600,
         )
     except Exception as e:
@@ -37,7 +37,7 @@ def get_file_url(file_full_path: str):
 def upload_file_to_s3(file_path, file_content):
     try:
         response = s3_client.put_object(
-            Bucket=S3_BUCKET_NAME, Key=file_path, Body=file_content
+            Bucket=S3_BUCKET, Key=file_path, Body=file_content
         )
         # Check if the upload was successful by looking for HTTPStatusCode 200
         if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
@@ -55,7 +55,7 @@ def upload_file_to_s3(file_path, file_content):
 # --------------------------------
 def delete_file_in_s3(full_path: str):
     try:
-        s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=full_path)
+        s3_client.delete_object(Bucket=S3_BUCKET, Key=full_path)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error deleting file in s3: {e!s}"

@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 def load_model():
     try:
         response = s3_client.get_object(
-            Bucket=settings.S3_BUCKET_NAME, Key="models/model_price.pkl"
+            Bucket=settings.S3_BUCKET, Key="models/model_price.pkl"
         )
         buffer = BytesIO(response["Body"].read())
         model = joblib_load(buffer)
         return model
     except Exception as e:
         logger.error(
-            f"Error reading pickle file s3://{settings.S3_BUCKET_NAME}/models/model_price.pkl: {e}"
+            f"Error reading pickle file s3://{settings.S3_BUCKET}/models/model_price.pkl: {e}"
         )
         raise
 
