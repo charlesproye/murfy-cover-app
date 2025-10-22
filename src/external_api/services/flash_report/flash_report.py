@@ -283,7 +283,7 @@ async def send_email(is_french: bool, email: str, token: str):
     try:
         with smtplib.SMTP(smtp_server, port, timeout=10) as server:
             server.starttls(context=context)
-            server.login(sender_email, password)
+            server.login(settings.SMTP_USER, password)
             server.sendmail(sender_email, email, message.as_string())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Email error: {e!s}") from e

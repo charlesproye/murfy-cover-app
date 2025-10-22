@@ -73,6 +73,7 @@ class Settings(BaseSettings):
 
     # SMTP
     SMTP_EMAIL: str = os.getenv("SMTP_EMAIL", "")
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", ""))
