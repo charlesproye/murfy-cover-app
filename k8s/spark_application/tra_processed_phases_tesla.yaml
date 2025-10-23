@@ -51,7 +51,7 @@ spec:
   executor:
     cores: 3
     coreLimit: "4000m"
-    instances: 3
+    instances: 5
     memory: "4g"
     memoryOverhead: "2g"
     envFrom:

@@ -15,7 +15,7 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         make="tesla-fleet-telemetry",
         spark: SparkSession = None,
         force_update: bool = False,
-        logger: Logger = None,
+        logger: Logger | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -50,11 +50,7 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
 
         phase_df = phase_df.withColumn(
             "CONSUMPTION",
-            F.when(
-                F.col("PHASE_STATUS") == "discharging",
-                (-1 * F.col("SOC_DIFF") * F.col("BATTERY_NET_CAPACITY"))
-                / F.col("ODOMETER_DIFF"),
-            ).otherwise(None),
+            F.expr("try_divide(-1 * SOC_DIFF * BATTERY_NET_CAPACITY, ODOMETER_DIFF)"),
         )
 
         return phase_df
@@ -93,8 +89,7 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
 
         df_aggregated = df_aggregated.withColumn(
             "SOH",
-            F.col("ENERGY_ADDED")
-            / (F.col("SOC_DIFF") / 100.0 * F.col("BATTERY_NET_CAPACITY")),
+            F.expr("try_divide(ENERGY_ADDED, SOC_DIFF / 100.0 * BATTERY_NET_CAPACITY)"),
         )
 
         return df_aggregated

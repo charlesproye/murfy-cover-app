@@ -14,7 +14,7 @@ ORCHESTRATED_MAKES = {
     "renault": (True, True, True),
     "volvo-cars": (True, True, False),
     "stellantis": (True, False, False),
-    "kia": (True, False, False),
+    "kia": (True, True, False),
     "ford": (True, True, False),
     "tesla-fleet-telemetry": (True, True, True),
     "volkswagen": (True, False, False),
