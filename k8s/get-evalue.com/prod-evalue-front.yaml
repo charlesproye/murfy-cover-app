@@ -46,14 +46,15 @@ metadata:
   name: evalue-front-ingress
   namespace: evalue
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt
     nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/real-ip-header: "CF-Connecting-IP"
 spec:
   ingressClassName: nginx
   tls:
   - hosts:
     - get-evalue.com
-    secretName: evalue-front-tls
+    secretName: evalue-tls
   rules:
   - host: get-evalue.com
     http:
