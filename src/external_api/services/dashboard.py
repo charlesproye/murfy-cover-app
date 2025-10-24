@@ -42,7 +42,6 @@ async def get_kpis(
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             WHERE v.fleet_id = ANY(:fleet_ids)
-            AND v.is_displayed = true
             AND (:brands IS NULL OR vm.oem_id = ANY(:brands))
             AND (:regions IS NULL OR v.region_id = ANY(:regions))
             AND (:pinned_vehicles = false OR v.is_pinned = true)
@@ -104,7 +103,6 @@ async def get_scatter_plot_brands(
             JOIN oem o ON vm.oem_id = o.id
             JOIN fleet f ON v.fleet_id = f.id
             WHERE v.fleet_id = ANY(:fleet_list)
-            AND v.is_displayed = true
             AND (CAST(:brands_list AS uuid[]) IS NULL OR vm.oem_id = ANY(CAST(:brands_list AS uuid[])))
             AND (:pinned_vehicles = false OR v.is_pinned = true)
             ORDER BY vd.vehicle_id, vd.timestamp DESC
@@ -184,7 +182,6 @@ async def get_scatter_plot_regions(
             JOIN region r ON v.region_id = r.id
             JOIN fleet f ON v.fleet_id = f.id
             WHERE v.fleet_id = ANY(:fleet_list)
-            AND v.is_displayed = true
             AND (CAST(:regions_list AS uuid[]) IS NULL OR v.region_id = ANY(CAST(:regions_list AS uuid[])))
             AND (:pinned_vehicles = false OR v.is_pinned = true)
             ORDER BY vd.vehicle_id, vd.timestamp DESC
@@ -262,7 +259,6 @@ async def get_global_table(
             JOIN oem o ON vm.oem_id = o.id
             JOIN region r ON v.region_id = r.id
             WHERE v.fleet_id = ANY(:fleet_ids)
-            AND v.is_displayed = true
             AND (:brands IS NULL OR vm.oem_id = ANY(:brands))
             AND (:regions IS NULL OR v.region_id = ANY(:regions))
             AND (:pinned_vehicles = false OR v.is_pinned = true)
@@ -343,7 +339,6 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
             FROM vehicle_data vd
             JOIN vehicle v ON vd.vehicle_id = v.id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             AND vd.timestamp > (CURRENT_DATE - INTERVAL '1 month')
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
@@ -369,7 +364,6 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
             FROM vehicle_data vd
             JOIN vehicle v ON vd.vehicle_id = v.id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             AND vd.timestamp < (CURRENT_DATE - INTERVAL '1 month')
             AND vd.timestamp > (CURRENT_DATE - INTERVAL '2 month')
             ORDER BY vd.vehicle_id, vd.timestamp DESC
@@ -437,7 +431,6 @@ async def get_filter(
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
             WHERE v.fleet_id = ANY(:fleet_ids)
-            AND v.is_displayed = true
         ),
         fleets AS (
             SELECT
@@ -479,7 +472,6 @@ async def get_range_soh(fleet_id: str, type: str, db: AsyncSession):
                 FROM vehicle_data vd
                 JOIN vehicle v ON vd.vehicle_id = v.id
                 WHERE v.fleet_id = :fleet_id
-                AND v.is_displayed = true
                 ORDER BY vd.vehicle_id, vd.timestamp DESC
             ),
             ranges AS (
@@ -505,7 +497,6 @@ async def get_range_soh(fleet_id: str, type: str, db: AsyncSession):
                 FROM vehicle_data vd
                 JOIN vehicle v ON vd.vehicle_id = v.id
                 WHERE v.fleet_id = :fleet_id
-                AND v.is_displayed = true
                 ORDER BY vd.vehicle_id, vd.timestamp DESC
             ),
             value_bounds AS (
@@ -566,7 +557,6 @@ async def get_new_vehicles(fleet_id: str, period: str, db: AsyncSession):
             COUNT(*) AS vehicle_count
         FROM vehicle
         WHERE fleet_id = :fleet_id
-        AND is_displayed = true
         AND start_date >= CURRENT_DATE - INTERVAL '{interval}'
         GROUP BY period
         ORDER BY period DESC
@@ -587,7 +577,6 @@ async def search_vin(vin: str, fleets: list[UUID], db: AsyncSession):
         SELECT id, vin FROM vehicle
         WHERE vin ILIKE '%' || :vin || '%'
         AND fleet_id = ANY(:fleets)
-        AND is_displayed = true
         ORDER BY vin
         LIMIT 10
     """)
@@ -609,7 +598,6 @@ def query_region_table():
             JOIN region r ON v.region_id = r.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
         SELECT
@@ -639,7 +627,6 @@ def query_brand_table():
             JOIN oem o ON vm.oem_id = o.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
         SELECT
@@ -717,7 +704,6 @@ async def get_trendline_brand(
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             ORDER BY vm.oem_id
             LIMIT 1
         ),
@@ -734,7 +720,6 @@ async def get_trendline_brand(
             JOIN oem o ON vm.oem_id = o.id
             LEFT JOIN vehicle_data vd ON v.id = vd.vehicle_id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             GROUP BY vm.oem_id, o.oem_name, o.trendline::text, o.trendline_max::text, o.trendline_min::text
         ),
         latest_vehicle_data AS (
@@ -757,7 +742,6 @@ async def get_trendline_brand(
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
             WHERE vm.oem_id = COALESCE(:brand, (SELECT oem_id FROM first_brand))
-            AND v.is_displayed = true
             ORDER BY v.id, vd.timestamp DESC
         )
         SELECT DISTINCT
@@ -881,7 +865,6 @@ async def get_soh_by_groups(fleet_id: str, group: str, page: int, db: AsyncSessi
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             ORDER BY v.id, vd.timestamp DESC
         ),
         filtered_data AS (
@@ -993,7 +976,6 @@ async def get_extremum_soh(
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             ORDER BY o.oem_name
         ),
         latest_vehicle_data AS (
@@ -1014,7 +996,6 @@ async def get_extremum_soh(
             JOIN oem o ON vm.oem_id = o.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
             WHERE v.fleet_id = :fleet_id
-            AND v.is_displayed = true
             AND (:brand='' OR vm.oem_id = CAST(:brand AS uuid))
             AND vd.soh IS NOT NULL
             AND vd.soh_comparison IS NOT NULL

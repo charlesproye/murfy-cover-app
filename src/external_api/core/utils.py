@@ -42,7 +42,6 @@ HEADERS = [
     "End of Contract",
     "Country",
     "Activation",
-    "EValue",
     "Ownership",
     "Start Date",
     "Comment",
@@ -77,7 +76,7 @@ def get_google_sheets_client():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de l'initialisation du client Google Sheets: {e!s}",
-        )
+        ) from e
 
 
 def get_or_create_spreadsheet(client, spreadsheet_id: str) -> gspread.Spreadsheet:
@@ -148,7 +147,7 @@ def get_or_create_spreadsheet(client, spreadsheet_id: str) -> gspread.Spreadshee
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"La feuille Google Sheets avec l'ID {spreadsheet_id} n'existe pas",
-                )
+                ) from None
     except SpreadsheetNotFound:
         if CREATE_SPREADSHEET_IF_NOT_EXISTS:
             logger.info("Création d'une nouvelle feuille 'Activations de véhicules'")
@@ -167,13 +166,13 @@ def get_or_create_spreadsheet(client, spreadsheet_id: str) -> gspread.Spreadshee
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"La feuille Google Sheets avec l'ID {spreadsheet_id} n'existe pas",
-            )
+            ) from None
     except Exception as e:
         logger.error(f"Erreur lors de l'ouverture de la feuille Google Sheets: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de l'ouverture de la feuille Google Sheets: {e!s}",
-        )
+        ) from e
 
 
 def get_or_create_worksheet(
@@ -229,7 +228,7 @@ def get_or_create_worksheet(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la récupération/création de l'onglet: {e!s}",
-        )
+        ) from e
 
 
 async def get_company_name_from_user_id(db: AsyncSession, user_id: uuid.UUID) -> str:
@@ -334,13 +333,13 @@ async def add_vehicles_to_google_sheet(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"The Google Sheets with ID {SPREADSHEET_ID} does not exist",
-        )
+        ) from None
     except WorksheetNotFound:
         logger.error(f"Worksheet {WORKSHEET_NAME} does not exist in the sheet")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Worksheet {WORKSHEET_NAME} does not exist in the sheet",
-        )
+        ) from None
     except APIError as e:
         # Extract error message from Google Sheets API
         error_message = str(e)
@@ -354,7 +353,7 @@ async def add_vehicles_to_google_sheet(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Google Sheets not found. Check ID and permissions. Details: {error_message}",
-            )
+            ) from e
         elif "403" in error_message:
             logger.error(
                 "Permission error (403): Service account does not have necessary permissions"
@@ -362,19 +361,19 @@ async def add_vehicles_to_google_sheet(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied to Google Sheets. Check service account permissions. Details: {error_message}",
-            )
+            ) from e
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error while interacting with Google Sheets: {error_message}",
-            )
+            ) from e
     except Exception as e:
         error_message = str(e)
         logger.error(f"Error while adding vehicles to Google Sheet: {error_message}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error while adding vehicles to Google Sheet: {error_message}",
-        )
+        ) from e
 
 
 logging.basicConfig(

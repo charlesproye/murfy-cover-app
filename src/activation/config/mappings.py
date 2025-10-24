@@ -70,7 +70,6 @@ COL_DTYPES = {
     "owner": str,
     "country": str,
     "activation": bool,
-    "EValue": bool,
     "eligibility": bool,
     "real_activation": bool,
     "activation_error": str,

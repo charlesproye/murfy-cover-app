@@ -69,7 +69,6 @@ class VehicleBase(BaseModel):
     vehicle_model_id: UUID4
     vin: str
     activation_status: bool | None = None
-    is_displayed: bool | None = None
     start_date: date | None = None
     licence_plate: str | None = None
     end_of_contract_date: date | None = None

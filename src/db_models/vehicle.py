@@ -119,7 +119,6 @@ class Vehicle(BaseUUIDModel):
     )
     vin: str = Column(String(50))
     activation_status: Mapped[bool] = Column(Boolean, nullable=True)
-    is_displayed: Mapped[bool] = Column(Boolean, nullable=True)
     is_eligible: Mapped[bool] = Column(Boolean, nullable=True)
     is_pinned: Mapped[bool] = Column(Boolean, nullable=True)
 

@@ -368,8 +368,8 @@ class VehicleProcessor:
                                 insert_query = """
                                     INSERT INTO vehicle (
                                         id, vin, fleet_id, region_id, vehicle_model_id,
-                                        licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                        licence_plate, end_of_contract_date, start_date, activation_status, is_eligible
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 """
                                 cursor.execute(
                                     insert_query,
@@ -383,7 +383,6 @@ class VehicleProcessor:
                                         vehicle["end_of_contract"],
                                         start_date,
                                         vehicle["real_activation"],
-                                        vehicle["EValue"],
                                         vehicle["eligibility"],
                                     ),
                                 )
@@ -392,11 +391,10 @@ class VehicleProcessor:
                                 )
                             else:
                                 cursor.execute(
-                                    "UPDATE vehicle SET fleet_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                    "UPDATE vehicle SET fleet_id = %s, activation_status = %s, is_eligible = %s WHERE vin = %s",
                                     (
                                         vehicle["fleet_id"],
                                         vehicle["real_activation"],
-                                        vehicle["EValue"],
                                         vehicle["eligibility"],
                                         vin,
                                     ),
@@ -471,8 +469,8 @@ class VehicleProcessor:
                                 insert_query = """
                                     INSERT INTO vehicle (
                                         id, vin, fleet_id, region_id, vehicle_model_id,
-                                        licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                        licence_plate, end_of_contract_date, start_date, activation_status, is_eligible
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 """
                                 cursor.execute(
                                     insert_query,
@@ -486,7 +484,6 @@ class VehicleProcessor:
                                         vehicle["end_of_contract"],
                                         vehicle["start_date"],
                                         vehicle["real_activation"],
-                                        vehicle["EValue"],
                                         vehicle["eligibility"],
                                     ),
                                 )
@@ -495,11 +492,10 @@ class VehicleProcessor:
                                 )
                             else:
                                 cursor.execute(
-                                    "UPDATE vehicle SET fleet_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                    "UPDATE vehicle SET fleet_id = %s, activation_status = %s, is_eligible = %s WHERE vin = %s",
                                     (
                                         fleet_id,
                                         vehicle["real_activation"],
-                                        vehicle["EValue"],
                                         vehicle["eligibility"],
                                         vin,
                                     ),
@@ -581,8 +577,8 @@ class VehicleProcessor:
                             insert_query = """
                                 INSERT INTO vehicle (
                                     id, vin, fleet_id, region_id, vehicle_model_id,
-                                    licence_plate, end_of_contract_date, start_date, activation_status, is_displayed, is_eligible
-                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    licence_plate, end_of_contract_date, start_date, activation_status, is_eligible
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """
 
                             cursor.execute(
@@ -599,7 +595,6 @@ class VehicleProcessor:
                                     await self._clean_value(
                                         vehicle["real_activation"], "bool"
                                     ),
-                                    await self._clean_value(vehicle["EValue"], "bool"),
                                     await self._clean_value(
                                         vehicle["eligibility"], "bool"
                                     ),
@@ -610,12 +605,11 @@ class VehicleProcessor:
                             )
                         else:
                             cursor.execute(
-                                "UPDATE vehicle SET fleet_id = %s, vehicle_model_id = %s, activation_status = %s, is_displayed = %s, is_eligible = %s WHERE vin = %s",
+                                "UPDATE vehicle SET fleet_id = %s, vehicle_model_id = %s, activation_status = %s, is_eligible = %s WHERE vin = %s",
                                 (
                                     fleet_id,
                                     model_id,
                                     vehicle["real_activation"],
-                                    vehicle["EValue"],
                                     vehicle["eligibility"],
                                     vehicle["vin"],
                                 ),
@@ -670,7 +664,6 @@ class VehicleProcessor:
                 cursor.execute("""
                     UPDATE vehicle v
                     SET activation_status = false,
-                        is_displayed = false,
                         is_eligible = t.eligibility,
                         updated_at = CURRENT_TIMESTAMP
                     FROM temp_deactivated_vehicles t
@@ -878,7 +871,7 @@ class VehicleProcessor:
                                 # Insert new vehicle
                                 vehicle_id = str(uuid.uuid4())
                                 cursor.execute(
-                                    "INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, end_of_contract_date, start_date, activation_status, is_displayed,is_eligible) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                    "INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, end_of_contract_date, start_date, activation_status, is_eligible) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                                     (
                                         vehicle_id,
                                         vin,
@@ -889,7 +882,6 @@ class VehicleProcessor:
                                         vehicle["end_of_contract"],
                                         start_date,
                                         vehicle["real_activation"],
-                                        vehicle["EValue"],
                                         vehicle["eligibility"],
                                     ),
                                 )
@@ -901,10 +893,9 @@ class VehicleProcessor:
                                 vehicle_id = result[0]
                                 model_id = result[1]
                                 cursor.execute(
-                                    "UPDATE vehicle SET activation_status = %s, is_displayed = %s, is_eligible = %s WHERE id = %s",
+                                    "UPDATE vehicle SET activation_status = %s, is_eligible = %s WHERE id = %s",
                                     (
                                         vehicle["real_activation"],
-                                        vehicle["EValue"],
                                         vehicle["eligibility"],
                                         vehicle_id,
                                     ),

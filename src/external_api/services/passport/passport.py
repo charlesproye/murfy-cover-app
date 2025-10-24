@@ -241,12 +241,7 @@ async def get_graph_data(vin: str, period: str = "Week", db: AsyncSession = None
 
 async def get_infos(vin: str, db: AsyncSession):
     query = text("""
-        WITH vehicle_check AS (
-            SELECT is_displayed
-            FROM vehicle
-            WHERE vin = :vin
-        ),
-        last_week AS (
+        WITH last_week AS (
             SELECT
                 date_trunc('week', CURRENT_DATE) - INTERVAL '1 week' as start_date,
                 date_trunc('week', CURRENT_DATE) - INTERVAL '1 second' as end_date
@@ -300,7 +295,6 @@ async def get_infos(vin: str, db: AsyncSession):
             v.licence_plate,
             v.activation_status,
             v.end_of_contract_date,
-            v.is_displayed,
             CONCAT(INITCAP(vm.model_name),
                 CASE
                     WHEN vm.type = 'unknown' THEN ''
@@ -410,7 +404,7 @@ async def get_infos(vin: str, db: AsyncSession):
     result = await db.execute(query, {"vin": vin})
     data = result.mappings().first()
 
-    if not data or not data["is_displayed"]:
+    if not data:
         print("ERREUR: Données absentes ou véhicule non affichable")
         raise HTTPException(
             status_code=404, detail="Vehicle not found or not available"
