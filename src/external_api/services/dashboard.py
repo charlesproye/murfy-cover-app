@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from uuid import UUID
 
 from pydantic import UUID4
@@ -331,46 +330,7 @@ async def get_global_table(
     ]
 
 
-async def get_last_timestamp_with_data(fleet_id: str, db: AsyncSession):
-    query = text("""
-        SELECT MAX(vd.timestamp) as last_update
-        FROM vehicle_data vd
-        JOIN vehicle v ON vd.vehicle_id = v.id
-        WHERE v.fleet_id = :fleet_id
-        AND vd.soh IS NOT NULL
-        AND vd.odometer IS NOT NULL
-    """)
-    result = await db.execute(query, {"fleet_id": fleet_id})
-    last_update_data = result.mappings().all()
-    last_update = (
-        last_update_data[0]["last_update"] if len(last_update_data) > 0 else None
-    )
-    return last_update
-
-
 async def get_individual_kpis(fleet_id: str, db: AsyncSession):
-    latest_timestamp = await get_last_timestamp_with_data(fleet_id, db)
-    if not latest_timestamp:
-        return [
-            {
-                "avg_odometer": None,
-                "avg_soh": None,
-                "vehicle_count": 0,
-                "pinned_count": 0,
-            },
-        ]
-
-    # Convert to datetime if it's not already
-    if isinstance(latest_timestamp, str):
-        latest_timestamp = datetime.fromisoformat(
-            latest_timestamp.replace("Z", "+00:00")
-        )
-
-    # Calculate 1 month and 2 months ago using timedelta
-    # This is approximate but works well for most use cases
-    one_month_since_last_data = latest_timestamp - timedelta(days=30)
-    two_months_since_last_data = latest_timestamp - timedelta(days=60)
-
     query = text("""
         WITH vehicles_data AS (
             SELECT DISTINCT ON (vd.vehicle_id)
@@ -378,11 +338,13 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
                 vd.timestamp,
                 vd.odometer,
                 ROUND((vd.soh * 100), 1) as soh,
+                vd.soh_comparison,
                 v.is_pinned
             FROM vehicle_data vd
             JOIN vehicle v ON vd.vehicle_id = v.id
             WHERE v.fleet_id = :fleet_id
-            AND vd.timestamp > :one_month_since_last_data
+            AND v.is_displayed = true
+            AND vd.timestamp > (CURRENT_DATE - INTERVAL '1 month')
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
         SELECT
@@ -392,10 +354,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
             COUNT(*) FILTER (WHERE is_pinned = true) as pinned_count
         FROM vehicles_data
     """)
-    result = await db.execute(
-        query,
-        {"fleet_id": fleet_id, "one_month_since_last_data": one_month_since_last_data},
-    )
+    result = await db.execute(query, {"fleet_id": fleet_id})
     latest_data = result.mappings().all()
 
     query = text("""
@@ -405,12 +364,14 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
                 vd.timestamp,
                 vd.odometer,
                 ROUND((vd.soh * 100), 1) as soh,
+                vd.soh_comparison,
                 v.is_pinned
             FROM vehicle_data vd
             JOIN vehicle v ON vd.vehicle_id = v.id
             WHERE v.fleet_id = :fleet_id
-            AND vd.timestamp < :one_month_since_last_data
-            AND vd.timestamp > :two_months_since_last_data
+            AND v.is_displayed = true
+            AND vd.timestamp < (CURRENT_DATE - INTERVAL '1 month')
+            AND vd.timestamp > (CURRENT_DATE - INTERVAL '2 month')
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
         SELECT
@@ -420,14 +381,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
             COUNT(*) FILTER (WHERE is_pinned = true) as pinned_count
         FROM previous_vehicle_data
     """)
-    result_previous = await db.execute(
-        query,
-        {
-            "fleet_id": fleet_id,
-            "one_month_since_last_data": one_month_since_last_data,
-            "two_months_since_last_data": two_months_since_last_data,
-        },
-    )
+    result_previous = await db.execute(query, {"fleet_id": fleet_id})
     previous_data = result_previous.mappings().all()
 
     return [

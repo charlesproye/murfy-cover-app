@@ -11,16 +11,6 @@ from external_api.schemas.user import GetCurrentUser
 router = APIRouter()
 
 
-@router.get("/get_last_timestamp_with_data", include_in_schema=False)
-async def get_last_timestamp_with_data_dashboard(
-    db=Depends(get_db),
-    fleet_id: str = Query(..., description="The fleet id"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
-):
-    response = await DashboardCrud().get_last_timestamp_with_data(fleet_id, db)
-    return response
-
-
 @router.get("/kpis", include_in_schema=False)
 async def kpis(
     db=Depends(get_db),
@@ -93,7 +83,7 @@ async def scatter_plot_regions(
 async def individual_kpis(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().individual_kpis(fleet_id, db)
     return response
