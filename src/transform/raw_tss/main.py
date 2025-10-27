@@ -8,7 +8,9 @@ from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session, create_spark_session_k8s
 from transform.raw_tss.providers.bmw import BMWResponseToRaw
 from transform.raw_tss.providers.high_mobility import HighMobilityResponseToRaw
+from transform.raw_tss.providers.kia import KiaResponseToRaw
 from transform.raw_tss.providers.mobilisight import MobilisightResponseToRaw
+from transform.raw_tss.providers.tesla import TeslaResponseToRaw
 from transform.raw_tss.providers.tesla_fleet_telemetry import TeslaFTResponseToRawTss
 from transform.raw_tss.providers.volkswagen import VolkswagenResponseToRaw
 

@@ -98,6 +98,8 @@ class RawTsToProcessedPhases(CachedETLSpark):
         tss = self._normalize_units_to_metric(tss)
         tss = tss.orderBy(["vin", "date"])
 
+        tss = self.fill_forward(tss)
+
         # Compute the charging status index and aggregate the phases
         tss_phase_idx = self.compute_charge_idx(tss, SOC_DIFF_THRESHOLD[self.make])
         tss_phase_idx = tss_phase_idx.cache()
@@ -159,6 +161,9 @@ class RawTsToProcessedPhases(CachedETLSpark):
             "odometer", col("odometer") * ODOMETER_MILES_TO_KM.get(self.make, 1)
         )
         tss = tss.withColumn("soc", F.col("soc") * SCALE_SOC[self.make])
+        return tss
+
+    def fill_forward(self, tss):
         return tss
 
     def _reassign_short_phases(self, df, min_duration_minutes=3):
