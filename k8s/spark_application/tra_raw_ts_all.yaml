@@ -7,7 +7,7 @@ spec:
   type: Python
   pythonVersion: "3"
   mode: cluster
-  image: "rg.fr-par.scw.cloud/bib-images/spark:1"
+  image: "rg.fr-par.scw.cloud/data-engineering/spark:1"
   imagePullPolicy: Always
   mainApplicationFile: local:///app/src/transform/raw_tss/main.py
   arguments:

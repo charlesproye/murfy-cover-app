@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: valkey
-  namespace: bib
+  namespace: data-engineering
   labels:
     app: valkey
 spec:
@@ -48,7 +48,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: valkey
-  namespace: bib
+  namespace: data-engineering
   labels:
     app: valkey
 spec:

@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: com-compressing-kia
-  namespace: bib
+  namespace: data-engineering
 spec:
   schedule: "0 0 * * *"
   successfulJobsHistoryLimit: 3
@@ -17,7 +17,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: com-compressing-kia-1
-              image: rg.fr-par.scw.cloud/bib-images/data_ev:latest
+              image: rg.fr-par.scw.cloud/data-engineering/data_ev:latest
               imagePullPolicy: Always
               command: ["python", "-m",  "src.transform.compressor.main"]
               args: ["kia"]

@@ -3,7 +3,7 @@
 services:
   data_ev:
     platform: linux/amd64
-    image: rg.fr-par.scw.cloud/bib-images/data_ev:latest
+    image: rg.fr-par.scw.cloud/data-engineering/data_ev:latest
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -12,7 +12,7 @@ services:
       - .env
   activation_service:
     platform: linux/amd64
-    image: rg.fr-par.scw.cloud/bib-images/activation:latest
+    image: rg.fr-par.scw.cloud/data-engineering/activation:latest
     build:
       context: .
       dockerfile: docker/activation.Dockerfile
@@ -22,7 +22,7 @@ services:
 
   ev_database_service:
     platform: linux/amd64
-    image: rg.fr-par.scw.cloud/bib-images/ev_database:latest
+    image: rg.fr-par.scw.cloud/data-engineering/ev_database:latest
     build:
       context: .
       dockerfile: docker/ev_database.Dockerfile
@@ -35,30 +35,17 @@ services:
       context: .
       dockerfile: docker/tesla.Dockerfile
     container_name: tesla-ingestion
-    image: rg.fr-par.scw.cloud/bib-images/tesla-ingestion:latest
+    image: rg.fr-par.scw.cloud/data-engineering/tesla-ingestion:latest
     env_file:
       - ./.env
       - ./.python.env
-
-  # bmw_ingestion_service:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/bmw.Dockerfile
-  #   container_name: bmw-ingestion
-  #   env_file:
-  #     - ./.env
-  #     - ./.python.env
-  #   volumes:
-  #     - .:/app
-  #   depends_on:
-  #     - redis
 
   scraping_soh_service:
     platform: linux/amd64
     build:
       context: .
       dockerfile: docker/scraping_soh.Dockerfile
-    image: rg.fr-par.scw.cloud/bib-images/scraping_soh:latest
+    image: rg.fr-par.scw.cloud/data-engineering/scraping_soh:latest
     container_name: scraping_soh
     env_file:
       - ./.env
@@ -69,7 +56,7 @@ services:
     build:
       context: .
       dockerfile: docker/results.Dockerfile
-    image: rg.fr-par.scw.cloud/bib-images/results:latest
+    image: rg.fr-par.scw.cloud/data-engineering/results:latest
     container_name: results
     env_file:
       - .env
@@ -88,7 +75,7 @@ services:
     build:
       context: .
       dockerfile: docker/hm.Dockerfile
-    image: rg.fr-par.scw.cloud/bib-images/hm-ingestion:latest
+    image: rg.fr-par.scw.cloud/data-engineering/hm-ingestion:latest
     container_name: hm-ingestion
     env_file:
       - ./.env
@@ -105,7 +92,7 @@ services:
     build:
       context: .
       dockerfile: docker/mobilisights.Dockerfile
-    image: rg.fr-par.scw.cloud/bib-images/ms-ingestion:latest
+    image: rg.fr-par.scw.cloud/data-engineering/ms-ingestion:latest
     container_name: ms-ingestion
     env_file:
       - ./.env
@@ -137,7 +124,7 @@ services:
       context: .
       dockerfile: docker/data_catalog.Dockerfile
     container_name: data-catalog
-    image: rg.fr-par.scw.cloud/bib-images/data-catalog:latest
+    image: rg.fr-par.scw.cloud/data-engineering/data-catalog:latest
     restart: always
     ports:
       - "8501:8501"
@@ -162,7 +149,7 @@ services:
 
   ingestion-web-app:
     platform: linux/amd64
-    image: rg.fr-par.scw.cloud/bib-images/ingestion-web-app:latest
+    image: rg.fr-par.scw.cloud/data-engineering/ingestion-web-app:latest
     build:
       dockerfile: docker/webapp.Dockerfile
       context: .
@@ -182,7 +169,7 @@ services:
     build:
       context: .
       dockerfile: docker/spark.Dockerfile
-    image: rg.fr-par.scw.cloud/bib-images/spark:1
+    image: rg.fr-par.scw.cloud/data-engineering/spark:1
     container_name: spark-transform
     env_file:
       - ./.env
@@ -191,7 +178,7 @@ services:
     build:
       context: .
       dockerfile: docker/external_api.Dockerfile
-    image: rg.fr-par.scw.cloud/bib-images/external-api:latest
+    image: rg.fr-par.scw.cloud/evalue/external-api:latest
     container_name: external_api
     restart: unless-stopped
     platform: linux/amd64

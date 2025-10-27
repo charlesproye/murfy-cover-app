@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ingestion-ms
-  namespace: bib
+  namespace: data-engineering
   labels:
     app: ingestion-ms
 spec:
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: ingestion-ms
-          image: rg.fr-par.scw.cloud/bib-images/ms-ingestion:latest
+          image: rg.fr-par.scw.cloud/data-engineering/ms-ingestion:latest
           resources:
             requests:
               cpu: 100m

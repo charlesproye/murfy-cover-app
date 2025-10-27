@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: enr-adding-results
-  namespace: bib
+  namespace: data-engineering
 spec:
   template:
     metadata:
@@ -12,7 +12,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: results
-          image: rg.fr-par.scw.cloud/bib-images/results:latest
+          image: rg.fr-par.scw.cloud/data-engineering/results:latest
           imagePullPolicy: Always
           command: ["python", "src/results/main.py"]
           envFrom:

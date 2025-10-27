@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: evalue-front
-        image: rg.fr-par.scw.cloud/bib-images/evalue-front:latest
+        image: rg.fr-par.scw.cloud/evalue/evalue-front:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
