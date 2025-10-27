@@ -11,6 +11,7 @@ from visualization.catalog.utils import (
 )
 
 engine = get_sqlalchemy_engine()
+engine_eng = get_sqlalchemy_engine(db_name="data-engineering")
 s3_service = S3Service()
 settings = S3Settings()
 
@@ -130,7 +131,7 @@ if st.button("🚀 Lancer l'actualisation de la base de données"):
 
             columns = get_parquet_schema_from_s3(path_formatted, s3_service)
             if columns and columns[0][0] != "Erreur":
-                with engine.connect() as conn:
+                with engine_eng.connect() as conn:
                     existing = conn.execute(
                         text("""
                         SELECT column_name

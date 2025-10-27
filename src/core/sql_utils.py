@@ -8,6 +8,8 @@ import pandas as pd
 from sqlalchemy import Engine, create_engine, inspect, text
 
 from .config import (
+    DB_ENG_URI_FORMAT_KEYS,
+    DB_ENG_URI_FORMAT_STR,
     DB_URI_FORMAT_KEYS,
     DB_URI_FORMAT_KEYS_PROD,
     DB_URI_FORMAT_STR,
@@ -19,7 +21,7 @@ from .pandas_utils import DF, left_merge
 logger = getLogger("core.sql_utils")
 
 
-def get_sqlalchemy_engine(is_prod: bool = False) -> Engine:
+def get_sqlalchemy_engine(is_prod: bool = False, db_name: str = "rdb") -> Engine:
     """Get a SQLAlchemy engine for the specified environment.
 
     Args:
@@ -28,8 +30,12 @@ def get_sqlalchemy_engine(is_prod: bool = False) -> Engine:
     Returns:
         Engine: SQLAlchemy engine instance
     """
-    keys = DB_URI_FORMAT_KEYS_PROD if is_prod else DB_URI_FORMAT_KEYS
-    format_str = DB_URI_FORMAT_STR_PROD if is_prod else DB_URI_FORMAT_STR
+    if db_name == "rdb":
+        keys = DB_URI_FORMAT_KEYS_PROD if is_prod else DB_URI_FORMAT_KEYS
+        format_str = DB_URI_FORMAT_STR_PROD if is_prod else DB_URI_FORMAT_STR
+    elif db_name == "data-engineering":
+        keys = DB_ENG_URI_FORMAT_KEYS
+        format_str = DB_ENG_URI_FORMAT_STR
     db_uri_format_dict = {key: get_env_var(key) for key in keys}
     db_uri = format_str.format(**db_uri_format_dict)
     return create_engine(db_uri)

@@ -19,67 +19,15 @@ spec:
       containers:
         - name: streamlit
           image: rg.fr-par.scw.cloud/data-engineering/data-catalog:latest
-          env:
-            - name: DB_DATA_EV_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: db-data-ev-secret
-                  key: DB_DATA_EV_PASSWORD
-            - name: DB_DATA_EV_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: db-data-ev-secret
-                  key: DB_DATA_EV_NAME
-            - name: DB_DATA_EV_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: db-data-ev-secret
-                  key: DB_DATA_EV_HOST
-            - name: DB_DATA_EV_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: db-data-ev-secret
-                  key: DB_DATA_EV_PORT
-            - name: DB_DATA_EV_USER
-              valueFrom:
-                secretKeyRef:
-                  name: db-data-ev-secret
-                  key: DB_DATA_EV_USER
-            - name: GOOGLE_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: google-secret
-                  key: GOOGLE_PRIVATE_KEY
-            - name: S3_BUCKET
-              valueFrom:
-                secretKeyRef:
-                  name: s3-secret
-                  key: S3_BUCKET
-            - name: S3_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: s3-secret
-                  key: S3_KEY
-            - name: S3_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: s3-secret
-                  key: S3_SECRET
-            - name: S3_REGION
-              valueFrom:
-                secretKeyRef:
-                  name: s3-secret
-                  key: S3_REGION
-            - name: S3_ENDPOINT
-              valueFrom:
-                secretKeyRef:
-                  name: s3-secret
-                  key: S3_ENDPOINT
-            - name: S3_BASE_PATH
-              valueFrom:
-                secretKeyRef:
-                  name: s3-secret
-                  key: S3_BASE_PATH
+          envFrom:
+            - secretRef:
+                name: db-data-ev-secret
+            - secretRef:
+                name: google-secret
+            - secretRef:
+                name: db-data-eng-secret
+            - secretRef:
+                name: s3-secret
           ports:
             - containerPort: 8501
           resources:

@@ -51,7 +51,8 @@ def get_parquet_schema_from_s3(s3_key: str, s3_service) -> list[tuple[str, str]]
 
 def insert_into_data_catalog(columns: list[tuple[str, str]], step: str, oem: str):
     """Insère les colonnes dans data_catalog"""
-    with engine.begin() as conn:
+    engine_eng = get_sqlalchemy_engine(db_name="data-engineering")
+    with engine_eng.begin() as conn:
         for col_name, col_type in columns:
             conn.execute(
                 text("""
