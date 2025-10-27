@@ -53,5 +53,3 @@ WORKDIR /app
 
 USER app
 
-# Entrypoint
-CMD ["python", "src/ingestion/main.py aramis autospherre spoticar ev_market"]

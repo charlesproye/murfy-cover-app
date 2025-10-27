@@ -26,6 +26,8 @@ spec:
                     name: db-data-ev-secret
                 - secretRef:
                     name: s3-secret
+                - secretRef:
+                    name: google-secret
               env:
                 - name: S3_BUCKET
                   value: "bib-platform-prod-data"
