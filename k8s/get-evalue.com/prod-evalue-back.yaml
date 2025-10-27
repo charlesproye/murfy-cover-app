@@ -28,13 +28,13 @@ spec:
         envFrom:
         - secretRef:
             name: evalue-back-secret
+        - secretRef:
+            name: s3-secret
+        - secretRef:
+            name: db-data-ev-secret
         env:
         - name: ALGORITHM
           value: HS256
-        - name: DB_DATA_EV_HOST
-          value: 172.16.20.9 # Private IP
-        - name: DB_DATA_EV_PORT
-          value: "5432"
         - name: COOKIE_DOMAIN
           value: "get-evalue.com"
         - name: FRONTEND_URL
@@ -43,6 +43,8 @@ spec:
           value: valkey.bib.svc
         - name: REDIS_PORT
           value: "6379"
+        - name: S3_BUCKET
+          value: "bib-platform-prod-data"
 ---
 apiVersion: v1
 kind: Service

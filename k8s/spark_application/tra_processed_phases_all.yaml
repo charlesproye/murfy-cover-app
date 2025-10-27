@@ -46,8 +46,8 @@ spec:
       - secretRef:
           name: db-data-ev-secret
     env:
-      - name: PYTHONPATH
-        value: "/app/src"
+      - name: S3_BUCKET
+        value: "bib-platform-prod-data"
   executor:
     cores: 3
     coreLimit: "4000m"
@@ -60,6 +60,6 @@ spec:
       - secretRef:
           name: db-data-ev-secret
     env:
-      - name: PYTHONPATH
-        value: "/app/src"
+      - name: S3_BUCKET
+        value: "bib-platform-prod-data"
 

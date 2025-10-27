@@ -41,6 +41,8 @@ spec:
             - secretRef:
                 name: s3-secret
           env:
+            - name: S3_BUCKET
+              value: "bib-platform-prod-data"
             - name: POD_NAME
               valueFrom:
                 fieldRef:

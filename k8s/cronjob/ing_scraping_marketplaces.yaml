@@ -26,6 +26,11 @@ spec:
                     name: db-data-ev-secret
                 - secretRef:
                     name: s3-secret
+              env:
+                - name: S3_BUCKET
+                  value: "bib-platform-prod-data"
+                - name: S3_BUCKET_DEV
+                  value: "bib-platform-dev-data"
               resources:
                 limits:
                   memory: "4Gi"

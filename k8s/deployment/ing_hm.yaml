@@ -39,4 +39,6 @@ spec:
               value: "6379"
             - name: REDIS_DB_INGESTION
               value: "1"
+            - name: S3_BUCKET
+              value: "bib-platform-prod-data"
 
