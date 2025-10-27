@@ -92,7 +92,6 @@ class VehicleActivationService:
 
             if status_code != 200:
                 error_msg = f"Failed to get fleets: HTTP {status_code}"
-                logging.error(error_msg)
                 return False, error_msg
 
             target_fleet_id = None
@@ -187,6 +186,9 @@ class VehicleActivationService:
             }
 
             status_code, result = await self.bmw_api.create_clearance(payload, session)
+
+            if not status_code:
+                return False, result
 
             result = json.loads(result)
 
@@ -406,6 +408,19 @@ class VehicleActivationService:
                             "Real_Activation": True,
                             "Activation_Error": None,
                             "API_Detail": None,
+                        }
+                        status_data.append(vehicle_data)
+                        continue
+                    elif api_detail and "header unit" in api_detail:
+                        logging.info(
+                            f"BMW vehicle {vin} header unit version is too old to have a sufficient data frequency"
+                        )
+                        vehicle_data = {
+                            "vin": vin,
+                            "Eligibility": True,
+                            "Real_Activation": False,
+                            "Activation_Error": "Activation failed",
+                            "API_Detail": api_detail,
                         }
                         status_data.append(vehicle_data)
                         continue
