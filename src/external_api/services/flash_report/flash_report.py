@@ -4,17 +4,17 @@ import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-import numpy as np
 import pandas as pd
 from fastapi import HTTPException, status
-from fastapi.responses import JSONResponse
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from activation.config.mappings import mapping_vehicle_type
 from db_models.vehicle import Battery, Make, VehicleModel
+from external_api.core import utils
 from external_api.core.config import settings
+from external_api.schemas.flash_report import GenerationData
 from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
     TeslaVinDecoder,
 )
@@ -83,9 +83,9 @@ async def get_db_names(
 
 async def send_vehicle_specs(vin: str, db: AsyncSession):
     if len(vin) != 17:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": "VIN must be 17 characters long"},
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="VIN must be 17 characters long",
         )
 
     tesla_vin_decoder = TeslaVinDecoder()
@@ -127,6 +127,7 @@ async def send_vehicle_specs(vin: str, db: AsyncSession):
 
 
 async def insert_combination(
+    vin: str,
     make: str,
     model: str,
     type: str,
@@ -139,14 +140,15 @@ async def insert_combination(
     id = uuid.uuid4()
 
     insert_query = """
-        INSERT INTO flash_report_combination (id, make, model, type, version, odometer, token)
-        VALUES (:id, :make, :model, :type, :version, :odometer, :token)
+        INSERT INTO flash_report_combination (id, vin, make, model, type, version, odometer, token)
+        VALUES (:id, :vin, :make, :model, :type, :version, :odometer, :token)
     """
     try:
         await db.execute(
             text(insert_query),
             {
                 "id": id,
+                "vin": vin,
                 "make": make,
                 "model": model,
                 "type": type,
@@ -289,28 +291,38 @@ async def send_email(is_french: bool, email: str, token: str):
         raise HTTPException(status_code=500, detail=f"Email error: {e!s}") from e
 
 
-async def get_soh_from_trendline(trendline: str, odometer: int):
-    soh_estimated = eval(trendline, {"np": np, "x": odometer})
-
-    return soh_estimated
+def get_soh_from_trendline(trendline: str, odometer: int):
+    return utils.numpy_safe_eval(trendline, x=odometer)
 
 
-async def send_flash_report_data(
-    vin: str,
-    make: str,
-    model: str,
-    type: str,
-    odometer: int,
-    version: str | None = None,
+async def get_flash_report_data(
+    token: str,
     db: AsyncSession = None,
 ):
-    if make == "tesla" and not version:
+    get_vehicle_query = """
+        SELECT vin, make, model, type, version, odometer
+        FROM flash_report_combination
+        WHERE token = :token
+    """
+    result = await db.execute(
+        text(get_vehicle_query),
+        {
+            "token": token,
+        },
+    )
+    vehicle_info = result.fetchone()
+
+    if not vehicle_info:
+        raise HTTPException(
+            status_code=404, detail="Cannot get back vehicle info from token.."
+        )
+
+    if vehicle_info.make == "tesla" and not vehicle_info.version:
         select_version_query = """
             SELECT version
             FROM vehicle_model vm
-            left join oem o
-            on o.id = vm.oem_id
-            where o.oem_name = :make
+            left join make m on m.id = vm.make_id
+            where m.make_name = :make
             and vm.model_name = :model
             and vm.type = :type
             and vm.trendline is not null
@@ -318,72 +330,45 @@ async def send_flash_report_data(
 
         result = await db.execute(
             text(select_version_query),
-            {"make": make, "model": model, "type": type},
+            {
+                "make": vehicle_info.make,
+                "model": vehicle_info.model,
+                "type": vehicle_info.type,
+            },
         )
 
         version = result.fetchone()[0]
-
-    if version:
-        select_query = """
-            SELECT oem_name,
-                   model_name,
-                   type,
-                   version,
-                   vm.url_image,
-                   vm.warranty_date,
-                   vm.warranty_km,
-                   autonomy,
-                   battery_chemistry,
-                   net_capacity,
-                   capacity,
-                   vm.trendline,
-                   vm.trendline_min, vm.trendline_max
-            FROM vehicle_model vm
-            left join oem o
-            on o.id = vm.oem_id
-            left join battery b
-            on b.id = vm.battery_id
-            where 1=1
-            and o.oem_name=:make
-            and vm.model_name = :model
-            and vm.type = :type
-            and vm.version = :version
-        """
-
-        result = await db.execute(
-            text(select_query),
-            {"make": make, "model": model, "type": type, "version": version},
-        )
     else:
-        select_query = """
-            SELECT oem_name,
-                   model_name,
-                   type,
-                   version,
-                   vm.url_image,
-                   vm.warranty_date,
-                   vm.warranty_km,
-                   autonomy,
-                   battery_chemistry,
-                   net_capacity,
-                   capacity,
-                   vm.trendline,
-                   vm.trendline_min, vm.trendline_max
-            FROM vehicle_model vm
-            left join oem o
-            on o.id = vm.oem_id
-            left join battery b
-            on b.id = vm.battery_id
-            where 1=1
-            and o.oem_name=:make
-            and vm.model_name = :model
-            and vm.type = :type
-        """
+        version = vehicle_info.version
 
-        result = await db.execute(
-            text(select_query),
-            {"make": make, "model": model, "type": type},
-        )
+    select_query = """
+        SELECT vm.url_image,
+                vm.warranty_date,
+                vm.warranty_km,
+                vm.autonomy,
+                b.battery_chemistry,
+                b.battery_oem,
+                b.net_capacity,
+                b.capacity,
+                vm.trendline, vm.trendline_min, vm.trendline_max
+        FROM vehicle_model vm
+        left join make m on m.id = vm.make_id
+        left join battery b on b.id = vm.battery_id
+        where m.make_name=:make
+        and vm.model_name = :model
+        and vm.type = :type
+        and vm.version = :version
+    """
+
+    result = await db.execute(
+        text(select_query),
+        {
+            "make": vehicle_info.make,
+            "model": vehicle_info.model,
+            "type": vehicle_info.type,
+            "version": version,
+        },
+    )
 
     row = result.mappings().first()
     if not row:
@@ -394,36 +379,40 @@ async def send_flash_report_data(
         trendline_min = None
         trendline_max = None
         status = False
-        soh_estimated = None
+        soh = None
     else:
         trendline = row["trendline"]["trendline"]
         trendline_min = row["trendline_min"]["trendline"]
         trendline_max = row["trendline_max"]["trendline"]
         status = True
-        soh_estimated = await get_soh_from_trendline(trendline, odometer)
+        soh = get_soh_from_trendline(trendline, vehicle_info.odometer)
 
-    return {
-        "has_trendline": status,
-        "vehicle_info": {
-            "vin": vin,
-            "brand": row["oem_name"],
-            "model": row["model_name"],
-            "version": None if row["version"] == "unknown" else row["version"],
-            "type": row["type"],
-            "mileage": odometer,
-            "image": row["url_image"],
+    return GenerationData(
+        has_trendline=status,
+        vehicle_info={
+            "vin": vehicle_info.vin,
+            "brand": vehicle_info.make,
+            "model": vehicle_info.model,
+            "version": version if version and version != "unknown" else None,
+            "type": vehicle_info.type
+            if vehicle_info.type and vehicle_info.type != "unknown"
+            else None,
+            "mileage": vehicle_info.odometer,
+            "image_url": row["url_image"],
             "warranty_date": row["warranty_date"],
             "warranty_km": row["warranty_km"],
         },
-        "battery_info": {
+        battery_info={
+            "oem": row["battery_oem"],
             "chemistry": row["battery_chemistry"],
             "net_capacity": row["net_capacity"],
             "capacity": row["capacity"],
+            "consumption": None,
             "range": row["autonomy"],
             "trendline": trendline,
             "trendline_min": trendline_min,
             "trendline_max": trendline_max,
-            "soh_estimated": soh_estimated,
+            "soh": soh,
         },
-    }
+    )
 

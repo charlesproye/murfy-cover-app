@@ -18,3 +18,34 @@ class FlashReportFormType(BaseModel):
     email: EmailStr
     language: LanguageEnum
 
+
+class VehicleInfo(BaseModel):
+    vin: str
+    brand: str
+    model: str
+    type: str
+    version: str | None
+    mileage: float
+    image_url: str | None
+    warranty_date: float | None
+    warranty_km: float | None
+
+
+class BatteryInfo(BaseModel):
+    oem: str | None
+    chemistry: str | None
+    net_capacity: float
+    capacity: float
+    consumption: float | None
+    range: float
+    trendline: str | None
+    trendline_min: str | None
+    trendline_max: str | None
+    soh: float | None
+
+
+class GenerationData(BaseModel):
+    has_trendline: bool
+    vehicle_info: VehicleInfo
+    battery_info: BatteryInfo
+

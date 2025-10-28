@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from external_api.db.session import get_db
 from external_api.schemas.flash_report import FlashReportFormType
 from external_api.services.flash_report.flash_report import (
+    get_flash_report_data,
     insert_combination,
     send_email,
-    send_flash_report_data,
     send_vehicle_specs,
 )
 
@@ -32,6 +32,7 @@ async def send_report_email(
     db: AsyncSession = Depends(get_db),
 ):
     token = await insert_combination(
+        vin=data.vin,
         make=data.make,
         model=data.model,
         type=data.type,
@@ -45,17 +46,11 @@ async def send_report_email(
     return {"message": f"Mail sent to {data.email}"}
 
 
-@router.get("/data")
-async def get_flash_report_data(
-    make: str = Query(...),
-    model: str = Query(...),
-    type: str = Query(...),
-    odometer: int = Query(...),
-    version: str | None = Query(None),
+@router.get("/generation-data")
+async def get_flash_report_data_for_generation(
+    token: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await send_flash_report_data(make, model, type, odometer, version, db)
-    if not result:
-        raise HTTPException(status_code=404, detail="No data found for this vehicle")
+    result = await get_flash_report_data(token, db)
     return result
 

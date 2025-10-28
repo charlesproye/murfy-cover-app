@@ -320,6 +320,7 @@ class ApiBilling(BaseUUIDModel):
 
 class FlashReportCombination(BaseUUIDModel):
     __tablename__ = "flash_report_combination"
+    vin: str = Column(String, nullable=False)
     make: str = Column(String, nullable=False)
     model: str = Column(String, nullable=False)
     type: str = Column(String, nullable=False)
