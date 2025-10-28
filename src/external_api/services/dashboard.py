@@ -1,10 +1,12 @@
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from pydantic import UUID4
-from sqlalchemy import ARRAY, bindparam, text
+from sqlalchemy import ARRAY, and_, bindparam, case, distinct, func, select, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from db_models.vehicle import Vehicle, VehicleData
 from external_api.schemas.user import FleetInfo
 
 
@@ -326,56 +328,115 @@ async def get_global_table(
     ]
 
 
-async def get_individual_kpis(fleet_id: str, db: AsyncSession):
-    query = text("""
-        WITH vehicles_data AS (
-            SELECT DISTINCT ON (vd.vehicle_id)
-                vd.vehicle_id,
-                vd.timestamp,
-                vd.odometer,
-                ROUND((vd.soh * 100), 1) as soh,
-                vd.soh_comparison,
-                v.is_pinned
-            FROM vehicle_data vd
-            JOIN vehicle v ON vd.vehicle_id = v.id
-            WHERE v.fleet_id = :fleet_id
-            AND vd.timestamp > (CURRENT_DATE - INTERVAL '1 month')
-            ORDER BY vd.vehicle_id, vd.timestamp DESC
+async def get_last_timestamp_with_data(fleet_id: str, db: AsyncSession):
+    query = (
+        select(func.max(VehicleData.timestamp).label("last_update"))
+        .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
+        .where(
+            and_(
+                Vehicle.fleet_id == fleet_id,
+                VehicleData.soh.isnot(None),
+                VehicleData.odometer.isnot(None),
+            )
         )
-        SELECT
-            ROUND(AVG(odometer)) as avg_odometer,
-            ROUND(AVG(soh), 1) as avg_soh,
-            COUNT(DISTINCT vehicle_id) as vehicle_count,
-            COUNT(*) FILTER (WHERE is_pinned = true) as pinned_count
-        FROM vehicles_data
-    """)
+    )
     result = await db.execute(query, {"fleet_id": fleet_id})
+    last_update_data = result.mappings().all()
+    last_update = (
+        last_update_data[0]["last_update"] if len(last_update_data) > 0 else None
+    )
+    return last_update
+
+
+async def get_individual_kpis(fleet_id: str, db: AsyncSession):
+    latest_timestamp = await get_last_timestamp_with_data(fleet_id, db)
+    if not latest_timestamp:
+        return [
+            {
+                "avg_odometer": None,
+                "avg_soh": None,
+                "vehicle_count": 0,
+                "pinned_count": 0,
+            },
+        ]
+
+    # Convert to datetime if it's not already
+    if isinstance(latest_timestamp, str):
+        latest_timestamp = datetime.fromisoformat(
+            latest_timestamp.replace("Z", "+00:00")
+        )
+
+    # Calculate 1 month and 2 months ago using timedelta
+    # This is approximate but works well for most use cases
+    one_month_since_last_data = latest_timestamp - timedelta(days=30)
+    two_months_since_last_data = latest_timestamp - timedelta(days=60)
+
+    # Getting fleet data in a one-month window from the last data
+    subquery = (
+        select(
+            VehicleData.vehicle_id,
+            VehicleData.timestamp,
+            VehicleData.odometer,
+            func.round(VehicleData.soh * 100, 1).label("soh"),
+            Vehicle.is_pinned,
+        )
+        .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
+        .where(
+            Vehicle.fleet_id == fleet_id,
+            VehicleData.timestamp > one_month_since_last_data,
+        )
+        .order_by(VehicleData.vehicle_id, VehicleData.timestamp.desc())
+        .distinct(VehicleData.vehicle_id)
+        .subquery()
+    )
+
+    query = select(
+        func.round(func.avg(subquery.c.odometer)).label("avg_odometer"),
+        func.round(func.avg(subquery.c.soh), 1).label("avg_soh"),
+        func.count(distinct(subquery.c.vehicle_id)).label("vehicle_count"),
+        func.count(case((subquery.c.is_pinned, 1))).label("pinned_count"),
+    )
+    result = await db.execute(
+        query,
+        {"fleet_id": fleet_id, "one_month_since_last_data": one_month_since_last_data},
+    )
     latest_data = result.mappings().all()
 
-    query = text("""
-        WITH previous_vehicle_data AS (
-            SELECT DISTINCT ON (vd.vehicle_id)
-                vd.vehicle_id,
-                vd.timestamp,
-                vd.odometer,
-                ROUND((vd.soh * 100), 1) as soh,
-                vd.soh_comparison,
-                v.is_pinned
-            FROM vehicle_data vd
-            JOIN vehicle v ON vd.vehicle_id = v.id
-            WHERE v.fleet_id = :fleet_id
-            AND vd.timestamp < (CURRENT_DATE - INTERVAL '1 month')
-            AND vd.timestamp > (CURRENT_DATE - INTERVAL '2 month')
-            ORDER BY vd.vehicle_id, vd.timestamp DESC
+    # Getting fleet data in a one-month window from the last data, the month before the one just above
+    prev_data_row = (
+        select(
+            VehicleData.id,
+            VehicleData.vehicle_id,
+            VehicleData.timestamp,
+            VehicleData.odometer,
+            func.round(VehicleData.soh * 100, 1).label("soh"),
+            Vehicle.is_pinned,
         )
-        SELECT
-            ROUND(AVG(odometer)) as avg_odometer,
-            ROUND(AVG(soh), 1) as avg_soh,
-            COUNT(DISTINCT vehicle_id) as vehicle_count,
-            COUNT(*) FILTER (WHERE is_pinned = true) as pinned_count
-        FROM previous_vehicle_data
-    """)
-    result_previous = await db.execute(query, {"fleet_id": fleet_id})
+        .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
+        .where(
+            Vehicle.fleet_id == fleet_id,
+            VehicleData.timestamp < one_month_since_last_data,
+            VehicleData.timestamp > two_months_since_last_data,
+        )
+        .order_by(VehicleData.vehicle_id, VehicleData.timestamp.desc())
+        .distinct(VehicleData.vehicle_id)
+        .subquery()
+    )
+
+    query = select(
+        func.round(func.avg(prev_data_row.c.odometer)).label("avg_odometer"),
+        func.round(func.avg(prev_data_row.c.soh), 1).label("avg_soh"),
+        func.count(distinct(prev_data_row.c.vehicle_id)).label("vehicle_count"),
+        func.count(case((prev_data_row.c.is_pinned, 1))).label("pinned_count"),
+    )
+    result_previous = await db.execute(
+        query,
+        {
+            "fleet_id": fleet_id,
+            "one_month_since_last_data": one_month_since_last_data,
+            "two_months_since_last_data": two_months_since_last_data,
+        },
+    )
     previous_data = result_previous.mappings().all()
 
     return [

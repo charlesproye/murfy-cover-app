@@ -7,6 +7,7 @@ from external_api.services.dashboard import (
     get_global_table,
     get_individual_kpis,
     get_kpis,
+    get_last_timestamp_with_data,
     get_new_vehicles,
     get_range_soh,
     get_scatter_plot_brands,
@@ -19,6 +20,11 @@ from external_api.services.dashboard import (
 
 
 class DashboardCrud:
+    async def get_last_timestamp_with_data(
+        self, fleet_id: str, db: AsyncSession | None = None
+    ):
+        return await get_last_timestamp_with_data(fleet_id, db)
+
     async def kpis(
         self,
         fleets: list[str],
