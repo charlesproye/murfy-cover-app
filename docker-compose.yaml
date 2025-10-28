@@ -31,6 +31,7 @@ services:
       - .env
 
   tesla_ingestion_service:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: docker/tesla.Dockerfile
@@ -72,6 +73,7 @@ services:
       - .env
 
   hm_ingestion_service:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: docker/hm.Dockerfile
@@ -89,6 +91,7 @@ services:
       - REDIS_PASSWORD=bibpwd
 
   ms_ingestion_service:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: docker/mobilisights.Dockerfile
