@@ -42,9 +42,11 @@ from activation.config.credentials import (
     VW_ORGANIZATION_ID,
 )
 from activation.config.settings import LOGGING_CONFIG
+from activation.fleet_info import check_vehicles_without_type
 from activation.fleet_info import read_fleet_info as fleet_info
 from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
+from core.slack_utils import send_slack_message
 
 # KIA_API_KEY,
 # KIA_API_PWD,
@@ -117,7 +119,10 @@ async def process_vehicles(owner_filter: str | None = None):
 
         # Get initial fleet info
         df = await fleet_info(fleet_filter=owner_filter)
-
+        nbr_vehicles_without_type = check_vehicles_without_type(df)
+        send_slack_message(
+            SLACK_CHANNEL_ID, f"{nbr_vehicles_without_type} vehicles without type"
+        )
         # Initialize activation service
         activation_service = VehicleActivationService(
             bmw_api=bmw_api,

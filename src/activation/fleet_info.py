@@ -319,6 +319,17 @@ async def read_fleet_info(fleet_filter: str | None = None) -> pd.DataFrame:
     #     raise
 
 
+def check_vehicles_without_type(fleet_info_df: pd.DataFrame) -> int:
+    """Check the number of vehicles without type."""
+    return (
+        fleet_info_df[
+            (fleet_info_df["oem"] != "tesla") & (fleet_info_df["activation"] == True)
+        ]
+        .type.isna()
+        .sum()
+    )
+
+
 if __name__ == "__main__":
     df = asyncio.run(read_fleet_info(fleet_filter=""))
 
