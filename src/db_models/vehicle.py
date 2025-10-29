@@ -324,7 +324,7 @@ class FlashReportCombination(BaseUUIDModel):
     make: str = Column(String, nullable=False)
     model: str = Column(String, nullable=False)
     type: str = Column(String, nullable=False)
-    version: str = Column(String, nullable=True)
+    version: str | None = Column(String, nullable=True)
     odometer: int = Column(Integer, nullable=False)
     token: str = Column(String, nullable=False, unique=True)
 

@@ -7,11 +7,10 @@ from email.mime.text import MIMEText
 import pandas as pd
 from fastapi import HTTPException, status
 from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from activation.config.mappings import mapping_vehicle_type
-from db_models.vehicle import Battery, Make, VehicleModel
+from db_models.vehicle import Battery, FlashReportCombination, Make, VehicleModel
 from external_api.core import utils
 from external_api.core.config import settings
 from external_api.schemas.flash_report import GenerationData
@@ -135,31 +134,19 @@ async def insert_combination(
     odometer: int,
     db: AsyncSession,
 ):
-    # Generate a unique token based on the combination values
     token = str(uuid.uuid4())
-    id = uuid.uuid4()
-
-    insert_query = """
-        INSERT INTO flash_report_combination (id, vin, make, model, type, version, odometer, token)
-        VALUES (:id, :vin, :make, :model, :type, :version, :odometer, :token)
-    """
-    try:
-        await db.execute(
-            text(insert_query),
-            {
-                "id": id,
-                "vin": vin,
-                "make": make,
-                "model": model,
-                "type": type,
-                "version": version,
-                "odometer": odometer,
-                "token": token,
-            },
+    db.add(
+        FlashReportCombination(
+            vin=vin,
+            make=make,
+            model=model,
+            type=type,
+            version=version,
+            odometer=odometer,
+            token=token,
         )
-    except IntegrityError:
-        return token
-
+    )
+    await db.flush()
     await db.commit()
 
     return token
@@ -299,91 +286,68 @@ async def get_flash_report_data(
     token: str,
     db: AsyncSession = None,
 ):
-    get_vehicle_query = """
-        SELECT vin, make, model, type, version, odometer
-        FROM flash_report_combination
-        WHERE token = :token
-    """
-    result = await db.execute(
-        text(get_vehicle_query),
-        {
-            "token": token,
-        },
-    )
-    vehicle_info = result.fetchone()
+    # Get vehicle info from flash report combination
+    stmt = select(FlashReportCombination).where(FlashReportCombination.token == token)
+    result = await db.execute(stmt)
+    vehicle_info = result.scalar_one_or_none()
 
     if not vehicle_info:
         raise HTTPException(
             status_code=404, detail="Cannot get back vehicle info from token.."
         )
 
-    if vehicle_info.make == "tesla" and not vehicle_info.version:
-        select_version_query = """
-            SELECT version
-            FROM vehicle_model vm
-            left join make m on m.id = vm.make_id
-            where m.make_name = :make
-            and vm.model_name = :model
-            and vm.type = :type
-            and vm.trendline is not null
-        """
+    version = vehicle_info.version
 
-        result = await db.execute(
-            text(select_version_query),
-            {
-                "make": vehicle_info.make,
-                "model": vehicle_info.model,
-                "type": vehicle_info.type,
-            },
+    # If Tesla and no version, get version from vehicle_model
+    if vehicle_info.make == "tesla" and not version:
+        stmt = (
+            select(VehicleModel.version)
+            .join(Make, Make.id == VehicleModel.make_id)
+            .where(
+                (Make.make_name == vehicle_info.make)
+                & (VehicleModel.model_name == vehicle_info.model)
+                & (VehicleModel.type == vehicle_info.type)
+                & VehicleModel.trendline.is_not(None)
+            )
+        )
+        result = await db.execute(stmt)
+        version = result.scalar_one_or_none()
+
+    version = version or "unknown"
+
+    # Get vehicle model with battery info
+    stmt = (
+        select(VehicleModel, Battery)
+        .outerjoin(Make, Make.id == VehicleModel.make_id)
+        .outerjoin(Battery, Battery.id == VehicleModel.battery_id)
+        .where(
+            (Make.make_name == vehicle_info.make)
+            & (VehicleModel.model_name == vehicle_info.model)
+            & (VehicleModel.type == vehicle_info.type)
+            & (VehicleModel.version == version)
+        )
+    )
+    result = await db.execute(stmt)
+    row = result.first()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Cannot get back vehicle model from token {vehicle_info.make=}, {vehicle_info.model=}, {vehicle_info.type=}, {version=}.",
         )
 
-        version = result.fetchone()[0]
-    else:
-        version = vehicle_info.version
+    vehicle_model, battery = row
 
-    select_query = """
-        SELECT vm.url_image,
-                vm.warranty_date,
-                vm.warranty_km,
-                vm.autonomy,
-                b.battery_chemistry,
-                b.battery_oem,
-                b.net_capacity,
-                b.capacity,
-                vm.trendline, vm.trendline_min, vm.trendline_max
-        FROM vehicle_model vm
-        left join make m on m.id = vm.make_id
-        left join battery b on b.id = vm.battery_id
-        where m.make_name=:make
-        and vm.model_name = :model
-        and vm.type = :type
-        and vm.version = :version
-    """
-
-    result = await db.execute(
-        text(select_query),
-        {
-            "make": vehicle_info.make,
-            "model": vehicle_info.model,
-            "type": vehicle_info.type,
-            "version": version,
-        },
-    )
-
-    row = result.mappings().first()
-    if not row:
-        return None
-
-    if not row["trendline"]:
+    if not vehicle_model.trendline:
         trendline = None
         trendline_min = None
         trendline_max = None
         status = False
         soh = None
     else:
-        trendline = row["trendline"]["trendline"]
-        trendline_min = row["trendline_min"]["trendline"]
-        trendline_max = row["trendline_max"]["trendline"]
+        trendline = vehicle_model.trendline["trendline"]
+        trendline_min = vehicle_model.trendline_min["trendline"]
+        trendline_max = vehicle_model.trendline_max["trendline"]
         status = True
         soh = get_soh_from_trendline(trendline, vehicle_info.odometer)
 
@@ -398,17 +362,17 @@ async def get_flash_report_data(
             if vehicle_info.type and vehicle_info.type != "unknown"
             else None,
             "mileage": vehicle_info.odometer,
-            "image_url": row["url_image"],
-            "warranty_date": row["warranty_date"],
-            "warranty_km": row["warranty_km"],
+            "image_url": vehicle_model.url_image,
+            "warranty_date": vehicle_model.warranty_date,
+            "warranty_km": vehicle_model.warranty_km,
         },
         battery_info={
-            "oem": row["battery_oem"],
-            "chemistry": row["battery_chemistry"],
-            "net_capacity": row["net_capacity"],
-            "capacity": row["capacity"],
+            "oem": battery.battery_oem if battery else None,
+            "chemistry": battery.battery_chemistry if battery else None,
+            "net_capacity": battery.net_capacity if battery else None,
+            "capacity": battery.capacity if battery else None,
             "consumption": None,
-            "range": row["autonomy"],
+            "range": vehicle_model.autonomy,
             "trendline": trendline,
             "trendline_min": trendline_min,
             "trendline_max": trendline_max,

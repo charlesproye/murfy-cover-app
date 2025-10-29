@@ -55,7 +55,6 @@ def get_session_maker():
     return _session_maker
 
 
-# @asynccontextmanager
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Get a database session.
@@ -65,6 +64,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     session = session_maker()
     try:
         yield session
+    except Exception:
+        await session.rollback()
+        raise
     finally:
         await session.close()
 
