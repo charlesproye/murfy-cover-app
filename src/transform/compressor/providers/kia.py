@@ -20,8 +20,6 @@ class KiaCompressor(Compressor):
         all_items = []
         for file in new_files.values():
             decoded = msgspec.json.decode(file)
-            if isinstance(decoded, str):
-                decoded = msgspec.json.decode(decoded.encode())
             if isinstance(decoded, list):
                 all_items.extend(decoded)
             else:

@@ -38,8 +38,6 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
         return tss
 
     def compute_specific_features_before_aggregation(self, phase_df):
-        print(phase_df.show())
-
         phase_df = phase_df.withColumn("soh_oem", F.col("soh_oem") / 100)
 
         phase_df = phase_df.withColumn(

@@ -10,7 +10,6 @@ from transform.raw_tss.providers.bmw import BMWResponseToRaw
 from transform.raw_tss.providers.high_mobility import HighMobilityResponseToRaw
 from transform.raw_tss.providers.kia import KiaResponseToRaw
 from transform.raw_tss.providers.mobilisight import MobilisightResponseToRaw
-from transform.raw_tss.providers.tesla import TeslaResponseToRaw
 from transform.raw_tss.providers.tesla_fleet_telemetry import TeslaFTResponseToRawTss
 from transform.raw_tss.providers.volkswagen import VolkswagenResponseToRaw
 
@@ -20,7 +19,7 @@ PROVIDERS = {
     "renault": HighMobilityResponseToRaw,
     "volvo-cars": HighMobilityResponseToRaw,
     "stellantis": MobilisightResponseToRaw,
-    "kia": HighMobilityResponseToRaw,
+    "kia": KiaResponseToRaw,
     "ford": HighMobilityResponseToRaw,
     "tesla-fleet-telemetry": TeslaFTResponseToRawTss,
     "volkswagen": VolkswagenResponseToRaw,

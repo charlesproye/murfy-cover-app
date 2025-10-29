@@ -30,6 +30,9 @@ spec:
                 name: s3-secret
           ports:
             - containerPort: 8501
+          env:
+            - name: S3_BUCKET
+              value: "bib-platform-prod-data"
           resources:
             limits:
               memory: "512Mi"

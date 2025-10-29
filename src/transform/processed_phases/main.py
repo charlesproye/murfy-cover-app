@@ -8,6 +8,7 @@ from core.s3.settings import S3Settings
 from core.spark_utils import create_spark_session, create_spark_session_k8s
 from transform.processed_phases.providers.bmw import BMWRawTsToProcessedPhases
 from transform.processed_phases.providers.ford import FordRawTsToProcessedPhases
+from transform.processed_phases.providers.kia import KiaRawTsToProcessedPhases
 from transform.processed_phases.providers.mercedes_benz import (
     MercedesBenzRawTsToProcessedPhases,
 )
@@ -27,7 +28,7 @@ PROVIDERS = {
     "renault": RenaultRawTsToProcessedPhases,
     "volvo-cars": VolvoRawTsToProcessedPhases,
     "stellantis": StellantisRawTsToProcessedPhases,
-    "kia": RawTsToProcessedPhases,
+    "kia": KiaRawTsToProcessedPhases,
     "ford": FordRawTsToProcessedPhases,
     "tesla-fleet-telemetry": TeslaFTRawTsToProcessedPhases,
     "volkswagen": RawTsToProcessedPhases,
