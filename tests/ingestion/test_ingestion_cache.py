@@ -1,3 +1,5 @@
+import time
+
 import fakeredis
 import pytest
 
@@ -27,7 +29,9 @@ def test_ingestion_cache(fake_redis):
 
 
 def test_ingestion_cache_with_keys_to_ignore(fake_redis):
-    cache = IngestionCache(make="mobilisights", keys_to_ignore=["date.time", "id"])
+    cache = IngestionCache(
+        make="mobilisights", keys_to_ignore=["date.time", "id", "date"]
+    )
 
     test_data = {
         "test": "value",
@@ -43,7 +47,6 @@ def test_ingestion_cache_with_keys_to_ignore(fake_redis):
 
     test_data_different_ignored = {
         "test": "value",
-        "date": {"day": "2023-01-01", "time": "13:00:00"},
         "id": "456",
     }
     assert (
@@ -74,4 +77,18 @@ def test_remove_paths_wildcard():
             "last_updated": {},
         },
     }
+
+
+def test_ingestion_cache_with_min_change_interval(fake_redis):
+    cache = IngestionCache(make="mobilisights", min_change_interval=0.2)
+
+    test_data = {"test": "value"}
+    assert cache.json_in_db(vin="1234567890", json_data=test_data) is False
+    cache.set_json_in_db(vin="1234567890", json_data=test_data)
+
+    test_data["test"] = "new_value"
+    assert cache.json_in_db(vin="1234567890", json_data=test_data) is True
+
+    time.sleep(0.2)
+    assert cache.json_in_db(vin="1234567890", json_data=test_data) is False
 

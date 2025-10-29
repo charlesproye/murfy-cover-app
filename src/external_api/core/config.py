@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", ""))
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
 
     # Default user
     FIRST_SUPERUSER_EMAIL: EmailStr | None = None

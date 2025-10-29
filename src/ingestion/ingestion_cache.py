@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import time
 from typing import Any
 
 import msgspec
@@ -43,7 +44,22 @@ def _remove_paths(data: dict, paths: list[tuple[str, ...]]) -> Any:
 
 
 class IngestionCache:
-    def __init__(self, make: str, keys_to_ignore: list[str] | None = None):
+    def __init__(
+        self,
+        make: str,
+        keys_to_ignore: list[str] | None = None,
+        min_change_interval: float | None = None,
+    ):
+        """
+        Parameters
+        ----------
+        make: str
+            The make of the vehicle
+        keys_to_ignore: list[str] | None
+            The keys to ignore
+        min_change_interval: float | None
+            The minimum change interval in seconds. If provided, the cache will only store the data if it has changed since the last time it was stored.
+        """
         redis_host = os.environ.get("REDIS_HOST", "redis")
         redis_port = int(os.environ.get("REDIS_PORT", 6379))
         redis_user = os.environ.get("REDIS_USER")
@@ -67,6 +83,8 @@ class IngestionCache:
             [tuple(p.split(".")) for p in keys_to_ignore] if keys_to_ignore else []
         )
 
+        self._min_change_interval = min_change_interval
+
     def __compute_hash(self, json_data: dict[str, Any] | msgspec.Struct) -> str:
         if self.__ignore_paths:
             hash_data = _remove_paths(json_data, self.__ignore_paths)
@@ -80,7 +98,21 @@ class IngestionCache:
         hash_data = self.__compute_hash(json_data)
 
         key = f"{self.__make}:{vin}"
-        cached_hash = self.__redis.get(key)
+        cached_data = self.__redis.get(key)
+
+        if cached_data is None:
+            return False
+
+        if self._min_change_interval and ":" in cached_data:
+            # Might have some old keys without the last change timestamp
+            cached_hash, last_change = cached_data.split(":")
+            if (
+                last_change
+                and time.time() - float(last_change) < self._min_change_interval
+            ):
+                return True  # data is still valid
+        else:
+            cached_hash = cached_data
 
         is_cached = cached_hash == hash_data
 
@@ -94,6 +126,9 @@ class IngestionCache:
     ) -> None:
         hash_data = self.__compute_hash(json_data)
         key = f"{self.__make}:{vin}"
+
+        if self._min_change_interval:
+            hash_data = f"{hash_data}:{time.time()}"
 
         if ttl:
             self.__redis.set(key, hash_data, ex=ttl)

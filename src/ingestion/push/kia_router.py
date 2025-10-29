@@ -29,7 +29,9 @@ class KiaSettings(BaseSettings):
 @asynccontextmanager
 async def kia_lifespan(app):
     LOGGER.info("Initialisation du cache KIA...")
-    kia_cache = IngestionCache(make="kia", keys_to_ignore=KIA_KEYS_TO_IGNORE)
+    kia_cache = IngestionCache(
+        make="kia", keys_to_ignore=KIA_KEYS_TO_IGNORE, min_change_interval=30
+    )
 
     app.state.kia_cache = kia_cache
 
@@ -58,26 +60,21 @@ async def receive_kia_data(
     try:
         raw_bytes = await request.body()
 
-        decoded_bytes = gzip.decompress(raw_bytes)
-        decoded_str = decoded_bytes.decode("utf-8")
-        decoded_json = json.loads(decoded_str)
+        decompressed_data = gzip.decompress(raw_bytes)
+        decoded_json = json.loads(decompressed_data.decode("utf-8"))
 
-        kia_cache = request.app.state.kia_cache
+        kia_cache: IngestionCache = request.app.state.kia_cache
 
         for record in decoded_json["records"]:
-            decoded_bytes = base64.b64decode(str(record))
-            json_start = decoded_bytes.find(b"{")
-            json_bytes = decoded_bytes[json_start:]
-            decoded_str = json_bytes.decode("utf-8")
-            data = json.loads(decoded_str)
+            record_data = json.loads(base64.b64decode(record["data"]))
 
-            vin = data.get("header", {}).get("vin", "unknown")
-            if kia_cache.json_in_db(vin, data):
+            vin = record_data.get("header", {}).get("vin", "unknown")
+            if kia_cache.json_in_db(vin, record_data):
                 continue
 
-            kia_cache.set_json_in_db(vin, data)
-
-        await storage_service.store_raw_json("kia", data)
+            kia_cache.set_json_in_db(vin, record_data)
+            await storage_service.store_raw_json("kia", record_data)
+            LOGGER.info(f"Stored new record for VIN: {vin}")
 
     except Exception as e:
         LOGGER.exception(f"Error decoding Kia data: {e}")
