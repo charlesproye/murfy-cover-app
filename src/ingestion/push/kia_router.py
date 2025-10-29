@@ -4,6 +4,7 @@ import json
 import logging
 import secrets
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -58,6 +59,8 @@ async def receive_kia_data(
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     try:
+        request_id = request.headers.get("x-request-id")
+
         raw_bytes = await request.body()
 
         decompressed_data = gzip.decompress(raw_bytes)
@@ -79,7 +82,10 @@ async def receive_kia_data(
     except Exception as e:
         LOGGER.exception(f"Error decoding Kia data: {e}")
 
-    return {}
+    return {
+        "requestId": request_id,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
 
 
 @kia_router.post("/token")
