@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .bmw_router import bmw_router
+from .kia_router import kia_router
 from .volksvagen_router import volkswagen_router
 
 app = FastAPI(
@@ -27,4 +28,5 @@ app.add_middleware(LogRequestMiddleware)
 
 app.include_router(volkswagen_router)
 app.include_router(bmw_router)
+app.include_router(kia_router)
 

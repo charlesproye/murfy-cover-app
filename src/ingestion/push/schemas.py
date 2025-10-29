@@ -8,6 +8,10 @@ class BaseModelWithVin(BaseModel):
     received_date: datetime = Field(default_factory=datetime.now)
 
 
+class EventSelector(BaseModel):
+    event: str
+
+
 class Trip(BaseModelWithVin):
     event: str  # = Field(..., pattern="^TRIP$", example="TRIP")
     tripId: str | None = None
@@ -94,6 +98,11 @@ class ChargingState(BaseModelWithVin):
     vehicleTimeUtc: datetime | None = None
     vehicleTimeLocal: datetime | None = None
     targetSoc: int | None = None
+    batteryCareMode: str | None = None
+    chargingState: str | None = None
+    chargePower: float | None = None
+    chargeRate: float | None = None
+    chargingMode: str | None = None
 
 
 class ChargingRemainingTime(BaseModelWithVin):
@@ -105,6 +114,7 @@ class ChargingRemainingTime(BaseModelWithVin):
     remainingTimeMinutes: int | None = None
 
 
+# BMW
 class PushKeyValue(BaseModel):
     key: str
     value: str

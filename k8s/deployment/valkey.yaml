@@ -35,7 +35,7 @@ spec:
             - containerPort: 9121
           env:
             - name: REDIS_EXPORTER_COUNT_KEYS
-              value: "db1=mobilisights:*,db1=highmobility:*"
+              value: "db1=mobilisights:*,db1=highmobility:*,db1=kia:*"
           resources:
             requests:
               cpu: 50m
@@ -80,5 +80,5 @@ spec:
       scrapeTimeout: 10s
   namespaceSelector:
     matchNames:
-      - bib
+      - data-engineering
 

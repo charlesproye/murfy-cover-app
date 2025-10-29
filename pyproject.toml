@@ -80,6 +80,7 @@ web = [
     "python-multipart>=0.0.18",
     "orjson==3.8.5",
     "greenlet==3.2.2",
+    "jwt"
 ]
 
 # Results/visualization module dependencies
@@ -100,6 +101,13 @@ ingestion = [
     "rapidfuzz==3.13.0",
     "aiokafka==0.10.0",
     "memory-profiler==0.61.0",
+    "fastapi~=0.118",
+    "uvicorn",
+    "python-multipart>=0.0.18",
+    "orjson==3.8.5",
+    "greenlet==3.2.2",
+    "pyjwt",
+    "pyyaml>=6.0",
 ]
 
 # Scraping module dependencies

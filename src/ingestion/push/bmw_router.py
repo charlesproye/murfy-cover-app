@@ -12,8 +12,10 @@ class BmwSettings(BaseSettings):
     BMW_PUSH_API_KEY: str = Field(default=...)
 
 
+settings = BmwSettings()
+
+
 def authenticate(request: Request):
-    settings = BmwSettings()
     api_key = request.headers.get("x-push-payload-key")
     logging.info(f"BMW {api_key = }")
     if api_key != settings.BMW_PUSH_API_KEY:

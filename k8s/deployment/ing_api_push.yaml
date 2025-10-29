@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ing-api-push
+  namespace: data-engineering
+  labels:
+    app: ing-api-push
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ing-api-push
+  template:
+    metadata:
+      labels:
+        app: ing-api-push
+    spec:
+      containers:
+        - name: ing-api-push
+          image: rg.fr-par.scw.cloud/data-engineering/ingestion-push:latest
+          imagePullPolicy: Always
+          command: ["uvicorn", "src.ingestion.push.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1024Mi"
+          envFrom:
+            - secretRef:
+                name: kia-secret
+            - secretRef:
+                name: bmw-secret
+            - secretRef:
+                name: vw-secret
+            - secretRef:
+                name: s3-secret
+          env:
+            - name: REDIS_HOST
+              value: valkey.data-engineering.svc
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_DB_INGESTION
+              value: "1"
+            - name: S3_BUCKET
+              value: "bib-platform-prod-data"
+      restartPolicy: Always
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ing-api-push-service
+  namespace: data-engineering
+spec:
+  type: ClusterIP
+  selector:
+    app: ing-api-push
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ing-api-push-ingress
+  namespace: data-engineering
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt
+    # nginx.ingress.kubernetes.io/whitelist-source-range: "35.156.51.248/32,18.159.198.255/32,3.68.135.92/32,82.121.210.218/32"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - kia.bib-services.fr
+        - bmw.bib-services.fr
+        - volkswagen.bib-services.fr
+      secretName: ing-api-push-tls
+  rules:
+    - host: kia.bib-services.fr
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ing-api-push-service
+                port:
+                  number: 80
+    - host: bmw.bib-services.fr
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ing-api-push-service
+                port:
+                  number: 80
+    - host: volkswagen.bib-services.fr
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ing-api-push-service
+                port:
+                  number: 80
+

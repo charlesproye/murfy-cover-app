@@ -34,7 +34,7 @@ spec:
                 name: s3-secret
           env:
             - name: REDIS_HOST
-              value: valkey.bib.svc
+              value: valkey.data-engineering.svc
             - name: REDIS_PORT
               value: "6379"
             - name: REDIS_DB_INGESTION

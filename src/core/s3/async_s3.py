@@ -1,13 +1,15 @@
 import asyncio
 import logging
 import time
+from collections.abc import AsyncGenerator, Iterable
 from contextlib import asynccontextmanager
-from typing import Annotated, AsyncGenerator, Iterable, TypeVar
+from typing import Any, TypeVar
 
 import aioboto3
+import yaml
 from botocore.exceptions import ClientError
 
-from .settings import S3Settings, get_s3_settings
+from .settings import get_s3_settings
 
 T = TypeVar("T")
 
@@ -41,7 +43,7 @@ class AsyncS3:
         """Returns (folders, files)"""
         folders = set()
         files = []
-        async with self._client() as client:
+        async with self._sem, self._client() as client:
             paginator = client.get_paginator("list_objects_v2")
             async for page in paginator.paginate(
                 Bucket=self.bucket, Prefix=path, Delimiter="/"
@@ -57,16 +59,15 @@ class AsyncS3:
         return sorted(folders), sorted(files)
 
     async def get_file(self, path: str) -> bytes | None:
-        async with self._sem:
-            async with self._client() as client:  # type: ignore
-                try:
-                    response = await client.get_object(Bucket=self.bucket, Key=path)
-                    async with response["Body"] as stream:
-                        return await stream.read()
-                except ClientError as e:
-                    if e.response["Error"]["Code"] == "NoSuchKey":
-                        return None
-                    raise
+        async with self._sem, self._client() as client:
+            try:
+                response = await client.get_object(Bucket=self.bucket, Key=path)
+                async with response["Body"] as stream:
+                    return await stream.read()
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "NoSuchKey":
+                    return None
+                raise
 
     async def get_files(self, paths: Iterable[str]) -> dict[str, bytes]:
         paths_list = list(paths)
@@ -87,7 +88,7 @@ class AsyncS3:
         """Optimized download using single client with proper concurrency control"""
         results: dict[str, bytes] = {}
 
-        async with self._client() as client:
+        async with self._sem, self._client() as client:
 
             async def download_single(key: str):
                 async with self._sem:
@@ -108,19 +109,18 @@ class AsyncS3:
         return results
 
     async def upload_file(self, path: str, file: bytes) -> None:
-        async with self._client() as client:  # type: ignore
+        async with self._sem, self._client() as client:
             await client.put_object(Bucket=self.bucket, Key=path, Body=file)
 
     async def delete_file(self, path: str) -> bool:
-        async with self._sem:
-            async with self._client() as client:  # type: ignore
-                try:
-                    await client.delete_object(Bucket=self.bucket, Key=path)
-                    return True
-                except ClientError as e:
-                    if e.response["Error"]["Code"] == "NoSuchKey":
-                        return False
-                    raise
+        async with self._sem, self._client() as client:
+            try:
+                await client.delete_object(Bucket=self.bucket, Key=path)
+                return True
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "NoSuchKey":
+                    return False
+                raise
 
     async def download_folder(self, folder_path: str) -> dict[str, bytes]:
         _, files = await self.list_content(folder_path)
@@ -149,25 +149,48 @@ class AsyncS3:
 
     async def delete_folder(self, prefix: str) -> int:
         deleted_count = 0
-        async with self._sem:
-            async with self._client() as client:  # type: ignore
-                paginator = client.get_paginator("list_objects_v2")
-                async for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
-                    contents = page.get("Contents", [])
-                    if not contents:
-                        continue
+        async with self._sem, self._client() as client:
+            paginator = client.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+                contents = page.get("Contents", [])
+                if not contents:
+                    continue
 
-                    # Batch delete (doc says max 1000 at a time)
-                    for i in range(0, len(contents), 1000):
-                        batch = contents[i : i + 1000]
-                        keys = [{"Key": obj["Key"]} for obj in batch]
+                # Batch delete (doc says max 1000 at a time)
+                for i in range(0, len(contents), 1000):
+                    batch = contents[i : i + 1000]
+                    keys = [{"Key": obj["Key"]} for obj in batch]
 
-                        await client.delete_objects(
-                            Bucket=self.bucket, Delete={"Objects": keys, "Quiet": True}
-                        )
-                        deleted_count += len(keys)
+                    await client.delete_objects(
+                        Bucket=self.bucket, Delete={"Objects": keys, "Quiet": True}
+                    )
+                    deleted_count += len(keys)
 
-            return deleted_count
+        return deleted_count
+
+    async def read_yaml_file(self, path: str) -> dict[str, Any] | None:
+        """
+        Asynchronously read and parse a YAML file from S3.
+
+        Args:
+            path: S3 path to the YAML file
+
+        Returns:
+            Parsed YAML content as dictionary, or None if file doesn't exist
+        """
+        file_content = await self.get_file(path)
+        if file_content is None:
+            return None
+
+        try:
+            yaml_content = file_content.decode("utf-8")
+            return yaml.safe_load(yaml_content)
+        except yaml.YAMLError as e:
+            self.logger.error(f"Erreur de parsing YAML dans {path} : {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Erreur de lecture du fichier YAML {path} : {e}")
+            raise
 
 
 def get_async_s3() -> AsyncS3:

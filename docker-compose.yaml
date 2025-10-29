@@ -150,21 +150,25 @@ services:
       restart_policy:
         condition: on-failure
 
-  ingestion-web-app:
+  ingestion-push:
     platform: linux/amd64
-    image: rg.fr-par.scw.cloud/data-engineering/ingestion-web-app:latest
+    image: rg.fr-par.scw.cloud/data-engineering/ingestion-push:latest
     build:
-      dockerfile: docker/webapp.Dockerfile
+      dockerfile: docker/push_ingestion.Dockerfile
       context: .
     ports:
       - "8080:8080"
+    env_file:
+      - ./.env
+      - ./.python.env
     environment:
-      BMW_PUSH_API_KEY: ${BMW_PUSH_API_KEY}
-      S3_REGION: ${S3_REGION}
-      S3_ENDPOINT: ${S3_ENDPOINT}
-      S3_BUCKET: ${S3_BUCKET}
-      S3_KEY: ${S3_KEY}
-      S3_SECRET: ${S3_SECRET}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_USER=bib
+      - REDIS_PASSWORD=bibpwd
+    depends_on:
+      - redis
+
 
 
   spark-transform-service:
