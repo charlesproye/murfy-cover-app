@@ -72,10 +72,6 @@ class MobilisightsIngester:
         if MS_PASSWORD is None:
             self.__ingester_logger.error("MS_PASSWORD environment variable not found")
             return
-        MS_FLEET_ID = os.getenv("MS_FLEET_ID")
-        if MS_FLEET_ID is None:
-            self.__ingester_logger.error("MS_FLEET_ID environment variable not found")
-            return
         MS_COMPANY = os.getenv("MS_COMPANY")
         if MS_COMPANY is None:
             self.__ingester_logger.error("MS_COMPANY environment variable not found")
@@ -100,7 +96,7 @@ class MobilisightsIngester:
         if S3_SECRET is None:
             self.__ingester_logger.error("S3_SECRET environment variable not found")
             return
-        self.__api = MSApi(MS_BASE_URL, MS_EMAIL, MS_PASSWORD, MS_FLEET_ID, MS_COMPANY)
+        self.__api = MSApi(MS_BASE_URL, MS_EMAIL, MS_PASSWORD, MS_COMPANY)
         self.__s3 = boto3.client(
             "s3",
             region_name=S3_REGION,

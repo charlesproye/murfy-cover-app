@@ -10,7 +10,6 @@ class MSApi:
     __base_url: str
     __email: str
     __password: str
-    __fleet_id: str
     __company: str
 
     __auth_api_route = "api"
@@ -19,13 +18,10 @@ class MSApi:
     __token: str | None = None
     __token_exp = float("inf")
 
-    def __init__(
-        self, base_url: str, email: str, password: str, fleet_id: str, company: str
-    ) -> None:
+    def __init__(self, base_url: str, email: str, password: str, company: str) -> None:
         self.__base_url = base_url
         self.__email = email
         self.__password = password
-        self.__fleet_id = fleet_id
         self.__company = company
         self.__fetch_token()
 
@@ -76,13 +72,9 @@ class MSApi:
         return result.status_code, result.json()
 
     def export_car_info(self) -> tuple[int, Iterator[bytes]]:
-        fleet_filter = {"fleets": [self.__fleet_id]}
-        encoded_filter = urlencode(
-            {"conditions": fleet_filter}, quote_via=quote
-        ).replace("%27", "%22")
         token = self.__get_token()
         result = requests.get(
-            f"{self.__base_url}/{self.__fleet_api_route}/exports/car-states.json?{encoded_filter}",
+            f"{self.__base_url}/{self.__fleet_api_route}/exports/car-states.json",
             params={"v": 2},
             headers={"Authorization": f"Bearer {token}"},
             stream=True,
