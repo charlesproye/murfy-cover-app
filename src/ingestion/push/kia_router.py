@@ -1,11 +1,11 @@
 import base64
 import gzip
-import json
 import logging
 import secrets
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
+import orjson
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import Field
@@ -64,12 +64,12 @@ async def receive_kia_data(
         raw_bytes = await request.body()
 
         decompressed_data = gzip.decompress(raw_bytes)
-        decoded_json = json.loads(decompressed_data.decode("utf-8"))
+        decoded_json = orjson.loads(decompressed_data)
 
         kia_cache: IngestionCache = request.app.state.kia_cache
 
         for record in decoded_json["records"]:
-            record_data = json.loads(base64.b64decode(record["data"]))
+            record_data = orjson.loads(base64.b64decode(record["data"]))
 
             vin = record_data.get("header", {}).get("vin", "unknown")
             if kia_cache.json_in_db(vin, record_data):

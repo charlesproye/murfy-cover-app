@@ -28,6 +28,23 @@ def test_ingestion_cache(fake_redis):
     assert cache.json_in_db(vin="different_vin", json_data={"test": "test"}) is False
 
 
+def test_ingestion_cache_sort_keys(fake_redis):
+    cache = IngestionCache(make="mobilisights")
+    test_data = {"a": "a", "b": "b", "$": {"-": 1, "Q": 2}}
+    data_new_order = {
+        "$": {"Q": 2, "-": 1},
+        "b": "b",
+        "a": "a",
+    }
+
+    assert cache.json_in_db(vin="1234567890", json_data=data_new_order) is False
+
+    cache.set_json_in_db(vin="1234567890", json_data=test_data)
+    assert cache.json_in_db(vin="1234567890", json_data=test_data) is True
+
+    assert cache.json_in_db(vin="1234567890", json_data=data_new_order) is True
+
+
 def test_ingestion_cache_with_keys_to_ignore(fake_redis):
     cache = IngestionCache(
         make="mobilisights", keys_to_ignore=["date.time", "id", "date"]

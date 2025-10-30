@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
 import msgspec
@@ -23,7 +23,7 @@ class ResponseStorage:
         objects: Sequence[BaseModelWithVin],
     ):
         # Use UTC timestamp with microsecond precision
-        timestamp = int(datetime.utcnow().timestamp() * 1e6)
+        timestamp = int(datetime.now(UTC).timestamp() * 1e6)
 
         for object_ in objects:
             vin = object_.vin
@@ -38,7 +38,7 @@ class ResponseStorage:
         raw_bytes: bytes,
     ):
         # Store raw bytes directly
-        timestamp = int(datetime.utcnow().timestamp() * 1e6)
+        timestamp = int(datetime.now(UTC).timestamp() * 1e6)
         filename = f"response/{car_brand}/raw/{timestamp}.bin"
         await self._s3.upload_file(filename, raw_bytes)
 
@@ -48,10 +48,10 @@ class ResponseStorage:
         json_data: dict | list,
     ):
         # Store raw JSON without Pydantic validation
-        timestamp = int(datetime.utcnow().timestamp() * 1e6)
+        timestamp = int(datetime.now(UTC).timestamp() * 1e6)
 
         # Add received_date directly without creating a copy
-        received_date = datetime.utcnow().isoformat()
+        received_date = datetime.now(UTC).isoformat()
         if isinstance(json_data, dict):
             json_data["received_date"] = received_date
             vin = json_data["header"]["vin"]

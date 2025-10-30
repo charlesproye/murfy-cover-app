@@ -1,11 +1,11 @@
 import hashlib
-import json
 import logging
 import os
 import time
 from typing import Any
 
 import msgspec
+import orjson
 from redis import Redis
 
 LOGGER = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ class IngestionCache:
         else:
             hash_data = json_data
 
-        serialized = json.dumps(hash_data, sort_keys=True).encode()
+        serialized = orjson.dumps(hash_data, option=orjson.OPT_SORT_KEYS)
         return hashlib.sha256(serialized).hexdigest()
 
     def json_in_db(self, vin: str, json_data: dict[str, Any]) -> bool:

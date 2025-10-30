@@ -12,7 +12,7 @@ dependencies = [
     # Core dependencies used across all modules
     "python-dotenv>=1.0.0",
     "pandas==2.2.2", # Adds 150MB to images, might be worth to install only in needed modules
-    "msgspec==0.19.0",
+    "msgspec>=0.19.0",
     "schedule==1.2.2",
     "rich==13.5.2",
     "requests==2.30.0",
@@ -73,16 +73,6 @@ load = [
     "sqlmodel>=0.0.24",
 ]
 
-# Web module dependencies - FastAPI web application
-web = [
-    "fastapi~=0.118",
-    "uvicorn",
-    "python-multipart>=0.0.18",
-    "orjson==3.8.5",
-    "greenlet==3.2.2",
-    "jwt"
-]
-
 # Results/visualization module dependencies
 results = [
     "plotly==5.19.0",
@@ -100,12 +90,10 @@ results = [
 ingestion = [
     "rapidfuzz==3.13.0",
     "aiokafka==0.10.0",
-    "memory-profiler==0.61.0",
-    "fastapi~=0.118",
+    "fastapi>=0.118",
     "uvicorn",
     "python-multipart>=0.0.18",
-    "orjson==3.8.5",
-    "greenlet==3.2.2",
+    "orjson>=3.11",
     "pyjwt",
     "pyyaml>=6.0",
 ]
@@ -177,7 +165,7 @@ visualization = [
 [dependency-groups]
 # Full development environment with all dependencies
 dev = [
-    "data_ev[activation,transform,eda,load,web,results,ingestion,external_api,migrations]",
+    "data_ev[activation,transform,eda,load,results,ingestion,external_api,migrations]",
     "pytest",
     "pytest-asyncio",
     "ruff",

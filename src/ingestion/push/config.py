@@ -7,6 +7,7 @@ KIA_KEYS_TO_IGNORE = [
     "state.Vehicle.Body",
     "state.Vehicle.Cabin",
     "state.Vehicle.Chassis",
+    "state.Vehicle.Green.BatteryManagement.BatteryRemaining.Value",  # We already watch the ratio (SoC) and this value has a 1e-5kWh precision
     "state.Vehicle.Green.EnergyInformation",
     "state.Vehicle.Green.PlugAndCharge",
     "state.Vehicle.Green.PowerConsumption",
