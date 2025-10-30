@@ -17,7 +17,6 @@ __pycache__/
 
 # C extensions
 *.so
-
 # Distribution / packaging
 .Python
 build/
@@ -166,6 +165,8 @@ cython_debug/
 .json
 *.csv
 **/*.csv
+
+**/graph/*
 
 **/*.png
 **/*.json
