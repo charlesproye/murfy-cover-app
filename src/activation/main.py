@@ -6,8 +6,7 @@ from functools import partial
 
 from activation.api.bmw_client import BMWApi
 from activation.api.hm_client import HMApi
-
-# from activation.api.kia_client import KiaApi
+from activation.api.kia_client import KiaApi
 from activation.api.renault_client import RenaultApi
 from activation.api.stellantis_client import StellantisApi
 from activation.api.tesla_client import TeslaApi
@@ -22,6 +21,11 @@ from activation.config.credentials import (
     HM_BASE_URL,
     HM_CLIENT_ID,
     HM_CLIENT_SECRET,
+    KIA_API_KEY,
+    KIA_API_PWD,
+    KIA_API_USERNAME,
+    KIA_AUTH_URL,
+    KIA_BASE_URL,
     RENAULT_AUD,
     RENAULT_CLIENT,
     RENAULT_KID,
@@ -47,12 +51,6 @@ from activation.fleet_info import read_fleet_info as fleet_info
 from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
 from core.slack_utils import send_slack_message
-
-# KIA_API_KEY,
-# KIA_API_PWD,
-# KIA_API_USERNAME,
-# KIA_AUTH_URL,
-# # KIA_BASE_URL
 
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
@@ -82,13 +80,13 @@ async def process_vehicles(owner_filter: str | None = None):
             company_id=STELLANTIS_COMPANY_ID,
         )
 
-        # kia_api = KiaApi(
-        #     auth_url=KIA_AUTH_URL,
-        #     base_url=KIA_BASE_URL,
-        #     client_username=KIA_API_USERNAME,
-        #     client_pwd=KIA_API_PWD,
-        #     api_key=KIA_API_KEY,
-        # )
+        kia_api = KiaApi(
+            auth_url=KIA_AUTH_URL,
+            base_url=KIA_BASE_URL,
+            client_username=KIA_API_USERNAME,
+            client_pwd=KIA_API_PWD,
+            api_key=KIA_API_KEY,
+        )
 
         renault_api = RenaultApi(
             kid=RENAULT_KID,
@@ -111,11 +109,6 @@ async def process_vehicles(owner_filter: str | None = None):
             slack_token=SLACK_TOKEN,
             slack_channel_id=SLACK_CHANNEL_ID,
         )
-        # tesla_particulier_api = TeslaParticulierApi(
-        #     base_url=TESLA_BASE_URL,
-        #     token_url= TESLA_TOKEN_URL,
-        #     client_id=TESLA_CLIENT_ID,
-        # )
 
         # Get initial fleet info
         df = await fleet_info(fleet_filter=owner_filter)
@@ -130,8 +123,7 @@ async def process_vehicles(owner_filter: str | None = None):
             stellantis_api=stellantis_api,
             renault_api=renault_api,
             volkswagen_api=volkswagen_api,
-            # kia_api=kia_api,
-            kia_api=None,
+            kia_api=kia_api,
             fleet_info_df=df,
         )
 
@@ -141,24 +133,22 @@ async def process_vehicles(owner_filter: str | None = None):
             activation_service.activation_hm(),
             activation_service.activation_stellantis(),
             activation_service.activation_volkswagen(),
-            # activation_service.activation_kia()
+            activation_service.activation_kia(),
         )
 
         # Get updated fleet info after activation"""
         logging.info(
             "-------------------------------Activation completed-------------------------------"
         )
-        #     df = await fleet_info(owner_filter=owner_filter)
 
-        #     # # # Process vehicles with updated info
+        #   Process vehicles with updated info
         vehicle_processor = VehicleProcessor(
             bmw_api=bmw_api,
             hm_api=hm_api,
             stellantis_api=stellantis_api,
             renault_api=renault_api,
             volkswagen_api=volkswagen_api,
-            # kia_api=kia_api,
-            kia_api=None,
+            kia_api=kia_api,
             tesla_api=tesla_api,
             df=df,
         )
@@ -170,9 +160,6 @@ async def process_vehicles(owner_filter: str | None = None):
             vehicle_processor.process_deactivated_vehicles(),
             vehicle_processor.process_bmw(),
         )
-
-        # await vehicle_processor.delete_unused_models()
-        # await vehicle_processor.generate_vehicle_summary()
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {e!s}")

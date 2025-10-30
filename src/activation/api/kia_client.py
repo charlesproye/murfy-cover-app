@@ -1,5 +1,4 @@
 import logging
-from typing import Dict, List
 
 import aiohttp
 
@@ -25,7 +24,7 @@ class KiaApi:
         self._access_token = None
         self.logger = logging.getLogger(" KIA Api")
         self.logger.setLevel(logging.INFO)
-        self.scope = "external-server-sta/default"
+        self.scope = "external-server-prod/default"
 
         if not self.logger.hasHandlers():
             handler = logging.StreamHandler()
@@ -34,7 +33,7 @@ class KiaApi:
             self.logger.addHandler(handler)
 
     async def _get_auth_token(self, session: aiohttp.ClientSession) -> str:
-        """Get authentication token from Cognito."""
+        """Get authentication token."""
         try:
             payload = {
                 "grant_type": "client_credentials",
@@ -76,16 +75,12 @@ class KiaApi:
             "Authorization": f"Bearer {self._access_token}",
         }
 
-        try:
-            async with session.post(
-                f"{self.base_url}/consent", headers=headers, json=payload
-            ) as response:
-                response.raise_for_status()
+        async with session.post(
+            f"{self.base_url}/consent", headers=headers, json=payload
+        ) as response:
+            response.raise_for_status()
 
-                return await response.json()
-        except Exception as e:
-            print("Error sending consent request:", e)
-            return None
+            return await response.json()
 
     async def _get_status_consent_type(
         self, session: aiohttp.ClientSession, consent_type: str
@@ -101,19 +96,13 @@ class KiaApi:
             "Authorization": f"Bearer {self._access_token}",
         }
 
-        try:
-            async with session.get(
-                f"{self.base_url}/consent/{consent_type}", headers=headers
-            ) as response:
-                response.raise_for_status()
-                data = await response.json()
+        async with session.get(
+            f"{self.base_url}/consent/{consent_type}", headers=headers
+        ) as response:
+            response.raise_for_status()
+            data = await response.json()
 
-                # 🔽 ici tu choisis ce que ton client expose
-                return data.get("body", {}).get("results", None)
-
-        except Exception as e:
-            print(f"Error getting status for package {consent_type}:", e)
-            return None
+            return data.get("body", {}).get("results", None)
 
     async def delete_consent(self, session: aiohttp.ClientSession, vins: str):
         """Revoke a consent for a given VIN and consent type."""
@@ -134,11 +123,7 @@ class KiaApi:
             "consentType": ["vehicle", "dtcInfo"],
         }
 
-        try:
-            async with session.delete(url, headers=headers, json=payload) as response:
-                response.raise_for_status()
-                return await response.json()
-        except Exception as e:
-            print("Error deleting consent:", e)
-            return None
+        async with session.delete(url, headers=headers, json=payload) as response:
+            response.raise_for_status()
+            return await response.json()
 
