@@ -9,12 +9,15 @@ from pathlib import Path
 import gspread
 import numpy as np
 import requests
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
 from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
 from oauth2client.service_account import ServiceAccountCredentials
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import select
 
+from db_models.vehicle import User
+from external_api.db.session import get_db
 from external_api.services.user import get_user_by_id
 
 logger = logging.getLogger(__name__)
@@ -122,10 +125,13 @@ def get_or_create_spreadsheet(client, spreadsheet_id: str) -> gspread.Spreadshee
                                     f"Feuille trouvée avec l'ID extrait: {part}"
                                 )
                                 return spreadsheet
-                            except:
+                            except Exception as e:
+                                logger.error(
+                                    f"Error opening spreadsheet with extracted ID: {e!s}"
+                                )
                                 continue
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Error opening spreadsheet with URL: {e!s}")
 
             # Si l'ouverture par URL échoue aussi
             if CREATE_SPREADSHEET_IF_NOT_EXISTS:
@@ -541,4 +547,19 @@ def replace_closest_value(value: float, values: list[float]) -> list[float]:
 
     values[closest] = value
     return values
+
+
+async def get_flash_report_user(
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    query = select(User).where(User.email == "flash-report@bib-batteries.fr")
+    flash_report_user = (await db.execute(query)).scalar_one_or_none()
+
+    if not flash_report_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Flash report user not found",
+        )
+
+    return flash_report_user
 

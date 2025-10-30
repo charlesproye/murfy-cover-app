@@ -90,7 +90,7 @@ results = [
 ingestion = [
     "rapidfuzz==3.13.0",
     "aiokafka==0.10.0",
-    "fastapi>=0.118",
+    "fastapi>=0.120",
     "uvicorn",
     "python-multipart>=0.0.18",
     "orjson>=3.11",
@@ -106,20 +106,20 @@ scraping = [
     "gspread",
     "oauth2client",
     "beautifulsoup4==4.13.4",
-    "selenium==4.33.0",
+    "selenium>=4.33.0",
     "PyPDF2==3.0.1",
     "lxml==6.0.1",
 ]
 
 external_api = [
     "bcrypt==3.2.2",
-    "fastapi~=0.118",
+    "fastapi>=0.120",
     "fastapi-pagination~=0.14",
     "uvicorn[standard]~=0.23.2",
     "python-jose[cryptography]~=3.3.0",
     "python-multipart~=0.0.6",
     "passlib[bcrypt]==1.7.4",
-    "pydantic[email]~=2.11",
+    "pydantic[email]>=2.12",
     "asyncpg~=0.30",
     "psycopg2-binary~=2.9.7",
     "redis~=6.0.0",
@@ -157,8 +157,8 @@ visualization = [
     "psycopg2-binary>=2.9.9",
     "asyncpg~=0.30",
     "sqlalchemy>=2.0.0",
-    "pydantic>=1.10.13",
-    "pydantic-settings~=2.11",
+    "pydantic>=2.12",
+    "pydantic-settings>=2.11",
 ]
 
 

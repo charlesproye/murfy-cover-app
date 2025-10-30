@@ -46,6 +46,8 @@ spec:
           value: "6379"
         - name: S3_BUCKET
           value: "bib-platform-prod-data"
+        - name: SMTP_EMAIL
+          value: "flash-report@bib-batteries.fr"
 ---
 apiVersion: v1
 kind: Service

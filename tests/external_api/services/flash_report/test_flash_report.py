@@ -1,8 +1,11 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import select
 
+from db_models.vehicle import FlashReportCombination
 from external_api.core.config import Settings
+from external_api.schemas.flash_report import VehicleSpecs
 from external_api.services.flash_report.flash_report import (
     get_db_names,
     get_flash_report_data,
@@ -40,13 +43,13 @@ async def test_send_vehicle_specs_tesla_vin_decoder():
     async with async_session() as session:
         result = await send_vehicle_specs(vin, db=session)
 
-        assert result == {
-            "has_trendline": True,
-            "make": "tesla",
-            "model": "model 3",
-            "type": "long range awd",
-            "version": "MT352",
-        }
+        assert result == VehicleSpecs(
+            has_trendline=True,
+            make="tesla",
+            model="model 3",
+            type="long range awd",
+            version="MT352",
+        )
 
 
 @pytest.mark.asyncio
@@ -58,7 +61,7 @@ async def test_insert_combination():
         await insert_combination(
             make="tesla",
             model="model 3",
-            type="long range awd",
+            vehicle_type="long range awd",
             version="MT352",
             odometer=100000,
             vin="LRW3E7EKXRC152510",
@@ -76,13 +79,13 @@ async def test_send_vehicle_specs_vin_decoder():
     async with async_session() as session:
         result = await send_vehicle_specs(vin, db=session)
 
-        assert result == {
-            "has_trendline": True,
-            "make": "renault",
-            "model": "zoe",
-            "type": None,
-            "version": None,
-        }
+        assert result == VehicleSpecs(
+            has_trendline=True,
+            make="renault",
+            model="zoe",
+            type=None,
+            version=None,
+        )
 
 
 @pytest.mark.asyncio
@@ -98,7 +101,12 @@ async def test_get_flash_report_data():
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
-        result = await get_flash_report_data(token, db=session)
+        stmt = select(FlashReportCombination).where(
+            FlashReportCombination.token == token
+        )
+        result = await session.execute(stmt)
+        flash_report_combination = result.scalar_one_or_none()
+        result = await get_flash_report_data(flash_report_combination, db=session)
 
         assert result is not None
 
