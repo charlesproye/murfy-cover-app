@@ -12,12 +12,7 @@ from core.gsheet_utils import get_google_client
 from core.pandas_utils import *
 
 from .config.credentials import SPREADSHEET_ID
-from .config.mappings import (
-    COL_DTYPES,
-    OEM_MAPPING,
-    mappings,
-    suffixes_to_remove,
-)
+from .config.mappings import COL_DTYPES, OEM_MAPPING, mappings, suffixes_to_remove
 from .config.settings import INITIAL_RETRY_DELAY, MAX_RETRIES, MAX_RETRY_DELAY
 
 logger = getLogger("ingestion.vehicle_info")

@@ -41,10 +41,14 @@ OEM_MAPPING = {
     "mercedes-benz": "mercedes",
     "Mercedes-Benz": "mercedes",
     "MERCEDES-BENZ": "mercedes",
-    "Mercedes": "mercedes",
     "Stellantis": "stellantis",
     "STELLANTIS": "stellantis",
     "stellantis": "stellantis",
+    "volvo": "volvo-cars",
+    "VOLVO": "volvo-cars",
+    "Volvo": "volvo-cars",
+    "VOLVO-CARS": "volvo-cars",
+    "Volvo-Cars": "volvo-cars",
 }
 
 COUNTRY_MAPPING = {

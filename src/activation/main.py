@@ -36,7 +36,6 @@ from activation.config.credentials import (
     STELLANTIS_BASE_URL,
     STELLANTIS_COMPANY_ID,
     STELLANTIS_EMAIL,
-    STELLANTIS_FLEET_ID,
     STELLANTIS_PASSWORD,
     TESLA_BASE_URL,
     VW_AUTH_URL,
@@ -76,7 +75,6 @@ async def process_vehicles(owner_filter: str | None = None):
             base_url=STELLANTIS_BASE_URL,
             email=STELLANTIS_EMAIL,
             password=STELLANTIS_PASSWORD,
-            fleet_id=STELLANTIS_FLEET_ID,
             company_id=STELLANTIS_COMPANY_ID,
         )
 

@@ -37,6 +37,8 @@ spec:
                     name: hm-secret
                 - secretRef:
                     name: tesla-secret
+                - secretRef:
+                    name: kia-secret
               resources:
                 limits:
                   memory: "2Gi"

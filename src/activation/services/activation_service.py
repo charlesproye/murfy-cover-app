@@ -34,6 +34,20 @@ class VehicleActivationService:
         self.fleet_info_df = fleet_info_df
         self.volkswagen_api = volkswagen_api
 
+    async def _get_vehicle_status_hm(self, data: list[dict], vin: str) -> dict | None:
+        vehicle = next((v for v in data if v.get("vin") == vin), None)
+        if not vehicle:
+            return None
+
+        status = vehicle.get("status")
+        reason = None
+
+        changelog = vehicle.get("changelog", [])
+        if changelog and isinstance(changelog[-1], dict):
+            reason = changelog[-1].get("reason")
+
+        return {"status": status, "reason": reason}
+
     async def _get_current_states_kia(
         self, session: aiohttp.ClientSession, vins: list[str]
     ):
@@ -271,6 +285,7 @@ class VehicleActivationService:
                         "Eligibility": current_state,
                         "Real_Activation": current_state,
                         "Activation_Error": None,
+                        "API_Detail": None,
                     }
                     status_data.append(vehicle_data)
                     continue
@@ -294,6 +309,7 @@ class VehicleActivationService:
                                 "Eligibility": real_state,
                                 "Real_Activation": False,
                                 "Activation_Error": None,
+                                "API_Detail": None,
                             }
                             status_data.append(vehicle_data)
                             continue
@@ -306,6 +322,7 @@ class VehicleActivationService:
                                 "Eligibility": real_state,
                                 "Real_Activation": False,
                                 "Activation_Error": "Failed to deactivate",
+                                "API_Detail": None,
                             }
                             status_data.append(vehicle_data)
                             continue
@@ -318,6 +335,7 @@ class VehicleActivationService:
                             "Eligibility": real_state,
                             "Real_Activation": False,
                             "Activation_Error": "No contract ID found",
+                            "API_Detail": None,
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -335,9 +353,10 @@ class VehicleActivationService:
                         logging.info(f"Stellantis vehicle {vin} activated successfully")
                         vehicle_data = {
                             "vin": vin,
-                            "Eligibility": real_state,
+                            "Eligibility": True,
                             "Real_Activation": real_state,
                             "Activation_Error": None,
+                            "API_Detail": None,
                         }
                         status_data.append(vehicle_data)
                         continue
@@ -345,7 +364,7 @@ class VehicleActivationService:
                         logging.info(f"Stellantis vehicle {vin} activation in progress")
                         vehicle_data = {
                             "vin": vin,
-                            "Eligibility": real_state,
+                            "Eligibility": True,
                             "Real_Activation": real_state,
                             "Activation_Error": status,
                             "API_Detail": REASON_MAPPING["stellantis"].get(
@@ -504,153 +523,152 @@ class VehicleActivationService:
 
     async def activation_hm(self):
         """Process High Mobility vehicle activation/deactivation."""
-        df_hm = self.fleet_info_df[
-            self.fleet_info_df["oem"].isin(["renault", "ford", "mercedes", "volvo"])
-        ]
+
         status_data = []
+
+        df_hm = self.fleet_info_df[
+            self.fleet_info_df["oem"].isin(
+                ["renault", "ford", "mercedes", "volvo-cars"]
+            )
+        ][["vin", "oem", "activation"]]
+
+        # Get all status from HM
         async with aiohttp.ClientSession() as session:
-            for _, row in df_hm.iterrows():
-                vin = row["vin"]
-                make = row["make"]
+            data = await self.hm_api.get_all_status(session)
 
-                desired_state = row["activation"]
+        status_dict = {
+            vehicle["vin"]: {
+                "status": vehicle["status"] == "approved",
+                "status_hm": vehicle["status"],
+            }
+            for vehicle in data
+        }
 
-                try:
-                    current_state, _ = await self.hm_api.get_status(vin, session)
-                    if current_state == desired_state:
-                        logging.info(
-                            f"High Mobility vehicle {vin} already in desired state: {desired_state}"
-                        )
-                        vehicle_data = {
-                            "vin": vin,
-                            "Eligibility": current_state,
-                            "Real_Activation": current_state,
-                            "Activation_Error": None,
-                        }
-                        status_data.append(vehicle_data)
-                        continue
+        to_activate = {}
+        to_deactivate = {}
+        status_equal = {}
 
-                    elif desired_state:
-                        try:
-                            activation_success = await self.hm_api.create_clearance(
-                                vin, make, session
-                            )
-                            if activation_success:
-                                logging.info(
-                                    f"High Mobility vehicle {vin} activated successfully"
-                                )
-                                vehicle_data = {
-                                    "vin": vin,
-                                    "Eligibility": True,
-                                    "Real_Activation": True,
-                                    "Activation_Error": None,
-                                }
-                                status_data.append(vehicle_data)
-                                continue
-                            else:
-                                logging.info(
-                                    f"High Mobility vehicle {vin} activation failed"
-                                )
-                                _, response = await self.hm_api.get_status(vin, session)
+        for _, row in df_hm.iterrows():
+            vin = row["vin"]
+            oem = row["oem"]
+            desired_status = row["activation"]
+            current_status_info = status_dict.get(
+                vin, {"status": False, "status_hm": "unknown"}
+            )
+            current_status = current_status_info["status"]
+            status_hm = current_status_info["status_hm"]
 
-                                response["status"] if response[
-                                    "status"
-                                ] is not None else ""
-                                api_detail = (
-                                    response["changelog"][-1]["reason"]
-                                    if "reason" in response["changelog"][-1] is not None
-                                    else ""
-                                )
+            entry = {
+                "oem": oem,
+                "status_desired": desired_status,
+                "current_status": current_status,
+                "reason": status_hm,
+            }
 
-                                if api_detail in REASON_MAPPING["high-mobility"]:
-                                    api_detail_trad = REASON_MAPPING["high-mobility"][
-                                        api_detail
-                                    ]
-                                elif response["status"] == "pending":
-                                    api_detail_trad = "En attente que le véhicule émette des données pour qu'il soit activé"
-                                elif response["status"] == "rejected":
-                                    api_detail_trad = REASON_MAPPING["high-mobility"][
-                                        "unspecified"
-                                    ]
-                                else:
-                                    api_detail_trad = ""
+            if current_status is False and desired_status is True:
+                to_activate[vin] = entry
+            elif current_status is True and desired_status is False:
+                to_deactivate[vin] = entry
+            elif current_status == desired_status:
+                status_equal[vin] = entry
+            else:
+                pass
 
-                                vehicle_data = {
-                                    "vin": vin,
-                                    "Eligibility": False,
-                                    "Real_Activation": False,
-                                    "Activation_Error": response["status"]
-                                    if response["status"] is not None
-                                    else "",
-                                    "API_Detail": api_detail_trad,
-                                }
+        # Update status when desired status is equal to current status
+        logging.info("HM Status update started")
+        if len(status_equal) > 0:
+            for key, values in status_equal.items():
+                if values["status_desired"]:
+                    vehicle_data = {
+                        "vin": key,
+                        "Eligibility": values["status_desired"],
+                        "Real_Activation": values["status_desired"],
+                        "Activation_Error": "",
+                        "API_Detail": "",
+                    }
+                elif values["reason"] == "unknown":
+                    vehicle_data = {
+                        "vin": key,
+                        "Eligibility": False,
+                        "Real_Activation": False,
+                        "Activation_Error": "Activation non demandée sur le Gsheet",
+                        "API_Detail": "",
+                    }
+                    status_data.append(vehicle_data)
+                else:
+                    vehicle_data = {
+                        "vin": key,
+                        "Eligibility": values["status_desired"],
+                        "Real_Activation": values["status_desired"],
+                        "Activation_Error": values["reason"],
+                        "API_Detail": "",
+                    }
+                    status_data.append(vehicle_data)
+        # Activation
+        logging.info("HM Activation started")
+        if len(to_activate) > 0:
+            async with aiohttp.ClientSession() as session:
+                results_activation = await self.hm_api.create_clearance_batch(
+                    to_activate, session
+                )
 
-                                status_data.append(vehicle_data)
-                                continue
-                        except Exception as e:
-                            logging.error(
-                                f"Error activating High Mobility vehicle: {e!s}"
-                            )
-                            vehicle_data = {
-                                "vin": vin,
-                                "Eligibility": True,
-                                "Real_Activation": False,
-                                "Activation_Error": "Erreur d'activation, le VIN est faux ou non activable sur High Mobility",
-                            }
-                            status_data.append(vehicle_data)
-                            continue
-                    else:
-                        try:
-                            deactivation_success = await self.hm_api.delete_clearance(
-                                vin, session
-                            )
-                            if not deactivation_success:
-                                logging.error(
-                                    "Failed to deactivate High Mobility vehicle"
-                                )
-                                vehicle_data = {
-                                    "vin": vin,
-                                    "Eligibility": True,
-                                    "Real_Activation": False,
-                                    "Activation_Error": "Failed to deactivate or pending approval",
-                                }
-                                status_data.append(vehicle_data)
-                                continue
-                            else:
-                                logging.info(
-                                    f"High Mobility vehicle {vin} deactivated successfully"
-                                )
-                                vehicle_data = {
-                                    "vin": vin,
-                                    "Eligibility": False,
-                                    "Real_Activation": False,
-                                    "Activation_Error": None,
-                                }
-                                status_data.append(vehicle_data)
-                                continue
-                        except Exception as e:
-                            logging.error(
-                                f"Error deactivating High Mobility vehicle: {e!s}"
-                            )
-                            vehicle_data = {
-                                "vin": vin,
-                                "Eligibility": True,
-                                "Real_Activation": False,
-                                "Activation_Error": "Failed to deactivate or pending approval",
-                            }
-                            status_data.append(vehicle_data)
-                            continue
+            # Recheck the status of the vehicles as it can be pending as a result of the batch activation
+            # and switch to rejected immediately
+            async with aiohttp.ClientSession() as session:
+                time.sleep(3)
+                data = await self.hm_api.get_all_status(session)
+            for vin_dict in results_activation["vehicles"]:
+                status = await self._get_vehicle_status_hm(data, vin_dict["vin"])
+                if status:
+                    vehicle_data = {
+                        "vin": vin_dict["vin"],
+                        "Eligibility": False,
+                        "Real_Activation": status["status"] == "approved",
+                        "Activation_Error": status["status"],
+                        "API_Detail": status["reason"],
+                    }
+                    status_data.append(vehicle_data)
+                elif vin_dict["status"] == "error":
+                    vehicle_data = {
+                        "vin": vin_dict["vin"],
+                        "Eligibility": False,
+                        "Real_Activation": False,
+                        "Activation_Error": vin_dict.get("status"),
+                        "API_Detail": vin_dict.get("description"),
+                    }
+                    status_data.append(vehicle_data)
 
-                except Exception as e:
-                    logging.error(f"Error processing High Mobility vehicle: {e!s}")
+        # Deactivation - HM does not support batch deactivation
+        logging.info("HM Deactivation started")
+        if len(to_deactivate) > 0:
+            for vin in to_deactivate:
+                async with aiohttp.ClientSession() as session:
+                    deactivation_success = await self.hm_api.delete_clearance(
+                        vin, session
+                    )
+                if not deactivation_success:
+                    logging.info(f"Failed to deactivate High Mobility vehicle : {vin}")
+                    vehicle_data = {
+                        "vin": vin,
+                        "Eligibility": True,
+                        "Real_Activation": True,
+                        "Activation_Error": "La désactivation a échoué",
+                    }
+                    status_data.append(vehicle_data)
+                    continue
+                else:
+                    logging.info(
+                        f"Successfully deactivated High Mobility vehicle : {vin}"
+                    )
                     vehicle_data = {
                         "vin": vin,
                         "Eligibility": True,
                         "Real_Activation": False,
-                        "Activation_Error": "Failed to process High Mobility vehicle",
+                        "Activation_Error": None,
                     }
                     status_data.append(vehicle_data)
                     continue
+
         status_df = pd.DataFrame(status_data)
         await update_vehicle_activation_data(status_df)
 
@@ -858,42 +876,45 @@ class VehicleActivationService:
 
             logging.info(f"Vins to activate: {vins_to_activate}")
 
-            await self.kia_api._activate_vins(session, vins_to_activate)
+            if len(vins_to_activate) > 0:
+                await self.kia_api._activate_vins(session, vins_to_activate)
 
-            activated_current_states = await self._get_current_states_kia(
-                session, vins_to_activate
-            )
+                activated_current_states = await self._get_current_states_kia(
+                    session, vins_to_activate
+                )
 
-            for vin in vins_to_activate:
-                if vin not in activated_current_states:
-                    vehicle_data = {
-                        "vin": vin,
-                        "Eligibility": False,
-                        "Real_Activation": False,
-                        "Activation_Error": "vin not eligible for data sharing",
-                        "API_Detail": "Le vin n'est pas éligible pour le partage de données, VIN erroné ou d'une version non prise en charge",
-                    }
-
-                else:
-                    info = activated_current_states[vin]
-
-                    if info["status_bool"]:
+                for vin in vins_to_activate:
+                    if vin not in activated_current_states:
                         vehicle_data = {
                             "vin": vin,
-                            "Eligibility": True,
-                            "Real_Activation": True,
-                            "Activation_Error": "",
-                            "API_Detail": "",
-                        }
-                    else:
-                        vehicle_data = {
-                            "vin": vin,
-                            "Eligibility": True,
+                            "Eligibility": False,
                             "Real_Activation": False,
-                            "Activation_Error": info["reason"],
-                            "API_Detail": info["reason"],
+                            "Activation_Error": "vin not eligible for data sharing",
+                            "API_Detail": "Le vin n'est pas éligible pour le partage de données, VIN erroné ou d'une version non prise en charge",
                         }
-                status_data.append(vehicle_data)
+
+                    else:
+                        info = activated_current_states[vin]
+
+                        if info["status_bool"]:
+                            vehicle_data = {
+                                "vin": vin,
+                                "Eligibility": True,
+                                "Real_Activation": True,
+                                "Activation_Error": "",
+                                "API_Detail": "",
+                            }
+                        else:
+                            vehicle_data = {
+                                "vin": vin,
+                                "Eligibility": True,
+                                "Real_Activation": False,
+                                "Activation_Error": info["reason"],
+                                "API_Detail": info["reason"],
+                            }
+                    status_data.append(vehicle_data)
+            else:
+                logging.info("No vins to activate")
 
             # --- Deactivation ---
             logging.info("\nKIA DEACTIVATION : Starting")
@@ -901,25 +922,25 @@ class VehicleActivationService:
 
             if len(vins_to_deactivate) > 0:
                 await self.kia_api.delete_consent(session, vins_to_deactivate)
+
+                deactivated_current_states = await self._get_current_states_kia(
+                    session, vins_to_deactivate
+                )
+
+                for vin, info in deactivated_current_states.items():
+                    logging.info(
+                        f"Update KIA vehicle that has just been deactivated {vin} : {info['status_bool']}"
+                    )
+                    vehicle_data = {
+                        "vin": vin,
+                        "Eligibility": True,
+                        "Real_Activation": False,
+                        "Activation_Error": "",
+                        "API_Detail": "",
+                    }
+                    status_data.append(vehicle_data)
             else:
                 logging.info("No vins to deactivate")
-
-            deactivated_current_states = await self._get_current_states_kia(
-                session, vins_to_deactivate
-            )
-
-            for vin, info in deactivated_current_states.items():
-                logging.info(
-                    f"Update KIA vehicle that has just been deactivated {vin} : {info['status_bool']}"
-                )
-                vehicle_data = {
-                    "vin": vin,
-                    "Eligibility": True,
-                    "Real_Activation": False,
-                    "Activation_Error": "",
-                    "API_Detail": "",
-                }
-                status_data.append(vehicle_data)
 
         # --- Cleaning before sending to Google Sheets ---
         status_df = pd.DataFrame(status_data)

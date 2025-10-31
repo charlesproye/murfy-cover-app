@@ -5,7 +5,7 @@ import os
 import requests
 
 
-def send_slack_message(channel_id: str, text: str):
+def send_slack_message(channel_id: str, text: str) -> int:
     """Send a message to a Slack channel."""
     slack_token = os.getenv("SLACK_TOKEN")
     if not slack_token:
@@ -21,9 +21,5 @@ def send_slack_message(channel_id: str, text: str):
         json=payload,
         timeout=10,
     )
-    if r.status_code == 200:
-        print("Message envoyé !")
-        print(r.json().get("message", {}).get("text"))
-    else:
-        print("Body text:", r.text)
+    return r.status_code
 
