@@ -1,8 +1,10 @@
+import json
 from datetime import datetime, timezone
 from urllib.parse import quote, urlencode
-import json
 
 import requests
+
+from ingestion.high_mobility.config import BRAND_TO_OEM
 from ingestion.high_mobility.vehicle import Vehicle
 
 
@@ -34,19 +36,22 @@ class HMApi:
                     "client_id": self.client_id,
                     "client_secret": self.client_secret,
                 },
-                timeout=10  # 10 secondes timeout
+                timeout=10,  # 10 secondes timeout
             )
             r.raise_for_status()  # Raise exception for non-200 status codes
             response_data = r.json()
-            
+
             if not response_data.get("access_token"):
                 raise Exception("No access token in response")
-                
+
             self.__token = response_data.get("access_token")
             timestamp = (
-                datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
+                datetime.now(tz=timezone.utc)
+                - datetime(1970, 1, 1, tzinfo=timezone.utc)
             ).total_seconds()
-            expires_in = int(response_data.get("expires_in", 3600))  # Default 1 hour if not specified
+            expires_in = int(
+                response_data.get("expires_in", 3600)
+            )  # Default 1 hour if not specified
             self.__token_exp = timestamp + expires_in
         except requests.exceptions.RequestException as e:
             raise Exception(f"Failed to fetch High Mobility API token: {str(e)}")
@@ -122,7 +127,9 @@ class HMApi:
                 return result.status_code, [
                     Vehicle(
                         vin=vehicle["vin"],
-                        brand=vehicle["brand"],
+                        brand=BRAND_TO_OEM.get(vehicle["brand"], vehicle["brand"])
+                        if vehicle["brand"] in BRAND_TO_OEM
+                        else vehicle["brand"],
                         clearance_status=vehicle["status"],
                     )
                     for vehicle in result.json()
@@ -138,7 +145,9 @@ class HMApi:
             return result.status_code, [
                 Vehicle(
                     vin=vehicle["vin"],
-                    brand=vehicle["brand"],
+                    brand=BRAND_TO_OEM.get(vehicle["brand"], vehicle["brand"])
+                    if vehicle["brand"] in BRAND_TO_OEM
+                    else vehicle["brand"],
                     clearance_status=vehicle["status"],
                 )
                 for vehicle in result.json()
