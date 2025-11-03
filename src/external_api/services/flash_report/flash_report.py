@@ -111,7 +111,12 @@ async def send_vehicle_specs(vin: str, db: AsyncSession) -> VehicleSpecs:
         vin_decoder = VinDecoder()
         make, model = vin_decoder.decode(vin)
 
-        make_db_name, model_db_name = await get_db_names(make, model, type=None, db=db)
+        if model:
+            make_db_name, model_db_name = await get_db_names(
+                make, model, type=None, db=db
+            )
+        else:
+            make_db_name = make.lower().replace("ë", "e")
 
         has_trendline = await get_make_has_trendline(make_db_name, db)
 

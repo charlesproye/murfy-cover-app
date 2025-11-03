@@ -1,4 +1,5 @@
 from core.s3.s3_utils import S3Service
+from external_api.services.flash_report.vin_decoder.config import WMI_TO_OEM
 
 
 def load_model(model_name: str):
@@ -42,7 +43,12 @@ class VinDecoder:
         model = predictions.split("_")[0].capitalize()
         version = predictions.split("_")[1].capitalize()
 
-        return model, version
+        vin_first_three_characters = vin[:3]
+
+        if model.capitalize() == WMI_TO_OEM[vin_first_three_characters]:
+            return model, version
+        else:
+            return WMI_TO_OEM[vin_first_three_characters], None
 
     def decode_batch(self, vins: list[str]) -> list[str]:
         """
