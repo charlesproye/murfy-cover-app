@@ -45,87 +45,57 @@ class StellantisApi:
             "Content-Type": "application/json",
         }
 
-    async def is_eligible(self, vin: str, session: aiohttp.ClientSession) -> bool:
-        """Check if a vehicle is eligible for activation.
+    async def is_eligible_batch(
+        self, vins: list[str], session: aiohttp.ClientSession
+    ) -> dict:
+        """Check if a vehicle is eligible for activation."""
 
-        Args:
-            vin: Vehicle Identification Number
-            session: aiohttp ClientSession for making HTTP requests
+        url = f"{self.base_url}/connected-fleet/api/vehicles/eligibilities"
+        response = await session.post(
+            url,
+            headers=await self._get_headers(session),
+            json={"vins": vins, "resultByEmail": False},
+        )
 
-        Returns:
-            bool: True if the vehicle is eligible, False otherwise
-        """
-        try:
-            url = f"{self.base_url}/connected-fleet/api/vehicles/eligibilities"
-            response = await session.post(
-                url,
-                headers=await self._get_headers(session),
-                json={"vins": [vin], "resultByEmail": False},
-            )
-            if response.status == 502:
-                await asyncio.sleep(2)
-                response = await session.post(
-                    url,
-                    headers=await self._get_headers(session),
-                    json={"vins": [vin], "resultByEmail": False},
-                )
-            response.raise_for_status()
+        response_data = await response.json()
 
-            response_data = await response.json()
-            if (
-                not response_data
-                or not isinstance(response_data, list)
-                or not response_data
-            ):
-                return False
+        result = {}
+        for item in response_data:
+            vin = item.get("vin")
+            if vin:
+                if "eligible" in item:
+                    result[vin] = bool(item["eligible"])
+                elif "error_code" in item:
+                    result[vin] = False
+        return result
 
-            vehicle_data = response_data[0]
-            return vehicle_data.get("eligible") is True
-
-        except Exception as e:
-            logging.error(f"Failed to check eligibility for VIN {vin}: {e}")
-            return False
-
-    async def get_status(
-        self, vin: str, session: aiohttp.ClientSession, skip: int = 0, limit: int = 100
+    async def get_status_batch(
+        self, vins: list[str], session: aiohttp.ClientSession, skip: int = 0
     ) -> tuple[bool, str, str]:
         """Get vehicle activation status and contract ID."""
-        try:
-            url = f"{self.base_url}/connected-fleet/api/contracts"
-            params = {
-                "skip": skip,
-                "limit": limit,
-                "conditions": json.dumps({"car.vin": vin}),
-            }
+        url = f"{self.base_url}/connected-fleet/api/contracts"
+        params = {
+            "skip": skip,
+        }
 
-            response = await session.get(
-                url, headers=await self._get_headers(session), params=params
-            )
-            if response.status == 502:
-                await asyncio.sleep(2)
-                response = await session.get(
-                    url, headers=await self._get_headers(session), params=params
-                )
-            response.raise_for_status()
+        response = await session.get(
+            url, headers=await self._get_headers(session), params=params
+        )
 
-            data = await response.json()
-            if not data or not isinstance(data, list):
-                return False, None, None
+        response_data = await response.json()
 
-            for i in range(len(data)):
-                if data[i].get("status") == "activated":
-                    return True, data[i].get("_id", None), data[i].get("status", None)
-                elif (
-                    data[i].get("status") == "pending"
-                    or data[i].get("status") == "rejected"
-                ):
-                    return False, None, data[i].get("status", None)
+        result = {}
 
-            return False, None, None
-
-        except Exception as e:
-            logging.error(f"Failed to get vehicle status for VIN {vin}: {e}")
-            return False, None, None
+        for item in response_data:
+            if item.get("car", {}).get("vin") not in vins:
+                continue
+            car = item.get("car", {})
+            vin = car.get("vin")
+            status = item.get("status")
+            id = item.get("_id")
+            if vin and status:
+                result[vin] = {"status": status, "id": id}
+        return result
 
     async def add_to_fleet(self, id: str, session: aiohttp.ClientSession):
         """Add a vehicle to the fleet."""
@@ -156,6 +126,7 @@ class StellantisApi:
                 .strftime("%Y-%m-%dT%H:%M:%S.000Z"),
                 "pack": "pack-1",
             }
+
             response = await session.post(
                 url, headers=await self._get_headers(session), json=data
             )

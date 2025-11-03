@@ -246,147 +246,149 @@ class VehicleActivationService:
     async def activation_stellantis(self):
         """Process Stellantis vehicle activation/deactivation."""
         df_stellantis = self.fleet_info_df[(self.fleet_info_df["oem"] == "stellantis")]
+
+        vin_list = df_stellantis["vin"].tolist()
+
         status_data = []
         async with aiohttp.ClientSession() as session:
-            for _, row in df_stellantis.iterrows():
-                vin = row["vin"]
-                desired_state = row["activation"]
-                is_eligible = await self.stellantis_api.is_eligible(vin, session)
+            eligibilities = await self.stellantis_api.is_eligible_batch(
+                vin_list, session
+            )
+            statuses = await self.stellantis_api.get_status_batch(vin_list, session)
 
-                if not is_eligible:
+        to_activate = {}
+        to_deactivate = {}
+        status_equal = {}
+
+        for _, row in df_stellantis.iterrows():
+            vin = row["vin"]
+            desired_status = row["activation"]
+            current_status = statuses.get(vin, {}).get("status", "") == "activated"
+            reason = statuses.get(vin, {}).get("status", "")
+            contract_id = statuses.get(vin, {}).get("id", "")
+
+            entry = {
+                "eligibility": eligibilities.get(vin, False),
+                "status_desired": desired_status,
+                "current_status": current_status,
+                "reason": reason,
+                "id": contract_id,
+            }
+
+            if not current_status and desired_status:
+                to_activate[vin] = entry
+            elif current_status and not desired_status:
+                to_deactivate[vin] = entry
+            elif current_status == desired_status:
+                status_equal[vin] = entry
+            else:
+                pass
+
+        if len(status_equal) > 0:
+            for key, values in status_equal.items():
+                if values["status_desired"]:
                     vehicle_data = {
-                        "vin": vin,
-                        "Eligibility": False,
-                        "Real_Activation": False,
-                        "Activation_Error": "Not eligible",
-                        "API_Detail": "Le VIN est non éligible à l'activation sur Stellantis",
+                        "vin": key,
+                        "Eligibility": values["eligibility"],
+                        "Real_Activation": values["status_desired"],
+                        "Activation_Error": "",
+                        "API_Detail": "",
                     }
-                    if desired_state:
-                        logging.info(
-                            f"Stellantis vehicle {vin} should be activated but is not eligible"
-                        )
-                    else:
-                        logging.info(
-                            f"Stellantis vehicle {vin} is already in desired state: {desired_state}"
-                        )
-                    status_data.append(vehicle_data)
-                    continue
-
-                current_state, contract_id, _ = await self.stellantis_api.get_status(
-                    vin, session
-                )
-
-                if current_state == desired_state:
-                    logging.info(
-                        f"Stellantis vehicle {vin} is already in desired state: {desired_state}"
-                    )
+                else:
                     vehicle_data = {
-                        "vin": vin,
-                        "Eligibility": current_state,
-                        "Real_Activation": current_state,
-                        "Activation_Error": None,
-                        "API_Detail": None,
+                        "vin": key,
+                        "Eligibility": values["eligibility"],
+                        "Real_Activation": values["status_desired"],
+                        "Activation_Error": values["reason"],
+                        "API_Detail": "",
                     }
                     status_data.append(vehicle_data)
-                    continue
 
-                elif not desired_state:
-                    if contract_id:
-                        status_code, error_msg = await self.stellantis_api.deactivate(
-                            contract_id, session
+        # Activation & Deactivation per batch unavailable with Mobilisight
+        if len(to_activate) > 0:
+            async with aiohttp.ClientSession() as session:
+                for vin, entry in to_activate.items():
+                    if entry["eligibility"]:
+                        status_code, result = await self.stellantis_api.activate(
+                            vin, session
                         )
-                        (
-                            real_state,
-                            contract_id,
-                            _,
-                        ) = await self.stellantis_api.get_status(vin, session)
-                        if status_code in [200, 204]:
+                        if status_code in [200, 201, 204]:
+                            if result["status"] == "activated":
+                                vehicle_data = {
+                                    "vin": vin,
+                                    "Eligibility": entry["eligibility"],
+                                    "Real_Activation": entry["status_desired"],
+                                    "Activation_Error": result["status"],
+                                    "API_Detail": "",
+                                }
+                                status_data.append(vehicle_data)
+                            else:
+                                vehicle_data = {
+                                    "vin": vin,
+                                    "Eligibility": entry["eligibility"],
+                                    "Real_Activation": False,
+                                    "Activation_Error": result["status"],
+                                    "API_Detail": "",
+                                }
+                                status_data.append(vehicle_data)
                             logging.info(
-                                f"Stellantis vehicle {vin} deactivated successfully"
+                                f"Stellantis vehicle {vin} activated successfully"
+                            )
+                        elif status_code == 409:
+                            logging.info(
+                                f"Stellantis vehicle {vin} activation already in progress"
                             )
                             vehicle_data = {
                                 "vin": vin,
-                                "Eligibility": real_state,
-                                "Real_Activation": False,
-                                "Activation_Error": None,
-                                "API_Detail": None,
+                                "Eligibility": entry["eligibility"],
+                                "Real_Activation": entry["current_status"],
+                                "Activation_Error": entry["reason"],
+                                "API_Detail": "",
                             }
                             status_data.append(vehicle_data)
-                            continue
                         else:
-                            logging.info(
-                                f"Failed to deactivate Stellantis vehicle {vin}: HTTP {status_code} - {error_msg}"
-                            )
                             vehicle_data = {
                                 "vin": vin,
-                                "Eligibility": real_state,
+                                "Eligibility": entry["eligibility"],
                                 "Real_Activation": False,
-                                "Activation_Error": "Failed to deactivate",
-                                "API_Detail": None,
+                                "Activation_Error": result,
+                                "API_Detail": "",
                             }
                             status_data.append(vehicle_data)
-                            continue
-                    else:
+                            logging.error(
+                                f"Failed to activate Stellantis vehicle {vin}: HTTP {status_code} - {result}"
+                            )
+        # Deactivation
+        if len(to_deactivate) > 0:
+            async with aiohttp.ClientSession() as session:
+                for vin, entry in to_deactivate.items():
+                    status_code, error_msg = await self.stellantis_api.deactivate(
+                        entry["id"], session
+                    )
+                    if status_code in [200, 204]:
                         logging.info(
-                            f"Failed to deactivate Stellantis vehicle {vin} has no contract ID"
+                            f"Stellantis vehicle {vin} deactivated successfully"
                         )
                         vehicle_data = {
                             "vin": vin,
-                            "Eligibility": real_state,
+                            "Eligibility": entry["eligibility"],
                             "Real_Activation": False,
-                            "Activation_Error": "No contract ID found",
-                            "API_Detail": None,
-                        }
-                        status_data.append(vehicle_data)
-                        continue
-
-                elif desired_state:
-                    status_code, result = await self.stellantis_api.activate(
-                        vin, session
-                    )
-                    (
-                        real_state,
-                        contract_id,
-                        status,
-                    ) = await self.stellantis_api.get_status(vin, session)
-                    if status_code in [200, 201, 204]:
-                        logging.info(f"Stellantis vehicle {vin} activated successfully")
-                        vehicle_data = {
-                            "vin": vin,
-                            "Eligibility": True,
-                            "Real_Activation": real_state,
                             "Activation_Error": None,
                             "API_Detail": None,
                         }
                         status_data.append(vehicle_data)
-                        continue
-                    elif status_code == 409:
-                        logging.info(f"Stellantis vehicle {vin} activation in progress")
-                        vehicle_data = {
-                            "vin": vin,
-                            "Eligibility": True,
-                            "Real_Activation": real_state,
-                            "Activation_Error": status,
-                            "API_Detail": REASON_MAPPING["stellantis"].get(
-                                status,
-                                f"La description du statut {status} est inconnue, voir avec l'équipe TECH.",
-                            ),
-                        }
-                        status_data.append(vehicle_data)
-                        continue
                     else:
-                        error_msg = f"Failed to activate Stellantis vehicle {vin}: HTTP {status_code} - {result}"
-                        logging.error(error_msg)
+                        logging.info(
+                            f"Failed to deactivate Stellantis vehicle {vin}: HTTP {status_code} - {error_msg}"
+                        )
                         vehicle_data = {
                             "vin": vin,
-                            "Eligibility": real_state,
-                            "Real_Activation": real_state,
-                            "Activation_Error": error_msg,
-                            "API_Detail": "Erreur de l'API lors de l'activation du véhicule.",
+                            "Eligibility": entry["eligibility"],
+                            "Real_Activation": entry["current_status"],
+                            "Activation_Error": "Failed to deactivate",
+                            "API_Detail": error_msg,
                         }
                         status_data.append(vehicle_data)
-                        continue
-
         status_df = pd.DataFrame(status_data)
         await update_vehicle_activation_data(status_df)
 
