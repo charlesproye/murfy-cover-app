@@ -390,14 +390,24 @@ class VehicleProcessor:
                                     f"New Renault vehicle inserted in DB VIN: {vehicle['vin']}"
                                 )
                             else:
+                                update_data = {
+                                    "fleet_id": fleet_id,
+                                    "activation_status": vehicle["real_activation"],
+                                    "is_eligible": vehicle["eligibility"],
+                                    "vehicle_model_id": model_id,
+                                    "vin": vin,
+                                }
+
                                 cursor.execute(
-                                    "UPDATE vehicle SET fleet_id = %s, activation_status = %s, is_eligible = %s WHERE vin = %s",
-                                    (
-                                        vehicle["fleet_id"],
-                                        vehicle["real_activation"],
-                                        vehicle["eligibility"],
-                                        vin,
-                                    ),
+                                    """
+                                    UPDATE vehicle
+                                    SET fleet_id = %(fleet_id)s,
+                                        activation_status = %(activation_status)s,
+                                        is_eligible = %(is_eligible)s,
+                                        vehicle_model_id = %(vehicle_model_id)s
+                                    WHERE vin = %(vin)s
+                                    """,
+                                    update_data,
                                 )
                             con.commit()
                         except Exception as e:
@@ -441,6 +451,7 @@ class VehicleProcessor:
                             fleet_id = await self._get_fleet_id(
                                 cursor, con, vehicle["fleet"], vehicle["company"]
                             )
+
                             region_id = await self._get_or_create_region(
                                 cursor, con, vehicle["country"]
                             )
@@ -455,9 +466,14 @@ class VehicleProcessor:
                             model_name, model_type = await self.bmw_api.get_data(
                                 vin, session
                             )
+
                             model_id = mapping_vehicle_type(
-                                model_type, vehicle["make"], model_name, model_existing
+                                model_type,
+                                vehicle["make"],
+                                model_name,
+                                model_existing,
                             )
+
                             if not vehicle_exists:
                                 # Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
 
@@ -491,14 +507,24 @@ class VehicleProcessor:
                                     f"New BMW vehicle inserted in DB VIN: {vehicle['vin']}"
                                 )
                             else:
+                                update_data = {
+                                    "fleet_id": fleet_id,
+                                    "activation_status": vehicle["real_activation"],
+                                    "is_eligible": vehicle["eligibility"],
+                                    "vehicle_model_id": model_id,
+                                    "vin": vin,
+                                }
+
                                 cursor.execute(
-                                    "UPDATE vehicle SET fleet_id = %s, activation_status = %s, is_eligible = %s WHERE vin = %s",
-                                    (
-                                        fleet_id,
-                                        vehicle["real_activation"],
-                                        vehicle["eligibility"],
-                                        vin,
-                                    ),
+                                    """
+                                    UPDATE vehicle
+                                    SET fleet_id = %(fleet_id)s,
+                                        activation_status = %(activation_status)s,
+                                        is_eligible = %(is_eligible)s,
+                                        vehicle_model_id = %(vehicle_model_id)s
+                                    WHERE vin = %(vin)s
+                                    """,
+                                    update_data,
                                 )
                             con.commit()
                         except Exception as e:
