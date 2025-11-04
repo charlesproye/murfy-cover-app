@@ -29,9 +29,11 @@ class StellantisProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         phase_df = phase_df.withColumn(
             "CONSUMPTION",
             F.when(
-                F.col("PHASE_STATUS") == "discharging",
+                (F.col("PHASE_STATUS") == "discharging")
+                & (F.col("ODOMETER_DIFF").isNotNull())
+                & (F.col("ODOMETER_DIFF") != 0),
                 (-1 * F.col("SOC_DIFF"))
-                * (F.col("BATTERY_NET_CAPACITY"))
+                * F.col("BATTERY_NET_CAPACITY")
                 * (F.col("SOH_OEM") / 100)
                 / F.col("ODOMETER_DIFF"),
             ).otherwise(None),

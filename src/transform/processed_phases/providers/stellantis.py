@@ -10,9 +10,9 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
     def __init__(
         self,
         make="stellantis",
-        spark: SparkSession = None,
+        spark: SparkSession | None = None,
         force_update: bool = False,
-        logger: Logger = None,
+        logger: Logger | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -20,8 +20,7 @@ class StellantisRawTsToProcessedPhases(RawTsToProcessedPhases):
         )
 
     def compute_specific_features_before_aggregation(self, phase_df):
-        phase_df = phase_df.withColumn("soh_oem", F.col("soh_oem") / 100)
-
+        phase_df = phase_df.withColumn("soh_oem", F.col("soh_oem").cast("double") / 100)
         return phase_df
 
     def aggregate_stats(self, phase_df):

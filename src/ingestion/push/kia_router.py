@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import orjson
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -39,7 +40,12 @@ async def kia_lifespan(app):
     yield
 
 
-kia_router = APIRouter(prefix="/kia", tags=["KIA"], lifespan=kia_lifespan)
+kia_router = APIRouter(
+    prefix="/kia",
+    tags=["KIA"],
+    lifespan=kia_lifespan,
+    default_response_class=JSONResponse,
+)
 
 
 @kia_router.post("/data")

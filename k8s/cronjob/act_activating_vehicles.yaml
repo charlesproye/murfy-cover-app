@@ -39,6 +39,8 @@ spec:
                     name: tesla-secret
                 - secretRef:
                     name: kia-secret
+                - secretRef:
+                    name: slack-secret
               resources:
                 limits:
                   memory: "2Gi"

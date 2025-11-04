@@ -13,9 +13,9 @@ class RenaultProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
     def __init__(
         self,
         make="renault",
-        spark: SparkSession = None,
+        spark: SparkSession | None = None,
         force_update: bool = False,
-        logger: Logger = None,
+        logger: Logger | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -26,9 +26,11 @@ class RenaultProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         """
         Compute the soh
         """
-        return df_aggregated.withColumn(
-            "SOH", F.col("BATTERY_ENERGY") / F.col("EXPECTED_BATTERY_ENERGY")
+        df_aggregated = df_aggregated.withColumn(
+            "SOH", F.expr("try_divide(BATTERY_ENERGY, EXPECTED_BATTERY_ENERGY)")
         )
+
+        return df_aggregated
 
     def compute_charge_levels(self, df_aggregated):
         df_aggregated = (
@@ -62,9 +64,7 @@ class RenaultProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
             "CONSUMPTION",
             F.when(
                 F.col("PHASE_STATUS") == "discharging",
-                (-1 * F.col("SOC_DIFF"))
-                * (F.col("BATTERY_NET_CAPACITY"))
-                / F.col("ODOMETER_DIFF"),
+                F.expr("try_divide(-SOC_DIFF * BATTERY_NET_CAPACITY, ODOMETER_DIFF)"),
             ).otherwise(None),
         )
 

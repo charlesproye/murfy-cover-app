@@ -7,9 +7,9 @@ import requests
 
 def send_slack_message(channel_id: str, text: str) -> int:
     """Send a message to a Slack channel."""
-    slack_token = os.getenv("SLACK_TOKEN")
+    slack_token = os.getenv("OAUTH_TOKEN")
     if not slack_token:
-        raise ValueError("SLACK_TOKEN is not set")
+        raise ValueError("Slack OAUTH_TOKEN is not set")
     headers = {
         "Authorization": f"Bearer {slack_token}",
         "Content-Type": "application/json; charset=utf-8",
