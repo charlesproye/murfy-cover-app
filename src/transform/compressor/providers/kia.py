@@ -1,4 +1,5 @@
 import asyncio
+import gc
 
 import msgspec
 
@@ -25,6 +26,42 @@ class KiaCompressor(Compressor):
             else:
                 all_items.append(decoded)
         return msgspec.json.encode(all_items)
+
+    async def _compress_temp_vin_data_buffer(
+        self,
+        vin_folder_path: str,
+        max_retries: int = 3,
+        retry_delay: int = 2,
+        upload: bool = True,
+    ):
+        attempt = 0
+
+        while attempt < max_retries:
+            all_items: list = []
+
+            async for batch in self._s3.download_folder_in_batches(
+                f"{vin_folder_path}temp/", batch_size=4000
+            ):
+                merged_data = self._temp_data_to_daily_file(batch)
+                if merged_data:
+                    decoded_batch = msgspec.json.decode(merged_data)
+                    all_items.extend(decoded_batch)
+                    del batch
+
+            break
+
+        if all_items:
+            final_bytes = msgspec.json.encode(all_items)
+            if upload:
+                await self._s3.upload_file(
+                    path=f"{vin_folder_path}{self._filename()}", file=final_bytes
+                )
+                await self._s3_dev.upload_file(
+                    path=f"{vin_folder_path}{self._filename()}", file=final_bytes
+                )
+                await self._s3.delete_folder(f"{vin_folder_path}temp/")
+            else:
+                return final_bytes
 
     @classmethod
     async def compress(cls, make):

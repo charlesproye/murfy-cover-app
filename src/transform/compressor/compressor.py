@@ -73,6 +73,7 @@ class Compressor(ABC):
         vins_folders, _ = self._sync_s3.list_content(
             self._s3.bucket, f"response/{self.brand_prefix}/"
         )
+
         folders_files = []
         for vin_path in track(vins_folders, description="Temp files listing..."):
             folders_files.append(
