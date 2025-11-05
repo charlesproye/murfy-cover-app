@@ -98,6 +98,7 @@ class VehicleModel(BaseUUIDModel):
     soh_oem_data: bool = Column(Boolean, default=False)
     commissioning_date = Column(DateTime, comment="First time seen on the market")
     end_of_life_date = Column(DateTime, comment="Last time seen on the market")
+    expected_consumption = Column(Integer)
 
 
 class Battery(BaseUUIDModel):
@@ -327,4 +328,3 @@ class FlashReportCombination(BaseUUIDModel):
     version: str | None = Column(String, nullable=True)
     odometer: int = Column(Integer, nullable=False)
     token: str = Column(String, nullable=False, unique=True)
-

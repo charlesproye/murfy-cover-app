@@ -27,7 +27,7 @@ def fetch_api_data(url: str) -> Optional[list]:
 
 def get_oem(cursor, vehicle_make: str) -> str:
     """Get an OEM record and return its ID."""
-    if type(vehicle_make) == str:
+    if isinstance(vehicle_make, str):
         cursor.execute(
             "SELECT oem_id FROM make join oem on oem.id=make.oem_id WHERE oem_name = lower(%s)",
             (vehicle_make,),
@@ -204,7 +204,7 @@ def get_or_create_vehicle_model(
         cursor.execute(
             """
             INSERT INTO vehicle_model (
-                id, model_name, type, version, make_id, oem_id, autonomy, warranty_date, warranty_km, source, battery_id, commissioning_date, end_of_life_date
+                id, model_name, type, version, make_id, oem_id, autonomy, expected_consumption, warranty_date, warranty_km, source, battery_id, commissioning_date, end_of_life_date
             ) VALUES (%s, LOWER(%s), LOWER(%s), LOWER(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
             (
@@ -215,6 +215,7 @@ def get_or_create_vehicle_model(
                 make_id,
                 get_oem(cursor, make_id),
                 vehicle.get("Range_WLTP"),
+                vehicle.get("Efficiency_Consumption_Real"),
                 vehicle.get("Battery_Warranty_Period"),
                 vehicle.get("Battery_Warranty_Mileage"),
                 vehicle.get("EVDB_Detail_URL"),
@@ -227,8 +228,9 @@ def get_or_create_vehicle_model(
     else:
         cursor.execute(
             """
-            UPDATE vehicle_model 
+            UPDATE vehicle_model
             SET autonomy = COALESCE(%s, autonomy),
+                expected_consumption = COALESCE(%s, expected_consumption),
                 warranty_date = COALESCE(%s, warranty_date),
                 warranty_km = COALESCE(%s, warranty_km),
                 source = COALESCE(%s, source),
@@ -239,6 +241,7 @@ def get_or_create_vehicle_model(
         """,
             (
                 vehicle.get("Range_WLTP"),
+                vehicle.get("Efficiency_Consumption_Real"),
                 vehicle.get("Battery_Warranty_Period"),
                 vehicle.get("Battery_Warranty_Mileage"),
                 vehicle.get("EVDB_Detail_URL"),
@@ -289,4 +292,3 @@ def fetch_ev_data():
 
 if __name__ == "__main__":
     fetch_ev_data()
-

@@ -237,3 +237,8 @@ src/ingestion/vehicle_info/api/pkcs12.txt
 !.vscode/launch.json
 !.vscode/tasks.json
 
+temp_header.b64
+temp_payload.b64
+temp_unsigned.b64
+jwt_signature.bin
+private.key

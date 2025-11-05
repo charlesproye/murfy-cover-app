@@ -136,7 +136,8 @@ external_api = [
     "sqlmodel>=0.0.24",
     "rapidfuzz==3.13.0",
     "pyspark>=3.5.5",
-    "scikit-learn==1.5.1"
+    "scikit-learn==1.5.1",
+    "greenlet>=2.0.1",
 ]
 
 migrations = [
