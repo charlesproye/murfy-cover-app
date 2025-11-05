@@ -32,16 +32,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --extra transform
 
 # Use official Spark base image that includes spark-submit and proper entrypoints
-FROM apache/spark:4.0.1-java21-python3
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    UV_PROJECT_ENVIRONMENT=/usr \
-    UV_PYTHON=/usr/bin/python3
-
-# Install UV in the Spark image (as root to avoid permission issues)
+FROM apache/spark:4.0.1-scala2.13-java21-ubuntu
 USER root
-RUN pip install uv
 
 COPY --from=builder /opt/spark/jars/hadoop-aws-3.4.1.jar ${SPARK_HOME}/jars/
 COPY --from=builder /opt/spark/jars/bundle-2.28.29.jar ${SPARK_HOME}/jars/
@@ -53,13 +45,21 @@ COPY src/core /app/src/core
 COPY src/transform /app/src/transform
 COPY src/__init__.py /app/src/__init__.py
 
+# Install dependencies directly into the system Python using UV (as root)
+WORKDIR /app
+ENV UV_INSTALL_DIR=/home/spark/.local/bin
+ENV UV_PYTHON_INSTALL_DIR=/home/spark/.local/share/uv/python
+ENV PATH="/home/spark/.local/bin:$PATH"
+
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+RUN uv python install 3.11
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --extra transform
+
 # Allow spark user to read and write to the app directory
 RUN chown -R spark:spark /app \
     && chmod -R u+rwX /app
 
-# Install dependencies directly into the system Python using UV (as root)
-WORKDIR /app
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --extra transform
+ENV PATH="/app/.venv/bin:$PATH"
 USER spark
-
