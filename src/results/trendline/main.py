@@ -82,7 +82,7 @@ def load_all_data():
     # data from db
     with get_connection() as connection:
         query = """
-            SELECT vm.model_name, vm.id as vehicle_model_id, vm.type, m.make_name, vd.soh, vd.soh_oem, vd.odometer, o.oem_name, o.id as oem_id, m.id as make_id FROM vehicle v
+            SELECT v.vin, vm.model_name, vm.id as vehicle_model_id, vm.type, m.make_name, vd.soh, vd.soh_oem, vd.odometer, o.oem_name, o.id as oem_id, m.id as make_id FROM vehicle v
             left JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
             left JOIN vehicle_data vd ON vd.vehicle_id = v.id
             left JOIN oem o ON o.id = vm.oem_id
@@ -171,4 +171,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

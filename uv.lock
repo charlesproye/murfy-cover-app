@@ -996,6 +996,16 @@ requires-dist = [
     { name = "rapidfuzz", marker = "extra == 'results'", specifier = ">=3.13.0" },
     { name = "rapidfuzz", marker = "extra == 'scraping'", specifier = ">=3.13.0" },
     { name = "redis", specifier = ">=6.0.0" },
+<<<<<<< HEAD
+    { name = "redis", marker = "extra == 'external-api'", specifier = "~=6.0.0" },
+    { name = "requests", specifier = "==2.30.0" },
+    { name = "rich", specifier = "==13.5.2" },
+    { name = "schedule", specifier = "==1.2.2" },
+    { name = "scikit-learn", marker = "extra == 'eda'", specifier = "==1.5.1" },
+    { name = "scikit-learn", marker = "extra == 'external-api'", specifier = "==1.5.1" },
+    { name = "scikit-learn", marker = "extra == 'results'", specifier = "==1.5.1" },
+    { name = "scipy", marker = "extra == 'eda'", specifier = ">=1.10.1" },
+=======
     { name = "redis", marker = "extra == 'external-api'", specifier = ">=6.0.0" },
     { name = "requests", specifier = ">=2.30.0" },
     { name = "rich", specifier = ">=13.5.2" },
@@ -1004,6 +1014,7 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'external-api'", specifier = ">=1.5.1" },
     { name = "scikit-learn", marker = "extra == 'results'", specifier = ">=1.7" },
     { name = "scipy", marker = "extra == 'eda'", specifier = ">=1.16" },
+>>>>>>> main
     { name = "scipy", marker = "extra == 'visualization'", specifier = ">=1.10.1" },
     { name = "selenium", marker = "extra == 'scraping'", specifier = ">=4.33.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },

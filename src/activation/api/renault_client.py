@@ -1,13 +1,11 @@
 import asyncio
 import base64
 import json
-import logging
 import os
 import subprocess
 import time
 from enum import Enum
-from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Any
 
 import aiohttp
 
@@ -16,8 +14,6 @@ from core.env_utils import get_env_var
 
 class RenaultAPIError(Exception):
     """Base exception for Renault API errors"""
-
-    pass
 
 
 class RenaultAPIErrorCode(Enum):
@@ -52,14 +48,18 @@ class RenaultApi:
         self.pwd = pwd
         self.temp_files = []
         self.pkcs12_file = "src/activation/api/pkcs12.txt"
-        self._token_data: Optional[Dict] = None
+        self._token_data: type[dict] = None
         self._token_expiry: float = 0
 
         # Model mapping dictionary
         self.model_mapping = {"megane e-tech": "megane e-tech", "zoe": "zoe"}
 
         # Type mapping dictionary
-        self.type_mapping = {"r110": "r110", "r135": "r135"}
+        self.type_mapping = {
+            "r110 z.e. 50": "ze50 r110",
+            "r110 z.e. 40": "ze40 r110",
+            "r135": "r135",
+        }
 
         # Verify pkcs12.txt exists
         if not os.path.exists(self.pkcs12_file):
@@ -101,7 +101,7 @@ class RenaultApi:
         """Convert base64 to URL-safe base64"""
         return data.replace("+", "-").replace("/", "_")
 
-    async def _generate_token(self) -> Dict:
+    async def _generate_token(self) -> dict:
         """Generate Okta token using PKCS12 certificate"""
         try:
             # Step 1: Convert PKCS12 to private key
@@ -155,8 +155,9 @@ class RenaultApi:
 
             # Step 8: Make the token request asynchronously
             print("Requesting token from Okta...")
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
                     self.aud,
                     data={
                         "grant_type": "client_credentials",
@@ -166,12 +167,13 @@ class RenaultApi:
                         "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
                     },
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
-                ) as response:
-                    if response.status != 200:
-                        text = await response.text()
-                        raise Exception(f"Token request failed: {text}")
+                ) as response,
+            ):
+                if response.status != 200:
+                    text = await response.text()
+                    raise Exception(f"Token request failed: {text}")
 
-                    return await response.json()
+                return await response.json()
 
         except Exception as e:
             raise Exception(f"Token generation failed: {str(e)}")
@@ -188,7 +190,7 @@ class RenaultApi:
 
     async def get_vehicle_info(
         self, session: aiohttp.ClientSession, vin: str
-    ) -> Tuple[str, str, str, Optional[str]]:
+    ) -> tuple[str, str, str, Any | None]:
         """
         Get vehicle information from Renault API using the provided VIN.
 
@@ -365,4 +367,3 @@ class RenaultApi:
         except Exception as e:
             print(f"Error getting vehicle WLTP range for VIN {vin}: {str(e)}")
             return None
-

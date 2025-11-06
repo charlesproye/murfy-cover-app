@@ -206,87 +206,97 @@ def get_car_infos(url):
 
 
 def main():
-    all_car_link = scrape_all_cars(max_pages=5, delay=1)
+    all_car_link = scrape_all_cars(delay=1)
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=data_sheet[0, :7], data=data_sheet[1:, :7])
     try:
-        with open(PATH_FILE, "r", encoding="utf-8") as f:
+        with open(PATH_FILE, encoding="utf-8") as f:
             link_already_try = {line.strip() for line in f if line.strip()}
     except FileNotFoundError:
         link_already_try = set()
+
+    print("link_already_try", link_already_try)
+    print("all_car_link", set(all_car_link))
+    print("df_sheet['lien']", set(df_sheet["lien"]))
+    print(
+        "set(all_car_link) - set(df_sheet['lien']) - link_already_try",
+        set(all_car_link) - set(df_sheet["lien"]) - link_already_try,
+    )
     links_not_fetch = set(all_car_link) - set(df_sheet["lien"]) - link_already_try
 
     print(f"Number of link to scrappe = {len(links_not_fetch)}")
-    all_infos = {}
-    for i, link in enumerate(all_car_link, 1):
-        print(f"{i:2d}. {link}")
-        try:
-            all_infos[i] = get_car_infos(link)
-        except Exception as e:
-            print(f"[{i}] Erreur sur le lien {link} : {e}")
-            with open(PATH_FILE, "a", encoding="utf-8") as f:
-                f.write(f"{link}\n")
-                f.flush()
-        time.sleep(1)
+    if links_not_fetch:
+        print("No new links to scrap")
+    else:
+        all_infos = {}
+        for i, link in enumerate(links_not_fetch, 1):
+            print(f"{i:2d}. {link}")
+            try:
+                all_infos[i] = get_car_infos(link)
+            except Exception as e:
+                print(f"[{i}] Erreur sur le lien {link} : {e}")
+                with open(PATH_FILE, "a", encoding="utf-8") as f:
+                    f.write(f"{link}\n")
+                    f.flush()
+            time.sleep(1)
 
-    infos_clean = pd.DataFrame(all_infos).T.dropna(subset="SoH")[
-        [
-            "OEM",
-            "Modèle",
-            "Type",
-            "Année",
-            "Odomètre (km)",
-            "SoH",
-            "lien",
-            "battery_capacity",
-            "price",
-            "WLTP",
+        infos_clean = pd.DataFrame(all_infos).T.dropna(subset="SoH")[
+            [
+                "OEM",
+                "Modèle",
+                "Type",
+                "Année",
+                "Odomètre (km)",
+                "SoH",
+                "lien",
+                "battery_capacity",
+                "price",
+                "WLTP",
+            ]
         ]
-    ]
-    # Mapping to database model
-    with get_connection() as con:
-        cursor = con.cursor()
-        cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
-                                                    join make m on vm.make_id=m.id
-                                                    join battery b on b.id=vm.battery_id;""")
-        model_existing = pd.DataFrame(
-            cursor.fetchall(),
-            columns=[
-                "model_name",
-                "id",
-                "type",
-                "commissioning_date",
-                "vm.end_of_life_date",
-                "make_name",
-                "capacity",
-            ],
+        # Mapping to database model
+        with get_connection() as con:
+            cursor = con.cursor()
+            cursor.execute("""SELECT vm.model_name, vm.id, vm.type, vm.commissioning_date, vm.end_of_life_date, m.make_name, b.capacity FROM vehicle_model vm
+                                                        join make m on vm.make_id=m.id
+                                                        join battery b on b.id=vm.battery_id;""")
+            model_existing = pd.DataFrame(
+                cursor.fetchall(),
+                columns=[
+                    "model_name",
+                    "id",
+                    "type",
+                    "commissioning_date",
+                    "vm.end_of_life_date",
+                    "make_name",
+                    "capacity",
+                ],
+            )
+        infos_clean["id"] = infos_clean.apply(
+            lambda row: mapping_vehicle_type(
+                row["Type"],
+                row["OEM"],
+                row["Modèle"],
+                model_existing,
+                row["battery_capacity"],
+                row["Année"],
+            ),
+            axis=1,
         )
-    infos_clean["id"] = infos_clean.apply(
-        lambda row: mapping_vehicle_type(
-            row["Type"],
-            row["OEM"],
-            row["Modèle"],
-            model_existing,
-            row["battery_capacity"],
-            row["Année"],
-        ),
-        axis=1,
-    )
-    type_mapping = infos_clean.merge(
-        model_existing[["id", "type"]], on="id", how="left"
-    )["type"]
-    infos_clean["Type"] = [
-        mapped if mapped != "unknown" else old
-        for old, mapped in zip(infos_clean["Type"], type_mapping)
-    ]
-    infos_clean.drop(columns="id", inplace=True)
-    infos_clean["Odomètre (km)"] = infos_clean["Odomètre (km)"].astype(float)
-    infos_clean["WLTP"] = infos_clean["WLTP"].astype(float)
-    infos_clean["price"] = infos_clean["price"].astype(float)
-    infos_clean = infos_clean.replace(np.nan, "unknown").replace(pd.NA, "unknown")
-    export_to_excel(infos_clean, "Courbes de tendance", "Courbes OS")
+        type_mapping = infos_clean.merge(
+            model_existing[["id", "type"]], on="id", how="left"
+        )["type"]
+        infos_clean["Type"] = [
+            mapped if mapped != "unknown" else old
+            for old, mapped in zip(infos_clean["Type"], type_mapping, strict=True)
+        ]
+        infos_clean.drop(columns="id", inplace=True)
+        infos_clean["Odomètre (km)"] = infos_clean["Odomètre (km)"].astype(float)
+        infos_clean["WLTP"] = infos_clean["WLTP"].astype(float)
+        infos_clean["price"] = infos_clean["price"].astype(float)
+        infos_clean = infos_clean.replace(np.nan, "unknown").replace(pd.NA, "unknown")
+        export_to_excel(infos_clean, "Courbes de tendance", "Courbes OS")
 
 
 if __name__ == "__main__":
     main()
-
