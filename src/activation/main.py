@@ -49,6 +49,7 @@ from activation.fleet_info import check_vehicles_without_type
 from activation.fleet_info import read_fleet_info as fleet_info
 from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
+from activation.utils.metric_utils import write_metrics_to_db
 from core.slack_utils import send_slack_message
 
 # Configure logging
@@ -152,12 +153,14 @@ async def process_vehicles(owner_filter: str | None = None):
         )
 
         await asyncio.gather(
-            vehicle_processor.process_tesla(),
+            # vehicle_processor.process_tesla(),
             vehicle_processor.process_other_vehicles(),
             vehicle_processor.process_renault(),
             vehicle_processor.process_deactivated_vehicles(),
             vehicle_processor.process_bmw(),
         )
+
+        await write_metrics_to_db(logger)
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {e!s}")
@@ -208,4 +211,3 @@ if __name__ == "__main__":
         # Close the event loop
         loop.close()
         sys.exit(0)
-

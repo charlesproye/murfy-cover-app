@@ -42,13 +42,13 @@ def get_sqlalchemy_engine(is_prod: bool = False, db_name: str = "rdb") -> Engine
 
 
 @contextmanager
-def get_connection(is_prod: bool = False):
+def get_connection(is_prod: bool = False, db_name: str = "rdb"):
     """Context manager pour obtenir une connexion à la base de données
 
     Args:
         is_prod (bool): If True, uses the production database connection. Defaults to False.
     """
-    engine = get_sqlalchemy_engine(is_prod)
+    engine = get_sqlalchemy_engine(is_prod, db_name)
     conn = engine.raw_connection()
     try:
         yield conn
@@ -224,4 +224,3 @@ def insert_df_and_deduplicate(
         conn.execute(text(dedup_sql))
 
     return df
-

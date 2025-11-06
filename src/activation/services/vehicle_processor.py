@@ -308,7 +308,8 @@ class VehicleProcessor:
         """Process Renault vehicles."""
         try:
             renault_df = self.df[
-                (self.df["oem"] == "renault") & (self.df["real_activation"])
+                (self.df["oem"] == "renault")
+                & (self.df["real_activation"].astype(bool))
             ]
             async with aiohttp.ClientSession() as session:
                 with get_connection() as con:
@@ -423,7 +424,9 @@ class VehicleProcessor:
     async def process_bmw(self) -> None:
         """Process BMW vehicles."""
         try:
-            bmw_df = self.df[(self.df["oem"] == "bmw") & (self.df["real_activation"])]
+            bmw_df = self.df[
+                (self.df["oem"] == "bmw") & (self.df["real_activation"].astype(bool))
+            ]
             async with aiohttp.ClientSession() as session:
                 with get_connection() as con:
                     cursor = con.cursor()
@@ -656,7 +659,7 @@ class VehicleProcessor:
     async def process_deactivated_vehicles(self) -> None:
         """Process deactivated vehicles."""
         logging.info("Processing deactivated vehicles")
-        deactivated_df = self.df[not self.df["real_activation"]]
+        deactivated_df = self.df[~self.df["real_activation"]]
         if deactivated_df.empty:
             logging.info("No deactivated vehicles to process")
             return
@@ -842,7 +845,7 @@ class VehicleProcessor:
         """Process Tesla vehicles."""
         try:
             tesla_df = self.df[
-                (self.df["oem"] == "tesla") & (self.df["real_activation"])
+                (self.df["oem"] == "tesla") & (self.df["real_activation"].astype(bool))
             ]
             async with aiohttp.ClientSession() as session:
                 with get_connection() as con:
@@ -1087,4 +1090,3 @@ class VehicleProcessor:
     #     except Exception as e:
     #         logging.error(f"Error in Tesla particulier processing: {str(e)}")
     #         raise
-

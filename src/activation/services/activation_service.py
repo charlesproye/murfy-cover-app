@@ -588,6 +588,7 @@ class VehicleActivationService:
                         "Activation_Error": "",
                         "API_Detail": "",
                     }
+                    status_data.append(vehicle_data)
                 elif values["reason"] == "unknown":
                     vehicle_data = {
                         "vin": key,
@@ -1066,4 +1067,3 @@ class VehicleActivationService:
 
     #             status_df = pd.DataFrame(status_data)
     #             await update_vehicle_activation_data(status_df)
-
