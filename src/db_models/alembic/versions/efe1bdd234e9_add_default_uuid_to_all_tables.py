@@ -196,13 +196,6 @@ def upgrade() -> None:
         existing_nullable=False,
     )
     op.create_table_comment("vehicle_data", "", existing_comment=None, schema=None)
-    op.add_column(
-        "vehicle_model", sa.Column("odometer_data", sa.Boolean(), nullable=True)
-    )
-    op.add_column("vehicle_model", sa.Column("soh_data", sa.Boolean(), nullable=True))
-    op.add_column(
-        "vehicle_model", sa.Column("soh_oem_data", sa.Boolean(), nullable=True)
-    )
     op.alter_column(
         "vehicle_model",
         "id",
@@ -260,9 +253,6 @@ def downgrade() -> None:
         existing_comment="Unique identifier of the row",
         existing_nullable=False,
     )
-    op.drop_column("vehicle_model", "soh_oem_data")
-    op.drop_column("vehicle_model", "soh_data")
-    op.drop_column("vehicle_model", "odometer_data")
     op.drop_table_comment("vehicle_data", existing_comment="", schema=None)
     op.alter_column(
         "vehicle_data",

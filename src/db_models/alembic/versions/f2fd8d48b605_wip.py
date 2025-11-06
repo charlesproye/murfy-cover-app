@@ -92,6 +92,9 @@ def upgrade() -> None:
         sa.Column("oem", sa.String(length=100), nullable=True),
         sa.Column("capacity", sa.Numeric(precision=10, scale=2), nullable=True),
         sa.Column("net_capacity", sa.Numeric(precision=10, scale=2), nullable=True),
+        sa.Column("odometer_data", sa.Boolean(), nullable=True),
+        sa.Column("soh_data", sa.Boolean(), nullable=True),
+        sa.Column("soh_oem_data", sa.Boolean(), nullable=True),
         sa.Column("autonomy", sa.Integer(), nullable=True),
         sa.Column(
             "id", sa.UUID(), nullable=False, comment="Unique identifier of the row"
