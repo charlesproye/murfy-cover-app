@@ -1,5 +1,3 @@
-# version: '3.8'
-
 services:
   data_ev:
     platform: linux/amd64
@@ -169,8 +167,6 @@ services:
     depends_on:
       - redis
 
-
-
   spark-transform-service:
     platform: linux/amd64
     build:
@@ -197,11 +193,15 @@ services:
       ALGORITHM: HS256
       SECRET_KEY: ${SECRET_KEY}
       ENCRYPT_KEY: ${ENCRYPT_KEY}
-      DB_DATA_EV_USER: root
-      DB_DATA_EV_PASSWORD: ${EXTERNAL_DB_DATA_EV_PASSWORD}
-      DB_DATA_EV_HOST: 195.154.70.203
-      DB_DATA_EV_PORT: 1462
-      DB_DATA_EV_NAME: rdb
+      #DB_DATA_EV_USER: root
+      #DB_DATA_EV_PASSWORD: ${EXTERNAL_DB_DATA_EV_PASSWORD}
+      #DB_DATA_EV_HOST: 195.154.70.203
+      #DB_DATA_EV_PORT: 1462
+      DB_DATA_EV_NAME: evalue
+      DB_DATA_EV_USER: evalue
+      DB_DATA_EV_PASSWORD: evalue
+      DB_DATA_EV_HOST: postgres
+      DB_DATA_EV_PORT: 55432
     depends_on:
       - redis
     healthcheck:
@@ -211,7 +211,20 @@ services:
       retries: 3
       start_period: 20s
 
+  postgres:
+    image: postgres:14
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "55432:5432"
+    environment:
+      - POSTGRES_USER=evalue
+      - POSTGRES_PASSWORD=evalue
+      - POSTGRES_DB=evalue
+
 volumes:
   redis_data:
     driver: local
 
+  postgres_data:
+    driver: local

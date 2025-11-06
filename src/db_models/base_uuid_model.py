@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, declared_attr, mapped_column
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
 Base_ = declarative_base()
 ListTables = []
@@ -26,12 +26,7 @@ class Base(Base_):
         table_args = cls.__dict__.get("table_args", ())
         if doc is None:
             doc = ""
-        while (
-            doc.startswith("\n")
-            or doc.startswith(" ")
-            or doc.endswith("\n")
-            or doc.endswith(" ")
-        ):
+        while doc.startswith(("\n", " ")) or doc.endswith(("\n", " ")):
             doc = doc.strip(" ").strip("\n")
             doc = doc.strip(" ").strip("\n")
         if len(table_args) == 0:
@@ -58,6 +53,7 @@ class BaseUUIDModel(Base):
         index=False,
         nullable=False,
         comment="Unique identifier of the row",
+        server_default=text("gen_random_uuid()"),
     )
     updated_at = mapped_column(
         DateTime,
@@ -87,5 +83,5 @@ class BaseUUID(Base):
         index=False,
         nullable=False,
         comment="Unique identifier of the row",
+        server_default=text("gen_random_uuid()"),
     )
-

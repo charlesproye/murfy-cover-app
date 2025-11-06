@@ -19,7 +19,7 @@ depends_on = None
 
 def upgrade() -> None:
     # op.add_column('vehicle', sa.Column('is_displayed', sa.Boolean(), nullable=True))
-    op.add_table_comment("vehicle", existing_comment="", schema=None)
+    op.create_table_comment("vehicle", "", existing_comment="", schema=None)
 
 
 def downgrade() -> None:
@@ -99,4 +99,3 @@ def downgrade() -> None:
         schema="tesla",
     )
     # ### end Alembic commands ###
-

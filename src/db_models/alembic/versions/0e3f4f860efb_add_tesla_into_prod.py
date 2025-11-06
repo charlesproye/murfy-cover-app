@@ -66,4 +66,3 @@ def downgrade() -> None:
 
     # Drop tesla schema
     op.execute("DROP SCHEMA IF EXISTS tesla")
-
