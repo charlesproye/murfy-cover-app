@@ -996,16 +996,6 @@ requires-dist = [
     { name = "rapidfuzz", marker = "extra == 'results'", specifier = ">=3.13.0" },
     { name = "rapidfuzz", marker = "extra == 'scraping'", specifier = ">=3.13.0" },
     { name = "redis", specifier = ">=6.0.0" },
-<<<<<<< HEAD
-    { name = "redis", marker = "extra == 'external-api'", specifier = "~=6.0.0" },
-    { name = "requests", specifier = "==2.30.0" },
-    { name = "rich", specifier = "==13.5.2" },
-    { name = "schedule", specifier = "==1.2.2" },
-    { name = "scikit-learn", marker = "extra == 'eda'", specifier = "==1.5.1" },
-    { name = "scikit-learn", marker = "extra == 'external-api'", specifier = "==1.5.1" },
-    { name = "scikit-learn", marker = "extra == 'results'", specifier = "==1.5.1" },
-    { name = "scipy", marker = "extra == 'eda'", specifier = ">=1.10.1" },
-=======
     { name = "redis", marker = "extra == 'external-api'", specifier = ">=6.0.0" },
     { name = "requests", specifier = ">=2.30.0" },
     { name = "rich", specifier = ">=13.5.2" },
@@ -1014,7 +1004,6 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'external-api'", specifier = ">=1.5.1" },
     { name = "scikit-learn", marker = "extra == 'results'", specifier = ">=1.7" },
     { name = "scipy", marker = "extra == 'eda'", specifier = ">=1.16" },
->>>>>>> main
     { name = "scipy", marker = "extra == 'visualization'", specifier = ">=1.10.1" },
     { name = "selenium", marker = "extra == 'scraping'", specifier = ">=4.33.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
@@ -1125,15 +1114,15 @@ wheels = [
 
 [[package]]
 name = "fakeredis"
-version = "2.32.0"
+version = "2.32.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "redis" },
     { name = "sortedcontainers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e1/2e/94ca3f2ff35f086d7d3eeb924054e328b2ac851f0a20302d942c8d29726c/fakeredis-2.32.0.tar.gz", hash = "sha256:63d745b40eb6c8be4899cf2a53187c097ccca3afbca04fdbc5edc8b936cd1d59", size = 171097, upload-time = "2025-10-07T10:46:58.876Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/14/b47b8471303af7deed7080290c14cff27a831fa47b38f45643e6bf889cee/fakeredis-2.32.1.tar.gz", hash = "sha256:dd8246db159f0b66a1ced7800c9d5ef07769e3d2fde44b389a57f2ce2834e444", size = 171582, upload-time = "2025-11-06T01:40:57.836Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0e/1b/84ab7fd197eba5243b6625c78fbcffaa4cf6ac7dda42f95d22165f52187e/fakeredis-2.32.0-py3-none-any.whl", hash = "sha256:c9da8228de84060cfdb72c3cf4555c18c59ba7a5ae4d273f75e4822d6f01ecf8", size = 118422, upload-time = "2025-10-07T10:46:57.643Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/d2/c28f6909864bfdb7411bb8f39fabedb5a50da1cbd7da5a1a3a46dfea2eab/fakeredis-2.32.1-py3-none-any.whl", hash = "sha256:e80c8886db2e47ba784f7dfe66aad6cd2eab76093c6bfda50041e5bc890d46cf", size = 118964, upload-time = "2025-11-06T01:40:55.885Z" },
 ]
 
 [[package]]
@@ -1306,16 +1295,16 @@ wheels = [
 
 [[package]]
 name = "google-auth"
-version = "2.42.1"
+version = "2.43.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
     { name = "pyasn1-modules" },
     { name = "rsa" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/6b/22a77135757c3a7854c9f008ffed6bf4e8851616d77faf13147e9ab5aae6/google_auth-2.42.1.tar.gz", hash = "sha256:30178b7a21aa50bffbdc1ffcb34ff770a2f65c712170ecd5446c4bef4dc2b94e", size = 295541, upload-time = "2025-10-30T16:42:19.381Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/ef/66d14cf0e01b08d2d51ffc3c20410c4e134a1548fc246a6081eae585a4fe/google_auth-2.43.0.tar.gz", hash = "sha256:88228eee5fc21b62a1b5fe773ca15e67778cb07dc8363adcb4a8827b52d81483", size = 296359, upload-time = "2025-11-06T00:13:36.587Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/92/05/adeb6c495aec4f9d93f9e2fc29eeef6e14d452bba11d15bdb874ce1d5b10/google_auth-2.42.1-py2.py3-none-any.whl", hash = "sha256:eb73d71c91fc95dbd221a2eb87477c278a355e7367a35c0d84e6b0e5f9b4ad11", size = 222550, upload-time = "2025-10-30T16:42:17.878Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/d1/385110a9ae86d91cc14c5282c61fe9f4dc41c0b9f7d423c6ad77038c4448/google_auth-2.43.0-py2.py3-none-any.whl", hash = "sha256:af628ba6fa493f75c7e9dbe9373d148ca9f4399b5ea29976519e0a3848eddd16", size = 223114, upload-time = "2025-11-06T00:13:35.209Z" },
 ]
 
 [[package]]
