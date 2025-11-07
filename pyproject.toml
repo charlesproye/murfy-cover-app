@@ -138,6 +138,7 @@ external_api = [
     "pyspark>=3.5.5",
     "scikit-learn>=1.5.1",
     "greenlet>=2.0.1",
+    "aiohttp>=3.13",
 ]
 
 migrations = [
@@ -221,4 +222,3 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "activation", "transform", "eda", "load", "web", "results", "external_api", "visualization"]
-

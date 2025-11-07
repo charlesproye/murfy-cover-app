@@ -10,6 +10,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from external_api.api.v1 import api_router  # as api_router_v1
 from external_api.core.config import settings
+from external_api.core.http_client import HTTP_CLIENT
 
 # BACKEND_CORS_ORIGINS=[
 #     "http://localhost:3000"
@@ -75,29 +76,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
 
 
-# class ProxyHeadersMiddleware(BaseHTTPMiddleware):
-#     """Middleware to handle proxy headers like X-Forwarded-Prefix"""
-
-#     async def dispatch(self, request: Request, call_next):
-#         """
-#         Adjust path info based on X-Forwarded-Prefix header
-#         """
-#         forwarded_prefix = request.headers.get("X-Forwarded-Prefix", "")
-
-#         # Log the prefix for debugging
-#         if forwarded_prefix:
-#             logger.info("X-Forwarded-Prefix detected", prefix=forwarded_prefix)
-#             # We're in production mode if we get this header
-#             os.environ["ENVIRONMENT"] = "production"
-#         else:
-#             # Local development
-#             if is_local:
-#                 logger.info("Running in local development mode")
-
-#         response = await call_next(request)
-#         return response
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -107,24 +85,12 @@ async def lifespan(app: FastAPI):
     # Code exécuté au démarrage
     logger.info("Démarrage de l'API", version="1.1.0")
     logger.info("Environnement", environment=settings.ENVIRONMENT)
-    # Fourniture de l'application
+    HTTP_CLIENT.start()
+
     yield
 
-    # Code exécuté à l'arrêt
     logger.info("Arrêt de l'API")
 
-
-# # Fonction pour déterminer si on est en environnement local
-# def is_local_environment() -> bool:
-#     """
-#     Détecte si l'application tourne en environnement local, développement ou en production.
-#     En production, on s'attend à ce que l'en-tête X-Forwarded-Prefix soit présent.
-#     """
-#     return os.getenv("ENVIRONMENT", "development") == "development"
-
-
-# Détermine si nous sommes en environnement local
-# is_local = is_local_environment()
 
 # Préfixe à utiliser pour les URL OpenAPI
 root_path = "/api" if settings.ENVIRONMENT == "proxy" else ""
@@ -164,9 +130,6 @@ add_pagination(app)
 # # Ajout du middleware de journalisation
 app.add_middleware(RequestLoggingMiddleware)
 
-# # Ajout du middleware pour les en-têtes de proxy
-# app.add_middleware(ProxyHeadersMiddleware)
-
 
 @app.get("/", include_in_schema=False)
 async def root():
@@ -184,15 +147,9 @@ async def root():
     }
 
 
-# @app.get("/")
-# async def root():
-#     return {"message": f"Welcome to {settings.PROJECT_NAME} {settings.API_V1_STR}"}
-
-
 @app.get("/health")
 async def health_check():
     """
     Health check endpoint.
     """
     return {"status": "healthy"}
-

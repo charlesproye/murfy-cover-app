@@ -11,6 +11,7 @@ from external_api.api.v1.endpoints import (
     model,
     passport,
     static_data,
+    tesla,
 )
 from external_api.core.config import settings
 
@@ -30,7 +31,6 @@ api_router.include_router(
 api_router.include_router(billing.router, prefix="/billing", tags=["Billing"])
 api_router.include_router(individual.router, prefix="/individual", tags=["Individual"])
 
-
 # Routes cachées de la documentation OpenAPI
 hidden_router = APIRouter(include_in_schema=False)
 # Passport routes (cachées)
@@ -40,6 +40,7 @@ hidden_router.include_router(admin.router, prefix="/admin", tags=["Administratio
 hidden_router.include_router(
     flash_report.flash_report_router, prefix="/flash_report", tags=["Flash Report"]
 )
+hidden_router.include_router(tesla.tesla_router, prefix="/tesla", tags=["Tesla"])
+
 
 api_router.include_router(hidden_router)
-

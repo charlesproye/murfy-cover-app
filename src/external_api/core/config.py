@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_EMAIL: EmailStr | None = None
     FIRST_SUPERUSER_PASSWORD: str | None = None
 
+    # Tesla
+    TESLA_CLIENT_ID: str = os.getenv("TESLA_CLIENT_ID")
+    TESLA_CLIENT_SECRET: str = os.getenv("TESLA_CLIENT_SECRET")
+
     @field_validator("ASYNC_DB_DATA_EV_URI", mode="before")
     @classmethod
     def assemble_async_db_data_connection(cls, v: str | None, info) -> Any:
@@ -132,4 +136,3 @@ class Settings(BaseSettings):
 
 # Singleton for settings
 settings = Settings()
-

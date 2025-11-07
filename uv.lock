@@ -793,6 +793,7 @@ eda = [
     { name = "tqdm" },
 ]
 external-api = [
+    { name = "aiohttp" },
     { name = "asteval" },
     { name = "asyncpg" },
     { name = "bcrypt" },
@@ -911,6 +912,7 @@ local = [
 requires-dist = [
     { name = "aioboto3", specifier = ">=13.4.0" },
     { name = "aiohttp", specifier = ">=3.11.11" },
+    { name = "aiohttp", marker = "extra == 'external-api'", specifier = ">=3.13" },
     { name = "aiokafka", marker = "extra == 'ingestion'", specifier = ">=0.10.0" },
     { name = "aiosmtplib", marker = "extra == 'migrations'", specifier = ">=1.2.0" },
     { name = "alembic", marker = "extra == 'migrations'", specifier = ">=1.17" },

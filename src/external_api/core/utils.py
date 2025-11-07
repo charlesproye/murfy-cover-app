@@ -10,6 +10,7 @@ import gspread
 import numpy as np
 import requests
 from fastapi import Depends, HTTPException, status
+from fastapi.datastructures import URL
 from gspread.exceptions import APIError, SpreadsheetNotFound, WorksheetNotFound
 from oauth2client.service_account import ServiceAccountCredentials
 from sqlalchemy import text
@@ -563,3 +564,24 @@ async def get_flash_report_user(
 
     return flash_report_user
 
+
+def strip_params_from_url(url: URL) -> str:
+    """
+    Return the base URL without the query parameters.
+    """
+    return f"{url.scheme}://{url.netloc}{url.path}"
+
+
+def replace_in_url(url: URL, old: str, new: str, with_params: bool = False) -> str:
+    """
+    Replace the old string in the URL with the new string.
+    """
+
+    new_path = url.path.replace(old, new)
+
+    new_url = f"{url.scheme}://{url.netloc}{new_path}"
+
+    if with_params:
+        new_url += f"?{url.query}"
+
+    return new_url

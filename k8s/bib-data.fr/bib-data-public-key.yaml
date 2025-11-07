@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tesla-public-key
+  namespace: evalue
+spec:
+  type: ExternalName
+  externalName: bib-data-fr-statics.s3.fr-par.scw.cloud
+  ports:
+  - port: 443
+    targetPort: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tesla-public-key-ingress
+  namespace: evalue
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/rewrite-target: /.well-known/appspecific/com.tesla.3p.public-key.pem
+    nginx.ingress.kubernetes.io/upstream-vhost: bib-data-fr-statics.s3.fr-par.scw.cloud
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - bib-data.fr
+    secretName: bib-data-tls
+  rules:
+  - host: bib-data.fr
+    http:
+      paths:
+      - path: /.well-known/appspecific/com.tesla.3p.public-key.pem
+        pathType: Exact
+        backend:
+          service:
+            name: tesla-public-key
+            port:
+              number: 443
