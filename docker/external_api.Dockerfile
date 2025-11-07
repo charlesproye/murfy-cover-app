@@ -29,5 +29,5 @@ WORKDIR /app
 USER app
 
 # Run FastAPI with Uvicorn
-CMD ["uvicorn", "src.external_api.app:app", "--host", "0.0.0.0", "--port", "4000"]
-
+# The --proxy-headers --forwarded-allow-ips=* are used so that FastAPI sees requests as HTTPS and not HTTP
+CMD ["uvicorn", "src.external_api.app:app", "--proxy-headers", "--forwarded-allow-ips=*", "--host", "0.0.0.0", "--port", "4000"]

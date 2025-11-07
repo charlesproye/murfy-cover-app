@@ -8,6 +8,8 @@ README*
 *.Dockerfile
 docker-compose.yaml
 docker-compose.yml
+k8s/
+docker/
 
 # Logs and temporary files
 *.log
