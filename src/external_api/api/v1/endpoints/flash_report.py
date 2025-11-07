@@ -64,6 +64,7 @@ async def send_report_email(
         vehicle_type=data.type,
         version=data.version,
         odometer=data.odometer,
+        language=data.language,
         db=db,
     )
 

@@ -23,7 +23,7 @@ class VehicleInfo(BaseModel):
     vin: str
     brand: str
     model: str
-    type: str
+    type: str | None
     version: str | None
     mileage: float
     image_url: str | None
@@ -46,6 +46,7 @@ class BatteryInfo(BaseModel):
 
 class GenerationData(BaseModel):
     has_trendline: bool
+    language: LanguageEnum
     vehicle_info: VehicleInfo
     battery_info: BatteryInfo
 

@@ -4,6 +4,7 @@ import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+from db_models.enums import LanguageEnum
 import pandas as pd
 from fastapi import HTTPException, status
 from sqlalchemy import select, text
@@ -136,6 +137,7 @@ async def insert_combination(
     vehicle_type: str,
     version: str | None,
     odometer: int,
+    language: LanguageEnum,
     db: AsyncSession,
 ) -> str:
     token = str(uuid.uuid4())
@@ -148,6 +150,7 @@ async def insert_combination(
             version=version,
             odometer=odometer,
             token=token,
+            language=language,
         )
     )
     await db.flush()
@@ -170,7 +173,7 @@ async def send_email(is_french: bool, email: str, token: str) -> None:
     message["Subject"] = (
         "Bib a estimé l'état de santé de la batterie de votre véhicule"
         if is_french
-        else "Bib has estimated the health status of your battery"
+        else "Bib estimated your battery state-of-health"
     )
     message["From"] = sender_email
     message["To"] = email
@@ -184,10 +187,10 @@ async def send_email(is_french: bool, email: str, token: str) -> None:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <body style="font-family: Arial, sans-serif; line-height: 1.2; color: #333;">
+            <div style="max-width: 650px; margin: 0; padding: 20px;">
                 <p>Hello,</p>
-                <p>Good news! The health status estimation of your battery is ready!</p>
+                <p>Good news, your battery SoH estimation is ready!</p>
                 <div style="text-align: center; margin: 20px 0;">
                     <a
                         href="{link}"
@@ -196,7 +199,7 @@ async def send_email(is_french: bool, email: str, token: str) -> None:
                             padding: 12px 24px;
                             font-size: 16px;
                             color: white !important;
-                            background-color: #007bff;
+                            background-color: #2d6d49;
                             text-decoration: none;
                             border-radius: 5px;
                             margin-bottom: 10px;
@@ -208,13 +211,19 @@ async def send_email(is_french: bool, email: str, token: str) -> None:
                     </a>
                 </div>
                 <p>
-                    If you have any questions or encounter any issues, please don't hesitate to
-                    <a href="mailto:support@bib-batteries.fr" style="color: #007bff;">
+                    ➤ Learn more about battery SoH
+                    <a href="https://bib-batteries.fr/" style="color: #2d6d49;">
+                        on our website.
+                    </a>
+                </p>
+                <p>
+                    If you have any questions or encounter any issues, please
+                    <a href="mailto:support@bib-batteries.fr" style="color: #2d6d49;">
                         contact our support team.
                     </a>
                 </p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-                <p style="color: #666; font-size: 14px;">
+                <p style="color: #666; font-size: 14px; line-height: 1.6;">
                     Best regards,<br>
                     The Bib Team<br>
                 </p>
@@ -230,10 +239,10 @@ async def send_email(is_french: bool, email: str, token: str) -> None:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <body style="font-family: Arial, sans-serif; line-height: 1.2; color: #333;">
+            <div style="max-width: 800px; margin: 0; padding: 20px;">
                 <p>Bonjour,</p>
-                <p>Bonne nouvelle ! L'estimation de l'état de santé de votre batterie est prête !</p>
+                <p>Bonne nouvelle, l'estimation de l'état de santé de votre batterie est prête !</p>
                 <div style="text-align: center; margin: 20px 0;">
                     <a
                         href="{link}"
@@ -242,7 +251,7 @@ async def send_email(is_french: bool, email: str, token: str) -> None:
                             padding: 12px 24px;
                             font-size: 16px;
                             color: white !important;
-                            background-color: #007bff;
+                            background-color: #2d6d49;
                             text-decoration: none;
                             border-radius: 5px;
                             margin-bottom: 10px;
@@ -254,15 +263,21 @@ async def send_email(is_french: bool, email: str, token: str) -> None:
                     </a>
                 </div>
                 <p>
-                    Pour toutes questions ou si vous rencontrez un problème,
-                    <a href="mailto:support@bib-batteries.fr" style="color: #007bff;">
+                    ➤ Apprenez en plus sur l'état de santé des batteries
+                    <a href="https://bib-batteries.fr/" style="color: #2d6d49;">
+                        sur notre site web.
+                    </a>
+                </p>
+                <p>
+                    Pour toute question ou si vous rencontrez un problème,
+                    <a href="mailto:support@bib-batteries.fr" style="color: #2d6d49;">
                     contactez notre équipe de support.
                     </a>
                 </p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-                <p style="color: #666; font-size: 14px;">
+                <p style="color: #666; font-size: 14px; line-height: 1.6;">
                     Cordialement,<br>
-                    The Bib Team<br>
+                    L'équipe Bib<br>
                 </p>
             </div>
         </body>
@@ -347,6 +362,7 @@ async def get_flash_report_data(
 
     return GenerationData(
         has_trendline=status,
+        language=flash_report_combination.language,
         vehicle_info={
             "vin": flash_report_combination.vin,
             "brand": flash_report_combination.make,
@@ -366,7 +382,7 @@ async def get_flash_report_data(
             "chemistry": battery.battery_chemistry if battery else None,
             "net_capacity": battery.net_capacity if battery else None,
             "capacity": battery.capacity if battery else None,
-            "consumption": None,
+            "consumption": vehicle_model.expected_consumption,
             "range": vehicle_model.autonomy,
             "trendline": trendline,
             "trendline_min": trendline_min,
@@ -374,4 +390,3 @@ async def get_flash_report_data(
             "soh": soh,
         },
     )
-
