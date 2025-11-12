@@ -187,6 +187,7 @@ class VehicleProcessor:
             """,
                 (warranty_km, warranty_date, model_id),
             )
+
             logging.info(f"Updated existing Tesla model with version {version}")
             return model_id
         else:
@@ -991,6 +992,20 @@ class VehicleProcessor:
                                         (warranty_km, warranty_date, model_id),
                                     )
 
+                            # NB : Cas très particulier MTY13B qui a été monté avec deux types de batteries
+                            if (
+                                vin[9] == "P"
+                                and vin[7] == "S"
+                                and model_id == "4c43f13c-2246-45ea-aa33-a4f956e7237a"
+                            ):
+                                cursor.execute(
+                                    """
+                                    UPDATE vehicle
+                                    SET vehicle_model_id = '4c43f13c-2246-45ea-aa33-a4f956e7237b'
+                                    WHERE id = %s
+                                """,
+                                    (vehicle_id,),
+                                )
                             con.commit()
                         except Exception as e:
                             logging.error(

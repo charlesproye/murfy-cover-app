@@ -153,7 +153,7 @@ async def process_vehicles(owner_filter: str | None = None):
         )
 
         await asyncio.gather(
-            # vehicle_processor.process_tesla(),
+            vehicle_processor.process_tesla(),
             vehicle_processor.process_other_vehicles(),
             vehicle_processor.process_renault(),
             vehicle_processor.process_deactivated_vehicles(),
