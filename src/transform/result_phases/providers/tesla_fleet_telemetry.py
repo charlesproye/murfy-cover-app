@@ -50,9 +50,13 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
 
         phase_df = phase_df.withColumn(
             "CONSUMPTION",
-            F.expr("try_divide(-1 * SOC_DIFF * BATTERY_NET_CAPACITY, ODOMETER_DIFF)"),
+            F.when(
+                (F.col("PHASE_STATUS") == "discharging") & (F.col("ODOMETER_DIFF") > 5),
+                F.expr(
+                    "try_divide(-1 * SOC_DIFF * BATTERY_NET_CAPACITY, ODOMETER_DIFF)"
+                ),
+            ).otherwise(None),
         )
-
         return phase_df
 
     def compute_charge_levels(self, df_aggregated):
@@ -93,4 +97,3 @@ class TeslaFTProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         )
 
         return df_aggregated
-

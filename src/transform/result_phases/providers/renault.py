@@ -63,10 +63,9 @@ class RenaultProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         phase_df = phase_df.withColumn(
             "CONSUMPTION",
             F.when(
-                F.col("PHASE_STATUS") == "discharging",
+                (F.col("PHASE_STATUS") == "discharging") & (F.col("ODOMETER_DIFF") > 5),
                 F.expr("try_divide(-SOC_DIFF * BATTERY_NET_CAPACITY, ODOMETER_DIFF)"),
             ).otherwise(None),
         )
 
         return phase_df
-

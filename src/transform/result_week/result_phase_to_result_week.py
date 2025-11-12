@@ -130,7 +130,9 @@ class ResultPhaseToResultWeek:
         }
 
         if self.make != "bmw":
-            mask = results["CONSUMPTION"] <= 100  # mask to drop consumption over 100
+            mask = (results["CONSUMPTION"] > 0) & (
+                results["CONSUMPTION"] <= 100
+            )  # mask to drop negative and over 100 consumption
             agg_dict["CONSUMPTION"] = pd.NamedAgg(
                 "CONSUMPTION",
                 lambda x: weighted_mean(
@@ -197,4 +199,3 @@ class ResultPhaseToResultWeek:
             )
 
         return df
-

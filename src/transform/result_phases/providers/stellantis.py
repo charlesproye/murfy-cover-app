@@ -31,7 +31,7 @@ class StellantisProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
             F.when(
                 (F.col("PHASE_STATUS") == "discharging")
                 & (F.col("ODOMETER_DIFF").isNotNull())
-                & (F.col("ODOMETER_DIFF") != 0),
+                & (F.col("ODOMETER_DIFF") > 5),
                 (-1 * F.col("SOC_DIFF"))
                 * F.col("BATTERY_NET_CAPACITY")
                 * (F.col("SOH_OEM") / 100)
@@ -40,4 +40,3 @@ class StellantisProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         )
 
         return phase_df
-
