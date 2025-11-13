@@ -304,6 +304,7 @@ async def get_infos(vin: str, db: AsyncSession):
             INITCAP(oem.oem_name) as oem_name,
             vm.warranty_date,
             vm.warranty_km,
+            vm.trendline->>'trendline' as trendline,
             bi.chemistry,
             bi.capacity,
             bi.range,
@@ -435,7 +436,8 @@ async def get_infos(vin: str, db: AsyncSession):
             "consumption": data["consumption"],
             "soh": data["soh"] * 100
             if data["soh"]
-            else None,  # Conversion en pourcentage si nécessaire
+            else None,
+            "trendline": data["trendline"],
         },
         "end_of_contract_date": data["end_of_contract_date"].isoformat()
         if data["end_of_contract_date"]
