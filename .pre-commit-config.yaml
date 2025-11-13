@@ -23,3 +23,12 @@ repos:
     hooks:
       - id: nbstripout
 
+  - repo: local
+    hooks:
+      - id: frontend-lint-staged
+        name: Frontend lint-staged
+        entry: bash -c 'cd frontend && pnpm lint-staged'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+        always_run: false

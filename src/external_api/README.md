@@ -56,7 +56,8 @@ uv run uvicorn src.external_api.app:app --reload --port 4000
 
 ## 📝 Configuration
 
-Copy the `.env.example` file to `.env` and adjust values according to your environment:
+The same /.env file is used by data analyze and external_api.
+Copy the `.env.example` file to `.env` and adjust values according to your environment.
 
 # Redis
 
@@ -126,4 +127,3 @@ This project is under MIT license. See the `LICENSE` file for more details.
 
 For any questions or support, please contact the BIB Batteries team.
 ```
-
