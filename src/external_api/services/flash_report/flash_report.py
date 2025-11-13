@@ -320,7 +320,8 @@ async def get_flash_report_data(
             )
         )
         result = await db.execute(stmt)
-        version = result.scalar_one_or_none()
+        result_version = result.fetchone()
+        version = result_version[0] if result_version else None
 
     version = version or "unknown"
 
@@ -338,13 +339,11 @@ async def get_flash_report_data(
     )
     result = await db.execute(stmt)
     row = result.first()
-
     if not row:
         raise HTTPException(
             status_code=404,
             detail=f"Cannot get back vehicle model from token {flash_report_combination.make=}, {flash_report_combination.model=}, {flash_report_combination.type=}, {version=}.",
         )
-
     vehicle_model, battery = row
 
     if not vehicle_model.trendline:

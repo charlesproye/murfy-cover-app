@@ -1,12 +1,5 @@
-from enum import Enum
-
+from db_models.enums import LanguageEnum
 from pydantic import BaseModel, EmailStr
-
-
-class LanguageEnum(str, Enum):
-    en = "en"
-    fr = "fr"
-
 
 class FlashReportFormType(BaseModel):
     vin: str
