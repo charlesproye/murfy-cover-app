@@ -3,7 +3,6 @@
 import uuid
 from datetime import UTC, datetime
 
-from db_models.enums import LanguageEnum
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -17,10 +16,11 @@ from sqlalchemy import (
     Numeric,
     String,
 )
-from sqlalchemy.orm import Mapped
 from sqlalchemy import Enum as SqlEnum
+from sqlalchemy.orm import Mapped
 
 from db_models.base_uuid_model import BaseUUIDModel
+from db_models.enums import LanguageEnum
 
 
 class Company(BaseUUIDModel):
@@ -332,7 +332,8 @@ class FlashReportCombination(BaseUUIDModel):
     token: str = Column(String, nullable=False, unique=True)
 
     language: LanguageEnum = Column(
-        SqlEnum(LanguageEnum, name="language_enum"), 
-        nullable=False, 
-        default=LanguageEnum.EN
+        SqlEnum(LanguageEnum, name="language_enum"),
+        nullable=False,
+        default=LanguageEnum.EN,
+        server_default=LanguageEnum.EN,
     )

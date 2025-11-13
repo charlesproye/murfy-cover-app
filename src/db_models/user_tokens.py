@@ -30,6 +30,7 @@ class User(BaseUUIDModel):
         ),
         nullable=False,
         default=TeslaRegions.EUROPE,
+        server_default=TeslaRegions.EUROPE,
     )
 
 

@@ -1,4 +1,6 @@
 import asyncio
+import os
+from datetime import UTC, datetime
 from logging.config import fileConfig
 
 from alembic import context, operations
@@ -20,36 +22,39 @@ fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
 
+VERSION_DIR = os.path.join(os.path.dirname(__file__), "versions")
+
 
 def process_revision_directives(context, revision, directives):
     """Modify the MigrationScript directives to create schema as required."""
     script = directives[0]
-    
+    script.rev_id = datetime.now(UTC).strftime("%Y%m%d%H%M")
+
     # Filter out table comment operations
     # compare_table_comment=False does not work with this version of alembic
     def filter_comment_ops(ops_list):
         filtered = []
         for op in ops_list:
             # Check if this is a ModifyTableOps that contains comment operations
-            if hasattr(op, 'ops'):
+            if hasattr(op, "ops"):
                 # Recursively filter nested operations
                 filtered_nested = filter_comment_ops(op.ops)
                 if filtered_nested:
                     op.ops = filtered_nested
                     filtered.append(op)
             # Filter out table comment operations by checking the operation type name
-            elif hasattr(op, '__class__'):
+            elif hasattr(op, "__class__"):
                 op_class_name = op.__class__.__name__
                 # Only filter out table comment operations, keep column comments
-                if 'TableComment' not in op_class_name:
+                if "TableComment" not in op_class_name:
                     filtered.append(op)
             else:
                 filtered.append(op)
         return filtered
-    
+
     script.upgrade_ops.ops = filter_comment_ops(script.upgrade_ops.ops)
     script.downgrade_ops.ops = filter_comment_ops(script.downgrade_ops.ops)
-    
+
     tables = target_metadata.tables.values()
     if tables:
         t = list(tables)[-1]
@@ -116,4 +121,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     asyncio.run(run_migrations_online())
-
