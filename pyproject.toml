@@ -48,6 +48,7 @@ transform = [
     "minio>=7.1.13",
     "pyyaml>=6.0",
     "click>=8.1.7",
+    "dagster-pipes>=1.11",
 ]
 
 # EDA module dependencies - for exploratory data analysis notebooks
@@ -165,10 +166,21 @@ visualization = [
 ]
 
 
+orchestration = [
+    "dagster>=1.11.13",
+    "dagster-aws>=0.27.13",
+    "dagster-duckdb>=0.27.13",
+    "dagster-k8s>=0.27.13",
+    "dagster-postgres>=0.27.13",
+    "dagster-slack>=0.27.13",
+    "dagster-webserver",
+    "dagster-dg-cli",
+]
+
 [dependency-groups]
 # Full development environment with all dependencies
 dev = [
-    "data_ev[activation,transform,eda,load,results,ingestion,external_api,migrations]",
+    "data_ev[activation,transform,eda,load,results,ingestion,external_api,migrations,orchestration]",
     "pytest",
     "pytest-asyncio",
     "ruff",
@@ -183,6 +195,16 @@ local = ["pyspark>=4.0.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "bib_dagster"
+registry_modules = [
+    "bib_dagster.components.*",
+]
+
 
 [tool.ruff]
 target-version = "py311"

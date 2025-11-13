@@ -1,0 +1,74 @@
+type: Python
+pythonVersion: "3"
+mode: cluster
+image: "rg.fr-par.scw.cloud/bib-images/spark:1"
+imagePullPolicy: Always
+sparkVersion: "4.0.1"
+sparkConf:
+  "spark.hadoop.fs.s3a.endpoint": "https://s3.fr-par.scw.cloud"
+  "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+  "spark.hadoop.fs.s3a.path.style.access": "true"
+  "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+  "spark.kubernetes.container.image.pullPolicy": "Always"
+  "spark.eventLog.enabled": "true"
+  "spark.eventLog.dir": "s3a://bib-dev-spark-history/spark-events"
+timeToLiveSeconds: 3600
+restartPolicy:
+  type: Never
+driver:
+  cores: 1
+  memory: "512m"
+  memoryOverhead: "512m"
+  serviceAccount: spark-operator-spark
+  envFrom:
+    - secretRef:
+        name: db-data-ev-secret
+  env:
+    - name: S3_BUCKET
+      valueFrom:
+        secretKeyRef:
+          name: s3-secret-dev
+          key: S3_BUCKET_DEV
+    - name: S3_KEY
+      valueFrom:
+        secretKeyRef:
+          name: s3-secret-dev
+          key: S3_KEY_DEV
+    - name: S3_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: s3-secret-dev
+          key: S3_SECRET_DEV
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: s3-secret-dev
+          key: S3_KEY_DEV
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: s3-secret-dev
+          key: S3_SECRET_DEV
+executor:
+  cores: 1
+  instances: 1
+  memory: "512m"
+  envFrom:
+    - secretRef:
+        name: db-data-ev-secret
+  env:
+  - name: S3_BUCKET
+    valueFrom:
+      secretKeyRef:
+        name: s3-secret-dev
+        key: S3_BUCKET_DEV
+  - name: S3_KEY
+    valueFrom:
+      secretKeyRef:
+        name: s3-secret-dev
+        key: S3_KEY_DEV
+  - name: S3_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: s3-secret-dev
+        key: S3_SECRET_DEV

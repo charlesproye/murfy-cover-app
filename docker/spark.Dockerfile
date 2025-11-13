@@ -40,6 +40,7 @@ COPY --from=builder /opt/spark/jars/bundle-2.28.29.jar ${SPARK_HOME}/jars/
 COPY --from=builder /opt/spark/jars/spark-hadoop-cloud_2.13-4.0.1.jar ${SPARK_HOME}/jars/
 
 # Copy project files needed for UV installation
+# Code beeing stored in /app/src/ is needed, because SparkApplication use local files like `local:///app/src/...` to load the code.
 COPY pyproject.toml uv.lock /app/
 COPY src/core /app/src/core
 COPY src/transform /app/src/transform

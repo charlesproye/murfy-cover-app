@@ -8,8 +8,8 @@ README*
 *.Dockerfile
 docker-compose.yaml
 docker-compose.yml
-k8s/
-docker/
+docker/*
+k8s/*
 
 # Logs and temporary files
 *.log
@@ -23,6 +23,7 @@ __pycache__/
 .tox/
 .coverage
 .pytest_cache/
+.ruff_cache/
 
 # Development files
 .vscode/

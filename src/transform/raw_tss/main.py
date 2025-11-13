@@ -1,84 +1,79 @@
 import logging
-import os
-import sys
 
 import click
+from dagster_pipes import open_dagster_pipes
 
-from core.s3.settings import S3Settings
-from core.spark_utils import create_spark_session, create_spark_session_k8s
+from core.models.make import MakeEnum
+from transform.base_spark import BaseSpark
 from transform.raw_tss.providers.bmw import BMWResponseToRaw
 from transform.raw_tss.providers.high_mobility import HighMobilityResponseToRaw
 from transform.raw_tss.providers.kia import KiaResponseToRaw
 from transform.raw_tss.providers.mobilisight import MobilisightResponseToRaw
 from transform.raw_tss.providers.tesla_fleet_telemetry import TeslaFTResponseToRawTss
 from transform.raw_tss.providers.volkswagen import VolkswagenResponseToRaw
+from transform.raw_tss.response_to_raw import ResponseToRawTss
 
-PROVIDERS = {
-    "bmw": BMWResponseToRaw,
-    "mercedes-benz": HighMobilityResponseToRaw,
-    "renault": HighMobilityResponseToRaw,
-    "volvo-cars": HighMobilityResponseToRaw,
-    "stellantis": MobilisightResponseToRaw,
-    "kia": KiaResponseToRaw,
-    "ford": HighMobilityResponseToRaw,
-    "tesla-fleet-telemetry": TeslaFTResponseToRawTss,
-    "volkswagen": VolkswagenResponseToRaw,
+PROVIDERS: dict[MakeEnum, type[ResponseToRawTss]] = {
+    MakeEnum.bmw: BMWResponseToRaw,
+    MakeEnum.mercedes_benz: HighMobilityResponseToRaw,
+    MakeEnum.renault: HighMobilityResponseToRaw,
+    MakeEnum.volvo_cars: HighMobilityResponseToRaw,
+    MakeEnum.stellantis: MobilisightResponseToRaw,
+    MakeEnum.kia: KiaResponseToRaw,
+    MakeEnum.ford: HighMobilityResponseToRaw,
+    MakeEnum.tesla_fleet_telemetry: TeslaFTResponseToRawTss,
+    MakeEnum.volkswagen: VolkswagenResponseToRaw,
 }
 
 
-@click.group()
-def cli():
-    pass
+class ResponseToRawTssCLI(BaseSpark):
+    def __init__(self):
+        super().__init__(
+            name="response-to-raw-tss", help="Convert raw data from APIs to raw TSS"
+        )
 
-
-@cli.command()
-@click.argument("make", required=False)
-@click.option(
-    "--all",
-    "run_all",
-    is_flag=True,
-    help="Execute the parsing for all makes",
-)
-def run(make: str, run_all: bool):
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
+    @click.argument("make", required=False)
+    @click.option(
+        "--all",
+        "run_all",
+        is_flag=True,
+        help="Convert all makes",
     )
+    def run(self, make: str, run_all: bool):
+        """
+        Run the conversion of raw data from APIs to raw TSS.
+        """
+        if not run_all:
+            if not make:
+                raise click.UsageError("Please specify a make or use --all.")
+            make = make.lower()
+            if make not in PROVIDERS:
+                raise click.BadParameter(f"Unknown make: {make}")
 
-    settings = S3Settings()
-    is_k8s = os.getenv("KUBERNETES_SERVICE_HOST") is not None
+        with open_dagster_pipes() as pipes:
+            if run_all:
+                for make_name, parser_class in PROVIDERS.items():
+                    logger = logging.getLogger(f"ResponseToRawTss[{make_name}]")
+                    parser_class(make=make_name, spark=self.spark, logger=logger).run(
+                        pipes
+                    )
+            else:
+                logger = logging.getLogger(f"ResponseToRawTss[{make}]")
+                PROVIDERS[make](make=make, spark=self.spark, logger=logger).run(pipes)
 
-    if is_k8s:
-        spark = create_spark_session_k8s(settings.S3_KEY, settings.S3_SECRET)
-    else:
-        spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
+    @staticmethod
+    def list_makes():
+        """List the available makes."""
+        click.echo("Available makes:")
+        for make in PROVIDERS:
+            click.echo(f"  - {make}")
 
-    if run_all:
-        for make_name, parser_class in PROVIDERS.items():
-            logger = logging.getLogger(f"ResponseToRawTss[{make_name}]")
-            parser_class(make=make_name, spark=spark, logger=logger).run()
-
-    else:
-        if not make:
-            raise click.UsageError("Veuillez préciser une marque ou utiliser --all.")
-        make = make.lower()
-        if make not in PROVIDERS:
-            raise click.BadParameter(f"Marque inconnue: {make}")
-
-        logger = logging.getLogger(f"ResponseToRawTss[{make}]")
-        parser_class = PROVIDERS[make]
-        parser_class(make=make, spark=spark, logger=logger).run()
+    def add_subcommands(self):
+        self.cli.command("list-makes")(self.list_makes)
 
 
-@cli.command("list-makes")
-def list_makes():
-    """Affiche les marques disponibles."""
-    click.echo("Marques disponibles :")
-    for make in PROVIDERS:
-        click.echo(f"  - {make}")
-
+# Expose CLI for external access (e.g., Dagster Pipes)
+cli = ResponseToRawTssCLI().cli
 
 if __name__ == "__main__":
     cli()
-

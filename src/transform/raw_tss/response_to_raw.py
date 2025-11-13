@@ -5,6 +5,7 @@ from datetime import datetime
 from itertools import islice
 from logging import Logger
 
+from dagster_pipes import PipesContext
 from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark.sql.types import StringType, StructField, StructType
 
@@ -45,20 +46,22 @@ class ResponseToRawTss:
         self.base_s3_path = self.settings.S3_BASE_PATH
         self.raw_tss_path = S3_RAW_TSS_KEY_FORMAT.format(brand=self.make)
 
-    def run(self):
-        self.logger.info(f"Traitement débuté pour {self.make}")
+    def run(self, pipes: PipesContext):
+        pipes.log.info(f"Starting processing for {self.make}")
 
         keys_to_download_per_vin, paths_to_exclude = self._get_keys_to_download()
 
         if len(keys_to_download_per_vin) == 0:
-            self.logger.info(f"No VIN to process for {self.make}")
+            pipes.log.info(f"No VIN to process for {self.make}")
         else:
             optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
-                keys_to_download_per_vin, paths_to_exclude, self._get_available_cores()
+                keys_to_download_per_vin,
+                paths_to_exclude,
+                self._get_available_cores(),
             )
 
-            print(
-                f"Nombre de batchs = {math.ceil(len(keys_to_download_per_vin) / batch_size)}"
+            pipes.log.info(
+                f"Number of batches = {math.ceil(len(keys_to_download_per_vin) / batch_size)}"
             )
 
             for batch_num, batch in enumerate(
@@ -84,7 +87,17 @@ class ResponseToRawTss:
                 raw_tss_parsed.unpersist()
                 del raw_tss_parsed
 
-        self.logger.info(f"Processing completed for {self.make}")
+        pipes.report_asset_materialization(
+            metadata={
+                "total_vins": {
+                    "raw_value": len(keys_to_download_per_vin),
+                    "type": "int",
+                },
+                "output_path": {"raw_value": self.raw_tss_path, "type": "text"},
+            },
+        )
+
+        pipes.log.info(f"Processing completed for {self.make}")
 
     def _get_available_cores(self) -> int:
         """
@@ -332,4 +345,3 @@ class ResponseToRawTss:
 
     def _get_dynamic_schema(self, field_def: dict, parse_type_map: dict) -> DataFrame:
         return StructType()
-
