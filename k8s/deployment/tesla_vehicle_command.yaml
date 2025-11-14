@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tesla-vehicle-command
+  namespace: data-engineering
+  labels:
+    app: tesla-vehicle-command
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tesla-vehicle-command
+  template:
+    metadata:
+      labels:
+        app: tesla-vehicle-command
+    spec:
+      containers:
+        - name: tesla-http-proxy
+          image: tesla/vehicle-command:latest
+          imagePullPolicy: Always
+          env:
+            - name: TESLA_HTTP_PROXY_TLS_CERT
+              value: /config-secret/vehicle-command-tls-cert.pem
+            - name: TESLA_HTTP_PROXY_TLS_KEY
+              value: /config-secret/vehicle-command-tls-key.pem
+            - name: TESLA_KEY_FILE
+              value: /config-secret/fleet-app-key.pem
+            - name: TESLA_HTTP_PROXY_HOST
+              value: "0.0.0.0"
+            - name: TESLA_HTTP_PROXY_PORT
+              value: "4443"
+            - name: TESLA_HTTP_PROXY_TIMEOUT
+              value: "10s"
+            - name: TESLA_VERBOSE
+              value: "true"
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: config-secret
+              mountPath: /config-secret
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 20Mi
+            limits:
+              cpu: 200m
+              memory: 100Mi
+      volumes:
+        - name: config-secret
+          secret:
+            secretName: tesla-vehicle-command-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tesla-vehicle-command
+  namespace: data-engineering
+  labels:
+    app: tesla-vehicle-command
+spec:
+  type: ClusterIP
+  selector:
+    app: tesla-vehicle-command
+  ports:
+    - name: https
+      protocol: TCP
+      port: 4443
+      targetPort: 4443
+---
+apiVersion: external-secrets.io/v1
+kind: ClusterExternalSecret
+metadata:
+  name: tesla-vehicle-command-secret
+  namespace: bib
+spec:
+  externalSecretName: tesla-vehicle-command-secret
+  namespaceSelectors:
+    - matchLabels:
+        name: data-engineering
+  refreshTime: "1m"
+  externalSecretSpec:
+    refreshInterval: 60m
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: cluster-secret-store
+    target:
+      name: tesla-vehicle-command-secret
+      creationPolicy: Owner
+    data:
+      - remoteRef:
+          key: id:2f11462b-4127-4a50-9f30-04a91a86e8f7
+        secretKey: vehicle-command-tls-cert.pem
+      - remoteRef:
+          key: id:a1c4d63b-4990-4236-916b-82eed1531eeb
+        secretKey: vehicle-command-tls-key.pem
+      - remoteRef:
+          key: id:c0f919fb-01e1-4d1b-b17c-c789a8a9fbb4
+        secretKey: fleet-app-key.pem

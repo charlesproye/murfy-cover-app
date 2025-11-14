@@ -24,7 +24,7 @@ spec:
             - -c
             - >
               python -m src.ingestion.tesla_fleet_telemetry.main
-              --bootstrap-servers 51.159.175.138:9092
+              --bootstrap-servers bib-kafka-bootstrap.kafka.svc.cluster.local:9092
               --topic tesla_V
               --buffer-flush-interval 1800
               --group-id tesla-fleet-telemetry-consumer-${POD_NAME##*-}
@@ -47,4 +47,3 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-

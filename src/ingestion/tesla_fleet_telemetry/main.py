@@ -160,7 +160,9 @@ async def process_message(message) -> dict[str, Any] | None:
                 data = json.loads(message.value.decode("utf-8"))
                 logger.debug(f"Decoded message: {data}")
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                logger.warning(f"Unable to decode message: {e!s}")
+                logger.warning(
+                    f"Unable to decode message: {e!s}. Message: {message.value}"
+                )
                 return None
         else:
             # If it's already a dict, use it directly
@@ -675,4 +677,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Fatal error: {e!s}", exc_info=True)
         sys.exit(1)
-
