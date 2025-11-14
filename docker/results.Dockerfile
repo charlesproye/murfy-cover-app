@@ -25,4 +25,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-USER app
+USER 1001

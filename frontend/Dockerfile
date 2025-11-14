@@ -71,7 +71,7 @@ COPY --from=deps /app/node_modules/sharp ./node_modules/sharp
 
 # Adjust ownership
 RUN chown -R nextjs:nodejs /app
-USER nextjs
+USER 1001
 
 EXPOSE 3000
 CMD ["node", "server.js"]

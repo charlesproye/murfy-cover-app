@@ -17,6 +17,12 @@ spec:
       - name: external-api
         image: rg.fr-par.scw.cloud/evalue/external-api:latest
         imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
         ports:
         - containerPort: 4000
         resources:
@@ -88,4 +94,3 @@ spec:
             name: external-api
             port:
               number: 4000
-

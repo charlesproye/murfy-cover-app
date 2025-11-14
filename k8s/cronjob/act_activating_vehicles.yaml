@@ -20,6 +20,12 @@ spec:
               image: rg.fr-par.scw.cloud/data-engineering/activation:latest
               imagePullPolicy: Always
               command: ["python", "src/activation/main.py"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop:
+                    - ALL
               envFrom:
                 - secretRef:
                     name: db-data-ev-secret
@@ -48,4 +54,3 @@ spec:
                 requests:
                   memory: "2Gi"
                   cpu: "1"
-

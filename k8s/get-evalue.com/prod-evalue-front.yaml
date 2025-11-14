@@ -17,6 +17,12 @@ spec:
       - name: evalue-front
         image: rg.fr-par.scw.cloud/evalue/evalue-front:latest
         imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
         ports:
         - containerPort: 3000
         resources:
@@ -66,4 +72,3 @@ spec:
             name: evalue-front
             port:
               number: 3000
-

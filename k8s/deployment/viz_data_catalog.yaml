@@ -19,6 +19,12 @@ spec:
       containers:
         - name: streamlit
           image: rg.fr-par.scw.cloud/data-engineering/data-catalog:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
           envFrom:
             - secretRef:
                 name: db-data-ev-secret
@@ -85,4 +91,3 @@ spec:
                 name: streamlit-service
                 port:
                   number: 8501
-

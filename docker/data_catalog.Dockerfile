@@ -27,9 +27,8 @@ COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
-USER app
+USER 1001
 
 EXPOSE 8501
 
 CMD ["streamlit", "run", "src/visualization/catalog/Catalogue.py", "--server.address=0.0.0.0", "--server.port=8501"]
-

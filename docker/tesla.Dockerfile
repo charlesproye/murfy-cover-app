@@ -25,7 +25,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-USER app
+USER 1001
 
 CMD ["./start_tesla_fleet_telemetry.sh", "--auto-offset-reset=latest"]
-

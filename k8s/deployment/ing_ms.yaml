@@ -18,6 +18,12 @@ spec:
       containers:
         - name: ingestion-ms
           image: rg.fr-par.scw.cloud/data-engineering/ms-ingestion:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               cpu: 100m
@@ -39,4 +45,3 @@ spec:
               value: "1"
             - name: S3_BUCKET
               value: "bib-platform-prod-data"
-

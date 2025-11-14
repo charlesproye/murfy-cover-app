@@ -29,8 +29,7 @@ COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
-USER app
+USER 1001
 
 # Run FastAPI Uvicorn pour l'app ingestion/push
 CMD ["uvicorn", "src.ingestion.push.main:app", "--host", "0.0.0.0", "--port", "8080"]
-

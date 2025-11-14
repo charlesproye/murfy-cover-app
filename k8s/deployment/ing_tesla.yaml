@@ -19,6 +19,12 @@ spec:
         - name: ingestion-tesla
           image: rg.fr-par.scw.cloud/data-engineering/tesla-ingestion:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
           command:
             - /bin/sh
             - -c

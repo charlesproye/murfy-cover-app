@@ -18,6 +18,14 @@ spec:
       containers:
         - name: valkey
           image: valkey/valkey:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 6379
           resources:
@@ -29,6 +37,14 @@ spec:
               memory: 512Mi
         - name: redis-exporter
           image: oliver006/redis_exporter:v1.78.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            capabilities:
+              drop:
+                - ALL
           args:
             - "--redis.addr=redis://localhost:6379"
           ports:
@@ -81,4 +97,3 @@ spec:
   namespaceSelector:
     matchNames:
       - data-engineering
-

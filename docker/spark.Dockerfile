@@ -63,4 +63,5 @@ RUN chown -R spark:spark /app \
     && chmod -R u+rwX /app
 
 ENV PATH="/app/.venv/bin:$PATH"
-USER spark
+# spark user id
+USER 185

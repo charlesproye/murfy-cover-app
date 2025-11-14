@@ -24,5 +24,4 @@ COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
-USER app
-
+USER 1001

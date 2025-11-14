@@ -20,6 +20,12 @@ spec:
           image: rg.fr-par.scw.cloud/data-engineering/ingestion-push:latest
           imagePullPolicy: Always
           command: ["uvicorn", "src.ingestion.push.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               cpu: "800m"
@@ -148,4 +154,3 @@ spec:
           periodSeconds: 60
       selectPolicy: Max
       stabilizationWindowSeconds: 300
-

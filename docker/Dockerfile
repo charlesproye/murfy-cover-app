@@ -7,9 +7,9 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-dev --extra transform 
+    uv sync --locked --no-install-project --no-dev --extra transform
     # TODO: No sure exactlly what extras are needed here
-    
+
 COPY . /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -25,5 +25,4 @@ COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
-USER app
-
+USER 1001

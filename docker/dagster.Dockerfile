@@ -28,7 +28,7 @@ COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
-USER app
+USER 1001
 
 # Run the Dagster gRPC server
 CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "-m", "bib_dagster.definitions"]

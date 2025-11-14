@@ -21,6 +21,12 @@ spec:
               imagePullPolicy: Always
               command: ["python", "src/ingestion/soh_scraping/main.py"]
               args: ["spoticar", "autospherre", "aramis", "ev_market"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop:
+                    - ALL
               envFrom:
                 - secretRef:
                     name: db-data-ev-secret
@@ -40,4 +46,3 @@ spec:
                 requests:
                   memory: "2Gi"
                   cpu: "1"
-

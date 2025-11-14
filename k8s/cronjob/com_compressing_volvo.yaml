@@ -21,6 +21,12 @@ spec:
               imagePullPolicy: Always
               command: ["python", "-m",  "src.transform.compressor.main"]
               args: ["volvo-cars"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop:
+                    - ALL
               envFrom:
                 - secretRef:
                     name: s3-secret
@@ -38,4 +44,3 @@ spec:
                 requests:
                   memory: "2Gi"
                   cpu: "1"
-
