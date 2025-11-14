@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core import numpy_utils
 from db_models.vehicle import Battery, Make, VehicleModel
-from external_api.core import utils
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
 from external_api.schemas.model import ModelWarrantyData
@@ -389,7 +389,7 @@ async def get_model_soh_trendline(
                 detail=f"Model {model} + model_type {model_type} not found",
             )
 
-        soh = round(utils.numpy_safe_eval(trendline.trendline, x=odometer), 2)
+        soh = round(numpy_utils.numpy_safe_eval(trendline.trendline, x=odometer), 2)
 
         return SOHWithTrendline(
             trendline_mean=trendline.trendline,
@@ -409,4 +409,3 @@ async def get_model_soh_trendline(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving model data",
         ) from e
-

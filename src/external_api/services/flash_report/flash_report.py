@@ -4,15 +4,15 @@ import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from db_models.enums import LanguageEnum
 import pandas as pd
 from fastapi import HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from activation.config.mappings import mapping_vehicle_type
+from core import numpy_utils
+from db_models.enums import LanguageEnum
 from db_models.vehicle import Battery, FlashReportCombination, Make, VehicleModel
-from external_api.core import utils
 from external_api.core.config import settings
 from external_api.schemas.flash_report import GenerationData, VehicleSpecs
 from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
@@ -297,10 +297,6 @@ async def send_email(is_french: bool, email: str, token: str) -> None:
         raise HTTPException(status_code=500, detail=f"Email error: {e!s}") from e
 
 
-def get_soh_from_trendline(trendline: str, odometer: int):
-    return utils.numpy_safe_eval(trendline, x=odometer)
-
-
 async def get_flash_report_data(
     flash_report_combination: FlashReportCombination,
     db: AsyncSession = None,
@@ -357,7 +353,9 @@ async def get_flash_report_data(
         trendline_min = vehicle_model.trendline_min["trendline"]
         trendline_max = vehicle_model.trendline_max["trendline"]
         status = True
-        soh = get_soh_from_trendline(trendline, flash_report_combination.odometer)
+        soh = numpy_utils.numpy_safe_eval(
+            expression=trendline, x=flash_report_combination.odometer
+        )
 
     return GenerationData(
         has_trendline=status,

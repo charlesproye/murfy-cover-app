@@ -4,6 +4,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from sqlalchemy.sql import text
 
+from core import numpy_utils
 from core.sql_utils import get_sqlalchemy_engine
 from core.stats_utils import log_function
 
@@ -221,7 +222,9 @@ def compute_upper_bound(df, trendline, coef_mean):
     dict or None
         Computed upper bound or None.
     """
-    mask = eval(trendline["trendline"], {"np": np, "x": df["odometer"]})
+    mask = numpy_utils.numpy_safe_eval(
+        expression=trendline["trendline"], x=df["odometer"]
+    )
     test = df[df["soh"] > mask]
     x_sorted, y_sorted = prepare_data_for_fitting(test)
 
@@ -262,7 +265,9 @@ def compute_lower_bound(df, trendlines, coef_mean):
     dict or None
         Computed lower bound or None.
     """
-    mask = eval(trendlines["trendline"], {"np": np, "x": df["odometer"]})
+    mask = numpy_utils.numpy_safe_eval(
+        expression=trendlines["trendline"], x=df["odometer"]
+    )
     test = df[df["soh"] < mask]
     x_sorted, y_sorted = prepare_data_for_fitting(test)
 
@@ -317,4 +322,3 @@ def filtrer_trendlines(
     if nb_total_vins >= vin_total and nb_lower >= nbr_under and nb_upper >= nbr_upper:
         return nb_total_vins
     print("The model don't respect the filtering criteria")
-
