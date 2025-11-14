@@ -1,5 +1,4 @@
 import asyncio
-import gc
 
 import msgspec
 
@@ -59,7 +58,8 @@ class KiaCompressor(Compressor):
                 await self._s3_dev.upload_file(
                     path=f"{vin_folder_path}{self._filename()}", file=final_bytes
                 )
-                await self._s3.delete_folder(f"{vin_folder_path}temp/")
+                # Limit the batch size because we sometime get ReadTimeoutError from Scaleway
+                await self._s3.delete_folder(f"{vin_folder_path}temp/", batch_size=500)
             else:
                 return final_bytes
 
@@ -69,4 +69,3 @@ class KiaCompressor(Compressor):
         asyncio.get_event_loop().set_debug(False)
         compressor = cls(make)
         await compressor.run()
-

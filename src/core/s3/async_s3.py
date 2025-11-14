@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 import aioboto3
 import yaml
 from botocore.exceptions import ClientError
+from types_aiobotocore_s3.client import S3Client as AsyncS3Client
 
 from .settings import get_s3_settings
 
@@ -29,7 +30,7 @@ class AsyncS3:
         self.logger = logging.getLogger("AsyncS3")
 
     @asynccontextmanager
-    async def _client(self):
+    async def _client(self) -> AsyncGenerator[AsyncS3Client, None]:
         async with self.session.client(
             "s3",
             region_name=self._settings.S3_REGION,
@@ -147,7 +148,7 @@ class AsyncS3:
             batch = files[i : i + batch_size]
             yield await self.get_files(batch)
 
-    async def delete_folder(self, prefix: str) -> int:
+    async def delete_folder(self, prefix: str, batch_size: int = 1000) -> int:
         deleted_count = 0
         async with self._sem, self._client() as client:
             paginator = client.get_paginator("list_objects_v2")
@@ -157,8 +158,8 @@ class AsyncS3:
                     continue
 
                 # Batch delete (doc says max 1000 at a time)
-                for i in range(0, len(contents), 1000):
-                    batch = contents[i : i + 1000]
+                for i in range(0, len(contents), batch_size):
+                    batch = contents[i : i + batch_size]
                     keys = [{"Key": obj["Key"]} for obj in batch]
 
                     await client.delete_objects(
@@ -195,4 +196,3 @@ class AsyncS3:
 
 def get_async_s3() -> AsyncS3:
     return AsyncS3()
-
