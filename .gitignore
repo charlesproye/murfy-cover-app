@@ -25,7 +25,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -126,6 +125,7 @@ ENV/
 env.bak/
 venv.bak/
 .env
+.python-version
 
 # Spyder project settings
 .spyderproject
@@ -159,17 +159,11 @@ cython_debug/
 
 #File
 .csv
-.png
 *.parquet
 
-.json
 *.csv
 **/*.csv
 
-**/graph/*
-
-**/*.png
-**/*.json
 # These are some examples of commonly ignored file patterns.
 # You should customize this list as applicable to your project.
 # Learn more about .gitignore:
@@ -212,9 +206,6 @@ Thumbs.db
 *.exe
 *.war
 
-# Auth
-auth
-
 # Large media files
 *.mp4
 *.tiff
@@ -242,3 +233,6 @@ temp_payload.b64
 temp_unsigned.b64
 jwt_signature.bin
 private.key
+
+# Frontend exceptions
+!next-env.d.ts
