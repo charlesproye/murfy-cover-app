@@ -1,3 +1,4 @@
+from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from external_api.services.dashboard import (
@@ -81,9 +82,9 @@ class DashboardCrud:
         return await get_table_brand(fleet_id, filter, db)
 
     async def search_vin(
-        self, vin: str, fleets: list[str], db: AsyncSession | None = None
+        self, vin: str, fleets_ids: list[UUID4], db: AsyncSession | None = None
     ):
-        return await search_vin(vin, fleets, db)
+        return await search_vin(vin, fleets_ids, db)
 
     async def global_table(
         self,
@@ -129,4 +130,3 @@ class DashboardCrud:
             sorting_order,
             db,
         )
-

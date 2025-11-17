@@ -150,7 +150,8 @@ async def search_vin(
     vin: str = Path(..., description="The vin"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
-    response = await DashboardCrud().search_vin(vin, user.get("fleets"), db)
+    fleets_ids = [fleet.id for fleet in user.fleets]
+    response = await DashboardCrud().search_vin(vin, fleets_ids, db)
     return response
 
 
@@ -234,4 +235,3 @@ async def get_extremum_soh(
         fleet_id, brand, page, page_size, extremum, sorting_column, sorting_order, db
     )
     return response
-

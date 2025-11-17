@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from uuid import UUID
 
 from pydantic import UUID4
 from sqlalchemy import ARRAY, and_, bindparam, case, distinct, func, select, text
@@ -630,19 +629,19 @@ async def get_new_vehicles(fleet_id: str, period: str, db: AsyncSession):
     return result.mappings().all()
 
 
-async def search_vin(vin: str, fleets: list[UUID], db: AsyncSession):
-    if not fleets:
+async def search_vin(vin: str, fleets_ids: list[UUID4], db: AsyncSession):
+    if not fleets_ids:
         return []
 
     query = text("""
         SELECT id, vin FROM vehicle
         WHERE vin ILIKE '%' || :vin || '%'
-        AND fleet_id = ANY(:fleets)
+        AND fleet_id = ANY(:fleets_ids)
         ORDER BY vin
         LIMIT 10
     """)
 
-    result = await db.execute(query, {"vin": vin.upper(), "fleets": fleets})
+    result = await db.execute(query, {"vin": vin.upper(), "fleets_ids": fleets_ids})
     return result.mappings().all()
 
 
@@ -1160,4 +1159,3 @@ async def get_extremum_soh(
                 "has_previous": False,
             },
         }
-
