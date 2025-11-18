@@ -7,6 +7,9 @@ import pytest
 from ingestion.mobilisights.api import MSApi
 from ingestion.mobilisights.schema import CarState
 
+# Mark all tests in this module as integration tests (require real Mobilisights API)
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def api():
@@ -37,4 +40,3 @@ def test_export_car_info(api: MSApi):
     car_state = msgspec.json.decode(next(res), type=CarState)
 
     assert car_state.vin is not None
-

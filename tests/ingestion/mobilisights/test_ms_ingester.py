@@ -7,6 +7,9 @@ import pytest
 from ingestion.mobilisights.api import MSApi
 from ingestion.mobilisights.ingester import MobilisightsIngester
 
+# Mark all tests in this module as integration tests (require real Mobilisights API)
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def api():
@@ -71,4 +74,3 @@ def test_export_car_info_two_calls(
     bytes_data = next(res)
     parsed_data_second_call = ms_ingester._parse_car_state_with_cache(bytes_data)
     assert parsed_data_second_call is None
-

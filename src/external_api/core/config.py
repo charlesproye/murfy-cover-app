@@ -1,9 +1,12 @@
+import logging
 import os
 from typing import Any
 
 import dotenv
 from pydantic import EmailStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -83,8 +86,13 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str | None = None
 
     # Tesla
-    TESLA_CLIENT_ID: str = os.getenv("TESLA_CLIENT_ID")
-    TESLA_CLIENT_SECRET: str = os.getenv("TESLA_CLIENT_SECRET")
+    TESLA_CLIENT_ID: str | None = os.getenv("TESLA_CLIENT_ID", None)
+    TESLA_CLIENT_SECRET: str | None = os.getenv("TESLA_CLIENT_SECRET", None)
+
+    if not all([TESLA_CLIENT_ID, TESLA_CLIENT_SECRET]):
+        LOGGER.warning(
+            "TESLA_CLIENT_ID or TESLA_CLIENT_SECRET is not set. Will not be able to use Tesla API."
+        )
 
     @field_validator("ASYNC_DB_DATA_EV_URI", mode="before")
     @classmethod

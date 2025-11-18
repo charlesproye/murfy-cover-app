@@ -1,7 +1,7 @@
 import logging
 import urllib.parse
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import aiohttp
@@ -156,6 +156,11 @@ async def refresh_token(
     db: AsyncSession = Depends(get_db),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
 ) -> dict[str, str]:
+    if not all([settings.TESLA_CLIENT_ID, settings.TESLA_CLIENT_SECRET]):
+        raise HTTPException(
+            status_code=500, detail="Tesla credentials are not set on the server."
+        )
+
     user_token_query = (
         select(UserToken)
         .where(UserToken.user_id == user_id)
@@ -192,7 +197,7 @@ async def refresh_token(
 
     user_token.access_token = tokens.access_token
     user_token.refresh_token = tokens.refresh_token
-    user_token.expires_at = datetime.now() + timedelta(seconds=tokens.expires_in)
+    user_token.expires_at = datetime.now(tz=UTC) + timedelta(seconds=tokens.expires_in)
     await db.commit()
 
     return {"message": f"Tokens refreshed successfully for user={user_id}"}

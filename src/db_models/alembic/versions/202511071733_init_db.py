@@ -129,7 +129,10 @@ def upgrade() -> None:
         sa.Column("odometer", sa.Integer(), nullable=False),
         sa.Column("token", sa.String(), nullable=False),
         sa.Column(
-            "language", language_enum, nullable=False, server_default=LanguageEnum.EN
+            "language",
+            language_enum,
+            nullable=False,
+            server_default=LanguageEnum.EN.value,
         ),
         sa.Column(
             "id",

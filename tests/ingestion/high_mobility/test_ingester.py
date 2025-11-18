@@ -6,6 +6,9 @@ import pytest
 from ingestion.high_mobility.ingester import HMIngester
 from ingestion.high_mobility.vehicle import Vehicle
 
+# Mark all tests in this module as integration tests (require real High Mobility API)
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def fake_redis(monkeypatch):
@@ -85,4 +88,3 @@ def test_process_vehicle_volvo_cars(
 
     parsed_data_2nd = hm_ingester._process_vehicle(vehicule, auto_upload=False)
     assert parsed_data_2nd is None  # cached
-

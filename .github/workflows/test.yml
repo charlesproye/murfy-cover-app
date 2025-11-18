@@ -1,0 +1,84 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      # Gives the action the necessary permissions for publishing new
+      # comments in pull requests.
+      pull-requests: write
+      # Gives the action the necessary permissions for pushing data to the
+      # python-coverage-comment-action branch, and for editing existing
+      # comments (to avoid publishing multiple comments in the same PR)
+      contents: write
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: evalue
+          POSTGRES_PASSWORD: evalue
+          POSTGRES_DB: evalue
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Run database migrations
+        env:
+          DB_DATA_EV_HOST: localhost
+          DB_DATA_EV_PORT: 5432
+          DB_DATA_EV_NAME: evalue
+          DB_DATA_EV_USER: evalue
+          DB_DATA_EV_PASSWORD: evalue
+        run: |
+          uv run alembic -c src/db_models/alembic.ini upgrade head
+
+      - name: Run unit tests
+        env:
+          DB_DATA_EV_HOST: localhost
+          DB_DATA_EV_PORT: 5432
+          DB_DATA_EV_NAME: evalue
+          DB_DATA_EV_USER: evalue
+          DB_DATA_EV_PASSWORD: evalue
+          SECRET_KEY: test-secret-key-at-least-32-characters-long-for-jwt-signing
+          ALGORITHM: HS256
+          ENCRYPT_KEY: dGVzdC1mZXJuZXQta2V5LW11c3QtYmUtZXhhY3RseS00NC1jaGFycwo=
+          COOKIE_SECURE: false
+          COOKIE_DOMAIN: localhost
+          S3_ENDPOINT: https://s3.fr-par.scw.cloud
+        run: |
+          uv run pytest --cov=src --cov-report=xml --cov-report=json --cov-report=term-missing
+
+      - name: Comment coverage report on PR
+        if: github.event_name == 'pull_request'
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERAGE_PATH: .
+          MINIMUM_GREEN: 80
+          MINIMUM_ORANGE: 60

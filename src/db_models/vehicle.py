@@ -1,7 +1,6 @@
 """Models for vehicle-related tables"""
 
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
@@ -15,6 +14,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    func,
 )
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped
@@ -59,7 +59,7 @@ class FleetAggregate(BaseUUIDModel):
     avg_soh = Column(Numeric(5, 2))
     avg_value = Column(Numeric(5, 2))
     avg_energy_consumption = Column(Numeric(10, 2))
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp = Column(DateTime, server_default=func.now())
 
 
 class UserFleet(BaseUUIDModel):
@@ -146,7 +146,7 @@ class VehicleAggregate(BaseUUIDModel):
     )
     avg_soh = Column(Numeric(5, 2))
     energy_consumption = Column(Numeric(10, 2))
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp = Column(DateTime, server_default=func.now())
 
 
 class VehicleData(BaseUUIDModel):
@@ -160,7 +160,7 @@ class VehicleData(BaseUUIDModel):
     cycles = Column(Numeric(10, 2))
     consumption = Column(Numeric(5, 3))
     soh_comparison = Column(Numeric(6, 3))
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp = Column(DateTime, server_default=func.now())
     level_1 = Column(
         Numeric(6, 2),
         comment="Level 1 of charging. Corresponds to charging in the range 1.4-1.9 kW, 120V, AC, 12-16 Ah",
@@ -200,7 +200,7 @@ class RegionalAggregate(BaseUUIDModel):
     avg_temperature = Column(Numeric(5, 2))
     avg_voltage = Column(Numeric(10, 2))
     energy_consumption = Column(Numeric(10, 2))
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp = Column(DateTime, server_default=func.now())
 
 
 class ApiUser(BaseUUIDModel):
@@ -208,7 +208,7 @@ class ApiUser(BaseUUIDModel):
     user_id: Mapped[uuid.UUID] = Column(ForeignKey("user.id"), nullable=False)
     api_key: str = Column(String(100), unique=True, nullable=False)
     is_active: bool = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, server_default=func.now())
     last_access = Column(DateTime)
 
     # Index pour les recherches rapides
@@ -233,10 +233,8 @@ class ApiPricingPlan(BaseUUIDModel):
     price_per_request: float = Column(
         Numeric(10, 4), nullable=False, comment="Prix par requête en euros"
     )
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
-    )
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class ApiUserPricing(BaseUUIDModel):
@@ -261,10 +259,8 @@ class ApiUserPricing(BaseUUIDModel):
         comment="Date d'entrée en vigueur de ce plan pour cet utilisateur",
     )
     expiration_date = Column(Date, comment="Date d'expiration si applicable")
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
-    )
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Index pour les recherches rapides
     __table_args__ = (
@@ -282,7 +278,7 @@ class ApiCallLog(BaseUUIDModel):
         nullable=False,
         comment="Point d'accès appelé (ex: /vehicle/static)",
     )
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    timestamp = Column(DateTime, server_default=func.now(), nullable=False)
     response_time = Column(Float, comment="Temps de réponse en millisecondes")
     status_code = Column(Integer, comment="Code de statut HTTP de la réponse")
     is_billed: bool = Column(Boolean, default=False, nullable=False)
@@ -308,10 +304,8 @@ class ApiBilling(BaseUUIDModel):
     invoice_number: str = Column(String(50))
     paid: bool = Column(Boolean, default=False)
     payment_date = Column(DateTime)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
-    )
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Index pour les performances
     __table_args__ = (

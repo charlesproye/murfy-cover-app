@@ -405,6 +405,8 @@ async def get_user_with_company_with_email(email: str, db: AsyncSession):
     """)
     result = await db.execute(query, {"email": email})
     row = result.mappings().first()
+    if row is None:
+        return None, None
     user = row["user"]
     company = row["company"]
     return user, company

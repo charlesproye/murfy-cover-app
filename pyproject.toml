@@ -183,12 +183,13 @@ orchestration = [
 dev = [
     "data_ev[activation,transform,eda,load,results,ingestion,external_api,migrations,orchestration]",
     "pytest",
-    "pytest-asyncio",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.25.0",
     "ruff",
     "nbstripout",
     "fakeredis>=2.31.3",
     "py-spy>=0.4.1",
-    "pytest-asyncio>=1.2.0",
     "ipykernel",
 ]
 
@@ -245,3 +246,30 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "activation", "transform", "eda", "load", "web", "results", "external_api", "visualization"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+#pythonpath = ["src"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--import-mode=importlib",
+    "-m", "not integration",  # Skip integration tests by default
+]
+markers = [
+    "asyncio: mark test as async",
+    "integration: mark test as integration test (requires external APIs, database, S3, etc.)",
+    "unit: mark test as unit test (self-sufficient, no external dependencies)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+relative_files = true
