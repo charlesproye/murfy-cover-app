@@ -7,37 +7,45 @@ from uuid import uuid4
 import pandas as pd
 from sqlalchemy import Engine, create_engine, inspect, text
 
-from .config import (
-    DB_ENG_URI_FORMAT_KEYS,
-    DB_ENG_URI_FORMAT_STR,
-    DB_URI_FORMAT_KEYS,
-    DB_URI_FORMAT_KEYS_PROD,
-    DB_URI_FORMAT_STR,
-    DB_URI_FORMAT_STR_PROD,
-)
-from .env_utils import get_env_var
+from db_models.core.config import db_settings as db_settings
+
 from .pandas_utils import DF, left_merge
 
 logger = getLogger("core.sql_utils")
 
 
 def get_sqlalchemy_engine(is_prod: bool = False, db_name: str = "rdb") -> Engine:
-    """Get a SQLAlchemy engine for the specified environment.
+    """Get a SQLAlchemy engine for the specified database.
+
+    All connections use SSL encryption in transit for remote databases.
+    Localhost connections skip SSL for development convenience.
 
     Args:
-        is_prod (bool): If True, uses production database configuration. Defaults to False.
+        is_prod (bool): Deprecated. No longer used. Configure via environment variables instead.
+        db_name (str): Database name - "rdb" (default) or "data-engineering"
 
     Returns:
-        Engine: SQLAlchemy engine instance
+        Engine: SQLAlchemy engine instance with SSL enabled for remote connections
     """
+    if is_prod:
+        logger.warning(
+            "is_prod parameter is deprecated and ignored. "
+            "Configure production database via DB_DATA_EV_* environment variables instead."
+        )
+
     if db_name == "rdb":
-        keys = DB_URI_FORMAT_KEYS_PROD if is_prod else DB_URI_FORMAT_KEYS
-        format_str = DB_URI_FORMAT_STR_PROD if is_prod else DB_URI_FORMAT_STR
+        db_uri = db_settings.DB_DATA_EV_URI
     elif db_name == "data-engineering":
-        keys = DB_ENG_URI_FORMAT_KEYS
-        format_str = DB_ENG_URI_FORMAT_STR
-    db_uri_format_dict = {key: get_env_var(key) for key in keys}
-    db_uri = format_str.format(**db_uri_format_dict)
+        db_uri = db_settings.DB_DATA_ENG_URI
+    else:
+        raise ValueError(f"Unknown database name: {db_name}")
+
+    if not db_uri:
+        raise ValueError(
+            f"Database URI not configured for db_name={db_name}. "
+            f"Check DB_DATA_EV_* or DB_DATA_ENG_* environment variables."
+        )
+
     return create_engine(db_uri)
 
 
@@ -46,7 +54,8 @@ def get_connection(is_prod: bool = False, db_name: str = "rdb"):
     """Context manager pour obtenir une connexion à la base de données
 
     Args:
-        is_prod (bool): If True, uses the production database connection. Defaults to False.
+        is_prod (bool): Deprecated. No longer used.
+        db_name (str): Database name - "rdb" (default) or "data-engineering"
     """
     engine = get_sqlalchemy_engine(is_prod, db_name)
     conn = engine.raw_connection()

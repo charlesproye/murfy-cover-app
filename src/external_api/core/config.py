@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Any
 
 import dotenv
 from pydantic import EmailStr, field_validator
@@ -45,23 +44,6 @@ class Settings(BaseSettings):
     WEB_CONCURRENCY: int = int(os.getenv("WEB_CONCURRENCY", "4"))
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-    # Database
-    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "20"))
-    POOL_SIZE: int = int(os.getenv("POOL_SIZE", "5"))
-    MAX_OVERFLOW: int = int(os.getenv("MAX_OVERFLOW", "10"))
-    POOL_TIMEOUT: int = int(os.getenv("POOL_TIMEOUT", "30"))
-    POOL_RECYCLE: int = int(os.getenv("POOL_RECYCLE", "1800"))
-
-    # Database data
-    DB_DATA_EV_USER: str = os.environ["DB_DATA_EV_USER"]
-    DB_DATA_EV_PASSWORD: str = os.environ["DB_DATA_EV_PASSWORD"]
-    DB_DATA_EV_HOST: str = os.environ["DB_DATA_EV_HOST"]
-    DB_DATA_EV_PORT: int | str = os.environ["DB_DATA_EV_PORT"]
-    DB_DATA_EV_NAME: str = os.environ["DB_DATA_EV_NAME"]
-
-    ASYNC_DB_DATA_EV_URI: str | None = None
-    DB_DATA_EV_URI: str | None = None
-
     # Redis
     REDIS_HOST: str = os.getenv("REDIS_HOST", "")
     REDIS_PORT: str = os.getenv("REDIS_PORT", "")
@@ -93,44 +75,6 @@ class Settings(BaseSettings):
         LOGGER.warning(
             "TESLA_CLIENT_ID or TESLA_CLIENT_SECRET is not set. Will not be able to use Tesla API."
         )
-
-    @field_validator("ASYNC_DB_DATA_EV_URI", mode="before")
-    @classmethod
-    def assemble_async_db_data_connection(cls, v: str | None, info) -> Any:
-        if isinstance(v, str):
-            return v
-        # Get values safely with fallbacks
-        values = info.data
-        username = values.get("DB_DATA_EV_USER", "")
-        password = values.get("DB_DATA_EV_PASSWORD", "")
-        host = values.get("DB_DATA_EV_HOST", "")
-        port_str = values.get("DB_DATA_EV_PORT", "")
-        db_name = values.get("DB_DATA_EV_NAME", "")
-
-        # Handle potential None values
-        port = int(port_str) if port_str else None
-        path = f"/{db_name.lstrip('/')}" if db_name else "/rdb"
-
-        # Build URL manually instead of using PostgresDsn.build
-        if all([username, password, host, port]):
-            return f"postgresql+asyncpg://{username}:{password}@{host}:{port}{path}"
-        else:
-            # Return a default or None if critical components are missing
-            return None
-
-    @field_validator("DB_DATA_EV_URI", mode="before")
-    @classmethod
-    def assemble_db_data_ev_connection(cls, v: str | None, info: dict[str, Any]) -> Any:
-        if isinstance(v, str):
-            return v
-
-        user = info.data.get("DB_DATA_EV_USER")
-        password = info.data.get("DB_DATA_EV_PASSWORD")
-        host = info.data.get("DB_DATA_EV_HOST")
-        port = info.data.get("DB_DATA_EV_PORT", "5432")
-        db = info.data.get("DB_DATA_EV_NAME", "")
-
-        return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

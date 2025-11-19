@@ -193,10 +193,6 @@ services:
       ALGORITHM: HS256
       SECRET_KEY: ${SECRET_KEY}
       ENCRYPT_KEY: ${ENCRYPT_KEY}
-      #DB_DATA_EV_USER: root
-      #DB_DATA_EV_PASSWORD: ${EXTERNAL_DB_DATA_EV_PASSWORD}
-      #DB_DATA_EV_HOST: 195.154.70.203
-      #DB_DATA_EV_PORT: 1462
       DB_DATA_EV_NAME: evalue
       DB_DATA_EV_USER: evalue
       DB_DATA_EV_PASSWORD: evalue
@@ -212,7 +208,7 @@ services:
       start_period: 20s
 
   postgres:
-    image: postgres:14
+    image: postgres:17
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -221,6 +217,7 @@ services:
       - POSTGRES_USER=evalue
       - POSTGRES_PASSWORD=evalue
       - POSTGRES_DB=evalue
+
   dagster-user-deployment:
     platform: linux/amd64
     build:

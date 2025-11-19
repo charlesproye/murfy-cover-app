@@ -47,6 +47,9 @@ RUN groupadd --gid 1001 app && \
 
 COPY --from=builder --chown=app:app /app /app
 
+RUN mkdir -p /home/app/.postgresql
+COPY --chown=app:app ./certs/bib-prod-rdb-data-ev.pem /home/app/.postgresql/root.crt
+
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app

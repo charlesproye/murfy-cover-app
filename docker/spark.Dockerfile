@@ -62,6 +62,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN chown -R spark:spark /app \
     && chmod -R u+rwX /app
 
+RUN mkdir -p /home/spark/.postgresql
+COPY --chown=spark:spark ./certs/bib-prod-rdb-data-ev.pem /home/spark/.postgresql/root.crt
+
 ENV PATH="/app/.venv/bin:$PATH"
 # spark user id
 USER 185

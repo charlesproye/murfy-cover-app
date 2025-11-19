@@ -22,15 +22,15 @@ from db_models import (
     Vehicle,
     VehicleModel,
 )
+from db_models.core.config import db_settings
 from db_models.enums import LanguageEnum
 from db_models.vehicle import FlashReportCombination, Region, User
 from external_api.app import app
-from external_api.core.config import settings
 from external_api.db.session import get_db
 
 # Test database configuration
 # Uses the same DB as the app but ensures we're using test environment
-TEST_DB_URI = settings.ASYNC_DB_DATA_EV_URI
+TEST_DB_URI = db_settings.ASYNC_DB_DATA_EV_URI
 
 
 @pytest_asyncio.fixture

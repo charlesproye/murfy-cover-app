@@ -25,6 +25,9 @@ RUN chown -R app:app /opt/dagster/dagster_home
 
 COPY --from=builder --chown=app:app /app /app
 
+RUN mkdir -p /home/app/.postgresql
+COPY --chown=app:app ./certs/bib-prod-rdb-data-ev.pem /home/app/.postgresql/root.crt
+
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app

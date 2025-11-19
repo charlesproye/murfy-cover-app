@@ -7,15 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-from external_api.core.config import settings
+from db_models.core.config import db_settings
 
 logger = logging.getLogger(__name__)
 
-# Configuration des pools de connexion
-POOL_SIZE = settings.POOL_SIZE
-MAX_OVERFLOW = settings.MAX_OVERFLOW
-POOL_TIMEOUT = settings.POOL_TIMEOUT
-POOL_RECYCLE = settings.POOL_RECYCLE
 
 # Instance d'engine pour la base de données
 _engine: AsyncEngine | None = None
@@ -27,11 +22,10 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         _engine = create_async_engine(
-            settings.ASYNC_DB_DATA_EV_URI,
+            db_settings.ASYNC_DB_DATA_EV_URI,
             echo=False,
             future=True,
-            pool_size=POOL_SIZE,
-            max_overflow=MAX_OVERFLOW,
+            pool_size=db_settings.POOL_SIZE,
             pool_timeout=30,
             pool_pre_ping=True,
             pool_recycle=1800,
@@ -69,4 +63,3 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         raise
     finally:
         await session.close()
-

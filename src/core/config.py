@@ -45,33 +45,8 @@ MODEL_INFO_NAME_MAP = {
     "autonomy": "range",
 }
 
-# SQL
-DB_URI_FORMAT_KEYS = [
-    "DB_DATA_EV_USER",
-    "DB_DATA_EV_HOST",
-    "DB_DATA_EV_PASSWORD",
-    "DB_DATA_EV_PORT",
-    "DB_DATA_EV_NAME",
-]
-
-DB_ENG_URI_FORMAT_KEYS = [
-    "DB_DATA_ENG_USER",
-    "DB_DATA_ENG_HOST",
-    "DB_DATA_ENG_PASSWORD",
-    "DB_DATA_ENG_PORT",
-    "DB_DATA_ENG_NAME",
-]
-
-DB_URI_FORMAT_KEYS_PROD = [
-    "PROD_DATA_EV_USER",
-    "PROD_DATA_EV_HOST",
-    "PROD_DATA_EV_PASSWORD",
-    "PROD_DATA_EV_PORT",
-    "PROD_DATA_EV_NAME",
-]
-DB_URI_FORMAT_STR = "postgresql+psycopg2://{DB_DATA_EV_USER}:{DB_DATA_EV_PASSWORD}@{DB_DATA_EV_HOST}:{DB_DATA_EV_PORT}/{DB_DATA_EV_NAME}"
-DB_URI_FORMAT_STR_PROD = "postgresql+psycopg2://{PROD_DATA_EV_USER}:{PROD_DATA_EV_PASSWORD}@{PROD_DATA_EV_HOST}:{PROD_DATA_EV_PORT}/{PROD_DATA_EV_NAME}"
-DB_ENG_URI_FORMAT_STR = "postgresql+psycopg2://{DB_DATA_ENG_USER}:{DB_DATA_ENG_PASSWORD}@{DB_DATA_ENG_HOST}:{DB_DATA_ENG_PORT}/{DB_DATA_ENG_NAME}"
+# Database configuration has been moved to db_models.core.config
+# All database URIs now include SSL encryption in transit for remote databases
 
 valid_soh_points = pd.DataFrame(
     {
@@ -85,4 +60,3 @@ valid_soh_points = pd.DataFrame(
 
 # SoH estimation evaluation
 BASE_SLOPE = 0.08 / 1e4  # base soh loss per kilometer (0.8% per 10k km)
-
