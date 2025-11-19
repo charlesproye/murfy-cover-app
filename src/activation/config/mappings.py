@@ -4,8 +4,6 @@ from datetime import date
 import pandas as pd
 from rapidfuzz import fuzz, process
 
-from core.sql_utils import *
-
 MAKE_MAPPING = {
     "mercedes-benz": "mercedes",
     "mercedes": "mercedes",
@@ -269,18 +267,34 @@ def mapping_vehicle_type(
             db_df["capacity"] = db_df["capacity"].astype(float)
         except:
             print(
-                "column battery capacity doesn't have the right name please change to cacity"
+                "column battery capacity doesn't have the right name please change to capacity"
             )
     make_name = make_name.lower().replace("ë", "e")
     type_car = type_car.lower()
+
+    ## special case for zoe
+    if model_name == "zoe":
+        pattern_1 = r"(?i)(r|q\d+)"
+        pattern_2 = r"(?<!\d)(50|40)(?!\d)"
+        type_car_1 = re.search(pattern_1, type_car)
+        type_car_2 = re.search(pattern_2, type_car)
+        if type_car_1:
+            type_car_1 = type_car_1.group(1)
+        if type_car_2:
+            type_car_2 = type_car_2.group(1)
+        if type_car_1 is not None:
+            type_car = (str(type_car_1) + " ze" + str(type_car_2)).replace(
+                " zeNone", ""
+            )
+    ## special case for scenic
+    if "scenic" in model_name:
+        model_name = "scenic"
+
     try:
-        d = re.findall("\d*", model_name)
+        d = re.findall(r"\d*", model_name)
         d.sort()
         nbr = d[-1]
-        if nbr:
-            model_name = nbr
-        else:
-            model_name = model_name.lower()
+        model_name = nbr or model_name.lower()
     except:
         model_name = model_name.lower()
     # filter on OEM
@@ -334,4 +348,3 @@ def mapping_vehicle_type(
             return subset.loc[index, "id"]
 
     return "unknown"
-
