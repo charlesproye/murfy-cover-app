@@ -138,8 +138,8 @@ async def get_model_with_data(
             VehicleModel.end_of_life_date,
         )
         .select_from(VehicleModel)
-        .inner_join(Make, VehicleModel.make_id == Make.id)
-        .inner_join(Battery, VehicleModel.battery_id == Battery.id)
+        .join(Make, VehicleModel.make_id == Make.id)
+        .join(Battery, VehicleModel.battery_id == Battery.id)
         .where(
             VehicleModel.trendline["trendline"].isnot(None),
             Battery.capacity is not None,
