@@ -101,6 +101,7 @@ class VehicleModel(BaseUUIDModel):
     commissioning_date = Column(DateTime, comment="First time seen on the market")
     end_of_life_date = Column(DateTime, comment="Last time seen on the market")
     expected_consumption = Column(Integer)
+    evdb_model_id: str | None = Column(String(100), nullable=True)
 
 
 class Battery(BaseUUIDModel):

@@ -2,14 +2,17 @@ import json
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 import requests
+from sqlalchemy import func
+from sqlalchemy.orm import Session, sessionmaker
 
-from core.sql_utils import get_connection
+from core.sql_utils import get_sqlalchemy_engine
+from db_models.vehicle import Battery, Make, Oem, VehicleModel
 
 
-def fetch_api_data(url: str) -> Optional[list]:
+def fetch_api_data(url: str) -> list | None:
     """Fetch data from the EV database API."""
     try:
         response = requests.get(url)
@@ -25,22 +28,19 @@ def fetch_api_data(url: str) -> Optional[list]:
         return None
 
 
-def get_oem(cursor, vehicle_make: str) -> str:
+def get_oem(session: Session, vehicle_make: str) -> uuid.UUID | None:
     """Get an OEM record and return its ID."""
     if isinstance(vehicle_make, str):
-        cursor.execute(
-            "SELECT oem_id FROM make join oem on oem.id=make.oem_id WHERE oem_name = lower(%s)",
-            (vehicle_make,),
+        oem = (
+            session.query(Oem)
+            .join(Make, Make.oem_id == Oem.id)
+            .filter(func.lower(Oem.oem_name) == vehicle_make.lower())
+            .first()
         )
-        oem_id = cursor.fetchone()
-        return oem_id
+        return oem.id if oem else None
     else:
-        cursor.execute(
-            "SELECT oem_id FROM make join oem on oem.id=make.oem_id WHERE make.id = %s",
-            (vehicle_make,),
-        )
-        oem_id = cursor.fetchone()
-        return oem_id
+        make = session.query(Make).filter(Make.id == vehicle_make).first()
+        return make.oem_id if make else None
 
 
 def get_commissioning_date(vehicle):
@@ -57,26 +57,35 @@ def get_commissioning_date(vehicle):
     return start_date, end_date
 
 
-def get_or_create_make(cursor, vehicle_make: str, oem_id) -> str:
+def get_or_create_make(
+    session: Session, vehicle_make: str, oem_id: uuid.UUID | None
+) -> uuid.UUID:
     """Get or create a Make record and return its ID."""
-    cursor.execute(
-        "SELECT id FROM make WHERE LOWER(make_name) = LOWER(%s)", (vehicle_make,)
+    make = (
+        session.query(Make)
+        .filter(func.lower(Make.make_name) == vehicle_make.lower())
+        .first()
     )
-    make_result = cursor.fetchone()
-    if not make_result:
-        make_id = str(uuid.uuid4())
-        cursor.execute(
-            "INSERT INTO make (id, make_name, oem_id) VALUES (%s, LOWER(%s), %s) RETURNING id",
-            (make_id, vehicle_make, oem_id),
+
+    if not make:
+        make = Make(
+            id=uuid.uuid4(),
+            make_name=vehicle_make.lower(),
+            oem_id=oem_id,
         )
-        make_id = cursor.fetchone()[0]
+        session.add(make)
+        session.flush()
+        print(f"Created new make: {vehicle_make}")
     else:
-        make_id = make_result[0]
+        # Update oem_id if it's different
+        if make.oem_id != oem_id:
+            make.oem_id = oem_id
+            session.flush()
 
-    return make_id
+    return make.id
 
 
-def standardize_battery_chemistry(battery_chemistry: str) -> str:
+def standardize_battery_chemistry(battery_chemistry: str | None) -> str:
     """Standardize battery chemistry values."""
     if not battery_chemistry:
         return "unknown"
@@ -85,77 +94,65 @@ def standardize_battery_chemistry(battery_chemistry: str) -> str:
     return battery_chemistry
 
 
-def get_or_create_battery(cursor, vehicle: Dict[str, Any]) -> str:
+def get_or_create_battery(session: Session, vehicle: dict[str, Any]) -> uuid.UUID:
     """Get or create a Battery record and return its ID."""
-
     battery_chemistry = standardize_battery_chemistry(vehicle.get("Battery_Chemistry"))
     battery_manufacturer = vehicle.get("Battery_Manufacturer") or "unknown"
+    battery_name = vehicle.get("Vehicle_Model", "unknown")
+    capacity = vehicle.get("Battery_Capacity_Full")
+    net_capacity = vehicle.get("Battery_Capacity_Useable")
 
-    cursor.execute(
-        "SELECT id FROM battery WHERE UPPER(battery_name) = UPPER(%s) AND UPPER(battery_chemistry) = UPPER(%s) AND UPPER(battery_oem) = UPPER(%s) AND capacity = %s AND net_capacity = %s",
-        (
-            vehicle.get("Vehicle_Model", "unknown"),
-            battery_chemistry.upper(),
-            battery_manufacturer.upper(),
-            vehicle.get("Battery_Capacity_Full"),
-            vehicle.get("Battery_Capacity_Useable"),
-        ),
-    )
-    battery_type_result = cursor.fetchone()
-
-    if not battery_type_result:
-        battery_id = str(uuid.uuid4())
-        cursor.execute(
-            "INSERT INTO battery (id, battery_name, battery_chemistry, battery_oem, capacity, net_capacity, source) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (
-                battery_id,
-                vehicle.get("Vehicle_Model", "unknown"),
-                battery_chemistry.upper(),
-                battery_manufacturer.upper(),
-                vehicle.get("Battery_Capacity_Full"),
-                vehicle.get("Battery_Capacity_Useable"),
-                vehicle.get("EVDB_Detail_URL"),
-            ),
+    battery = (
+        session.query(Battery)
+        .filter(
+            func.upper(Battery.battery_name) == battery_name.upper(),
+            func.upper(Battery.battery_chemistry) == battery_chemistry.upper(),
+            func.upper(Battery.battery_oem) == battery_manufacturer.upper(),
+            Battery.capacity == capacity,
+            Battery.net_capacity == net_capacity,
         )
-        battery_id = cursor.fetchone()[0]
+        .first()
+    )
+
+    if not battery:
+        battery = Battery(
+            id=uuid.uuid4(),
+            battery_name=battery_name,
+            battery_chemistry=battery_chemistry.upper(),
+            battery_oem=battery_manufacturer.upper(),
+            capacity=capacity,
+            net_capacity=net_capacity,
+            source=vehicle.get("EVDB_Detail_URL"),
+        )
+        session.add(battery)
+        session.flush()
         print(
-            f"Created new battery: Battery Name={vehicle.get('Vehicle_Model')}, Chemistry={battery_chemistry}, OEM={battery_manufacturer}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh"
+            f"Created new battery: Battery Name={battery_name}, Chemistry={battery_chemistry}, "
+            f"OEM={battery_manufacturer}, Capacity={capacity}kWh, Net Capacity={net_capacity}kWh"
         )
     else:
-        battery_id = battery_type_result[0]
-
-        cursor.execute(
-            """
-            UPDATE battery
-            SET
-                battery_name = %s,
-                battery_chemistry = %s,
-                battery_oem = %s,
-                capacity = %s,
-                net_capacity = %s,
-                source = %s
-            WHERE id = %s
-            """,
-            (
-                vehicle.get("Vehicle_Model", "unknown"),
-                battery_chemistry.upper(),
-                battery_manufacturer.upper(),
-                vehicle.get("Battery_Capacity_Full"),
-                vehicle.get("Battery_Capacity_Useable"),
-                vehicle.get("EVDB_Detail_URL"),
-                battery_id,  # id dans WHERE
-            ),
-        )
+        # Update battery fields
+        battery.battery_name = battery_name
+        battery.battery_chemistry = battery_chemistry.upper()
+        battery.battery_oem = battery_manufacturer.upper()
+        battery.capacity = capacity
+        battery.net_capacity = net_capacity
+        battery.source = vehicle.get("EVDB_Detail_URL")
+        session.flush()
         print(
-            f"Updating existing battery : Battery Name={vehicle.get('Vehicle_Model')}, Chemistry={battery_chemistry}, OEM={battery_manufacturer}, Capacity={vehicle.get('Battery_Capacity_Full')}kWh, Net Capacity={vehicle.get('Battery_Capacity_Useable')}kWh"
+            f"Updated existing battery: Battery Name={battery_name}, Chemistry={battery_chemistry}, "
+            f"OEM={battery_manufacturer}, Capacity={capacity}kWh, Net Capacity={net_capacity}kWh"
         )
-    return battery_id
+
+    return battery.id
 
 
 def get_or_create_vehicle_model(
-    cursor, vehicle: Dict[str, Any], make_id: str, battery_id: str
+    session: Session, vehicle: dict[str, Any], make_id: uuid.UUID, battery_id: uuid.UUID
 ) -> None:
     """Get or create a Vehicle Model record."""
+    vehicle_id = vehicle.get("Vehicle_ID")
+    evdb_model_id = str(vehicle_id) if vehicle_id is not None else None
     vehicle_model = vehicle.get("Vehicle_Model", "unknown")
     type_car = vehicle.get("Vehicle_Model_Version") or "unknown"
     version = "unknown"
@@ -186,76 +183,65 @@ def get_or_create_vehicle_model(
             type_car = type_parts[0] if type_parts else "unknown"
             version = " ".join(type_parts[1:]) if len(type_parts) > 1 else "unknown"
 
-        cursor.execute(
-            "SELECT id FROM vehicle_model WHERE model_name = LOWER(%s) AND LOWER(type) = LOWER(%s) AND version = LOWER(%s)",
-            (vehicle_model, type_car, version),
-        )
-        model_result = cursor.fetchone()
-    else:
-        cursor.execute(
-            "SELECT id FROM vehicle_model WHERE model_name = LOWER(%s) AND LOWER(type) = LOWER(%s)",
-            (vehicle_model, type_car),
-        )
-        model_result = cursor.fetchone()
+    # Query by evdb_model_id
+    model = (
+        session.query(VehicleModel)
+        .filter(VehicleModel.evdb_model_id == evdb_model_id)
+        .first()
+    )
 
     start_date, end_date = get_commissioning_date(vehicle)
-    if not model_result:
-        model_id = str(uuid.uuid4())
-        cursor.execute(
-            """
-            INSERT INTO vehicle_model (
-                id, model_name, type, version, make_id, oem_id, autonomy, expected_consumption, warranty_date, warranty_km, source, battery_id, commissioning_date, end_of_life_date
-            ) VALUES (%s, LOWER(%s), LOWER(%s), LOWER(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-            (
-                model_id,
-                vehicle_model,
-                type_car,
-                version,
-                make_id,
-                get_oem(cursor, make_id),
-                vehicle.get("Range_WLTP"),
-                vehicle.get("Efficiency_Consumption_Real"),
-                vehicle.get("Battery_Warranty_Period"),
-                vehicle.get("Battery_Warranty_Mileage"),
-                vehicle.get("EVDB_Detail_URL"),
-                battery_id,
-                start_date,
-                end_date,
-            ),
-        )
-        print(f"Created new vehicle model: {vehicle_model} {type_car} {version}")
-    else:
-        cursor.execute(
-            """
-            UPDATE vehicle_model
-            SET autonomy = COALESCE(%s, autonomy),
-                expected_consumption = COALESCE(%s, expected_consumption),
-                warranty_date = COALESCE(%s, warranty_date),
-                warranty_km = COALESCE(%s, warranty_km),
-                source = COALESCE(%s, source),
-                commissioning_date = COALESCE(%s, commissioning_date),
-                end_of_life_date = COALESCE(%s, end_of_life_date),
-                battery_id = COALESCE(%s, battery_id)
-            WHERE id = %s
-        """,
-            (
-                vehicle.get("Range_WLTP"),
-                vehicle.get("Efficiency_Consumption_Real"),
-                vehicle.get("Battery_Warranty_Period"),
-                vehicle.get("Battery_Warranty_Mileage"),
-                vehicle.get("EVDB_Detail_URL"),
-                start_date,
-                end_date,
-                battery_id,
-                model_result[0],
-            ),
-        )
+    oem_id = get_oem(session, vehicle.get("Vehicle_Make", ""))
 
+    if not model:
+        model = VehicleModel(
+            id=uuid.uuid4(),
+            model_name=vehicle_model.lower(),
+            type=type_car.lower(),
+            version=version.lower(),
+            make_id=make_id,
+            oem_id=oem_id,
+            autonomy=vehicle.get("Range_WLTP"),
+            expected_consumption=vehicle.get("Efficiency_Consumption_Real"),
+            warranty_date=vehicle.get("Battery_Warranty_Period"),
+            warranty_km=vehicle.get("Battery_Warranty_Mileage"),
+            source=vehicle.get("EVDB_Detail_URL"),
+            battery_id=battery_id,
+            commissioning_date=start_date,
+            end_of_life_date=end_date,
+            evdb_model_id=evdb_model_id,
+        )
+        session.add(model)
+        session.flush()
+        print(
+            f"Created new vehicle model with id {evdb_model_id}: {vehicle_model} {type_car} {version}"
+        )
+    else:
+        # Update existing model with COALESCE-like behavior (only update if new value is not None)
+        if vehicle.get("Range_WLTP") is not None:
+            model.autonomy = vehicle.get("Range_WLTP")
+        if vehicle.get("Efficiency_Consumption_Real") is not None:
+            model.expected_consumption = vehicle.get("Efficiency_Consumption_Real")
+        if vehicle.get("Battery_Warranty_Period") is not None:
+            model.warranty_date = vehicle.get("Battery_Warranty_Period")
+        if vehicle.get("Battery_Warranty_Mileage") is not None:
+            model.warranty_km = vehicle.get("Battery_Warranty_Mileage")
+        if vehicle.get("EVDB_Detail_URL") is not None:
+            model.source = vehicle.get("EVDB_Detail_URL")
+        if start_date is not None:
+            model.commissioning_date = start_date
+        if end_date is not None:
+            model.end_of_life_date = end_date
+        if battery_id is not None:
+            model.battery_id = battery_id
+        if evdb_model_id is not None:
+            model.evdb_model_id = evdb_model_id
+
+        session.flush()
         print(f"Updated existing vehicle model: {vehicle_model} {type_car} {version}")
 
 
-def process_vehicle(cursor, vehicle: Dict[str, Any]) -> None:
+def process_vehicle(session: Session, vehicle: dict[str, Any]) -> None:
     """Process a single vehicle record."""
     try:
         if vehicle.get("Vehicle_Make", "").lower() == "tesla":
@@ -263,12 +249,14 @@ def process_vehicle(cursor, vehicle: Dict[str, Any]) -> None:
                 f"Skipping Tesla model: {vehicle.get('Vehicle_Model')} {vehicle.get('Vehicle_Model_Version')}"
             )
             return
-        oem_id = get_oem(cursor, vehicle.get("Vehicle_Make", ""))
-        make_id = get_or_create_make(cursor, vehicle.get("Vehicle_Make", ""), oem_id)
-        battery_id = get_or_create_battery(cursor, vehicle)
-        get_or_create_vehicle_model(cursor, vehicle, make_id, battery_id)
+
+        oem_id = get_oem(session, vehicle.get("Vehicle_Make", ""))
+        make_id = get_or_create_make(session, vehicle.get("Vehicle_Make", ""), oem_id)
+        battery_id = get_or_create_battery(session, vehicle)
+        get_or_create_vehicle_model(session, vehicle, make_id, battery_id)
     except Exception as e:
-        print(f"Error processing vehicle {vehicle.get('Vehicle_Model')}: {str(e)}")
+        print(f"Error processing vehicle {vehicle.get('Vehicle_Model')}: {e!s}")
+        raise
 
 
 def fetch_ev_data():
@@ -280,12 +268,19 @@ def fetch_ev_data():
     if not data:
         return None
 
-    with get_connection() as con:
-        cursor = con.cursor()
-        for vehicle in data:
-            process_vehicle(cursor, vehicle)
-        con.commit()
-        print("Successfully processed all vehicle models")
+    engine = get_sqlalchemy_engine()
+    SessionLocal = sessionmaker(bind=engine)
+
+    with SessionLocal() as session:
+        try:
+            for vehicle in data:
+                process_vehicle(session, vehicle)
+            session.commit()
+            print("Successfully processed all vehicle models")
+        except Exception as e:
+            session.rollback()
+            print(f"Error processing vehicles: {e!s}")
+            raise
 
     return data
 
