@@ -5,6 +5,7 @@ from scipy.optimize import curve_fit
 from sqlalchemy.sql import text
 
 from core import numpy_utils
+from core.numpy_utils import numpy_safe_eval
 from core.sql_utils import get_sqlalchemy_engine
 from core.stats_utils import log_function
 
@@ -73,8 +74,8 @@ def update_database_trendlines(
                 sql_request,
                 {
                     "trendline_json": json.dumps(mean_trendline),
-                    "trendline_min_json": json.dumps(upper_trendline),
-                    "trendline_max_json": json.dumps(lower_trendline),
+                    "trendline_min_json": json.dumps(lower_trendline),
+                    "trendline_max_json": json.dumps(upper_trendline),
                     "oem_id": oem_id,
                 },
             )
@@ -93,8 +94,8 @@ def update_database_trendlines(
                 sql_request,
                 {
                     "trendline_json": json.dumps(mean_trendline),
-                    "trendline_min_json": json.dumps(upper_trendline),
-                    "trendline_max_json": json.dumps(lower_trendline),
+                    "trendline_min_json": json.dumps(lower_trendline),
+                    "trendline_max_json": json.dumps(upper_trendline),
                     "model_id": model_id,
                     "trendline_bib": trendline_bib,
                 },
@@ -193,7 +194,7 @@ def compute_main_trendline(x_sorted, y_sorted):
         x_sorted,
         y_sorted,
         maxfev=10000,
-        bounds=([0.97, -np.inf, -np.inf], [1.03, np.inf, np.inf]),
+        bounds=([0.999, -np.inf, 10000], [1.001, np.inf, 100000]),
     )
     y_fit = log_function(x_sorted, *coef_mean)
     y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
@@ -233,7 +234,7 @@ def compute_upper_bound(df, trendline, coef_mean):
         x_sorted,
         y_sorted,
         maxfev=10000,
-        bounds=([0.97, -np.inf, -np.inf], [1.03, np.inf, np.inf]),
+        bounds=([1, -np.inf, -np.inf], [1.03, np.inf, np.inf]),
     )
     y_fit = log_function(x_sorted, *coef_mean_upper)
     y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
@@ -276,7 +277,7 @@ def compute_lower_bound(df, trendlines, coef_mean):
         x_sorted,
         y_sorted,
         maxfev=10000,
-        bounds=([0.97, -np.inf, -np.inf], [1.03, np.inf, np.inf]),
+        bounds=([0.97, -np.inf, -np.inf], [1, np.inf, np.inf]),
     )
     y_fit = log_function(x_sorted, *coef_mean_upper)
     y_lower, y_upper = compute_trendline_bounds(y_sorted, y_fit)
@@ -290,7 +291,7 @@ def compute_lower_bound(df, trendlines, coef_mean):
     return upper_bound
 
 
-def filtrer_trendlines(
+def filter_data(
     df,
     col_odometer,
     col_vin,
@@ -321,4 +322,43 @@ def filtrer_trendlines(
 
     if nb_total_vins >= vin_total and nb_lower >= nbr_under and nb_upper >= nbr_upper:
         return nb_total_vins
-    print("The model don't respect the filtering criteria")
+    print("Not enought vehicles to compute trendlines")
+
+
+def filter_trendlines(trendline, trendline_max, trendline_min):
+    """
+    Filters trendlines based on two conditions:
+
+    1. The main trendline value at 160,000 km must be < 0.95.
+    2. The difference between trendline_max and trendline_min should not decrease
+       by more than 0.015 between 0 km and 150,000 km.
+
+    Parameters
+    ----------
+    trendline : dict
+        Dictionary containing the key "trendline" with the expression to evaluate.
+    trendline_max : dict
+        Maximum trendline.
+    trendline_min : dict
+        Minimum trendline.
+
+    Returns
+    -------
+    bool
+        True if the trendline passes the filters, False otherwise.
+    """
+
+    value_at_160k = numpy_safe_eval(expression=trendline["trendline"], x=160_000)
+    if value_at_160k >= 0.95:
+        print(f"The trendline value at 160,000 km is {value_at_160k}")
+        return False
+
+    kms = np.arange(0, 200_001, 50_000)
+    max_values = numpy_safe_eval(trendline_max["trendline"], x=kms)
+    min_values = numpy_safe_eval(trendline_min["trendline"], x=kms)
+
+    idx_150k = 150_000 // 50_000
+    diff_start = max_values[0] - min_values[0]
+    diff_150k = max_values[idx_150k] - min_values[idx_150k]
+
+    return (diff_start - diff_150k) < 0.015

@@ -4,17 +4,22 @@ import pandas as pd
 from sqlalchemy import text
 
 from activation.config.mappings import mapping_vehicle_type
+from activation.config.settings import LOGGING_CONFIG
 from core.gsheet_utils import load_excel_data
-from core.sql_utils import get_connection, get_sqlalchemy_engine
+from core.sql_utils import get_sqlalchemy_engine
 from results.trendline.trendline_utils import (
     clean_battery_data,
     compute_lower_bound,
     compute_main_trendline,
     compute_upper_bound,
-    filtrer_trendlines,
+    filter_data,
+    filter_trendlines,
     prepare_data_for_fitting,
     update_database_trendlines,
 )
+
+logging.basicConfig(**LOGGING_CONFIG)
+logger = logging.getLogger(__name__)
 
 
 def generate_trendline_functions(df, odometer_column, soh_column):
@@ -47,11 +52,11 @@ def generate_trendline_functions(df, odometer_column, soh_column):
     return mean, upper_bound, lower_bound
 
 
-def load_all_data():
-    # data from scrapping
-    df_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
+def load_and_clean_scrapping_data():
+    raw_data = load_excel_data("Courbes de tendance", "Courbes OS")
+
     df_sheet = pd.DataFrame(
-        data=df_sheet[1:, :8],
+        data=raw_data[1:, :8],
         columns=[
             "make_name",
             "model_name",
@@ -64,67 +69,120 @@ def load_all_data():
         ],
     )
 
-    df_sheet = df_sheet[
-        (df_sheet["soh"].notna()) & (df_sheet["soh"] != "")
-    ]  # Empty rows in gsheet
-    df_sheet["model_name"] = df_sheet["model_name"].apply(str.lower)
-    df_sheet["make_name"] = df_sheet["make_name"].apply(str.lower)
     df_sheet["soh"] = (
         df_sheet["soh"].apply(lambda x: x.replace("%", "").strip()).astype(float) / 100
     )
+
+    df_sheet = df_sheet[(df_sheet["soh"].notna()) & (df_sheet["soh"] != "")]
+
+    df_sheet["model_name"] = df_sheet["model_name"].apply(str.lower)
+    df_sheet["make_name"] = df_sheet["make_name"].apply(str.lower)
+
     df_sheet["odometer"] = (
         df_sheet["odometer"]
         .apply(lambda x: str(x).replace(",", "").replace(" ", "").strip())
         .astype(float)
     )
-    logging.info("Starting trendline update for oem")
 
-    # data from db
-    with get_connection() as connection:
-        query = """
-            SELECT v.vin, vm.model_name, vm.id as vehicle_model_id, vm.type, m.make_name, vd.soh, vd.soh_oem, vd.odometer, o.oem_name, o.id as oem_id, m.id as make_id FROM vehicle v
-            left JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
-            left JOIN vehicle_data vd ON vd.vehicle_id = v.id
-            left JOIN oem o ON o.id = vm.oem_id
-            left JOIN battery b ON b.id = vm.battery_id
-            left JOIN make m on m.id = vm.make_id
-            where (soh is not NULL or soh_oem is not null)
-            and o.id not in (uuid('fe6fba2f-1e10-43a7-b8b0-2aa021f97c3f'), uuid('1b093647-0d1b-409f-8b37-871bc81ac9ca'), uuid('5d2e8c26-d2bb-4c24-812e-59c3a7508213'), uuid('fc285a82-f5ea-44a0-8f2e-706cd5f8c868'))
-        """
-        df = pd.read_sql(query, connection)
+    return df_sheet.drop_duplicates(subset=["soh", "odometer", "model_name"])
+
+
+def load_vehicle_data_from_db():
+    query = """
+        SELECT 
+            v.vin, 
+            vm.model_name, 
+            vm.id as vehicle_model_id, 
+            vm.type, 
+            vm.version,
+            m.make_name, 
+            vd.soh, 
+            vd.soh_oem, 
+            vd.odometer, 
+            o.oem_name, 
+            o.id as oem_id, 
+            m.id as make_id 
+        FROM vehicle v
+        LEFT JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
+        LEFT JOIN vehicle_data vd ON vd.vehicle_id = v.id
+        LEFT JOIN oem o ON o.id = vm.oem_id
+        LEFT JOIN battery b ON b.id = vm.battery_id
+        LEFT JOIN make m ON m.id = vm.make_id
+        WHERE (soh IS NOT NULL OR soh_oem IS NOT NULL)
+    """
+    engine = get_sqlalchemy_engine()
+    with engine.connect() as connection:
+        df = pd.read_sql(text(query), connection)
+
     df["soh_oem"] = pd.to_numeric(df["soh_oem"], errors="coerce")
     df["soh"] = pd.to_numeric(df["soh"], errors="coerce")
+
+    # Use soh_oem if available
     df["soh"] = df.apply(
-        lambda x: x["soh_oem"] if float(x["soh_oem"]) > 0 else x["soh"], axis=1
+        lambda x: x["soh_oem"]
+        if pd.notna(x["soh_oem"]) and x["soh_oem"] > 0
+        else x["soh"],
+        axis=1,
     )
+
     df = df[df["soh"] < 1.1]
+    return df
+
+
+def load_vehicle_models_from_db():
+    query = """
+        SELECT 
+            vm.model_name, 
+            vm.id as id, 
+            vm.type, 
+            m.make_name, 
+            o.oem_name, 
+            o.id as oem_id, 
+            m.id as make_id 
+        FROM vehicle_model vm
+        JOIN oem o ON o.id = vm.oem_id
+        JOIN make m ON m.id = vm.make_id
+    """
 
     engine = get_sqlalchemy_engine()
-    con = engine.connect()
-    with engine.connect() as connection:
-        dbeaver_df = pd.read_sql(
-            text("""SELECT vm.model_name, vm.id as id, vm.type, m.make_name, o.oem_name, o.id as oem_id, m.id as make_id FROM vehicle_model vm
-            JOIN oem o ON o.id = vm.oem_id
-            JOIN make m on m.id = vm.make_id
-            and o.id not in (uuid('fe6fba2f-1e10-43a7-b8b0-2aa021f97c3f'), uuid('1b093647-0d1b-409f-8b37-871bc81ac9ca'), uuid('5d2e8c26-d2bb-4c24-812e-59c3a7508213'), uuid('fc285a82-f5ea-44a0-8f2e-706cd5f8c868'))
-        ;"""),
-            con,
-        )
-        df_merge = df_sheet.merge(
-            dbeaver_df[["make_name", "oem_id", "oem_name"]].drop_duplicates(),
-            on=[
-                "make_name",
-            ],
-            how="left",
-        )
-    df_merge["vehicle_model_id"] = df_merge.apply(
+    with engine.connect() as con:
+        return pd.read_sql(text(query), con)
+
+
+def load_all_data():
+    logging.info("Load data")
+    df_sheet = load_and_clean_scrapping_data()
+    cars_models = load_vehicle_models_from_db()
+    df_sheet = df_sheet.merge(
+        cars_models[["make_name", "oem_id", "oem_name"]].drop_duplicates(),
+        on=[
+            "make_name",
+        ],
+        how="left",
+    )
+
+    df_sheet["vehicle_model_id"] = df_sheet.apply(
         lambda x: mapping_vehicle_type(
-            x["type"], x["make_name"], x["model_name"], dbeaver_df
+            x["type"], x["make_name"], x["model_name"], cars_models
         ),
         axis=1,
     )
-    df_all = pd.concat((df, df_merge), ignore_index=True)
+    df_prod = load_vehicle_data_from_db()
+    df_all = pd.concat((df_prod, df_sheet), ignore_index=True)
     return df_all
+
+
+def clean_db_trendlines():
+    logging.info("Clean db trendlines...")
+    query = """
+        UPDATE vehicle_model
+        SET trendline = NULL,
+            trendline_min = NULL,
+            trendline_max = NULL
+        WHERE trendline is not null
+    """
+    with get_sqlalchemy_engine().begin() as conn:
+        conn.execute(text(query))
 
 
 def update_trendline_oem():
@@ -132,7 +190,7 @@ def update_trendline_oem():
 
     for oem in df_all.oem_id.unique():
         df_temp = df_all[df_all["oem_id"] == oem]
-        if filtrer_trendlines(df_temp, "odometer", "soh", 50_000, 50_000, 50, 10, 10):
+        if filter_data(df_temp, "odometer", "vin", 50_000, 50_000, 50, 10, 10):
             mean_trend, upper_bound, lower_bound = generate_trendline_functions(
                 df_temp, "odometer", "soh"
             )
@@ -144,27 +202,28 @@ def update_trendline_oem():
 
 
 def update_trendline_model():
+    logging.info("Update trendline model...")
     df_all = load_all_data()
-    print(df_all.columns)
-
-    logging.info("Starting trendline update from gsheet")
-
     for model_car in df_all["vehicle_model_id"].unique():
-        df_temp = df_all[(load_all_data()["vehicle_model_id"] == model_car)].copy()
+        df_temp = df_all[(df_all["vehicle_model_id"] == model_car)].copy()
         try:
-            if filtrer_trendlines(df_temp, "odometer", "vin", 0, 0, 20, 0, 0):
+            if filter_data(df_temp, "odometer", "vin", 0, 0, 20, 0, 0):
                 mean_trend, upper_bound, lower_bound = generate_trendline_functions(
                     df_temp, "odometer", "soh"
                 )
-                update_database_trendlines(
-                    model_car, mean_trend, upper_bound, lower_bound, False
-                )
-                logging.info(f"Trendline update for car model {model_car}")
+                if filter_trendlines(mean_trend, upper_bound, lower_bound):
+                    update_database_trendlines(
+                        model_car, mean_trend, upper_bound, lower_bound, False
+                    )
+                    logging.info(f"Trendline update for car model {model_car}")
+                else:
+                    logging.info(f"Trendline not updated for car model {model_car}")
         except Exception as e:
             logging.error(f"Error with car model: {model_car}: {e}")
 
 
 def main():
+    clean_db_trendlines()
     update_trendline_oem()
     update_trendline_model()
 
