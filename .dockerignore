@@ -32,6 +32,7 @@ __pycache__/
 .env
 .env.local
 .venv/
+.python-version
 
 # Large directories we don't need in production
 src/eda/
