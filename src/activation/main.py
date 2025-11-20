@@ -49,6 +49,7 @@ from activation.fleet_info import check_vehicles_without_type
 from activation.fleet_info import read_fleet_info as fleet_info
 from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
+from activation.utils.check_utils import ensure_admins_linked_to_fleets
 from activation.utils.metric_utils import write_metrics_to_db
 from core.slack_utils import send_slack_message
 
@@ -161,6 +162,7 @@ async def process_vehicles(owner_filter: str | None = None):
         )
 
         await write_metrics_to_db(logger)
+        await asyncio.to_thread(ensure_admins_linked_to_fleets, logger)
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {e!s}")
