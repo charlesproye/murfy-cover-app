@@ -30,4 +30,4 @@ WORKDIR /app
 
 USER 1001
 
-CMD ["./start_tesla_fleet_telemetry.sh", "--auto-offset-reset=latest"]
+CMD ["python", "-m", "src.ingestion.tesla_fleet_telemetry.main"]

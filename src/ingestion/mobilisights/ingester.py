@@ -10,13 +10,14 @@ from queue import Empty, Queue
 from types import FrameType
 from typing import Any
 
-import boto3
 import dotenv
 import msgspec
 import schedule
 from botocore.credentials import threading
 from botocore.exceptions import ClientError
 
+from core.s3.s3_utils import S3Service
+from core.s3.settings import S3Settings
 from ingestion.ingestion_cache import IngestionCache
 from ingestion.mobilisights.api import MSApi
 from ingestion.mobilisights.schema import CarState, ErrorMesage
@@ -27,7 +28,7 @@ class MobilisightsIngester:
     __scheduler_logger: logging.Logger
 
     __api: MSApi
-    __s3 = boto3.client("s3")
+    __s3: S3Service
     __bucket: str
 
     __fetch_scheduler = schedule.Scheduler()
@@ -97,16 +98,15 @@ class MobilisightsIngester:
             self.__ingester_logger.error("S3_SECRET environment variable not found")
             return
         self.__api = MSApi(MS_BASE_URL, MS_EMAIL, MS_PASSWORD, MS_COMPANY)
-        self.__s3 = boto3.client(
-            "s3",
-            region_name=S3_REGION,
-            endpoint_url=S3_ENDPOINT,
-            aws_access_key_id=S3_KEY,
-            aws_secret_access_key=S3_SECRET,
-            config=boto3.session.Config(
-                signature_version="s3", s3={"addressing_style": "path"}
-            ),
+
+        s3_settings = S3Settings(
+            S3_ENDPOINT=S3_ENDPOINT,
+            S3_REGION=S3_REGION,
+            S3_BUCKET=S3_BUCKET,
+            S3_KEY=S3_KEY,
+            S3_SECRET=S3_SECRET,
         )
+        self.__s3: S3Service = S3Service(s3_settings)
         self.__bucket = S3_BUCKET
         self.__executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.__job_queue = Queue()
@@ -177,21 +177,10 @@ class MobilisightsIngester:
         filename = f"response/stellantis/{car_state.vin}/temp/{int(datetime.now().timestamp())}.json"
 
         try:
-            uploaded = self.__s3.put_object(
-                Body=msgspec.json.encode(car_state),
-                Bucket=self.__bucket,
-                Key=filename,
+            self.__s3.store_object(msgspec.json.encode(car_state), filename)
+            self.__ingester_logger.info(
+                f"Uploaded info for vehicle with VIN {car_state.vin} at location {filename}"
             )
-            match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
-                case 200:
-                    self.__ingester_logger.info(
-                        f"Uploaded info for vehicle with VIN {car_state.vin} at location {filename}"
-                    )
-                case _:
-                    self.__ingester_logger.error(
-                        f"Error uploading info for vehicle with VIN {car_state.vin}: {uploaded['Error']['Message']}"
-                    )
-                    return
         except ClientError as e:
             self.__ingester_logger.error(
                 f"Error uploading info vehicle with VIN {car_state.vin}: {e.response['Error']['Message']}"
@@ -238,4 +227,3 @@ class MobilisightsIngester:
             time.sleep(1)
 
         self.__shutdown()
-

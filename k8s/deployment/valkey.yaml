@@ -18,6 +18,12 @@ spec:
       containers:
         - name: valkey
           image: valkey/valkey:latest
+          command:
+            - valkey-server
+            - --save
+            - ""
+            - --appendonly
+            - "no"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

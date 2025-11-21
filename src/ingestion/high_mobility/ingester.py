@@ -7,12 +7,13 @@ import threading
 from datetime import datetime
 from types import FrameType
 
-import boto3
 import dotenv
 import msgspec
 import schedule
-from botocore.client import ClientError
+from botocore.exceptions import ClientError
 
+from core.s3.s3_utils import S3Service
+from core.s3.settings import S3Settings
 from ingestion.high_mobility.api import HMApi
 from ingestion.high_mobility.schema import all_brands
 from ingestion.high_mobility.schema.brands import decode_vehicle_info
@@ -25,7 +26,7 @@ class HMIngester:
     __scheduler_logger: logging.Logger
 
     __api: HMApi
-    __s3 = boto3.client("s3")
+    __s3: S3Service
     __bucket: str
 
     __fetch_scheduler = schedule.Scheduler()
@@ -86,16 +87,16 @@ class HMIngester:
         self.__scheduler_logger = logging.getLogger("SCHEDULER")
 
         self.__api = HMApi(HM_BASE_URL, HM_CLIENT_ID, HM_CLIENT_SECRET)
-        self.__s3 = boto3.client(
-            "s3",
-            region_name=S3_REGION,
-            endpoint_url=S3_ENDPOINT,
-            aws_access_key_id=S3_KEY,
-            aws_secret_access_key=S3_SECRET,
-            config=boto3.session.Config(
-                signature_version="s3", s3={"addressing_style": "path"}
-            ),
+
+        # Use centralized S3 client
+        s3_settings = S3Settings(
+            S3_ENDPOINT=S3_ENDPOINT,
+            S3_REGION=S3_REGION,
+            S3_BUCKET=S3_BUCKET,
+            S3_KEY=S3_KEY,
+            S3_SECRET=S3_SECRET,
         )
+        self.__s3 = S3Service(s3_settings)
         self.__bucket = S3_BUCKET
         self.__executor: concurrent.futures.ThreadPoolExecutor = (
             concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
@@ -286,20 +287,10 @@ class HMIngester:
                 filename = f"response/{vehicle.brand}/{vehicle.vin}/temp/{int(datetime.now().timestamp())}.json"
 
                 try:
-                    uploaded = self.__s3.put_object(
-                        Body=encoded,
-                        Bucket=self.__bucket,
-                        Key=filename,
+                    self.__s3.store_object(encoded, filename)
+                    self.__ingester_logger.info(
+                        f"Uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
                     )
-                    match uploaded["ResponseMetadata"]["HTTPStatusCode"]:
-                        case 200:
-                            self.__ingester_logger.info(
-                                f"Uploaded info for vehicle with VIN {vehicle.vin} at location {filename}"
-                            )
-                        case _:
-                            self.__ingester_logger.error(
-                                f"Error uploading info for vehicle with VIN {vehicle.vin}: {uploaded['Error']['Message']}"
-                            )
                 except ClientError as e:
                     self.__ingester_logger.error(
                         f"Error uploading info for vehicle with VIN {vehicle.vin}: {e.response['Error']['Message']}"
@@ -334,4 +325,3 @@ class HMIngester:
             f"and {self.refresh_interval}min refresh interval"
         )
         self.__fetch_scheduler.run_all()
-

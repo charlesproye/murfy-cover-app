@@ -21,16 +21,8 @@ class Settings:
     s3_secret: str
     s3_bucket: str
 
-    # Application settings
-    flush_interval_seconds: int = 300  # 5 minutes
-    flush_batch_size: int = 100
-
     # Path settings
     base_s3_path: str = "response/tesla-fleet-telemetry"
-
-    # Compression settings
-    compression_enabled: bool = True
-    compression_retention_days: int = 30
 
 
 def get_settings() -> Settings:
@@ -67,17 +59,17 @@ def get_settings() -> Settings:
     if missing_params:
         raise ValueError(f"Paramètres manquants: {', '.join(missing_params)}")
 
+    # Validate HTTPS endpoint for security compliance (ISO27001)
+    if not s3_endpoint.startswith("https://"):
+        raise ValueError(
+            f"S3_ENDPOINT must use HTTPS protocol to ensure encryption in transit. "
+            f"Got: {s3_endpoint}. Please update to use https://"
+        )
+
     # Paramètres additionnels
     base_s3_path = os.getenv(
         "TESLA_FLEET_S3_BASE_PATH", "response/tesla-fleet-telemetry"
     )
-    flush_interval_seconds = int(os.getenv("TESLA_FLEET_FLUSH_INTERVAL_SECONDS", "300"))
-    flush_batch_size = int(os.getenv("TESLA_FLEET_FLUSH_BATCH_SIZE", "100"))
-    compression_enabled = os.getenv("TESLA_FLEET_COMPRESSION_ENABLED", "1") == "1"
-    compression_retention_days = int(
-        os.getenv("TESLA_FLEET_COMPRESSION_RETENTION_DAYS", "30")
-    )
-
     return Settings(
         kafka_bootstrap_servers=kafka_bootstrap_servers,
         kafka_topic=kafka_topic,
@@ -88,9 +80,4 @@ def get_settings() -> Settings:
         s3_secret=s3_secret,
         s3_bucket=s3_bucket,
         base_s3_path=base_s3_path,
-        flush_interval_seconds=flush_interval_seconds,
-        flush_batch_size=flush_batch_size,
-        compression_enabled=compression_enabled,
-        compression_retention_days=compression_retention_days,
     )
-

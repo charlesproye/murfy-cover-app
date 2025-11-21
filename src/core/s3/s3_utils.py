@@ -2,38 +2,59 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from functools import lru_cache
 from io import BytesIO
 from typing import Any
 
 import boto3
 import joblib
 import pandas as pd
-import pyarrow.parquet as pq
 import yaml
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from pandas import DataFrame as DF
 from pandas import Series
-from pyspark.sql import SparkSession
-from pyspark.sql import types as T
-from pyspark.sql.functions import col
+
+try:
+    from pyspark.sql import SparkSession
+except ImportError:
+    SparkSession = None
 
 from core.config import EMTPY_S3_KEYS_WARNING_MSG, KEY_LIST_COLUMN_NAMES
 from core.pandas_utils import str_split_and_retain_src
 from core.s3.settings import S3Settings
-from core.spark_utils import align_dataframes_for_union
 
 
 class S3Service:
+    """
+    Centralized S3 service with enforced encryption in transit (HTTPS/TLS).
+
+    This service ensures ISO27001 compliance by:
+    - Validating that endpoints use HTTPS protocol
+    - Enforcing SSL/TLS for all connections
+    - Requiring SSL certificate verification
+
+    Use this service for all S3 operations to maintain security standards.
+    """
+
     def __init__(self, settings: S3Settings | None = None):
         settings = settings or S3Settings()
         self._settings = settings
+
+        # Configure boto3 with explicit SSL enforcement
+        boto_config = Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+        )
+
         self._s3_client = boto3.client(
             "s3",
             region_name=settings.S3_REGION,
             endpoint_url=settings.S3_ENDPOINT,
             aws_access_key_id=settings.S3_KEY,
             aws_secret_access_key=settings.S3_SECRET,
+            use_ssl=True,  # Explicitly enforce SSL/TLS
+            verify=True,  # Require SSL certificate verification
+            config=boto_config,
         )
         self.bucket_name = settings.S3_BUCKET
         self.logger = logging.getLogger("S3_BUCKET")
@@ -82,6 +103,10 @@ class S3Service:
         Intended to concatenate existing data and overwrite files already present in scaleway.
         No idea about speed or viability.
         """
+        from pyspark.sql import types as T
+        from pyspark.sql.functions import col
+
+        from core.spark_utils import align_dataframes_for_union
 
         s3_path = f"s3a://{self.bucket_name}/{key}"
 
@@ -226,6 +251,8 @@ class S3Service:
         return Series(keys, dtype="string") if keys else Series(dtype="string")
 
     def read_parquet_df(self, key: str, **kwargs) -> DF:
+        import pyarrow.parquet as pq
+
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
         parquet_bytes = response["Body"].read()  # Convert bytes to a file-like buffer
         parquet_buffer = BytesIO(parquet_bytes)  # Use pyarrow to read the buffer
@@ -529,9 +556,3 @@ class S3Service:
                     files.append(key)
 
         return sorted(folders), sorted(files)
-
-
-@lru_cache
-def get_s3():
-    return S3Service()
-

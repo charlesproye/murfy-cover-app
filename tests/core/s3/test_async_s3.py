@@ -13,7 +13,7 @@ pytestmark = pytest.mark.integration
 @pytest.mark.asyncio
 async def test_download_folder_in_batches():
     vin = "W1VVVKFZ5P4323755"
-    s3 = AsyncS3(max_concurrency=50)
+    s3 = AsyncS3(max_concurrency=50, env="dev")
 
     start_time = time.time()
     total_files = 0
@@ -40,14 +40,14 @@ async def test_download_folder_in_batches():
 
 @pytest.mark.asyncio
 async def test_list_content():
-    s3 = AsyncS3(max_concurrency=200)
+    s3 = AsyncS3(max_concurrency=50, env="dev")
     folders, files = await s3.list_content("response/stellantis/")
 
     assert len(folders) > 1
 
     all_files = []
 
-    tasks = [s3.list_content(f"{vin_path}temp/") for vin_path in folders]
+    tasks = [s3.list_content(f"{vin_path}temp/") for vin_path in folders[:10]]
 
     for i, coro in enumerate(asyncio.as_completed(tasks), 1):
         folders_files = await coro

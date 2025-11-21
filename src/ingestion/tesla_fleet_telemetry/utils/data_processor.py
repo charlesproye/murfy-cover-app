@@ -129,4 +129,3 @@ def extract_value_from_variant(value_container: dict[str, Any]) -> Any:
         return None
     else:
         return None
-

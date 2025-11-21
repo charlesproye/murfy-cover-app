@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import contextlib
 import json
@@ -10,15 +9,13 @@ import warnings
 from datetime import datetime
 from typing import Any
 
-import aiohttp
+import click
 
 # Fix relative imports to use absolute paths
 from ingestion.tesla_fleet_telemetry.config.settings import get_settings
-from ingestion.tesla_fleet_telemetry.core.s3_handler import (
+from ingestion.tesla_fleet_telemetry.services.data_storage import (
     cleanup_clients,
-    force_time_sync,
     save_data_to_s3,
-    sync_time_with_aws,
 )
 from ingestion.tesla_fleet_telemetry.utils.kafka_consumer import KafkaConsumer
 
@@ -33,8 +30,7 @@ logger = logging.getLogger("tesla-fleet-telemetry")
 
 # Shutdown management events
 shutdown_event = asyncio.Event()
-compression_event = asyncio.Event()
-should_exit = asyncio.Event()
+
 
 # Data buffers by VIN
 data_buffers: dict[str, list[dict[str, Any]]] = {}
@@ -50,10 +46,6 @@ FLUSH_INTERVAL_SECONDS = 30
 MAX_VEHICLES_PER_WORKER = 200
 # Maximum number of workers in the pool
 MAX_WORKERS = 50
-# Default compression interval (in seconds)
-DEFAULT_COMPRESSION_INTERVAL = 300
-# Cleanup interval (in seconds)
-CLEANUP_INTERVAL = 86400
 # VIN cleanup interval (in seconds) - remove inactive VINs to prevent memory leak
 VIN_CLEANUP_INTERVAL = 3600  # Check every hour
 VIN_INACTIVE_THRESHOLD = 86400  # Remove VINs inactive for 24 hours
@@ -298,7 +290,9 @@ async def flush_buffer(vin: str) -> bool:
     if vin not in data_buffers or not data_buffers[vin]:
         return True
 
+    # Swap buffer to avoid race condition with add_to_buffer
     buffer_data = data_buffers[vin]
+    data_buffers[vin] = []
     buffer_size = len(buffer_data)
 
     logger.debug(f"Flushing buffer for VIN {vin} ({buffer_size} messages)")
@@ -308,23 +302,28 @@ async def flush_buffer(vin: str) -> bool:
         success = await save_data_to_s3(buffer_data, vin)
 
         if success:
-            # Empty buffer and update timestamp
-            data_buffers[vin] = []
             last_flush_time[vin] = asyncio.get_event_loop().time()
             logger.debug(f"Flush successful for VIN {vin} ({buffer_size} messages)")
             return True
         else:
             logger.error(f"Flush failed for VIN {vin}")
+            # Restore data on failure (putting it back at the start)
+            data_buffers[vin] = buffer_data + data_buffers[vin]
             return False
 
     except Exception as e:
         logger.error(f"Error during buffer flush for VIN {vin}: {e!s}")
+        # Restore data on exception
+        data_buffers[vin] = buffer_data + data_buffers[vin]
         return False
 
 
-async def check_buffer_timeouts():
+async def check_buffer_timeouts(flush_interval: int = FLUSH_INTERVAL_SECONDS):
     """
     Check buffer timeouts and trigger flush if necessary.
+
+    Args:
+        flush_interval: Interval in seconds to trigger a flush
     """
     current_time = asyncio.get_event_loop().time()
     tasks = []
@@ -333,7 +332,7 @@ async def check_buffer_timeouts():
     for vin, last_time in last_flush_time.items():
         # If buffer exceeded flush interval
         if (
-            (current_time - last_time) >= FLUSH_INTERVAL_SECONDS
+            (current_time - last_time) >= flush_interval
             and vin in data_buffers
             and data_buffers[vin]
         ):
@@ -349,6 +348,8 @@ async def check_buffer_timeouts():
             logger.warning(
                 f"Periodic flush: {success_count} successful, {error_count} failed"
             )
+        else:
+            logger.info(f"Periodic flush: {success_count} successful")
 
 
 async def flush_all_buffers():
@@ -458,7 +459,7 @@ async def consume_kafka_data(
         while running:
             await asyncio.sleep(buffer_flush_interval)
             try:
-                await check_buffer_timeouts()
+                await check_buffer_timeouts(buffer_flush_interval)
             except Exception as e:
                 logger.error(f"Error in periodic flush check: {e!s}", exc_info=True)
             if not running:
@@ -507,134 +508,23 @@ async def consume_kafka_data(
         logger.info("Kafka consumer closed")
 
 
-async def main():
+async def run_ingestion(
+    verbose: bool,
+    topic: str,
+    group_id: str,
+    bootstrap_servers: str,
+    auto_offset_reset: str,
+    buffer_flush_interval: int,
+):
     """
-    Main application function.
+    Configure logging, resolve runtime settings, and launch the Kafka consumer.
     """
     try:
-        # Parse command-line arguments
-        parser = argparse.ArgumentParser(
-            description="Tesla Fleet Telemetry - Data Ingestion"
-        )
-        parser.add_argument(
-            "--compress-now",
-            action="store_true",
-            help="Compress data immediately and exit",
-        )
-        parser.add_argument(
-            "--compress-vin", type=str, help="Compress data for a specific VIN and exit"
-        )
-        parser.add_argument(
-            "--deep-compress",
-            action="store_true",
-            help="Perform a deep compression of ALL temp files (can be combined with --compress-vin)",
-        )
-        parser.add_argument(
-            "--batch-size",
-            type=int,
-            default=10,
-            help="Number of vehicles to process in parallel during compression",
-        )
-        parser.add_argument(
-            "--verbose", action="store_true", help="Enable verbose logging (debug)"
-        )
-        parser.add_argument("--topic", type=str, help="Kafka topic to consume")
-        parser.add_argument("--group-id", type=str, help="Kafka consumer group ID")
-        parser.add_argument(
-            "--bootstrap-servers",
-            type=str,
-            help="Kafka bootstrap servers (comma-separated)",
-        )
-        parser.add_argument(
-            "--auto-offset-reset",
-            type=str,
-            choices=["earliest", "latest"],
-            default="latest",
-            help="Starting position (earliest or latest)",
-        )
-        parser.add_argument(
-            "--buffer-flush-interval",
-            type=int,
-            default=30,
-            help="Buffer flush interval in seconds",
-        )
-        parser.add_argument(
-            "--disable-periodic-compression",
-            action="store_true",
-            help="Disable periodic compression",
-        )
-        parser.add_argument(
-            "--compression-interval",
-            type=int,
-            default=300,
-            help="Compression interval in seconds",
-        )
-        parser.add_argument(
-            "--skip-time-sync",
-            action="store_true",
-            help="Skip time synchronization check with AWS",
-        )
-        parser.add_argument(
-            "--force-ntp-sync",
-            action="store_true",
-            help="Force time synchronization with NTP server",
-        )
+        await setup_logging(verbose=verbose)
 
-        args = parser.parse_args()
+        # Validate critical env configuration (raises if missing)
+        get_settings()
 
-        # Logging configuration
-        await setup_logging(verbose=args.verbose)
-
-        # Check time synchronization
-        time_offset = None
-        if args.force_ntp_sync:
-            logger.info("Forcing NTP time synchronization...")
-            time_offset = await force_time_sync()
-            if time_offset is not None:
-                logger.info(
-                    f"Time synchronized with NTP: offset {time_offset:.2f} seconds"
-                )
-            else:
-                logger.warning("NTP time sync failed")
-        elif not args.skip_time_sync:
-            logger.info("Checking time synchronization with AWS...")
-            time_offset = await sync_time_with_aws()
-
-        # Show time offset warning if significant
-        if time_offset is not None and abs(time_offset) > 30:
-            logger.warning("⚠️ TIME SYNCHRONIZATION ISSUE DETECTED ⚠️")
-            logger.warning(
-                f"System time is {abs(time_offset):.2f} seconds {'behind' if time_offset > 0 else 'ahead of'} reference time"
-            )
-            logger.warning("This may cause RequestTimeTooSkewed errors.")
-
-            # More serious warning for large offsets
-            if abs(time_offset) > 300:  # 5 minutes
-                logger.warning(
-                    "⚠️⚠️⚠️ CRITICAL TIME DIFFERENCE! Over 5 minutes offset! ⚠️⚠️⚠️"
-                )
-                logger.warning(
-                    "You should synchronize your system time: sudo ntpdate pool.ntp.org"
-                )
-
-            logger.warning("Processing will continue with automatic retry mechanisms.")
-            logger.warning("------------------------------------------")
-        elif time_offset is not None:
-            logger.info(
-                f"Time offset: {time_offset:.2f} seconds (within acceptable range)"
-            )
-
-        # Default configuration
-        settings = get_settings()
-
-        # Use command-line arguments or default values
-        topic = args.topic or settings.kafka_topic
-        group_id = args.group_id or settings.kafka_group_id
-        bootstrap_servers = args.bootstrap_servers or settings.kafka_bootstrap_servers
-        auto_offset_reset = args.auto_offset_reset
-        buffer_flush_interval = args.buffer_flush_interval
-
-        # Start Kafka consumption
         await consume_kafka_data(
             topic=topic,
             group_id=group_id,
@@ -647,33 +537,83 @@ async def main():
         logger.info("Keyboard interruption detected")
     except Exception as e:
         logger.error(f"Unhandled error: {e!s}", exc_info=True)
+        raise
     finally:
-        # Ensure shutdown event is set
+        try:
+            await graceful_shutdown()
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e!s}", exc_info=True)
         shutdown_event.set()
         logger.info("Program terminated")
-
-        # Force exit after 1 second
         logger.debug("Process ending in 1 second...")
         time.sleep(1)
-        sys.exit(0)
+
+
+@click.command()
+@click.option(
+    "--topic",
+    type=str,
+    default="tesla_V",
+    show_default=True,
+    envvar=("TESLA_FLEET_KAFKA_TOPIC", "KAFKA_TOPIC"),
+    help="Kafka topic to consume",
+)
+@click.option(
+    "--group-id",
+    type=str,
+    default="tesla-fleet-telemetry-consumer",
+    show_default=True,
+    envvar=("TESLA_FLEET_KAFKA_GROUP_ID", "KAFKA_GROUP_ID"),
+    help="Kafka consumer group ID",
+)
+@click.option(
+    "--bootstrap-servers",
+    type=str,
+    envvar=("TESLA_FLEET_KAFKA_BOOTSTRAP_SERVERS", "KAFKA_BOOTSTRAP_SERVERS"),
+    help="Kafka bootstrap servers (comma-separated)",
+)
+@click.option(
+    "--auto-offset-reset",
+    type=click.Choice(["earliest", "latest"], case_sensitive=False),
+    default="latest",
+    show_default=True,
+    help="Starting offset position",
+)
+@click.option(
+    "--buffer-flush-interval",
+    type=int,
+    default=FLUSH_INTERVAL_SECONDS,
+    show_default=True,
+    help="Buffer flush interval in seconds",
+)
+@click.option(
+    "--verbose",
+    is_flag=True,
+    default=False,
+    help="Enable verbose (debug) logging",
+)
+def cli(
+    topic: str | None,
+    group_id: str | None,
+    bootstrap_servers: str | None,
+    auto_offset_reset: str,
+    buffer_flush_interval: int,
+    verbose: bool,
+):
+    """
+    Tesla Fleet Telemetry ingestion service.
+    """
+    asyncio.run(
+        run_ingestion(
+            verbose=verbose,
+            topic=topic,
+            group_id=group_id,
+            bootstrap_servers=bootstrap_servers,
+            auto_offset_reset=auto_offset_reset.lower(),
+            buffer_flush_interval=buffer_flush_interval,
+        )
+    )
 
 
 if __name__ == "__main__":
-    try:
-        # Configure aiohttp to avoid the unclosed client session error
-        if hasattr(aiohttp, "ClientSession"):
-            original_init = aiohttp.ClientSession.__init__
-
-            def patched_init(self, *args, **kwargs):
-                kwargs["connector_owner"] = False  # Avoid connector warning
-                return original_init(self, *args, **kwargs)
-
-            aiohttp.ClientSession.__init__ = patched_init
-
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Interruption during startup")
-        sys.exit(0)
-    except Exception as e:
-        logger.error(f"Fatal error: {e!s}", exc_info=True)
-        sys.exit(1)
+    cli()

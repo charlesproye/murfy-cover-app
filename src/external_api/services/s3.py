@@ -1,31 +1,68 @@
-import boto3
+"""
+External API S3 service using centralized S3Service.
+
+This module provides S3 functionality for the external API,
+using the centralized S3Service from core for security and consistency.
+"""
+
+from functools import lru_cache
+
+from botocore.exceptions import ClientError
 from fastapi import HTTPException
 
+from core.s3.s3_utils import S3Service
+from core.s3.settings import S3Settings
 from external_api.core.config import settings
 
-# INITIALISATION
-# --------------------------------
 
-S3_KEY_FORM = settings.S3_KEY
-S3_SECRET_FORM = settings.S3_SECRET
-S3_ENDPOINT = settings.S3_ENDPOINT
-S3_BUCKET = settings.S3_BUCKET
+@lru_cache
+def _get_s3_service() -> S3Service:
+    """Get or create the S3Service instance (singleton pattern)."""
+    s3_settings = S3Settings(
+        S3_ENDPOINT=settings.S3_ENDPOINT,
+        S3_REGION=getattr(
+            settings, "S3_REGION", "fr-par"
+        ),  # Default to fr-par if not set
+        S3_BUCKET=settings.S3_BUCKET,
+        S3_KEY=settings.S3_KEY,
+        S3_SECRET=settings.S3_SECRET,
+    )
+    return S3Service(s3_settings)
 
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=S3_ENDPOINT,
-    aws_access_key_id=S3_KEY_FORM,
-    aws_secret_access_key=S3_SECRET_FORM,
-)
+
+# Backward compatibility: expose underlying boto3 client
+# Some code expects to import s3_client directly
+@lru_cache
+def _get_s3_client():
+    """Get the underlying boto3 S3 client for backward compatibility."""
+    return _get_s3_service()._s3_client
+
+
+# Export for backward compatibility
+s3_client = _get_s3_client()
 
 
 # GET FILE URLS
 # --------------------------------
-def get_file_url(file_full_path: str):
+def get_file_url(file_full_path: str) -> str:
+    """
+    Generate a presigned URL for downloading a file from S3.
+
+    Args:
+        file_full_path: S3 key (path) to the file
+
+    Returns:
+        Presigned URL string
+
+    Raises:
+        Exception: If URL generation fails
+    """
     try:
-        return s3_client.generate_presigned_url(
+        s3 = _get_s3_service()
+        # Use the underlying boto3 client for presigned URL generation
+        return s3._s3_client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": S3_BUCKET, "Key": file_full_path},
+            Params={"Bucket": s3.bucket_name, "Key": file_full_path},
             ExpiresIn=3600,
         )
     except Exception as e:
@@ -34,17 +71,29 @@ def get_file_url(file_full_path: str):
 
 # UPLOAD FILES
 # --------------------------------
-def upload_file_to_s3(file_path, file_content):
-    try:
-        response = s3_client.put_object(
-            Bucket=S3_BUCKET, Key=file_path, Body=file_content
-        )
-        # Check if the upload was successful by looking for HTTPStatusCode 200
-        if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
-            return response
-        else:
-            raise HTTPException(status_code=500, detail="Failed to upload file to S3")
+def upload_file_to_s3(file_path: str, file_content: bytes):
+    """
+    Upload a file to S3.
 
+    Args:
+        file_path: S3 key (path) where the file should be stored
+        file_content: File content as bytes
+
+    Returns:
+        Response from S3
+
+    Raises:
+        HTTPException: If upload fails
+    """
+    try:
+        s3 = _get_s3_service()
+        s3.store_object(file_content, file_path)
+        # Return a success response for backward compatibility
+        return {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error uploading file to s3: {e!s}"
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error uploading file to s3: {e!s}"
@@ -54,10 +103,24 @@ def upload_file_to_s3(file_path, file_content):
 # DELETE FILES
 # --------------------------------
 def delete_file_in_s3(full_path: str):
+    """
+    Delete a file from S3.
+
+    Args:
+        full_path: S3 key (path) to the file to delete
+
+    Raises:
+        HTTPException: If deletion fails
+    """
     try:
-        s3_client.delete_object(Bucket=S3_BUCKET, Key=full_path)
+        s3 = _get_s3_service()
+        # Use the underlying boto3 client for deletion
+        s3._s3_client.delete_object(Bucket=s3.bucket_name, Key=full_path)
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error deleting file in s3: {e!s}"
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error deleting file in s3: {e!s}"
         ) from e
-

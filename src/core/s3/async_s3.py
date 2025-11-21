@@ -7,27 +7,69 @@ from typing import Any, TypeVar
 
 import aioboto3
 import yaml
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from types_aiobotocore_s3.client import S3Client as AsyncS3Client
 
-from .settings import get_s3_settings
+from .settings import S3Settings, get_s3_settings
 
 T = TypeVar("T")
 
 
 class AsyncS3:
-    def __init__(self, env: str = "prod", max_concurrency: int = 200):
-        settings = get_s3_settings(env)
-        self._settings = settings
+    """
+    Asynchronous S3 client with enforced encryption in transit (HTTPS/TLS).
+
+    This service ensures ISO27001 compliance by:
+    - Validating that endpoints use HTTPS protocol
+    - Enforcing SSL/TLS for all connections
+    - Requiring SSL certificate verification
+
+    Use this service for all async S3 operations to maintain security standards.
+    """
+
+    def __init__(
+        self,
+        env: str = "prod",
+        max_concurrency: int = 200,
+        custom_config: Config | None = None,
+        settings: S3Settings | None = None,
+    ):
+        """
+        Initialize AsyncS3 client.
+
+        Args:
+            env: Environment to use ("prod" or "dev"), ignored if settings provided
+            max_concurrency: Maximum number of concurrent S3 operations
+            custom_config: Optional custom boto3 Config for specialized use cases
+                         (e.g., disabling checksum validation for specific providers)
+            settings: Optional S3Settings instance for custom configuration
+        """
+        if settings is not None:
+            self._settings = settings
+        else:
+            self._settings = get_s3_settings(env)
+
         self.session = aioboto3.Session(
-            aws_access_key_id=settings.S3_KEY,
-            aws_secret_access_key=settings.S3_SECRET,
-            region_name=settings.S3_REGION,
+            aws_access_key_id=self._settings.S3_KEY,
+            aws_secret_access_key=self._settings.S3_SECRET,
+            region_name=self._settings.S3_REGION,
         )
-        self.bucket = settings.S3_BUCKET
+        self.bucket = self._settings.S3_BUCKET
         self.max_concurrency = max_concurrency
         self._sem = asyncio.Semaphore(max_concurrency)
         self.logger = logging.getLogger("AsyncS3")
+
+        # Use custom config if provided, otherwise use default secure config
+        if custom_config is not None:
+            self._boto_config = custom_config
+        else:
+            # Configure boto3 with explicit SSL enforcement
+            self._boto_config = Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},
+                max_pool_connections=max_concurrency,
+            )
 
     @asynccontextmanager
     async def _client(self) -> AsyncGenerator[AsyncS3Client, None]:
@@ -37,6 +79,9 @@ class AsyncS3:
             endpoint_url=self._settings.S3_ENDPOINT,
             aws_access_key_id=self._settings.S3_KEY,
             aws_secret_access_key=self._settings.S3_SECRET,
+            use_ssl=True,  # Explicitly enforce SSL/TLS
+            verify=True,  # Require SSL certificate verification
+            config=self._boto_config,
         ) as client:
             yield client
 
@@ -89,7 +134,7 @@ class AsyncS3:
         """Optimized download using single client with proper concurrency control"""
         results: dict[str, bytes] = {}
 
-        async with self._sem, self._client() as client:
+        async with self._client() as client:
 
             async def download_single(key: str):
                 async with self._sem:
@@ -112,6 +157,28 @@ class AsyncS3:
     async def upload_file(self, path: str, file: bytes) -> None:
         async with self._sem, self._client() as client:
             await client.put_object(Bucket=self.bucket, Key=path, Body=file)
+
+    async def upload_files(self, files: dict[str, bytes]) -> list[Any]:
+        """
+        Upload multiple files using a single client session.
+
+        Args:
+            files: Dictionary mapping S3 keys to file contents (bytes)
+
+        Returns:
+            List of results/exceptions from the upload operations
+        """
+        async with self._client() as client:
+
+            async def upload_single(key: str, body: bytes):
+                async with self._sem:
+                    await client.put_object(Bucket=self.bucket, Key=key, Body=body)
+
+            tasks = [upload_single(key, body) for key, body in files.items()]
+            if not tasks:
+                return []
+
+            return await asyncio.gather(*tasks, return_exceptions=True)
 
     async def delete_file(self, path: str) -> bool:
         async with self._sem, self._client() as client:

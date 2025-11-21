@@ -342,4 +342,3 @@ class KafkaConsumer:
                 )
             finally:
                 self.consumer = None
-
