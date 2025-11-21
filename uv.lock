@@ -2,7 +2,8 @@ version = 1
 revision = 3
 requires-python = ">=3.11, <3.14"
 resolution-markers = [
-    "python_full_version >= '3.12'",
+    "python_full_version >= '3.13'",
+    "python_full_version == '3.12.*'",
     "python_full_version < '3.12'",
 ]
 
@@ -1231,6 +1232,17 @@ scraping = [
     { name = "selenium" },
     { name = "tqdm" },
 ]
+scraping-playwright = [
+    { name = "google-api-python-client" },
+    { name = "google-auth" },
+    { name = "gspread" },
+    { name = "lxml" },
+    { name = "oauth2client" },
+    { name = "playwright" },
+    { name = "psycopg2-binary" },
+    { name = "pypdf2" },
+    { name = "pyyaml" },
+]
 transform = [
     { name = "apscheduler" },
     { name = "asyncpg" },
@@ -1307,17 +1319,21 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'ingestion'", specifier = ">=0.120" },
     { name = "fastapi", marker = "extra == 'visualization'", specifier = ">=0.100.0" },
     { name = "fastapi-pagination", marker = "extra == 'external-api'", specifier = ">=0.14" },
+    { name = "google-api-python-client", marker = "extra == 'scraping-playwright'", specifier = ">=2.157.0" },
     { name = "google-auth", marker = "extra == 'scraping'", specifier = ">=2.24.0" },
+    { name = "google-auth", marker = "extra == 'scraping-playwright'", specifier = ">=2.24.0" },
     { name = "greenlet", marker = "extra == 'external-api'", specifier = ">=2.0.1" },
     { name = "gspread", marker = "extra == 'activation'" },
     { name = "gspread", marker = "extra == 'external-api'", specifier = ">=6.1.4" },
     { name = "gspread", marker = "extra == 'load'" },
     { name = "gspread", marker = "extra == 'results'" },
     { name = "gspread", marker = "extra == 'scraping'" },
+    { name = "gspread", marker = "extra == 'scraping-playwright'" },
     { name = "gspread", marker = "extra == 'visualization'" },
     { name = "joblib", specifier = ">=1.5.2" },
     { name = "joblib", marker = "extra == 'external-api'", specifier = ">=1.3.2" },
     { name = "lxml", marker = "extra == 'scraping'", specifier = ">=6.0.1" },
+    { name = "lxml", marker = "extra == 'scraping-playwright'", specifier = ">=6.0.1" },
     { name = "matplotlib", marker = "extra == 'eda'", specifier = ">=3.10" },
     { name = "minio", marker = "extra == 'transform'", specifier = ">=7.1.13" },
     { name = "msgspec", specifier = ">=0.19.0" },
@@ -1328,10 +1344,12 @@ requires-dist = [
     { name = "oauth2client", marker = "extra == 'load'" },
     { name = "oauth2client", marker = "extra == 'results'" },
     { name = "oauth2client", marker = "extra == 'scraping'" },
+    { name = "oauth2client", marker = "extra == 'scraping-playwright'" },
     { name = "orjson", marker = "extra == 'ingestion'", specifier = ">=3.11" },
     { name = "pandas", specifier = ">=2.2.2" },
     { name = "pandas", marker = "extra == 'external-api'", specifier = ">=2.2" },
     { name = "passlib", extras = ["bcrypt"], marker = "extra == 'external-api'", specifier = ">=1.7.4" },
+    { name = "playwright", marker = "extra == 'scraping-playwright'", specifier = ">=1.49.0" },
     { name = "plotly", marker = "extra == 'eda'", specifier = ">=6.4.0" },
     { name = "plotly", marker = "extra == 'results'", specifier = ">=6.4.0" },
     { name = "plotly", marker = "extra == 'visualization'", specifier = ">=5.19.0" },
@@ -1340,6 +1358,7 @@ requires-dist = [
     { name = "psycopg2-binary", marker = "extra == 'ingestion'", specifier = ">=2.9.9" },
     { name = "psycopg2-binary", marker = "extra == 'load'", specifier = ">=2.9.9" },
     { name = "psycopg2-binary", marker = "extra == 'results'", specifier = ">=2.9.9" },
+    { name = "psycopg2-binary", marker = "extra == 'scraping-playwright'", specifier = ">=2.9.9" },
     { name = "psycopg2-binary", marker = "extra == 'transform'", specifier = ">=2.9.9" },
     { name = "psycopg2-binary", marker = "extra == 'visualization'", specifier = ">=2.9.9" },
     { name = "pyarrow", marker = "extra == 'eda'", specifier = ">=22.0.0" },
@@ -1353,6 +1372,7 @@ requires-dist = [
     { name = "pydantic-settings", marker = "extra == 'visualization'", specifier = ">=2.11" },
     { name = "pyjwt", marker = "extra == 'ingestion'" },
     { name = "pypdf2", marker = "extra == 'scraping'", specifier = ">=3.0.1" },
+    { name = "pypdf2", marker = "extra == 'scraping-playwright'", specifier = ">=3.0.1" },
     { name = "pyspark", marker = "extra == 'external-api'", specifier = ">=3.5.5" },
     { name = "pyspark", marker = "extra == 'results'", specifier = ">=4.0.1" },
     { name = "pyspark", marker = "extra == 'visualization'", specifier = ">=3.4.0" },
@@ -1364,6 +1384,7 @@ requires-dist = [
     { name = "python-multipart", marker = "extra == 'ingestion'", specifier = ">=0.0.18" },
     { name = "pyyaml", marker = "extra == 'ingestion'", specifier = ">=6.0" },
     { name = "pyyaml", marker = "extra == 'results'", specifier = ">=6.0" },
+    { name = "pyyaml", marker = "extra == 'scraping-playwright'", specifier = ">=6.0" },
     { name = "pyyaml", marker = "extra == 'transform'", specifier = ">=6.0" },
     { name = "pyyaml", marker = "extra == 'visualization'", specifier = ">=6.0" },
     { name = "rapidfuzz", marker = "extra == 'activation'", specifier = ">=3.13.0" },
@@ -1401,7 +1422,7 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'ingestion'" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'external-api'", specifier = ">=0.23.2" },
 ]
-provides-extras = ["activation", "transform", "eda", "load", "results", "ingestion", "scraping", "external-api", "migrations", "visualization", "orchestration"]
+provides-extras = ["activation", "transform", "eda", "load", "results", "ingestion", "scraping", "scraping-playwright", "external-api", "migrations", "visualization", "orchestration"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1750,6 +1771,38 @@ wheels = [
 ]
 
 [[package]]
+name = "google-api-core"
+version = "2.28.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-auth" },
+    { name = "googleapis-common-protos" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/61/da/83d7043169ac2c8c7469f0e375610d78ae2160134bf1b80634c482fa079c/google_api_core-2.28.1.tar.gz", hash = "sha256:2b405df02d68e68ce0fbc138559e6036559e685159d148ae5861013dc201baf8", size = 176759, upload-time = "2025-10-28T21:34:51.529Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ed/d4/90197b416cb61cefd316964fd9e7bd8324bcbafabf40eef14a9f20b81974/google_api_core-2.28.1-py3-none-any.whl", hash = "sha256:4021b0f8ceb77a6fb4de6fde4502cecab45062e66ff4f2895169e0b35bc9466c", size = 173706, upload-time = "2025-10-28T21:34:50.151Z" },
+]
+
+[[package]]
+name = "google-api-python-client"
+version = "2.187.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-core" },
+    { name = "google-auth" },
+    { name = "google-auth-httplib2" },
+    { name = "httplib2" },
+    { name = "uritemplate" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/83/60cdacf139d768dd7f0fcbe8d95b418299810068093fdf8228c6af89bb70/google_api_python_client-2.187.0.tar.gz", hash = "sha256:e98e8e8f49e1b5048c2f8276473d6485febc76c9c47892a8b4d1afa2c9ec8278", size = 14068154, upload-time = "2025-11-06T01:48:53.274Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/58/c1e716be1b055b504d80db2c8413f6c6a890a6ae218a65f178b63bc30356/google_api_python_client-2.187.0-py3-none-any.whl", hash = "sha256:d8d0f6d85d7d1d10bdab32e642312ed572bdc98919f72f831b44b9a9cebba32f", size = 14641434, upload-time = "2025-11-06T01:48:50.763Z" },
+]
+
+[[package]]
 name = "google-auth"
 version = "2.43.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1761,6 +1814,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ff/ef/66d14cf0e01b08d2d51ffc3c20410c4e134a1548fc246a6081eae585a4fe/google_auth-2.43.0.tar.gz", hash = "sha256:88228eee5fc21b62a1b5fe773ca15e67778cb07dc8363adcb4a8827b52d81483", size = 296359, upload-time = "2025-11-06T00:13:36.587Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6f/d1/385110a9ae86d91cc14c5282c61fe9f4dc41c0b9f7d423c6ad77038c4448/google_auth-2.43.0-py2.py3-none-any.whl", hash = "sha256:af628ba6fa493f75c7e9dbe9373d148ca9f4399b5ea29976519e0a3848eddd16", size = 223114, upload-time = "2025-11-06T00:13:35.209Z" },
+]
+
+[[package]]
+name = "google-auth-httplib2"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-auth" },
+    { name = "httplib2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e0/83/7ef576d1c7ccea214e7b001e69c006bc75e058a3a1f2ab810167204b698b/google_auth_httplib2-0.2.1.tar.gz", hash = "sha256:5ef03be3927423c87fb69607b42df23a444e434ddb2555b73b3679793187b7de", size = 11086, upload-time = "2025-10-30T21:13:16.569Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/44/a7/ca23dd006255f70e2bc469d3f9f0c82ea455335bfd682ad4d677adc435de/google_auth_httplib2-0.2.1-py3-none-any.whl", hash = "sha256:1be94c611db91c01f9703e7f62b0a59bbd5587a95571c7b6fade510d648bc08b", size = 9525, upload-time = "2025-10-30T21:13:15.758Z" },
 ]
 
 [[package]]
@@ -3037,6 +3103,25 @@ wheels = [
 ]
 
 [[package]]
+name = "playwright"
+version = "1.56.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "greenlet" },
+    { name = "pyee" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/31/a5362cee43f844509f1f10d8a27c9cc0e2f7bdce5353d304d93b2151c1b1/playwright-1.56.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:b33eb89c516cbc6723f2e3523bada4a4eb0984a9c411325c02d7016a5d625e9c", size = 40611424, upload-time = "2025-11-11T18:39:10.175Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/95/347eef596d8778fb53590dc326c344d427fa19ba3d42b646fce2a4572eb3/playwright-1.56.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:b228b3395212b9472a4ee5f1afe40d376eef9568eb039fcb3e563de8f4f4657b", size = 39400228, upload-time = "2025-11-11T18:39:13.915Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/54/6ad97b08b2ca1dfcb4fbde4536c4f45c0d9d8b1857a2d20e7bbfdf43bf15/playwright-1.56.0-py3-none-macosx_11_0_universal2.whl", hash = "sha256:0ef7e6fd653267798a8a968ff7aa2dcac14398b7dd7440ef57524e01e0fbbd65", size = 40611424, upload-time = "2025-11-11T18:39:17.093Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/76/6d409e37e82cdd5dda3df1ab958130ae32b46e42458bd4fc93d7eb8749cb/playwright-1.56.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:404be089b49d94bc4c1fe0dfb07664bda5ffe87789034a03bffb884489bdfb5c", size = 46263122, upload-time = "2025-11-11T18:39:20.619Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/84/fb292cc5d45f3252e255ea39066cd1d2385c61c6c1596548dfbf59c88605/playwright-1.56.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:64cda7cf4e51c0d35dab55190841bfcdfb5871685ec22cb722cd0ad2df183e34", size = 46110645, upload-time = "2025-11-11T18:39:24.005Z" },
+    { url = "https://files.pythonhosted.org/packages/61/bd/8c02c3388ae14edc374ac9f22cbe4e14826c6a51b2d8eaf86e89fabee264/playwright-1.56.0-py3-none-win32.whl", hash = "sha256:d87b79bcb082092d916a332c27ec9732e0418c319755d235d93cc6be13bdd721", size = 35639837, upload-time = "2025-11-11T18:39:27.174Z" },
+    { url = "https://files.pythonhosted.org/packages/64/27/f13b538fbc6b7a00152f4379054a49f6abc0bf55ac86f677ae54bc49fb82/playwright-1.56.0-py3-none-win_amd64.whl", hash = "sha256:3c7fc49bb9e673489bf2622855f9486d41c5101bbed964638552b864c4591f94", size = 35639843, upload-time = "2025-11-11T18:39:30.851Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/c7/3ee8b556107995846576b4fe42a08ed49b8677619421f2afacf6ee421138/playwright-1.56.0-py3-none-win_arm64.whl", hash = "sha256:2745490ae8dd58d27e5ea4d9aa28402e8e2991eb84fb4b2fd5fbde2106716f6f", size = 31248959, upload-time = "2025-11-11T18:39:33.998Z" },
+]
+
+[[package]]
 name = "plotly"
 version = "6.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3137,6 +3222,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/48/f0/615c30622316496d2cbbc29f5985f7777d3ada70f23370608c1d3e081c1f/propcache-0.4.1-cp313-cp313t-win_amd64.whl", hash = "sha256:f7ee0e597f495cf415bcbd3da3caa3bd7e816b74d0d52b8145954c5e6fd3ff37", size = 44897, upload-time = "2025-10-08T19:47:48.336Z" },
     { url = "https://files.pythonhosted.org/packages/fd/ca/6002e46eccbe0e33dcd4069ef32f7f1c9e243736e07adca37ae8c4830ec3/propcache-0.4.1-cp313-cp313t-win_arm64.whl", hash = "sha256:929d7cbe1f01bb7baffb33dc14eb5691c95831450a26354cd210a8155170c93a", size = 39789, upload-time = "2025-10-08T19:47:49.876Z" },
     { url = "https://files.pythonhosted.org/packages/5b/5a/bc7b4a4ef808fa59a816c17b20c4bef6884daebbdf627ff2a161da67da19/propcache-0.4.1-py3-none-any.whl", hash = "sha256:af2a6052aeb6cf17d3e46ee169099044fd8224cbaf75c76a2ef596e8163e2237", size = 13305, upload-time = "2025-10-08T19:49:00.792Z" },
+]
+
+[[package]]
+name = "proto-plus"
+version = "1.26.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f4/ac/87285f15f7cce6d4a008f33f1757fb5a13611ea8914eb58c3d0d26243468/proto_plus-1.26.1.tar.gz", hash = "sha256:21a515a4c4c0088a773899e23c7bbade3d18f9c66c73edd4c7ee3816bc96a012", size = 56142, upload-time = "2025-03-10T15:54:38.843Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4e/6d/280c4c2ce28b1593a19ad5239c8b826871fc6ec275c21afc8e1820108039/proto_plus-1.26.1-py3-none-any.whl", hash = "sha256:13285478c2dcf2abb829db158e1047e2f1e8d63a077d94263c2b88b043c75a66", size = 50163, upload-time = "2025-03-10T15:54:37.335Z" },
 ]
 
 [[package]]
@@ -3467,6 +3564,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/ca/40e14e196864a0f61a92abb14d09b3d3da98f94ccb03b49cf51688140dab/pydeck-0.9.1.tar.gz", hash = "sha256:f74475ae637951d63f2ee58326757f8d4f9cd9f2a457cf42950715003e2cb605", size = 3832240, upload-time = "2024-05-10T15:36:21.153Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/4c/b888e6cf58bd9db9c93f40d1c6be8283ff49d88919231afe93a6bcf61626/pydeck-0.9.1-py2.py3-none-any.whl", hash = "sha256:b3f75ba0d273fc917094fa61224f3f6076ca8752b93d46faf3bcfd9f9d59b038", size = 6900403, upload-time = "2024-05-10T15:36:17.36Z" },
+]
+
+[[package]]
+name = "pyee"
+version = "13.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/95/03/1fd98d5841cd7964a27d729ccf2199602fe05eb7a405c1462eb7277945ed/pyee-13.0.0.tar.gz", hash = "sha256:b391e3c5a434d1f5118a25615001dbc8f669cf410ab67d04c4d4e07c55481c37", size = 31250, upload-time = "2025-03-17T18:53:15.955Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9b/4d/b9add7c84060d4c1906abe9a7e5359f2a60f7a9a4f67268b2766673427d8/pyee-13.0.0-py3-none-any.whl", hash = "sha256:48195a3cddb3b1515ce0695ed76036b5ccc2ef3a9f963ff9f77aec0139845498", size = 15730, upload-time = "2025-03-17T18:53:14.532Z" },
 ]
 
 [[package]]

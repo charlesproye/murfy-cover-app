@@ -50,6 +50,16 @@ services:
       - ./.env
       - ./.python.env
 
+  premium_report_service:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: docker/premium_report.Dockerfile
+    image: rg.fr-par.scw.cloud/data-engineering/premium_report:latest
+    container_name: premium_report
+    env_file:
+      - ./.env
+
   results_service:
     platform: linux/amd64
     build:

@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: res-generating-reports
+  namespace: data-engineering
+spec:
+  schedule: "0 0 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: res-generating-reports
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: res-generating-reports-1
+              image: rg.fr-par.scw.cloud/data-engineering/premium_report:latest
+              imagePullPolicy: Always
+              command: ["python", "src/reports/main.py"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop:
+                    - ALL
+              envFrom:
+                - secretRef:
+                    name: db-data-ev-secret
+                - secretRef:
+                    name: google-secret
+                - secretRef:
+                    name: vw-secret
+                - secretRef:
+                    name: get-ev-account-secret
+                - secretRef:
+                    name: s3-secret
+              env:
+                - name: CLIENT_FOLDER_ID
+                  value: "1DeFkOqD5a5j-gKsBe_PbCL73mpoI2B6x"
+                - name: S3_BUCKET
+                  value: "bib-premium-reports"
+              resources:
+                limits:
+                  memory: "2Gi"
+                  cpu: "1"
+                requests:
+                  memory: "2Gi"
+                  cpu: "1"

@@ -114,6 +114,19 @@ scraping = [
     "lxml>=6.0.1",
 ]
 
+# Scraping module dependencies
+scraping_playwright = [
+    "google-auth>=2.24.0",
+    "gspread",
+    "oauth2client",
+    "PyPDF2>=3.0.1",
+    "lxml>=6.0.1",
+    "playwright>=1.49.0",
+    "google-api-python-client>=2.157.0",
+    "pyyaml>=6.0",
+    "psycopg2-binary>=2.9.9",
+]
+
 external_api = [
     "bcrypt>=3.2.2",
     "fastapi>=0.120",

@@ -34,6 +34,7 @@ class AsyncS3:
         max_concurrency: int = 200,
         custom_config: Config | None = None,
         settings: S3Settings | None = None,
+        bucket: str | None = None,
     ):
         """
         Initialize AsyncS3 client.
@@ -55,7 +56,12 @@ class AsyncS3:
             aws_secret_access_key=self._settings.S3_SECRET,
             region_name=self._settings.S3_REGION,
         )
-        self.bucket = self._settings.S3_BUCKET
+
+        if bucket:
+            self.bucket = bucket
+        else:
+            self.bucket = self._settings.S3_BUCKET
+
         self.max_concurrency = max_concurrency
         self._sem = asyncio.Semaphore(max_concurrency)
         self.logger = logging.getLogger("AsyncS3")
@@ -259,6 +265,13 @@ class AsyncS3:
         except Exception as e:
             self.logger.error(f"Erreur de lecture du fichier YAML {path} : {e}")
             raise
+
+    async def get_presigned_url(self, path: str) -> str:
+        async with self._client() as client:
+            return await client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket, "Key": path},
+            )
 
 
 def get_async_s3() -> AsyncS3:
