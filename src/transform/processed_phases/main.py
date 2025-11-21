@@ -1,11 +1,10 @@
 import logging
-import os
-import sys
 
 import click
+from dagster_pipes import open_dagster_pipes
 
-from core.s3.settings import S3Settings
-from core.spark_utils import create_spark_session, create_spark_session_k8s
+from core.models.make import MakeEnum
+from transform.base_spark import BaseSpark
 from transform.processed_phases.providers.bmw import BMWRawTsToProcessedPhases
 from transform.processed_phases.providers.ford import FordRawTsToProcessedPhases
 from transform.processed_phases.providers.kia import KiaRawTsToProcessedPhases
@@ -22,69 +21,82 @@ from transform.processed_phases.providers.tesla_fleet_telemetry import (
 from transform.processed_phases.providers.volvo import VolvoRawTsToProcessedPhases
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
 
-PROVIDERS = {
-    "bmw": BMWRawTsToProcessedPhases,
-    "mercedes-benz": MercedesBenzRawTsToProcessedPhases,
-    "renault": RenaultRawTsToProcessedPhases,
-    "volvo-cars": VolvoRawTsToProcessedPhases,
-    "stellantis": StellantisRawTsToProcessedPhases,
-    "kia": KiaRawTsToProcessedPhases,
-    "ford": FordRawTsToProcessedPhases,
-    "tesla-fleet-telemetry": TeslaFTRawTsToProcessedPhases,
-    "volkswagen": RawTsToProcessedPhases,
+PROVIDERS: dict[MakeEnum, type[RawTsToProcessedPhases]] = {
+    MakeEnum.bmw: BMWRawTsToProcessedPhases,
+    MakeEnum.mercedes_benz: MercedesBenzRawTsToProcessedPhases,
+    MakeEnum.renault: RenaultRawTsToProcessedPhases,
+    MakeEnum.volvo_cars: VolvoRawTsToProcessedPhases,
+    MakeEnum.stellantis: StellantisRawTsToProcessedPhases,
+    MakeEnum.kia: KiaRawTsToProcessedPhases,
+    MakeEnum.ford: FordRawTsToProcessedPhases,
+    MakeEnum.tesla_fleet_telemetry: TeslaFTRawTsToProcessedPhases,
+    MakeEnum.volkswagen: RawTsToProcessedPhases,
 }
 
 
-@click.group()
-def cli():
-    pass
+class RawTsToProcessedPhasesCLI(BaseSpark):
+    def __init__(self):
+        super().__init__(
+            name="raw-ts-to-processed-phases",
+            help="Convert raw TSS to processed phases",
+        )
 
-
-@cli.command()
-@click.argument("make", required=False)
-@click.option(
-    "--all",
-    "run_all",
-    is_flag=True,
-    help="Execute the processing for all makes",
-)
-def run(make: str, run_all: bool):
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
+    @click.argument("make", required=False)
+    @click.option(
+        "--all",
+        "run_all",
+        is_flag=True,
+        help="Convert all makes",
     )
+    def run(self, make: str, run_all: bool):
+        """
+        Run the conversion of raw TSS to processed phases.
+        """
+        if not run_all:
+            if not make:
+                raise click.UsageError("Please specify a make or use --all.")
+            make = make.lower()
+            try:
+                make_enum = MakeEnum(make)
+            except ValueError as err:
+                raise click.BadParameter(f"Unknown make: {make}") from err
+            if make_enum not in PROVIDERS:
+                raise click.BadParameter(f"Unknown make: {make}")
 
-    settings = S3Settings()
-    is_k8s = os.getenv("KUBERNETES_SERVICE_HOST") is not None
+        with open_dagster_pipes() as pipes:
+            if run_all:
+                for make_name, parser_class in PROVIDERS.items():
+                    logger = logging.getLogger(f"RawTsToProcessedPhases[{make_name}]")
+                    parser_class(
+                        make=make_name,
+                        spark=self.spark,
+                        logger=logger,
+                        force_update=True,
+                        pipes=pipes,
+                    ).run()
+            else:
+                logger = logging.getLogger(f"RawTsToProcessedPhases[{make}]")
+                PROVIDERS[make_enum](
+                    make=make_enum,
+                    spark=self.spark,
+                    logger=logger,
+                    force_update=True,
+                    pipes=pipes,
+                ).run()
 
-    if is_k8s:
-        spark = create_spark_session_k8s(settings.S3_KEY, settings.S3_SECRET)
-    else:
-        spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
+    @staticmethod
+    def list_makes():
+        """List the available makes."""
+        click.echo("Available makes:")
+        for make in PROVIDERS:
+            click.echo(f"  - {make}")
 
-    if run_all:
-        for make_name, parser_class in PROVIDERS.items():
-            logger_make = logging.getLogger(f"RawTsToProcessedPhases[{make_name}]")
-            parser_class(
-                make=make_name,
-                spark=spark,
-                logger=logger_make,
-                force_update=True,
-            ).run()
-    else:
-        if not make:
-            raise click.UsageError("Veuillez préciser une marque")
-        make = make.lower()
-        if make not in PROVIDERS:
-            raise click.BadParameter(f"Marque inconnue: {make}")
-        logger_make = logging.getLogger(f"RawTsToProcessedPhases[{make}]")
-        parser_class = PROVIDERS[make]
-        parser_class(
-            make=make, spark=spark, logger=logger_make, force_update=True
-        ).run()
+    def add_subcommands(self):
+        self.cli.command("list-makes")(self.list_makes)
 
+
+# Expose CLI for external access (e.g., Dagster Pipes)
+cli = RawTsToProcessedPhasesCLI().cli
 
 if __name__ == "__main__":
     cli()
-

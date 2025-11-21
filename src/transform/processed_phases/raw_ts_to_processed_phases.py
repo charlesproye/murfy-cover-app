@@ -1,5 +1,6 @@
 from logging import getLogger
 
+from dagster_pipes import PipesContext
 from dotenv import load_dotenv
 from pyspark.sql import DataFrame as DF
 from pyspark.sql import SparkSession, Window
@@ -8,6 +9,7 @@ from pyspark.sql.functions import col, count_distinct
 
 from core.caching_utils import CachedETLSpark
 from core.logging_utils import set_level_of_loggers_with_prefix
+from core.models.make import MakeEnum
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from core.spark_utils import (
@@ -15,7 +17,7 @@ from core.spark_utils import (
     get_spark_available_cores,
     safe_astype_spark_with_error_handling,
 )
-from transform.fleet_info.main import fleet_info
+from transform.fleet_info.main import get_fleet_info
 from transform.processed_phases.config import (
     ODOMETER_MILES_TO_KM,
     PROCESSED_PHASES_CACHE_KEY_TEMPLATE,
@@ -30,25 +32,36 @@ load_dotenv()
 class RawTsToProcessedPhases(CachedETLSpark):
     def __init__(
         self,
-        make: str,
+        make: str | MakeEnum,
         id_col: str = "vin",
         log_level: str = "INFO",
         force_update: bool = False,
         spark: SparkSession = None,
+        pipes: PipesContext = None,
         **kwargs,
     ):
-        self.make = make
-        logger_name = f"transform.processed_tss.{make}"
+        # Normalize make to MakeEnum if it's a string
+        if isinstance(make, str):
+            self.make = MakeEnum(make)
+        else:
+            self.make = make
+        logger_name = f"transform.processed_tss.{self.make.value}"
         self.logger = getLogger(logger_name)
         set_level_of_loggers_with_prefix(log_level, logger_name)
         self.id_col = id_col
         self.spark = spark
         self.bucket = S3Service()
         self.settings = S3Settings()
+        self.pipes = pipes
+        self.fleet_info = get_fleet_info()
 
         super().__init__(
-            PROCESSED_PHASES_CACHE_KEY_TEMPLATE.format(make=make.replace("-", "_")),
+            PROCESSED_PHASES_CACHE_KEY_TEMPLATE.format(
+                make=self.make.value.replace("-", "_")
+            ),
             "s3",
+            bucket=self.bucket,
+            settings=self.settings,
             force_update=force_update,
             spark=spark,
             repartition_key="VIN",
@@ -64,14 +77,14 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
     def run(self):
         # Load the raw tss dataframe
-        self.logger.info(f"Running for {self.make}")
+        self.pipes.log.info(f"Running for {self.make.value}")
 
         if self.bucket.check_spark_file_exists(
-            f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet"
+            f"raw_ts/{self.make.value}/time_series/raw_ts_spark.parquet"
         ):
             tss = self.bucket.read_parquet_df_spark(
                 spark=self.spark,
-                key=f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet",
+                key=f"raw_ts/{self.make.value}/time_series/raw_ts_spark.parquet",
             )
         else:
             tss = PROVIDERS[self.make](self.make, spark=self.spark).run()
@@ -85,9 +98,9 @@ class RawTsToProcessedPhases(CachedETLSpark):
         tss.count()  # Trigger caching lazy operations
 
         # Harmonize, normalize and select the columns
-        dynamic_config = self.bucket.read_yaml_file(f"config/{self.make}.yaml")
+        dynamic_config = self.bucket.read_yaml_file(f"config/{self.make.value}.yaml")
         if dynamic_config is None:
-            raise ValueError(f"Config file config/{self.make}.yaml not found")
+            raise ValueError(f"Config file config/{self.make.value}.yaml not found")
         tss = tss.withColumnsRenamed(
             dynamic_config["raw_tss_to_processed_phase"]["rename"]
         )
@@ -101,7 +114,9 @@ class RawTsToProcessedPhases(CachedETLSpark):
         tss = self.fill_forward(tss)
 
         # Compute the charging status index and aggregate the phases
-        tss_phase_idx = self.compute_charge_idx(tss, SOC_DIFF_THRESHOLD[self.make])
+        tss_phase_idx = self.compute_charge_idx(
+            tss, SOC_DIFF_THRESHOLD[self.make.value]
+        )
         tss_phase_idx = tss_phase_idx.cache()
         tss_phase_idx.count()  # Trigger caching lazy operations
         phases = self.generate_phase(tss_phase_idx)
@@ -115,6 +130,17 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
         # Aggregate the time series stats to the phase dataframe / OEM dependent
         phases_enriched = self.aggregate_stats(phase_tss)
+
+        self.pipes.report_asset_materialization(
+            metadata={
+                "output_path": {
+                    "raw_value": PROCESSED_PHASES_CACHE_KEY_TEMPLATE.format(
+                        make=self.make.value.replace("-", "_")
+                    ),
+                    "type": "text",
+                },
+            },
+        )
 
         return phases_enriched
 
@@ -139,7 +165,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
             raise ValueError("Number of cores must be a positive integer")
 
         file_size, _ = self.bucket.get_object_size(
-            f"raw_ts/{self.make}/time_series/raw_ts_spark.parquet"
+            f"raw_ts/{self.make.value}/time_series/raw_ts_spark.parquet"
         )
 
         nb_vins = tss.select(count_distinct("vin")).collect()[0][0]
@@ -158,9 +184,9 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
     def _normalize_units_to_metric(self, tss):
         tss = tss.withColumn(
-            "odometer", col("odometer") * ODOMETER_MILES_TO_KM.get(self.make, 1)
+            "odometer", col("odometer") * ODOMETER_MILES_TO_KM.get(self.make.value, 1)
         )
-        tss = tss.withColumn("soc", F.col("soc") * SCALE_SOC[self.make])
+        tss = tss.withColumn("soc", F.col("soc") * SCALE_SOC[self.make.value])
         return tss
 
     def fill_forward(self, tss):
@@ -275,7 +301,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
         # For Tesla
         # Total time of the useful phase, for Tesla
-        if self.make in ("tesla-fleet-telemetry"):
+        if self.make == MakeEnum.tesla_fleet_telemetry:
             df = df.withColumn(
                 "total_phase_time", F.sum("time_gap_minutes").over(w_phase)
             )
@@ -346,7 +372,11 @@ class RawTsToProcessedPhases(CachedETLSpark):
         )
 
         # Separate successive phases that are identical, only if the frequency is sufficient
-        if self.make in ("bmw", "tesla-fleet-telemetry", "renault"):
+        if self.make in (
+            MakeEnum.bmw,
+            MakeEnum.tesla_fleet_telemetry,
+            MakeEnum.renault,
+        ):
             df = df.withColumn("prev_date", F.lag("date").over(w))
             df = df.withColumn(
                 "time_gap_minutes",
@@ -469,7 +499,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
         tss_phased = ph.join(ts, on=join_condition, how="left")
 
         tss_phased = (
-            tss_phased.join(self.spark.createDataFrame(fleet_info), "vin", "left")
+            tss_phased.join(self.spark.createDataFrame(self.fleet_info), "vin", "left")
             .drop("vin")
             .withColumnRenamed("VIN_ph", "VIN")
         )
@@ -513,4 +543,3 @@ class RawTsToProcessedPhases(CachedETLSpark):
         ).agg(*agg_columns)
 
         return df_final
-

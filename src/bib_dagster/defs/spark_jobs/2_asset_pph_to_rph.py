@@ -16,7 +16,7 @@ from bib_dagster.defs.sensors import format_slack_failure_message
 from bib_dagster.pipes.pipes_spark_operator import PipesSparkApplicationClient
 from bib_dagster.pipes.spark_resources import DriverResource, ExecutorResource
 from core.models.make import MakeEnum
-from transform.raw_tss.main import ResponseToRawTssCLI
+from transform.result_phases.main import ProcessedPhaseToResultPhaseCLI
 
 # Create a static partition for each make
 make_partitions = StaticPartitionsDefinition([make.value for make in MakeEnum])
@@ -27,11 +27,12 @@ make_partitions = StaticPartitionsDefinition([make.value for make in MakeEnum])
     group_name="spark_jobs",
     partitions_def=make_partitions,
 )
-def response_to_raw_tss(
+def raw_pph_to_rph(
     context: AssetExecutionContext,
     spark_pipes: PipesSparkApplicationClient,
 ):
-    """Response (json raw output from APIs) to raw TSS.
+    """Processed phases to result phases : Step for adding features computed
+    by BIB (consumption, SoH, charge levels, etc.)
 
     This asset is partitioned by vehicle make - one partition per make.
     Each partition processes data for a single vehicle manufacturer.
@@ -52,21 +53,23 @@ def response_to_raw_tss(
 
     # Pass the specific make to the Spark job
     spark_spec["arguments"] = ["run", make]
-    spark_spec["mainApplicationFile"] = ResponseToRawTssCLI.file_path_in_docker()
+    spark_spec["mainApplicationFile"] = (
+        ProcessedPhaseToResultPhaseCLI.file_path_in_docker()
+    )
 
     return spark_pipes.run(
         context=context,
         base_spec=spark_spec,
         namespace="spark-operator",
         cleanup=False,
-        driver_resource=DriverResource(cores=1, memory="1G", memoryOverhead="512m"),
-        executor_resource=ExecutorResource(cores=1, instances=1, memory="512m"),
+        driver_resource=DriverResource(cores=2, memory="3G", memoryOverhead="512m"),
+        executor_resource=ExecutorResource(cores=2, memory="3G", instances=3),
     ).get_materialize_result()
 
 
-@asset_check(asset=response_to_raw_tss, name="response_to_raw_tss_check")
-def response_to_raw_tss_check():
-    """Check if the response to raw TSS transformation is successful for this partition."""
+@asset_check(asset=raw_pph_to_rph, name="raw_pph_to_rph_check")
+def raw_pph_to_rph_check():
+    """Check if the processed phases to result phases transformation is successful for this partition."""
     # No partiton check possible yet
     # https://github.com/dagster-io/dagster/issues/17005
     # TODO: Implement partition check when issue is resolved

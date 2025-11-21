@@ -669,6 +669,13 @@ class VehicleProcessor:
             with get_connection() as con:
                 cursor = con.cursor()
 
+                cursor.execute("""
+                    SELECT vin FROM vehicle v
+                    WHERE activation_status = False
+                """)
+                deactivated_vehicles = cursor.fetchall()
+                set_deactivated_vehicles = {v[0] for v in deactivated_vehicles}
+
                 # Create a temporary table for bulk operations
                 cursor.execute("""
                     CREATE TEMPORARY TABLE temp_deactivated_vehicles (
@@ -676,6 +683,10 @@ class VehicleProcessor:
                         eligibility BOOLEAN
                     ) ON COMMIT DROP
                 """)
+
+                deactivated_df = deactivated_df[
+                    ~deactivated_df["vin"].isin(set_deactivated_vehicles)
+                ]
 
                 # Bulk insert VINs and eligibility into temporary table
                 vins_to_update = list(
@@ -685,6 +696,7 @@ class VehicleProcessor:
                         strict=False,
                     )
                 )
+
                 cursor.executemany(
                     "INSERT INTO temp_deactivated_vehicles (vin, eligibility) VALUES (%s, %s)",
                     vins_to_update,

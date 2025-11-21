@@ -16,7 +16,6 @@ from core.spark_utils import create_spark_session
 from .config import *
 from .s3.s3_utils import S3Service
 from .s3.settings import S3Settings
-from .singleton_s3_bucket import S3
 
 R = TypeVar("R")
 P = ParamSpec("P")
@@ -29,8 +28,8 @@ class CachedETL(DF, ABC):
         self,
         path: str,
         on: str,
+        bucket: S3Service,
         force_update: bool = False,
-        bucket: S3Service = S3,
         **kwargs,
     ):
         """
@@ -82,9 +81,9 @@ class CachedETLSpark(ABC):
         self,
         path: str,
         on: str,
+        bucket: S3Service,
+        settings: S3Settings,
         force_update: bool = False,
-        bucket: S3Service = S3,
-        settings: S3Settings = S3Settings(),
         spark: SparkSession = None,
         writing_mode: str | None = None,
         repartition_key: str | None = "vin",
@@ -296,4 +295,3 @@ def ensure_that_local_dirs_exist(path: str):
     dir_path = dirname(path)
     if not exists(dir_path) and dir_path != "":
         makedirs(dir_path)
-

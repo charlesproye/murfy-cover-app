@@ -1,5 +1,6 @@
 from logging import getLogger
 
+from dagster_pipes import PipesContext
 from dotenv import load_dotenv
 from pyspark.sql import DataFrame as DF
 from pyspark.sql import SparkSession
@@ -23,6 +24,7 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         log_level: str = "INFO",
         force_update: bool = False,
         spark: SparkSession = None,
+        pipes: PipesContext = None,
         **kwargs,
     ):
         self.make = make
@@ -33,10 +35,13 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         self.spark = spark
         self.bucket = S3Service()
         self.settings = S3Settings()
+        self.pipes = pipes
 
         super().__init__(
             RESULT_PHASES_CACHE_KEY_TEMPLATE.format(make=make.replace("-", "_")),
             "s3",
+            bucket=self.bucket,
+            settings=self.settings,
             force_update=force_update,
             spark=spark,
             repartition_key="VIN",
@@ -45,11 +50,13 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
 
     def run(self):
         # Load the raw tss dataframe
-        self.logger.info(f"Running for {self.make}")
+        self.pipes.log.info(f"Running for {self.make}")
 
         cls = PROVIDERS[self.make]
 
-        pph = cls(make=self.make, spark=self.spark, logger=self.logger).data
+        pph = cls(
+            make=self.make, spark=self.spark, logger=self.logger, pipes=self.pipes
+        ).data
 
         pph = self.compute_specific_features(pph)
         pph = self.compute_soh(pph)
@@ -57,6 +64,15 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         pph = self.compute_consumption(pph)
         pph = self.run_real_autonomy_compute(pph)
         pph = self.compute_charge_levels(pph)
+
+        self.pipes.report_asset_materialization(
+            metadata={
+                "output_path": {
+                    "raw_value": f"result_phases/{self.make}/result_phases_spark.parquet",
+                    "type": "text",
+                },
+            },
+        )
 
         return pph
 
@@ -417,5 +433,5 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         df_filtered = self.filter_data_by_bounds(df_valid, model_bounds)
         range_df = self.calculate_weighted_autonomy(df_filtered)
         phase_df = phase_df.join(range_df, "VIN", "left")
-        return phase_df
 
+        return phase_df

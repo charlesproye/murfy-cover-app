@@ -24,31 +24,28 @@ driver:
     - secretRef:
         name: db-data-ev-secret
   env:
-    - name: S3_BUCKET
-      valueFrom:
-        secretKeyRef:
-          name: s3-secret-dev
-          key: S3_BUCKET_DEV
     - name: S3_KEY
       valueFrom:
         secretKeyRef:
-          name: s3-secret-dev
-          key: S3_KEY_DEV
+          name: s3-secret
+          key: S3_KEY
     - name: S3_SECRET
       valueFrom:
         secretKeyRef:
-          name: s3-secret-dev
-          key: S3_SECRET_DEV
+          name: s3-secret
+          key: S3_SECRET
     - name: AWS_ACCESS_KEY_ID
       valueFrom:
         secretKeyRef:
-          name: s3-secret-dev
-          key: S3_KEY_DEV
+          name: s3-secret
+          key: S3_KEY
     - name: AWS_SECRET_ACCESS_KEY
       valueFrom:
         secretKeyRef:
-          name: s3-secret-dev
-          key: S3_SECRET_DEV
+          name: s3-secret
+          key: S3_SECRET
+    - name: S3_BUCKET
+      value: "bib-platform-prod-data"
 executor:
   cores: 1
   instances: 1
@@ -57,18 +54,15 @@ executor:
     - secretRef:
         name: db-data-ev-secret
   env:
-  - name: S3_BUCKET
-    valueFrom:
-      secretKeyRef:
-        name: s3-secret-dev
-        key: S3_BUCKET_DEV
   - name: S3_KEY
     valueFrom:
       secretKeyRef:
-        name: s3-secret-dev
-        key: S3_KEY_DEV
+        name: s3-secret
+        key: S3_KEY
   - name: S3_SECRET
     valueFrom:
       secretKeyRef:
-        name: s3-secret-dev
-        key: S3_SECRET_DEV
+        name: s3-secret
+        key: S3_SECRET
+  - name: S3_BUCKET
+    value: "bib-platform-prod-data"

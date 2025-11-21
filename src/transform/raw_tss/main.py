@@ -54,12 +54,14 @@ class ResponseToRawTssCLI(BaseSpark):
             if run_all:
                 for make_name, parser_class in PROVIDERS.items():
                     logger = logging.getLogger(f"ResponseToRawTss[{make_name}]")
-                    parser_class(make=make_name, spark=self.spark, logger=logger).run(
-                        pipes
-                    )
+                    parser_class(
+                        make=make_name, spark=self.spark, logger=logger, pipes=pipes
+                    ).run()
             else:
                 logger = logging.getLogger(f"ResponseToRawTss[{make}]")
-                PROVIDERS[make](make=make, spark=self.spark, logger=logger).run(pipes)
+                PROVIDERS[make](
+                    make=make, spark=self.spark, logger=logger, pipes=pipes
+                ).run()
 
     @staticmethod
     def list_makes():

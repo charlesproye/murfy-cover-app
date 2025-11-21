@@ -26,6 +26,7 @@ class ResponseToRawTss:
         writing_mode: str | None = "append",
         spark: SparkSession | None = None,
         logger: Logger | None = None,
+        pipes: PipesContext = None,
         **kwargs,
     ):
         """
@@ -45,14 +46,22 @@ class ResponseToRawTss:
         self.settings = S3Settings()
         self.base_s3_path = self.settings.S3_BASE_PATH
         self.raw_tss_path = S3_RAW_TSS_KEY_FORMAT.format(brand=self.make)
+        self.pipes = pipes
 
-    def run(self, pipes: PipesContext):
-        pipes.log.info(f"Starting processing for {self.make}")
+    def _log_info(self, message: str):
+        """Log info message using pipes if available, otherwise fallback to logger."""
+        if self.pipes is not None:
+            self.pipes.log.info(message)
+        elif self.logger is not None:
+            self.logger.info(message)
+
+    def run(self):
+        self._log_info(f"Starting processing for {self.make}")
 
         keys_to_download_per_vin, paths_to_exclude = self._get_keys_to_download()
 
         if len(keys_to_download_per_vin) == 0:
-            pipes.log.info(f"No VIN to process for {self.make}")
+            self._log_info(f"No VIN to process for {self.make}")
         else:
             optimal_partitions_nb, batch_size = self._set_optimal_spark_parameters(
                 keys_to_download_per_vin,
@@ -60,7 +69,7 @@ class ResponseToRawTss:
                 self._get_available_cores(),
             )
 
-            pipes.log.info(
+            self._log_info(
                 f"Number of batches = {math.ceil(len(keys_to_download_per_vin) / batch_size)}"
             )
 
@@ -87,17 +96,18 @@ class ResponseToRawTss:
                 raw_tss_parsed.unpersist()
                 del raw_tss_parsed
 
-        pipes.report_asset_materialization(
-            metadata={
-                "total_vins": {
-                    "raw_value": len(keys_to_download_per_vin),
-                    "type": "int",
+        if self.pipes is not None:
+            self.pipes.report_asset_materialization(
+                metadata={
+                    "total_vins": {
+                        "raw_value": len(keys_to_download_per_vin),
+                        "type": "int",
+                    },
+                    "output_path": {"raw_value": self.raw_tss_path, "type": "text"},
                 },
-                "output_path": {"raw_value": self.raw_tss_path, "type": "text"},
-            },
-        )
+            )
 
-        pipes.log.info(f"Processing completed for {self.make}")
+        self._log_info(f"Processing completed for {self.make}")
 
     def _get_available_cores(self) -> int:
         """
