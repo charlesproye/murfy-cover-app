@@ -26,12 +26,12 @@ from activation.config.credentials import (
     KIA_API_USERNAME,
     KIA_AUTH_URL,
     KIA_BASE_URL,
+    METRIC_SLACK_CHANNEL_ID,
     RENAULT_AUD,
     RENAULT_CLIENT,
     RENAULT_KID,
     RENAULT_PWD,
     RENAULT_SCOPE,
-    SLACK_CHANNEL_ID,
     SLACK_TOKEN,
     STELLANTIS_BASE_URL,
     STELLANTIS_COMPANY_ID,
@@ -107,14 +107,15 @@ async def process_vehicles(owner_filter: str | None = None):
         tesla_api = TeslaApi(
             base_url=TESLA_BASE_URL,
             slack_token=SLACK_TOKEN,
-            slack_channel_id=SLACK_CHANNEL_ID,
+            slack_channel_id=METRIC_SLACK_CHANNEL_ID,
         )
 
         # Get initial fleet info
         df = await fleet_info(fleet_filter=owner_filter)
         nbr_vehicles_without_type = check_vehicles_without_type(df)
         send_slack_message(
-            SLACK_CHANNEL_ID, f"{nbr_vehicles_without_type} vehicles without type"
+            METRIC_SLACK_CHANNEL_ID,
+            f"{nbr_vehicles_without_type} vehicles without type",
         )
         # Initialize activation service
         activation_service = VehicleActivationService(
@@ -166,11 +167,11 @@ async def process_vehicles(owner_filter: str | None = None):
         db_not_in_gsheet, gsheet_not_in_db = await compare_active_vehicles(df)
 
         send_slack_message(
-            SLACK_CHANNEL_ID,
+            METRIC_SLACK_CHANNEL_ID,
             f"Les véhicules suivants sont présents dans la base de données mais pas dans le Gsheet: {db_not_in_gsheet}",
         )
         send_slack_message(
-            SLACK_CHANNEL_ID,
+            METRIC_SLACK_CHANNEL_ID,
             f"Les véhicules suivants sont présents dans le Gsheet mais pas dans la base de données: {gsheet_not_in_db}",
         )
     except Exception as e:
