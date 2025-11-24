@@ -23,6 +23,10 @@ WORKDIR /app
 USER 1001
 
 COPY --from=builder --chown=app /app /app
+
+RUN mkdir -p /home/app/.postgresql
+COPY --chown=app:app ./certs/bib-prod-rdb-data-ev.pem /home/app/.postgresql/root.crt
+
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PLAYWRIGHT_BROWSERS_PATH=0
 

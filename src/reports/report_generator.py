@@ -125,6 +125,11 @@ class ReportGenerator:
 
         # Drop intermediate columns
         merged_df = merged_df.drop(columns=["SOH_DATA", "SOH_OEM", "SOH"])
+        merged_df["DATE_REPORT"] = (
+            pd.to_datetime(merged_df["DATE_REPORT"], errors="coerce")
+            .dt.strftime("%Y-%m-%d")
+            .fillna("")
+        )
 
         return merged_df
 
@@ -219,7 +224,7 @@ class ReportGenerator:
             formulas.append([formula])
 
         end_row = len(df) + 1
-        cell_range = f"D2:D{end_row}"
+        cell_range = f"E2:E{end_row}"
 
         worksheet.update(cell_range, formulas, raw=False)
 
@@ -232,6 +237,10 @@ class ReportGenerator:
 
         # Clear data below header
         self.worksheet.batch_clear(["A2:ZZ10000"])
+
+        # Replace NaN values with empty strings for JSON compatibility
+        df = df.fillna("")
+
         # Append new data
         self.worksheet.append_rows(df.values.tolist())
 
@@ -249,7 +258,10 @@ class ReportGenerator:
         merged_df = self.enrich_with_vehicle_data(df)
 
         # Download PDFs if requested
-        vins_to_download = merged_df[merged_df["AVAILABLE_SOH"]]["VIN"].tolist()
+        vins_to_download = merged_df[
+            (merged_df["AVAILABLE_SOH"])
+            & (merged_df["DATE_REPORT"] == datetime.now().strftime("%Y-%m-%d"))
+        ]["VIN"].tolist()
 
         list_files = await self.download_pdfs_for_vins(vins_to_download)
 

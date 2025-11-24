@@ -11,10 +11,7 @@ async def main():
     drive_service = get_drive_service()
     spreadsheets = list_spreadsheets_in_folder(drive_service, CLIENT_FOLDER_ID)
 
-    print(spreadsheets)
-
-    for spreadsheet in spreadsheets[1:]:
-        print(spreadsheet)
+    for spreadsheet in spreadsheets:
         spreadsheet_id = spreadsheet["id"]
         spreadsheet_name = spreadsheet["name"]
 
