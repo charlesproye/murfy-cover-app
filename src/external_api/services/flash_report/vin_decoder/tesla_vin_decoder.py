@@ -153,6 +153,10 @@ class TeslaVinDecoder:
             else:
                 return version
 
+        # Special case for MTY13B which has been mounted with two types of batteries
+        if vin[9] == "P" and vin[7] == "S" and "standard range" in type_:
+            version = ["MTY13C"]
+
         return {
             "VIN": vin,
             "Country": self._lookup(self._split_vin(vin, 0, 3), "first_to_third"),
@@ -166,4 +170,3 @@ class TeslaVinDecoder:
             "FactoryLocation": self._lookup(self._split_vin(vin, 10), "eleventh"),
             "SpecialVehicle": self._lookup(self._split_vin(vin, 11), "twelfth"),
         }
-

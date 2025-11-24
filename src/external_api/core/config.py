@@ -63,18 +63,17 @@ class Settings(BaseSettings):
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
 
-    # Default user
-    FIRST_SUPERUSER_EMAIL: EmailStr | None = None
-    FIRST_SUPERUSER_PASSWORD: str | None = None
-
     # Tesla
-    TESLA_CLIENT_ID: str | None = os.getenv("TESLA_CLIENT_ID", None)
-    TESLA_CLIENT_SECRET: str | None = os.getenv("TESLA_CLIENT_SECRET", None)
-
+    TESLA_CLIENT_ID: str = os.getenv("TESLA_CLIENT_ID", "")
+    TESLA_CLIENT_SECRET: str = os.getenv("TESLA_CLIENT_SECRET", "")
     if not all([TESLA_CLIENT_ID, TESLA_CLIENT_SECRET]):
         LOGGER.warning(
             "TESLA_CLIENT_ID or TESLA_CLIENT_SECRET is not set. Will not be able to use Tesla API."
         )
+
+    # Default user
+    FIRST_SUPERUSER_EMAIL: EmailStr | None = None
+    FIRST_SUPERUSER_PASSWORD: str | None = None
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

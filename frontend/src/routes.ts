@@ -49,6 +49,9 @@ export const ROUTES = {
   VIN_DECODER: `${BASE_URL}/flash_report/vin-decoder`,
   SEND_EMAIL: `${BASE_URL}/flash_report/send-email`,
   GENERATION_DATA: `${BASE_URL}/flash_report/generation-data`,
+
+  // TESLA ACTIVATION
+  TESLA_CREATE_USER: `${BASE_URL}/tesla/create-user`,
 };
 
 export type RouteKey = keyof typeof ROUTES;

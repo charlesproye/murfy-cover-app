@@ -182,6 +182,9 @@ dist/
 # Package files
 *.jar
 
+# Certificates
+*.pem
+
 # Maven
 target/
 dist/

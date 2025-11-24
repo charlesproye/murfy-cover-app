@@ -68,33 +68,3 @@ spec:
       protocol: TCP
       port: 4443
       targetPort: 4443
----
-apiVersion: external-secrets.io/v1
-kind: ClusterExternalSecret
-metadata:
-  name: tesla-vehicle-command-secret
-  namespace: bib
-spec:
-  externalSecretName: tesla-vehicle-command-secret
-  namespaceSelectors:
-    - matchLabels:
-        name: data-engineering
-  refreshTime: "1m"
-  externalSecretSpec:
-    refreshInterval: 60m
-    secretStoreRef:
-      kind: ClusterSecretStore
-      name: cluster-secret-store
-    target:
-      name: tesla-vehicle-command-secret
-      creationPolicy: Owner
-    data:
-      - remoteRef:
-          key: id:2f11462b-4127-4a50-9f30-04a91a86e8f7
-        secretKey: vehicle-command-tls-cert.pem
-      - remoteRef:
-          key: id:a1c4d63b-4990-4236-916b-82eed1531eeb
-        secretKey: vehicle-command-tls-key.pem
-      - remoteRef:
-          key: id:c0f919fb-01e1-4d1b-b17c-c789a8a9fbb4
-        secretKey: fleet-app-key.pem

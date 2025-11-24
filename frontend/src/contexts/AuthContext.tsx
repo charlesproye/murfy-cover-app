@@ -29,7 +29,7 @@ interface AuthContextProps {
   refetchSessionData: () => Promise<void>;
 }
 
-const AUTHORIZED_ROUTES = ['/auth/login', '/flash-report'];
+const AUTHORIZED_ROUTES = ['/auth/login', '/flash-report', '/tesla-activation'];
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
