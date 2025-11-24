@@ -1,5 +1,7 @@
-from db_models.enums import LanguageEnum
 from pydantic import BaseModel, EmailStr
+
+from db_models.enums import LanguageEnum
+
 
 class FlashReportFormType(BaseModel):
     vin: str
@@ -48,6 +50,5 @@ class VehicleSpecs(BaseModel):
     has_trendline: bool
     make: str
     model: str
-    type: str | None
-    version: str | None
-
+    type: list[str] | None
+    version: list[str] | None

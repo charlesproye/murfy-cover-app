@@ -95,18 +95,33 @@ async def send_vehicle_specs(vin: str, db: AsyncSession) -> VehicleSpecs:
         make_db_name, model_db_name = await get_db_names(
             "tesla",
             result.get("Model"),
-            result.get("Type"),
+            result["Type"][0]
+            if isinstance(result.get("Type"), list)
+            else result.get("Type"),
             db=db,
         )
 
         has_trendline = await get_make_has_trendline(make_db_name, db)
 
+        if isinstance(result.get("Version"), list):
+            types = []
+            versions = result.get("Version")
+            for version in versions:
+                # Match version with right type when multiples types
+                query = "select type from vehicle_model where version = :version"
+                result = await db.execute(text(query), {"version": version})
+                type_tesla = result.fetchone()[0]
+                types.append(type_tesla)
+        else:
+            versions = [result.get("Version")]
+            types = [result.get("Type")]
+
         return VehicleSpecs(
             has_trendline=has_trendline,
             make="tesla",
             model=model_db_name,
-            type=result.get("Type"),
-            version=result.get("Version"),
+            type=types,
+            version=versions,
         )
     else:
         vin_decoder = VinDecoder()
