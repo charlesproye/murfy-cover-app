@@ -1,6 +1,7 @@
 import asyncio
 import re
 import time
+from datetime import datetime
 from logging import getLogger
 from typing import Any
 
@@ -36,7 +37,6 @@ def get_google_sheet_data(
 
             # Get headers from first row and use them as column names
             df = pd.DataFrame(data)
-
             logger.info(f"Successfully fetched {len(df)} rows from Google Sheets")
             return df
 
@@ -279,7 +279,7 @@ async def read_fleet_info(fleet_filter: str | None = None) -> pd.DataFrame:
     )
 
     # Convert dates with explicit format handling
-    date_columns = ["start_date", "end_of_contract"]
+    date_columns = ["Activation date", "Deactivation date"]
     for col in date_columns:
         if col in df.columns:
             df[col] = pd.to_datetime(
@@ -303,9 +303,9 @@ async def read_fleet_info(fleet_filter: str | None = None) -> pd.DataFrame:
     df = df.pipe(
         standardize_model_type, oem_col="oem", model_col="model", type_col="type"
     )
-    logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
+    df = df.pipe(update_activation_status)
 
-    print(df.columns)
+    logger.info(f"Successfully processed fleet info. Final shape: {df.shape}")
 
     return df
 
@@ -325,6 +325,24 @@ def check_vehicles_without_type(fleet_info_df: pd.DataFrame) -> int:
     )
 
 
+def update_activation_status(df: pd.DataFrame) -> bool:
+    """Update the activation status according to the deactivation date."""
+
+    # Normalize today's date as Timestamp
+    today = pd.Timestamp.now().normalize()
+
+    # Convert columns to datetime safely (no crash)
+    df["activation_date"] = pd.to_datetime(df["activation_date"], errors="coerce")
+    df["deactivation_date"] = pd.to_datetime(df["deactivation_date"], errors="coerce")
+
+    # 1) Activate if activation_date <= today
+    df.loc[df["activation_date"] <= today, "activation"] = True
+
+    # 2) Deactivate if deactivation_date <= today (priority)
+    df.loc[df["deactivation_date"] <= today, "activation"] = False
+
+    return df
+
+
 if __name__ == "__main__":
     df = asyncio.run(read_fleet_info(fleet_filter=""))
-

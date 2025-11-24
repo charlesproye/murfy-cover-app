@@ -50,7 +50,7 @@ from activation.fleet_info import read_fleet_info as fleet_info
 from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
 from activation.utils.check_utils import ensure_admins_linked_to_fleets
-from activation.utils.metric_utils import write_metrics_to_db
+from activation.utils.metric_utils import compare_active_vehicles, write_metrics_to_db
 from core.slack_utils import send_slack_message
 
 # Configure logging
@@ -163,7 +163,16 @@ async def process_vehicles(owner_filter: str | None = None):
 
         await write_metrics_to_db(logger)
         await asyncio.to_thread(ensure_admins_linked_to_fleets, logger)
+        db_not_in_gsheet, gsheet_not_in_db = await compare_active_vehicles(df)
 
+        send_slack_message(
+            SLACK_CHANNEL_ID,
+            f"Les véhicules suivants sont présents dans la base de données mais pas dans le Gsheet: {db_not_in_gsheet}",
+        )
+        send_slack_message(
+            SLACK_CHANNEL_ID,
+            f"Les véhicules suivants sont présents dans le Gsheet mais pas dans la base de données: {gsheet_not_in_db}",
+        )
     except Exception as e:
         logger.error(f"Error processing vehicles: {e!s}")
         raise

@@ -47,6 +47,11 @@ spec:
                     name: kia-secret
                 - secretRef:
                     name: slack-secret
+                - secretRef:
+                    name: db-data-eng-secret
+              env:
+                - name: METRIC_SLACK_CHANNEL_ID
+                  value: "C09RUV9T2UR"
               resources:
                 limits:
                   memory: "2Gi"

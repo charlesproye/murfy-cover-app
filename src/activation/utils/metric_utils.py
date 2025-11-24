@@ -2,7 +2,10 @@ import asyncio
 import logging
 from datetime import datetime
 
-from core.sql_utils import get_connection
+import pandas as pd
+from sqlalchemy import text
+
+from core.sql_utils import get_connection, get_sqlalchemy_engine
 
 
 async def write_metrics_to_db(logger: logging.Logger):
@@ -40,5 +43,22 @@ async def write_metrics_to_db(logger: logging.Logger):
         logger.info("Metrics written to fct_activation_metric")
 
 
-if __name__ == "__main__":
-    asyncio.run(write_metrics_to_db(logging.getLogger(__name__)))
+async def compare_active_vehicles(
+    fleet_info: pd.DataFrame,
+) -> tuple[set[str], set[str]]:
+    active = fleet_info[fleet_info["real_activation"] == True]
+
+    engine = get_sqlalchemy_engine()
+
+    with engine.connect() as con:
+        result = con.execute(
+            text("SELECT vin FROM vehicle WHERE activation_status = True")
+        )
+        vehicle_db = {row[0] for row in result.fetchall()}
+
+    vehicle_gsheet = set(active["vin"].dropna().unique())
+
+    db_not_in_gsheet = vehicle_db - vehicle_gsheet
+    gsheet_not_in_db = vehicle_gsheet - vehicle_db
+
+    return db_not_in_gsheet, gsheet_not_in_db

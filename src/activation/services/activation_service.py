@@ -131,7 +131,8 @@ class VehicleActivationService:
                 target_fleet_id, vin, session
             )
 
-            result = json.loads(result)
+            if isinstance(result, str):
+                result = json.loads(result) if result.strip() else {}
 
             if status_code in [200, 201, 204]:
                 logging.info(
@@ -206,9 +207,10 @@ class VehicleActivationService:
             if not status_code:
                 return False, result
 
-            result = json.loads(result)
-
             logging.info("Create clearance response")
+
+            if isinstance(result, str):
+                result = json.loads(result) if result.strip() else {}
 
             if status_code in [200, 201, 204]:
                 fleet_success, fleet_error = await self._add_to_fleet(vin, session)
@@ -614,7 +616,6 @@ class VehicleActivationService:
                 results_activation = await self.hm_api.create_clearance_batch(
                     to_activate, session
                 )
-
             # Recheck the status of the vehicles as it can be pending as a result of the batch activation
             # and switch to rejected immediately
             async with aiohttp.ClientSession() as session:
@@ -961,7 +962,7 @@ class VehicleActivationService:
     #             - Eligibility: Whether the vehicle is eligible for activation
     #             - Real_Activation: Current activation status
     #             - Activation_Error: Any error messages
-    #             - account_owner: Tesla account owner name
+    #             - account_owner_tesla: Tesla account owner name
     #     """
     #     logging.info("Checking eligibility of Tesla vehicles")
 
@@ -987,7 +988,7 @@ class VehicleActivationService:
     #                         else False
     #                     ),
     #                     "Activation_Error": None,
-    #                     "account_owner": account_name,
+    #                     "account_owner_tesla": account_name,
     #                 }
     #                 for vin, account_name in api_tesla
     #             ]
@@ -1002,7 +1003,7 @@ class VehicleActivationService:
     #                     "Eligibility": False,
     #                     "Real_Activation": False,
     #                     "Activation_Error": "Vehicle not found in Tesla accounts",
-    #                     "account_owner": None,
+    #                     "account_owner_tesla": None,
     #                 }
     #                 for vin in ggsheet_tesla["vin"]
     #                 if vin
@@ -1041,7 +1042,7 @@ class VehicleActivationService:
     #                             "Eligibility": True,
     #                             "Real_Activation": True,
     #                             "Activation_Error": None,
-    #                             "account_owner": full_name,
+    #                             "account_owner_tesla": full_name,
     #                         }
     #                         status_data.append(vehicle_data)
     #                     else:
@@ -1050,7 +1051,7 @@ class VehicleActivationService:
     #                             "Eligibility": False,
     #                             "Real_Activation": False,
     #                             "Activation_Error": "Particulier Tesla account not found",
-    #                             "account_owner": full_name,
+    #                             "account_owner_tesla": full_name,
     #                         }
     #                         status_data.append(vehicle_data)
 
@@ -1061,7 +1062,7 @@ class VehicleActivationService:
     #                             "Eligibility": False,
     #                             "Real_Activation": False,
     #                             "Activation_Error": f"Error processing vehicle: {str(e)}",
-    #                             "account_owner": full_name,
+    #                             "account_owner_tesla": full_name,
     #                         }
     #                     )
 

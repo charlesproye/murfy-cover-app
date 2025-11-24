@@ -118,12 +118,18 @@ class KiaApi:
             "Authorization": f"Bearer {self._access_token}",
         }
 
-        payload = {
-            "vinList": [{"vin": vin} for vin in vins],
-            "consentType": ["vehicle", "dtcInfo"],
-        }
+        payloads = [
+            {
+                "vinList": [{"vin": vin} for vin in vins],
+                "consentType": consent_type,
+            }
+            for consent_type in ["vehicle", "dtcInfo"]
+        ]
 
-        async with session.delete(url, headers=headers, json=payload) as response:
-            response.raise_for_status()
-            return await response.json()
+        last_response = None
+        for payload in payloads:
+            async with session.delete(url, headers=headers, json=payload) as response:
+                response.raise_for_status()
+                last_response = await response.json()
 
+        return last_response

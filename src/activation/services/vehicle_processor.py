@@ -354,7 +354,7 @@ class VehicleProcessor:
                                 model_name,
                                 model_type,
                                 version,
-                                start_date,
+                                _,
                             ) = await self.renault_api.get_vehicle_info(session, vin)
                             model_id = mapping_vehicle_type(
                                 model_type, vehicle["make"], model_name, model_existing
@@ -362,7 +362,7 @@ class VehicleProcessor:
                             if not vehicle_exists:
                                 # Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
                                 logging.info(
-                                    f"Processing Renault vehicle {vin} | {model_name} | {model_type} | {version} | {start_date} -> {vehicle['end_of_contract']}"
+                                    f"Processing Renault vehicle {vin} | {model_name} | {model_type} | {version}"
                                 )
                                 # model_id = await self._get_or_create_renault_model(session,cursor, vin, model_name, model_type, version, vehicle['make'], vehicle['oem'])
 
@@ -370,8 +370,8 @@ class VehicleProcessor:
                                 insert_query = """
                                     INSERT INTO vehicle (
                                         id, vin, fleet_id, region_id, vehicle_model_id,
-                                        licence_plate, end_of_contract_date, start_date, activation_status, is_eligible
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                        licence_plate, activation_status, is_eligible
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                 """
                                 cursor.execute(
                                     insert_query,
@@ -382,8 +382,6 @@ class VehicleProcessor:
                                         region_id,
                                         model_id,
                                         vehicle["licence_plate"],
-                                        vehicle["end_of_contract"],
-                                        start_date,
                                         vehicle["real_activation"],
                                         vehicle["eligibility"],
                                     ),
@@ -489,8 +487,8 @@ class VehicleProcessor:
                                 insert_query = """
                                     INSERT INTO vehicle (
                                         id, vin, fleet_id, region_id, vehicle_model_id,
-                                        licence_plate, end_of_contract_date, start_date, activation_status, is_eligible
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                        licence_plate, activation_status, is_eligible
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                 """
                                 cursor.execute(
                                     insert_query,
@@ -501,8 +499,6 @@ class VehicleProcessor:
                                         region_id,
                                         model_id,
                                         vehicle["licence_plate"],
-                                        vehicle["end_of_contract"],
-                                        vehicle["start_date"],
                                         vehicle["real_activation"],
                                         vehicle["eligibility"],
                                     ),
@@ -607,8 +603,8 @@ class VehicleProcessor:
                             insert_query = """
                                 INSERT INTO vehicle (
                                     id, vin, fleet_id, region_id, vehicle_model_id,
-                                    licence_plate, end_of_contract_date, start_date, activation_status, is_eligible
-                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    licence_plate, activation_status, is_eligible
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                             """
 
                             cursor.execute(
@@ -620,8 +616,6 @@ class VehicleProcessor:
                                     region_id,
                                     model_id,
                                     await self._clean_value(vehicle["licence_plate"]),
-                                    await self._clean_value(vehicle["end_of_contract"]),
-                                    await self._clean_value(vehicle["start_date"]),
                                     await self._clean_value(
                                         vehicle["real_activation"], "bool"
                                     ),
@@ -896,7 +890,6 @@ class VehicleProcessor:
                                 (
                                     warranty_km,
                                     warranty_date,
-                                    start_date,
                                 ) = await self.tesla_api.get_warranty_info(session, vin)
 
                                 # Create/get model and related records
@@ -913,7 +906,7 @@ class VehicleProcessor:
                                 # Insert new vehicle
                                 vehicle_id = str(uuid.uuid4())
                                 cursor.execute(
-                                    "INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, end_of_contract_date, start_date, activation_status, is_eligible) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                                    "INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, activation_status, is_eligible) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                                     (
                                         vehicle_id,
                                         vin,
@@ -921,8 +914,6 @@ class VehicleProcessor:
                                         region_id,
                                         model_id,
                                         vehicle["licence_plate"],
-                                        vehicle["end_of_contract"],
-                                        start_date,
                                         vehicle["real_activation"],
                                         vehicle["eligibility"],
                                     ),
@@ -964,7 +955,7 @@ class VehicleProcessor:
                                         (
                                             warranty_km,
                                             warranty_date,
-                                            start_date,
+                                            _,
                                         ) = await self.tesla_api.get_warranty_info(
                                             session, vehicle["vin"]
                                         )
@@ -990,7 +981,7 @@ class VehicleProcessor:
                                     (
                                         warranty_km,
                                         warranty_date,
-                                        start_date,
+                                        _,
                                     ) = await self.tesla_api.get_warranty_info(
                                         session, vin
                                     )

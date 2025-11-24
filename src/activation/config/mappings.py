@@ -75,6 +75,8 @@ COL_DTYPES = {
     "eligibility": bool,
     "real_activation": bool,
     "activation_error": str,
+    "activation_date": "datetime64[ns]",
+    "deactivation_date": "datetime64[ns]",
 }
 
 suffixes_to_remove = [
