@@ -63,6 +63,7 @@ eda = [
     "nbformat>=5.10",
     "nbstripout>=0.8.1",
     "tqdm>=4.67",
+    "xgboost>=2.0.0",
 ]
 
 # Load module dependencies - for loading and processing trendlines
