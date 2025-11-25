@@ -3,6 +3,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator, Iterable
 from contextlib import asynccontextmanager
+from enum import StrEnum
 from typing import Any, TypeVar
 
 import aioboto3
@@ -14,6 +15,13 @@ from types_aiobotocore_s3.client import S3Client as AsyncS3Client
 from .settings import S3Settings, get_s3_settings
 
 T = TypeVar("T")
+
+
+class S3ACL(StrEnum):
+    """AWS S3 canned ACL options we currently rely on."""
+
+    PRIVATE = "private"
+    PUBLIC_READ = "public-read"
 
 
 class AsyncS3:
@@ -160,9 +168,12 @@ class AsyncS3:
 
         return results
 
-    async def upload_file(self, path: str, file: bytes) -> None:
+    async def upload_file(
+        self, path: str, file: bytes, acl: S3ACL = S3ACL.PRIVATE
+    ) -> None:
+        """Upload a file with a canned ACL (default private)."""
         async with self._sem, self._client() as client:
-            await client.put_object(Bucket=self.bucket, Key=path, Body=file)
+            await client.put_object(Bucket=self.bucket, Key=path, Body=file, ACL=acl)
 
     async def upload_files(self, files: dict[str, bytes]) -> list[Any]:
         """

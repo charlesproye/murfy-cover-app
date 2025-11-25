@@ -6,7 +6,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
 
-def get_drive_service():
+def get_google_service(service_type: str = "drive", version: str = "v3"):
     """Get authenticated Google Drive service."""
 
     base64_creds = os.getenv("GOOGLE_PRIVATE_KEY")
@@ -18,9 +18,9 @@ def get_drive_service():
     ]
 
     credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    get_drive_service = build("drive", "v3", credentials=credentials)
+    get_google_service = build(service_type, version, credentials=credentials)
 
-    return get_drive_service
+    return get_google_service
 
 
 def list_spreadsheets_in_folder(

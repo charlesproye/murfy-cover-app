@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -8,8 +9,9 @@ from playwright.async_api import async_playwright
 from sqlalchemy.orm import sessionmaker
 
 from core.env_utils import get_env_var
+from core.gdrive_utils import get_google_service
 from core.gsheet_utils import get_google_client
-from core.s3.async_s3 import AsyncS3
+from core.s3.async_s3 import S3ACL, AsyncS3
 from core.sql_utils import get_sqlalchemy_engine
 from db_models.vehicle import Vehicle, VehicleData, VehicleModel
 
@@ -45,7 +47,7 @@ class ReportGenerator:
         self.login_email = PREMIUM_REPORT_MAIL
         self.login_password = PREMIUM_REPORT_PWD
         self._gsheet_client = get_google_client()
-
+        self._sheets_service = get_google_service(service_type="sheets", version="v4")
         self._worksheet = None
         self._s3_client = None
         self._engine = None
@@ -73,11 +75,48 @@ class ReportGenerator:
 
     def load_gsheet_data(self) -> pd.DataFrame:
         """
-        Load data from client GSheet.
+        Load data from Google Sheet and extract actual hyperlinks in column 'LINK'.
         """
         logger.info(f"Loading data from Google Sheet: {self.worksheet_name}")
-        existing_data = self.worksheet.get_all_records()
-        df = pd.DataFrame(existing_data)
+
+        all_values = self.worksheet.get_all_values()
+        headers = all_values[0]
+        data = all_values[1:]
+
+        df = pd.DataFrame(data, columns=headers)
+
+        hyperlinks: list[str] = []
+
+        if data:
+            sheet_id = self.worksheet.spreadsheet.id
+            sheet_name = self.worksheet.title
+
+            range_name = f"{sheet_name}!E2:E{len(data) + 1}"
+            result = (
+                self._sheets_service.spreadsheets()
+                .get(
+                    spreadsheetId=sheet_id,
+                    ranges=[range_name],
+                    fields="sheets.data.rowData.values.hyperlink",
+                )
+                .execute()
+            )
+
+            row_data = result["sheets"][0]["data"][0].get("rowData", [])
+
+            for idx in range(len(data)):
+                row = row_data[idx] if idx < len(row_data) else {}
+                values = row.get("values", [])
+                if not values:
+                    hyperlinks.append("")
+                    continue
+
+                cell = values[0] or {}
+                val = cell.get("hyperlink") or cell.get("formattedValue") or ""
+                hyperlinks.append(val)
+
+        df["LINK"] = hyperlinks or ["" for _ in range(len(df))]
+
         return df
 
     def enrich_with_vehicle_data(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -178,9 +217,11 @@ class ReportGenerator:
                     logger.error(f"Error downloading PDF for {vin}: {e}")
                     continue
 
-                # Upload to S3
-                s3_path = f"{self.worksheet_name.upper()}/{vin}_{datetime.now().strftime('%Y%m%d')}.pdf"
-                await self.s3_client.upload_file(s3_path, pdf_bytes)
+                # Upload to S3 as a public object
+                s3_path = f"{self.worksheet_name.upper()}/{datetime.now().strftime('%Y%m%d')}/{vin}_{uuid.uuid4()}.pdf"
+                await self.s3_client.upload_file(
+                    s3_path, pdf_bytes, acl=S3ACL.PUBLIC_READ
+                )
 
                 list_files.append((vin, s3_path))
 
@@ -189,7 +230,7 @@ class ReportGenerator:
         logger.info(f"Downloaded {len(list_files)} PDFs successfully")
         return list_files
 
-    async def add_presigned_urls(
+    async def add_urls(
         self, df: pd.DataFrame, list_files: list[tuple[str, str]]
     ) -> pd.DataFrame:
         """
@@ -199,7 +240,7 @@ class ReportGenerator:
         logger.info(f"Generating presigned URLs for {len(list_files)} files")
 
         for vin, s3_path in list_files:
-            url = await self.s3_client.get_presigned_url(s3_path)
+            url = f"https://{self.s3_bucket}.s3.fr-par.scw.cloud/{s3_path}"
             df.loc[df["VIN"] == vin, "LINK"] = url
 
         logger.info("Presigned URLs generated")
@@ -265,8 +306,7 @@ class ReportGenerator:
 
         list_files = await self.download_pdfs_for_vins(vins_to_download)
 
-        # Add presigned URLs
-        merged_df = await self.add_presigned_urls(merged_df, list_files)
+        merged_df = await self.add_urls(merged_df, list_files)
 
         merged_df = merged_df.drop(columns=["AVAILABLE_SOH"])
 
