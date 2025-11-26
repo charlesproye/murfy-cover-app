@@ -43,3 +43,7 @@ tests/
 dist/
 build/
 *.egg-info/
+
+# Dagster
+.tmp_dagster_home_*
+dagster_home/

@@ -6,26 +6,24 @@ import yaml
 from dagster import (
     AssetCheckResult,
     AssetExecutionContext,
-    StaticPartitionsDefinition,
     asset,
     asset_check,
 )
 from dagster_slack import slack_on_failure
 
 from bib_dagster.defs.sensors import format_slack_failure_message
+from bib_dagster.defs.spark_jobs import MAKE_PARTITIONS
 from bib_dagster.pipes.pipes_spark_operator import PipesSparkApplicationClient
 from bib_dagster.pipes.spark_resources import DriverResource, ExecutorResource
-from core.models.make import MakeEnum
 from transform.result_phases.main import ProcessedPhaseToResultPhaseCLI
-
-# Create a static partition for each make
-make_partitions = StaticPartitionsDefinition([make.value for make in MakeEnum])
 
 
 @slack_on_failure("#bib-bot-test", message_fn=format_slack_failure_message)
 @asset(
     group_name="spark_jobs",
-    partitions_def=make_partitions,
+    partitions_def=MAKE_PARTITIONS,
+    deps=["raw_ts_to_pph"],
+    op_tags={"dagster/concurrency_key": "spark_jobs"},
 )
 def raw_pph_to_rph(
     context: AssetExecutionContext,

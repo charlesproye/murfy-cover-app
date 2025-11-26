@@ -41,14 +41,52 @@ from utils.k8s import k8s_utils
 
 DEFAULT_WAIT_TIMEOUT = 3 * 60 * 60  # 3 hours
 DEFAULT_POLL_INTERVAL = 5.0  # 5 seconds
+DEFAULT_MAX_WAIT = 3600  # 1 hour, can be very long when cluster under load
 
 
-def get_spark_app_name(run_id: str, op_name: str) -> str:
-    """Generate a valid SparkApplication name from run_id and op_name."""
-    clean_op_name = re.sub("[^a-z0-9-]", "", op_name.lower().replace("_", "-"))
-    suffix = "".join(random.choice(string.digits) for i in range(6))
+def get_spark_app_name(
+    context: OpExecutionContext | AssetExecutionContext,
+) -> str:
+    """Generate a valid SparkApplication name from context, including asset name and partition.
+
+    Args:
+        context: Dagster execution context
+
+    Returns:
+        DNS-1123 compliant name (max 63 chars)
+    """
+    run_id = context.run_id
+    op_name = context.op.name
+
+    # Extract asset name and partition if available
+    asset_name = None
+    partition = None
+    if isinstance(context, AssetExecutionContext):
+        # Get asset name from the first asset key
+        if context.assets_def.keys:
+            asset_name = next(iter(context.assets_def.keys)).path[-1]
+        partition = context.partition_key if context.has_partition_key else None
+
+    # Use asset name if available, otherwise fall back to op_name
+    base_name = asset_name if asset_name else op_name
+    clean_name = re.sub("[^a-z0-9-]", "", base_name.lower().replace("_", "-"))
+
+    # Clean partition string if present
+    clean_partition = ""
+    if partition:
+        clean_partition = re.sub("[^a-z0-9-]", "", partition.lower().replace("_", "-"))
+        # Limit partition to reasonable length
+        clean_partition = f"-{clean_partition[:15]}"
+
+    suffix = "".join(
+        random.choice(string.ascii_lowercase + string.digits) for i in range(6)
+    )
+
     # SparkApplication names must be DNS-1123 compliant (max 63 chars)
-    return f"dagster-{run_id[:18]}-{clean_op_name[:20]}-{suffix}"[:63]
+    # Format: dagster-{run_id}-{name}-{partition}-{suffix}
+    # Allocate space: "dagster-" (3) + run_id (8) + "-" (1) + name (20) + partition (16) + "-" (1) + suffix (6)
+
+    return f"dg-{run_id[:8]}-{clean_name[:25]}{clean_partition}-{suffix}"[:63]
 
 
 class PipesSparkApplicationLogsMessageReader(PipesMessageReader):
@@ -73,6 +111,7 @@ class PipesSparkApplicationLogsMessageReader(PipesMessageReader):
         core_api: kubernetes.client.CoreV1Api,
         driver_pod_name: str,
         namespace: str,
+        max_wait: int = DEFAULT_MAX_WAIT,
     ):
         """Consume logs from the Spark driver pod."""
         handler = check.not_none(
@@ -82,7 +121,6 @@ class PipesSparkApplicationLogsMessageReader(PipesMessageReader):
         try:
             # Wait for driver pod to be ready
             context.log.info(f"Waiting for driver pod {driver_pod_name} to be ready...")
-            max_wait = 300  # 5 minutes
             start_time = time.time()
             is_pod_ready = False
 
@@ -149,7 +187,6 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
             Defaults to PipesEnvContextInjector.
         message_reader (Optional[PipesMessageReader]): Message reader for Pipes protocol.
             Defaults to PipesSparkApplicationLogsMessageReader.
-        poll_interval (float): Seconds to wait between status checks. Default: 5.
         forward_termination (bool): Whether to delete the SparkApplication when
             Dagster process is interrupted. Default: True.
         inject_method (Literal["env", "conf"]): How to inject Pipes context into Spark.
@@ -165,7 +202,6 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
         kube_context: str | None = None,
         context_injector: PipesContextInjector | None = None,
         message_reader: PipesMessageReader | None = None,
-        poll_interval: float = DEFAULT_POLL_INTERVAL,
         forward_termination: bool = True,
         inject_method: Literal["env", "conf"] = "env",
     ):
@@ -184,7 +220,6 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
             if message_reader is not None
             else PipesSparkApplicationLogsMessageReader()
         )
-        self.poll_interval = check.float_param(poll_interval, "poll_interval")
         self.forward_termination = check.bool_param(
             forward_termination, "forward_termination"
         )
@@ -488,7 +523,7 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
             namespace = (
                 namespace or detect_current_namespace(self.kubeconfig_file) or "default"
             )
-            app_name = get_spark_app_name(context.run_id, context.op.name)
+            app_name = get_spark_app_name(context)
 
             # Enrich spec with Pipes context
             enriched_spec = self._enrich_spark_app_spec(
@@ -536,8 +571,13 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                 if isinstance(
                     self.message_reader, PipesSparkApplicationLogsMessageReader
                 ):
-                    # Wait a bit for driver pod to be created
-                    time.sleep(5)
+                    # Wait for driver pod to be created by the SparkApplication
+                    self._wait_for_driver_pod_creation(
+                        context=context,
+                        core_api=core_api,
+                        driver_pod_name=driver_pod_name,
+                        namespace=namespace,
+                    )
                     self.message_reader.consume_driver_logs(
                         context=context,
                         core_api=core_api,
@@ -546,7 +586,7 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                     )
 
                 # Wait for SparkApplication to complete
-                final_status = self._wait_for_completion(
+                final_status, spark_app_id = self._wait_for_completion(
                     context=context,
                     custom_objects_api=custom_objects_api,
                     app_name=app_name,
@@ -557,13 +597,20 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                     f"SparkApplication {app_name} completed with state: {final_status}"
                 )
 
+                metadata = {
+                    "spark_application_name": app_name,
+                    "namespace": namespace,
+                    "final_state": final_status,
+                }
+
+                if spark_app_id:
+                    metadata["spark_history_url"] = (
+                        f"https://spark-history.bibers.fr/history/{spark_app_id}/jobs/"
+                    )
+
                 return PipesClientCompletedInvocation(
                     pipes_session,
-                    metadata={
-                        "spark_application_name": app_name,
-                        "namespace": namespace,
-                        "final_state": final_status,
-                    },
+                    metadata=metadata,
                 )
 
             except DagsterExecutionInterruptedError:
@@ -588,18 +635,76 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                         namespace=namespace,
                     )
 
+    def _wait_for_driver_pod_creation(
+        self,
+        context: OpExecutionContext | AssetExecutionContext,
+        core_api: kubernetes.client.CoreV1Api,
+        driver_pod_name: str,
+        namespace: str,
+        max_wait: int = DEFAULT_MAX_WAIT,
+    ):
+        """Wait for the driver pod to be created by the SparkApplication.
+
+        When multiple SparkApplications are launched simultaneously, the driver pod
+        creation can take longer than expected. This method polls for the pod's
+        existence before proceeding to check its status.
+
+        Args:
+            context: Dagster execution context
+            core_api: Kubernetes CoreV1Api client
+            driver_pod_name: Name of the driver pod to wait for
+            namespace: Kubernetes namespace
+            max_wait: Maximum time to wait in seconds
+
+        Raises:
+            TimeoutError: If the driver pod is not created within max_wait seconds
+        """
+        context.log.info(
+            f"Waiting for driver pod {driver_pod_name} to be created by SparkApplication..."
+        )
+        start_time = time.time()
+
+        while time.time() - start_time < max_wait:
+            try:
+                # Try to read the pod - if it exists, we're done
+                core_api.read_namespaced_pod(driver_pod_name, namespace)
+                elapsed = time.time() - start_time
+                context.log.info(
+                    f"Driver pod {driver_pod_name} created after {elapsed:.1f} seconds"
+                )
+                return
+            except kubernetes.client.ApiException as e:
+                if e.status == 404:
+                    # Pod doesn't exist yet, keep waiting
+                    time.sleep(DEFAULT_POLL_INTERVAL)
+                    continue
+                else:
+                    # Some other API error occurred
+                    raise
+
+        # Timeout reached
+        elapsed = time.time() - start_time
+        raise TimeoutError(
+            f"Driver pod {driver_pod_name} was not created within {max_wait} seconds (waited {elapsed:.1f}s)"
+        )
+
     def _wait_for_completion(
         self,
         context: OpExecutionContext | AssetExecutionContext,
         custom_objects_api: kubernetes.client.CustomObjectsApi,
         app_name: str,
         namespace: str,
-    ) -> str:
-        """Wait for SparkApplication to complete and return final state."""
+    ) -> tuple[str, str | None]:
+        """Wait for SparkApplication to complete and return final state and Spark app ID.
+
+        Returns:
+            tuple: (final_state, spark_application_id) where spark_application_id may be None
+        """
         context.log.info(f"Waiting for SparkApplication {app_name} to complete...")
 
-        max_attempts = int(DEFAULT_WAIT_TIMEOUT / self.poll_interval)
+        max_attempts = int(DEFAULT_WAIT_TIMEOUT / DEFAULT_POLL_INTERVAL)
         attempt = 0
+        logged_spark_url = False
 
         while attempt < max_attempts:
             try:
@@ -613,8 +718,14 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
 
                 status = app.get("status", {})
                 app_state = status.get("applicationState", {}).get("state", "UNKNOWN")
+                spark_app_id = status.get("sparkApplicationId")
 
                 context.log.debug(f"SparkApplication state: {app_state}")
+                if spark_app_id and not logged_spark_url:
+                    context.log.info(
+                        f"Spark History Server: https://spark-history.bibers.fr/history/{spark_app_id}/jobs/"
+                    )
+                    logged_spark_url = True
 
                 # Terminal states
                 if app_state in [
@@ -630,7 +741,7 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                         raise RuntimeError(
                             f"SparkApplication {app_name} failed with state {app_state}: {error_message}"
                         )
-                    return app_state
+                    return app_state, spark_app_id
 
             except kubernetes.client.ApiException as e:
                 if e.status == 404:
@@ -640,7 +751,7 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                     ) from e
                 raise
 
-            time.sleep(self.poll_interval)
+            time.sleep(DEFAULT_POLL_INTERVAL)
             attempt += 1
 
         raise TimeoutError(

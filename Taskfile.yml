@@ -1,0 +1,11 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  dagster:redeploy:
+    cmds:
+      - docker compose build dagster-user-deployment --push
+      - kubectl --context $BIB_KAPSULE_PROD rollout restart deployment -n dagster user-code-dagster-user-deployments-bib-code
+      - kubectl --context $BIB_KAPSULE_PROD rollout status deployment -n dagster user-code-dagster-user-deployments-bib-code
+    silent: true

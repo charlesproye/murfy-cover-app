@@ -11,8 +11,8 @@ sparkConf:
   "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
   "spark.kubernetes.container.image.pullPolicy": "Always"
   "spark.eventLog.enabled": "true"
-  "spark.eventLog.dir": "s3a://bib-dev-spark-history/spark-events"
-timeToLiveSeconds: 3600
+  "spark.eventLog.dir": "s3a://bib-prod-spark-history/spark-events"
+timeToLiveSeconds: 300
 restartPolicy:
   type: Never
 driver:

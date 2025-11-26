@@ -24,7 +24,6 @@ def resources():
         resources={
             "spark_pipes": PipesSparkApplicationClient(
                 load_incluster_config=None,
-                poll_interval=10.0,
                 forward_termination=True,
                 # Inject Pipes context via environment variables
                 inject_method="env",

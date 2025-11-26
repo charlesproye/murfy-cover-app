@@ -238,3 +238,6 @@ private.key
 !next-env.d.ts
 
 scripts/s3-benchmark.py
+
+# Dagster
+.tmp_dagster_home_*
