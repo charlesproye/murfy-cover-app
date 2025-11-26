@@ -11,6 +11,7 @@ from dagster import (
 )
 from dagster_slack import slack_on_failure
 
+from bib_dagster.config import DAGSTER_SLACK_CHANNEL
 from bib_dagster.defs.sensors import format_slack_failure_message
 from bib_dagster.defs.spark_jobs import MAKE_PARTITIONS
 from bib_dagster.pipes.pipes_spark_operator import PipesSparkApplicationClient
@@ -18,7 +19,7 @@ from bib_dagster.pipes.spark_resources import DriverResource, ExecutorResource
 from transform.processed_phases.main import RawTsToProcessedPhasesCLI
 
 
-@slack_on_failure("#bib-bot-test", message_fn=format_slack_failure_message)
+@slack_on_failure(DAGSTER_SLACK_CHANNEL, message_fn=format_slack_failure_message)
 @asset(
     group_name="spark_jobs",
     partitions_def=MAKE_PARTITIONS,

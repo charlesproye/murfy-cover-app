@@ -252,14 +252,27 @@ class S3Service:
 
     def read_parquet_df(self, key: str, **kwargs) -> DF:
         import pyarrow.parquet as pq
+        from pyarrow import fs
 
-        response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
-        parquet_bytes = response["Body"].read()  # Convert bytes to a file-like buffer
-        parquet_buffer = BytesIO(parquet_bytes)  # Use pyarrow to read the buffer
-        table = pq.read_table(
-            parquet_buffer, **kwargs
-        )  # Convert the table to a pandas DataFrame
-        return table.to_pandas()
+        try:
+            # Configure S3FileSystem with custom endpoint for Scaleway
+            s3_fs = fs.S3FileSystem(
+                region=self._settings.S3_REGION,
+                access_key=self._settings.S3_KEY,
+                secret_key=self._settings.S3_SECRET,
+                endpoint_override=self._settings.S3_ENDPOINT.replace("https://", ""),
+                scheme="https",
+            )
+            # Ensure key ends with / for consistency
+            s3_path = f"{self.bucket_name}/{key.rstrip('/')}/"
+            dataset = pq.ParquetDataset(s3_path, filesystem=s3_fs)
+            table = dataset.read(**kwargs)
+            return table.to_pandas()
+        except Exception as e:
+            self.logger.exception(
+                f"Failed to read parquet dataset {key} in bucket {self.bucket_name}: {e}"
+            )
+            raise e
 
     def read_parquet_df_spark(self, spark: SparkSession, key: str, **kwargs):
         s3_path = f"s3a://{self.bucket_name}/{key}"

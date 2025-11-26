@@ -7,13 +7,13 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --no-install-project --locked --no-dev --extra orchestration --extra transform
+    uv sync --no-install-project --locked --no-dev --extra orchestration --extra transform --extra results
 
 COPY src/ /app/src/
 COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --extra orchestration --extra transform
+    uv sync --locked --no-dev --extra orchestration --extra transform --extra results
 
 FROM python:3.11-slim-bookworm
 

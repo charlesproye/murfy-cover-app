@@ -1,8 +1,8 @@
+import logging
 from logging import getLogger
 
 import numpy as np
 import pandas as pd
-from pyspark.sql import SparkSession
 
 from core.logging_utils import set_level_of_loggers_with_prefix
 from core.s3.s3_utils import S3Service
@@ -13,7 +13,7 @@ from core.stats_utils import (
     mask_out_outliers_by_interquartile_range,
     weighted_mean,
 )
-from transform.result_phases.main import PROVIDERS
+from transform.result_phases.config import RESULT_PHASES_CACHE_KEY_TEMPLATE
 from transform.result_week.config import SOH_FILTER_EVAL_STRINGS, UPDATE_FREQUENCY
 
 
@@ -22,26 +22,31 @@ class ResultPhaseToResultWeek:
         self,
         make: str,
         log_level: str = "INFO",
-        spark: SparkSession = None,
         has_soh: bool = False,
-        has_soh_oem: bool = False,
         has_levels: bool = False,
+        logger: logging.Logger | None = None,
         **kwargs,
     ):
         self.make = make
         logger_name = f"transform.result_week.{make}"
-        self.logger = getLogger(logger_name)
+        self.logger = logger or getLogger(logger_name)
         set_level_of_loggers_with_prefix(log_level, logger_name)
         self.bucket = S3Service()
         self.settings = S3Settings()
-        self.spark = spark
         self.has_soh = has_soh
         self.has_levels = has_levels
 
-    def run(self):
+    def run(self, results_phases_path: str | None = None):
         self.logger.info(f"Running {self.make}.")
-        cls = PROVIDERS[self.make]
-        rph = cls(make=self.make, spark=self.spark, logger=self.logger).data.toPandas()
+        if results_phases_path is None:
+            rph: pd.DataFrame = self.bucket.read_parquet_df(
+                key=RESULT_PHASES_CACHE_KEY_TEMPLATE.format(
+                    make=self.make.replace("-", "_")
+                )
+                + "/"
+            )
+        else:
+            rph: pd.DataFrame = pd.read_parquet(results_phases_path)
 
         rweek = (
             rph
@@ -93,7 +98,7 @@ class ResultPhaseToResultWeek:
         nb_negative_levels = negative_charge_levels.sum().sum()
         if nb_negative_levels > 0:
             self.logger.warning(
-                f"There are {nb_negative_levels}({100 * nb_negative_levels / len(results):2f}%) negative charge levels, setting them to 0."
+                f"[{self.make}] There are {nb_negative_levels}({100 * nb_negative_levels / len(results):2f}%) negative charge levels, setting them to 0."
             )
         results[["LEVEL_1", "LEVEL_2", "LEVEL_3"]] = results[
             ["LEVEL_1", "LEVEL_2", "LEVEL_3"]

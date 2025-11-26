@@ -1,10 +1,8 @@
 import logging
-import sys
 
-from core.console_utils import main_decorator
+import pandas as pd
+
 from core.pandas_utils import concat
-from core.s3.settings import S3Settings
-from core.spark_utils import create_spark_session
 from core.sql_utils import insert_df_and_deduplicate, left_merge_rdb_table
 from transform.result_week.result_phase_to_result_week import ResultPhaseToResultWeek
 
@@ -33,29 +31,19 @@ VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
     "ESTIMATED_CYCLES": "cycles",
 }
 
+LOGGER = logging.getLogger(__name__)
 
-@main_decorator
-def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
-    )
 
-    logger = logging.getLogger("ResultPhaseToResultWeek")
-    settings = S3Settings()
-    spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
-
+def main(logger: logging.Logger = LOGGER) -> pd.DataFrame:
     result_week_list = []
 
     for make, (is_orchestrated, has_soh, has_levels) in ORCHESTRATED_MAKES.items():
         if is_orchestrated:
             result_week = ResultPhaseToResultWeek(
                 make=make,
-                spark=spark,
-                logger=logger,
                 has_soh=has_soh,
                 has_levels=has_levels,
+                logger=logger,
             ).run()
             result_week_list.append(result_week)
         else:
@@ -70,11 +58,11 @@ def main():
         "vehicle_data",
         ["vehicle_id", "timestamp"],
         VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS,
-        logger=logger,
         uuid_cols=["vehicle_id"],
     )
+
+    return df_global
 
 
 if __name__ == "__main__":
     main()
-
