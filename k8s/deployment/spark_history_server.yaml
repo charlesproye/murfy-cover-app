@@ -39,11 +39,11 @@ spec:
                 name: s3-secret
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 1
+              cpu: 200m
               memory: 512Mi
+            limits:
+              cpu: "1.5"
+              memory: 1Gi
 ---
 apiVersion: v1
 kind: Service

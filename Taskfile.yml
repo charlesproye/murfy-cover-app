@@ -23,7 +23,7 @@ tasks:
     desc: Create a backup of the production Scaleway RDB
     cmds:
       - |
-        BACKUP_ID=$(scw rdb backup create instance-id={{.RDB_INSTANCE_ID}} name="rdb-$(whoami)-$(date +%s)" database-name={{.RDB_DATABASE_NAME}} expires-at=$(date -d '+1 day' --iso=seconds) --output json | jq -r '.id')
+        BACKUP_ID=$(scw rdb backup create instance-id={{.RDB_INSTANCE_ID}} name="rdb-$(whoami)-$(date +%s)" database-name={{.RDB_DATABASE_NAME}} expires-at=$(TZ=UTC-24 date +%Y-%m-%dT%H:%M:%SZ) --output json | jq -r '.id')
         scw rdb backup wait $BACKUP_ID
         scw rdb backup export $BACKUP_ID
         echo "Backup ID: $BACKUP_ID" > .last_backup_id
