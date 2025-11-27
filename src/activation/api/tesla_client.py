@@ -7,6 +7,8 @@ from typing import ClassVar
 
 from dateutil.relativedelta import relativedelta
 
+from core.tesla.tesla_utils import FLEET_URLS, TeslaRegions
+
 
 class TeslaApi:
     """Tesla Fleet API client for vehicle management."""
@@ -62,8 +64,8 @@ class TeslaApi:
     RATE_LIMIT_DELAY: ClassVar[float] = 0.5
     MAX_RETRIES: ClassVar[int] = 3
 
-    def __init__(self, base_url: str, slack_token: str, slack_channel_id: str):
-        self.base_url = base_url
+    def __init__(self, slack_token: str, slack_channel_id: str):
+        self.base_url = FLEET_URLS[TeslaRegions.EUROPE]
         self.slack_token = slack_token
         self.slack_channel_id = slack_channel_id
         self._tokens = {}
@@ -386,4 +388,3 @@ class TeslaApi:
             f"Failed to fetch warranty info for VIN {vin} after {self.MAX_RETRIES} retries"
         )
         return None, None, None
-

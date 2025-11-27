@@ -97,6 +97,8 @@ class TeslaIndividualActivator:
         user_token.refresh_token = tokens.refresh_token
         user_token.access_token = tokens.access_token
 
+        db.commit()
+
         return user_token.access_token
 
     def activate_vehicle(self, vin: str, db: Session, token: str):
@@ -145,7 +147,7 @@ class TeslaIndividualActivator:
             self._format_error_slack_notification(vin, f"Erreur SSL: {e}")
             return {"success": False, "error": f"SSL error: {e}", "vin": vin}
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request error activating vehicle {vin}: {e}")
+            logger.error(f"Request error activating vehicle {vin}: {e} - {error_msg}")
             if error_msg:
                 self._format_error_slack_notification(
                     vin,
@@ -153,7 +155,11 @@ class TeslaIndividualActivator:
                 )
             else:
                 self._format_error_slack_notification(vin, f"{e}")
-            return {"success": False, "error": f"Request error: {e}", "vin": vin}
+            return {
+                "success": False,
+                "error": f"Request error: {e} - {error_msg}",
+                "vin": vin,
+            }
 
     async def insert_vehicle_in_db(
         self, vin: str, db: Session, token: str, tesla_api: TeslaIndividualApi

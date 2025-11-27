@@ -43,8 +43,6 @@ KIA_API_USERNAME = get_env_var("KIA_API_USERNAME")
 KIA_API_PWD = get_env_var("KIA_API_PWD")
 KIA_API_KEY = get_env_var("KIA_API_KEY")
 
-TESLA_BASE_URL = get_env_var("TESLA_BASE_URL")
-TESLA_TOKEN_URL = get_env_var("TESLA_TOKEN_URL")
 TESLA_CLIENT_ID = get_env_var("TESLA_CLIENT_ID")
 TESLA_CLIENT_SECRET = get_env_var("TESLA_CLIENT_SECRET")
 

@@ -37,7 +37,6 @@ from activation.config.credentials import (
     STELLANTIS_COMPANY_ID,
     STELLANTIS_EMAIL,
     STELLANTIS_PASSWORD,
-    TESLA_BASE_URL,
     VW_AUTH_URL,
     VW_BASE_URL,
     VW_CLIENT_PASSWORD,
@@ -105,7 +104,6 @@ async def process_vehicles(owner_filter: str | None = None):
         )
 
         tesla_api = TeslaApi(
-            base_url=TESLA_BASE_URL,
             slack_token=SLACK_TOKEN,
             slack_channel_id=METRIC_SLACK_CHANNEL_ID,
         )

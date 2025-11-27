@@ -180,10 +180,10 @@ async def refresh_token(
     user = (await db.execute(user_query)).scalar_one_or_none()
 
     tesla_individual_api = TeslaIndividualApi(
-        base_url=settings.TESLA_BASE_URL,
-        token_url=settings.TESLA_TOKEN_URL,
         client_id=settings.TESLA_CLIENT_ID,
         client_secret=settings.TESLA_CLIENT_SECRET,
+        region=user.region,
+        session=session,
     )
 
     if user_token.refresh_token is None:
@@ -191,12 +191,10 @@ async def refresh_token(
             code=user_token.code,
             redirect_uri=user_token.callback_url,
             region=user.region,
-            session=session,
         )
     else:
         tokens = await tesla_individual_api.refresh_token(
             refresh_token=user_token.refresh_token,
-            session=session,
         )
 
     user_token.access_token = tokens.access_token
