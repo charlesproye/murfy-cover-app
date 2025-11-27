@@ -22,16 +22,6 @@ class RenaultProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
             make, spark=spark, force_update=force_update, logger=logger, **kwargs
         )
 
-    def compute_soh(self, df_aggregated):
-        """
-        Compute the soh
-        """
-        df_aggregated = df_aggregated.withColumn(
-            "SOH", F.expr("try_divide(BATTERY_ENERGY, EXPECTED_BATTERY_ENERGY)")
-        )
-
-        return df_aggregated
-
     def compute_charge_levels(self, df_aggregated):
         df_aggregated = (
             df_aggregated.withColumn(

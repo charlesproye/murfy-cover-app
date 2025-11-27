@@ -11,9 +11,9 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
     def __init__(
         self,
         make="renault",
-        spark: SparkSession = None,
+        spark: SparkSession | None = None,
         force_update: bool = False,
-        logger: Logger = None,
+        logger: Logger | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -31,12 +31,26 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
             "soc", F.last("soc", ignorenulls=True).over(window_ff)
         )
 
+        # Cast columns to FloatType before arithmetic operations
         phase_df = phase_df.withColumn(
-            "expected_battery_energy",
+            "battery_energy", F.col("battery_energy").cast("float")
+        )
+        phase_df = phase_df.withColumn(
+            "net_capacity", F.col("net_capacity").cast("float")
+        )
+        phase_df = phase_df.withColumn("soc", F.col("soc").cast("float"))
+
+        phase_df = phase_df.withColumn(
+            "soh",
             F.when(
                 (F.col("net_capacity").isNotNull())
-                & (F.col("battery_energy").isNotNull()),
-                F.col("net_capacity") * (F.col("soc") / 100.0),
+                & (F.col("battery_energy").isNotNull())
+                & (F.col("soc").between(30, 99))
+                & (F.col("IS_USABLE_PHASE") == F.lit(1)),
+                F.try_divide(
+                    F.col("battery_energy") * 100,
+                    F.col("net_capacity") * F.col("soc"),
+                ),
             ).otherwise(None),
         )
 
@@ -53,8 +67,7 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
             F.first("range", ignorenulls=True).alias("RANGE"),
             # Renault specific features / Might be able to handle with config
-            F.sum("battery_energy").alias("BATTERY_ENERGY"),
-            F.sum("expected_battery_energy").alias("EXPECTED_BATTERY_ENERGY"),
+            F.expr("percentile_approx(soh, 0.5)").alias("SOH"),
             F.mean("charging_rate").alias("CHARGING_RATE"),
         ]
 

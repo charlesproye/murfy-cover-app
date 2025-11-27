@@ -12,7 +12,7 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
         make="ford",
         spark: SparkSession = None,
         force_update: bool = False,
-        logger: Logger = None,
+        logger: Logger | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -28,9 +28,14 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
             .withColumn("soc", F.col("soc").cast("double"))
             .withColumn(
                 "soh",
-                F.try_divide(
-                    F.col("battery_energy") * 100, F.col("net_capacity") * F.col("soc")
-                ),
+                F.when(
+                    (F.col("soc").between(40, 99))
+                    & (F.col("IS_USABLE_PHASE") == F.lit(1)),
+                    F.try_divide(
+                        F.col("battery_energy") * 100,
+                        F.col("net_capacity") * F.col("soc"),
+                    ),
+                ).otherwise(F.lit(None)),
             )
         )
 
@@ -47,7 +52,7 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.last("odometer", ignorenulls=True).alias("ODOMETER_LAST"),
             F.first("range", ignorenulls=True).alias("RANGE"),
             # Ford specific features / Might be able to handle with config
-            F.mean("soh").alias("SOH"),
+            F.expr("percentile_approx(soh, 0.5)").alias("SOH"),
         ]
 
         if "consumption" in phase_df.columns:
@@ -67,4 +72,3 @@ class FordRawTsToProcessedPhases(RawTsToProcessedPhases):
         ).agg(*agg_columns)
 
         return df_aggregated
-

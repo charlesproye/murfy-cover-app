@@ -276,7 +276,7 @@ def mapping_vehicle_type(
 
     ## special case for zoe
     if model_name == "zoe":
-        pattern_1 = r"(?i)(r|q\d+)"
+        pattern_1 = r"(?i)((r|q)\d+)"
         pattern_2 = r"(?<!\d)(50|40)(?!\d)"
         type_car_1 = re.search(pattern_1, type_car)
         type_car_2 = re.search(pattern_2, type_car)
