@@ -1,6 +1,7 @@
 from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from external_api.schemas.user import FleetInfo
 from external_api.services.dashboard import (
     get_brands,
     get_extremum_soh,
@@ -28,7 +29,7 @@ class DashboardCrud:
 
     async def kpis(
         self,
-        fleets: list[str],
+        fleets: list[FleetInfo] | None,
         brands: list[str],
         regions: list[str],
         pinned_vehicles: bool,
@@ -38,7 +39,7 @@ class DashboardCrud:
 
     async def scatter_plot_brands(
         self,
-        fleets: list[str],
+        fleets: list[FleetInfo] | None,
         brands: list[str],
         fleets_input_list: list[str],
         pinned_vehicles: bool,
@@ -50,7 +51,7 @@ class DashboardCrud:
 
     async def scatter_plot_regions(
         self,
-        fleets: list[str],
+        fleets: list[FleetInfo] | None,
         regions: list[str],
         fleets_input_list: list[str],
         pinned_vehicles: bool,
@@ -61,7 +62,10 @@ class DashboardCrud:
         )
 
     async def filter(
-        self, base_fleet: list[str], fleet_id: str, db: AsyncSession | None = None
+        self,
+        base_fleet: list[FleetInfo] | None,
+        fleet_id: str,
+        db: AsyncSession | None = None,
     ):
         return await get_filter(base_fleet, fleet_id, db)
 

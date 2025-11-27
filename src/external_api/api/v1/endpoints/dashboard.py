@@ -42,7 +42,7 @@ async def kpis(
     )
     brands_list = Make.split(",") if Make and "," in Make else [Make] if Make else None
     response = await DashboardCrud().kpis(
-        user.get("fleets"), brands_list, country_list, pinned_vehicles, db
+        user.fleets, brands_list, country_list, pinned_vehicles, db
     )
     return response
 
@@ -60,7 +60,7 @@ async def scatter_plot_brands(
     )
     brands_list = Make.split(",") if Make and "," in Make else [Make] if Make else None
     response = await DashboardCrud().scatter_plot_brands(
-        user.get("fleets"), brands_list, fleets_input_list, pinned_vehicles, db
+        user.fleets, brands_list, fleets_input_list, pinned_vehicles, db
     )
     return response
 
@@ -84,7 +84,7 @@ async def scatter_plot_regions(
         else None
     )
     response = await DashboardCrud().scatter_plot_regions(
-        user.get("fleets"), country_list, fleets_input_list, pinned_vehicles, db
+        user.fleets, country_list, fleets_input_list, pinned_vehicles, db
     )
     return response
 
@@ -103,7 +103,7 @@ async def individual_kpis(
 async def range_soh(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
     type: str = Query(None, description="The type"),
 ):
     response = await DashboardCrud().range_soh(fleet_id, type, db)
@@ -115,7 +115,7 @@ async def new_vehicles(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     period: str = Query(None, description="The period"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().new_vehicles(fleet_id, period, db)
     return response
@@ -126,7 +126,7 @@ async def table_brand(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     filter: str = Query(None, description="The filter"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().table_brand(fleet_id, filter, db)
     return response
@@ -139,7 +139,7 @@ async def filters(
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await DashboardCrud().filter(
-        base_fleet=user.get("fleets"), fleet_id=fleet_id, db=db
+        base_fleet=user.fleets, fleet_id=fleet_id, db=db
     )
     return response
 
@@ -150,7 +150,7 @@ async def search_vin(
     vin: str = Path(..., description="The vin"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
-    fleets_ids = [fleet.id for fleet in user.fleets]
+    fleets_ids = [fleet.id for fleet in user.fleets] if user.fleets else []
     response = await DashboardCrud().search_vin(vin, fleets_ids, db)
     return response
 
@@ -176,7 +176,7 @@ async def global_table(
     )
     brands_list = Make.split(",") if Make and "," in Make else [Make] if Make else None
     response = await DashboardCrud().global_table(
-        user.get("fleets"), brands_list, country_list, pinned_vehicles, db
+        user.fleets, brands_list, country_list, pinned_vehicles, db
     )
     return response
 

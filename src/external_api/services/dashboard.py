@@ -10,7 +10,7 @@ from external_api.schemas.user import FleetInfo
 
 
 async def get_kpis(
-    fleets: list[FleetInfo],
+    fleets: list[FleetInfo] | None,
     brands: list[UUID4] | None = None,
     regions: list[UUID4] | None = None,
     pinned_vehicles: bool = False,
@@ -30,7 +30,7 @@ async def get_kpis(
         List of KPIs
     """
     # Extract fleet IDs from FleetInfo objects
-    fleet_id_list = [fleet.get("id") for fleet in fleets] if fleets else []
+    fleet_id_list = [fleet.id for fleet in fleets] if fleets else []
 
     query = text("""
         WITH latest_vehicle_data AS (
@@ -75,15 +75,16 @@ async def get_kpis(
 
 
 async def get_scatter_plot_brands(
-    fleets: list[str],
+    fleets: list[FleetInfo] | None,
     brands: list[str] | None,
     fleets_input_list: list[str],
     pinned_vehicles: bool = False,
     db: AsyncSession = None,
 ):
     brands_list = brands if brands else None
+    fleet_ids = [fleet.id for fleet in fleets] if fleets else []
     fleet_list = (
-        fleets
+        fleet_ids
         if not fleets_input_list or fleets_input_list[0].lower() == "all"
         else fleets_input_list
     )
@@ -154,15 +155,16 @@ async def get_scatter_plot_brands(
 
 
 async def get_scatter_plot_regions(
-    fleets: list[str],
+    fleets: list[FleetInfo] | None,
     regions: list[str] | None,
     fleets_input_list: list[str],
     pinned_vehicles: bool = False,
     db: AsyncSession = None,
 ):
     regions_list = regions if regions else None
+    fleet_ids = [fleet.id for fleet in fleets] if fleets else []
     fleet_list = (
-        fleets
+        fleet_ids
         if not fleets_input_list or fleets_input_list[0].lower() == "all"
         else fleets_input_list
     )
@@ -233,13 +235,13 @@ async def get_scatter_plot_regions(
 
 
 async def get_global_table(
-    fleet_ids: list[FleetInfo],
+    fleets: list[FleetInfo] | None,
     brands: list[UUID4] | None = None,
     regions: list[UUID4] | None = None,
     pinned_vehicles: bool = False,
     db: AsyncSession = None,
 ) -> list[dict]:
-    fleet_id_list = [fleet.get("id") for fleet in fleet_ids] if fleet_ids else []
+    fleet_id_list = [fleet.id for fleet in fleets] if fleets else []
 
     query = text("""
         WITH latest_vehicle_data AS (
@@ -464,7 +466,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
 
 
 async def get_filter(
-    base_fleet: list[FleetInfo],
+    base_fleet: list[FleetInfo] | None,
     fleet_id: UUID4 | None = None,
     db: AsyncSession = None,
 ) -> list[dict]:
@@ -480,7 +482,7 @@ async def get_filter(
         List of filter data
     """
     # Extract fleet IDs from FleetInfo objects
-    fleet_id_list = [fleet.get("id") for fleet in base_fleet] if base_fleet else []
+    fleet_id_list = [fleet.id for fleet in base_fleet] if base_fleet else []
 
     query = text("""
         WITH brands AS (
