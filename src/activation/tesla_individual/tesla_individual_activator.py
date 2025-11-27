@@ -103,7 +103,8 @@ class TeslaIndividualActivator:
 
     def activate_vehicle(self, vin: str, db: Session, token: str):
         service_url = get_env_var("TESLA_VEHICLE_COMMAND_SERVICE_URL")
-        fleet_cert = Path(FLEET_TELEMETRY_CERT_PATH).read_text().replace("\n", "\\n")
+        # The file itself is a PEM file (multiple lines), we just reaad it as it is
+        fleet_cert = Path(FLEET_TELEMETRY_CERT_PATH).read_text()
 
         payload = {
             "config": {
@@ -222,7 +223,14 @@ class TeslaIndividualActivator:
                     logger.info(f"Vehicle {vin} already exists in DB")
                     continue
 
-                token: str | None = await self.check_refresh_token(vin, db, tesla_api)
+                try:
+                    token: str | None = await self.check_refresh_token(
+                        vin, db, tesla_api
+                    )
+                except Exception as e:
+                    logger.error(f"Error checking refresh token for vehicle {vin}: {e}")
+                    continue
+
                 if token is None:
                     continue
 

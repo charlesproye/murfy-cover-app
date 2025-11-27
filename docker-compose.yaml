@@ -8,6 +8,7 @@ services:
     container_name: data_ev
     env_file:
       - .env
+
   activation_service:
     platform: linux/amd64
     image: rg.fr-par.scw.cloud/data-engineering/activation:latest
@@ -17,6 +18,7 @@ services:
     container_name: activation
     env_file:
       - .env
+
   ev_database_service:
     platform: linux/amd64
     image: rg.fr-par.scw.cloud/data-engineering/ev_database:latest

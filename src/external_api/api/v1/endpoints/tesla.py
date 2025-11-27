@@ -16,12 +16,10 @@ from sqlalchemy.sql import insert, select, update
 from core.tesla.tesla_individual_api import TeslaIndividualApi
 from db_models.user_tokens import User, UserToken
 from external_api.core.config import settings
-from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.core.http_client import HTTP_CLIENT
 from external_api.core.utils import replace_in_url, strip_params_from_url
 from external_api.db.session import get_db
 from external_api.schemas.tesla import TeslaCreateUserRequest
-from external_api.schemas.user import GetCurrentUser
 
 LOGGER = logging.getLogger(__name__)
 
@@ -107,7 +105,6 @@ async def create_user(
     create_user_request: TeslaCreateUserRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
 ) -> str:
     """
     Creates a new Tesla user and returns the authentication URL.
@@ -154,7 +151,6 @@ async def refresh_token(
     user_id: uuid.UUID,
     session: aiohttp.ClientSession = Depends(HTTP_CLIENT),
     db: AsyncSession = Depends(get_db),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
 ) -> dict[str, str]:
     if not all([settings.TESLA_CLIENT_ID, settings.TESLA_CLIENT_SECRET]):
         raise HTTPException(
@@ -177,7 +173,7 @@ async def refresh_token(
         )
 
     user_query = select(User).where(User.id == user_id)
-    user = (await db.execute(user_query)).scalar_one_or_none()
+    user: User = (await db.execute(user_query)).scalar_one_or_none()
 
     tesla_individual_api = TeslaIndividualApi(
         client_id=settings.TESLA_CLIENT_ID,
@@ -197,9 +193,16 @@ async def refresh_token(
             refresh_token=user_token.refresh_token,
         )
 
-    user_token.access_token = tokens.access_token
-    user_token.refresh_token = tokens.refresh_token
-    user_token.expires_at = datetime.now(tz=UTC) + timedelta(seconds=tokens.expires_in)
+    await db.execute(
+        update(UserToken)
+        .where(UserToken.id == user_token.id)
+        .values(
+            access_token=tokens.access_token,
+            refresh_token=tokens.refresh_token,
+            expires_at=datetime.now(UTC).replace(tzinfo=None)
+            + timedelta(seconds=tokens.expires_in),
+        )
+    )
     await db.commit()
 
     return {"message": f"Tokens refreshed successfully for user={user_id}"}

@@ -19,6 +19,13 @@ tasks:
       - kubectl --context $BIB_KAPSULE_PROD rollout status deployment -n dagster user-code-dagster-user-deployments-bib-code
     silent: true
 
+  evalue:back:build-deploy:
+    cmds:
+      - docker compose build external_api --push
+      - kubectl --context $BIB_KAPSULE_PROD rollout restart deployment -n evalue external-api
+      - kubectl --context $BIB_KAPSULE_PROD rollout status deployment -n evalue external-api
+    silent: true
+
   db:production:backup:
     desc: Create a backup of the production Scaleway RDB
     cmds:
@@ -26,7 +33,6 @@ tasks:
         BACKUP_ID=$(scw rdb backup create instance-id={{.RDB_INSTANCE_ID}} name="rdb-$(whoami)-$(date +%s)" database-name={{.RDB_DATABASE_NAME}} expires-at=$(TZ=UTC-24 date +%Y-%m-%dT%H:%M:%SZ) --output json | jq -r '.id')
         scw rdb backup wait $BACKUP_ID
         scw rdb backup export $BACKUP_ID
-        echo "Backup ID: $BACKUP_ID" > .last_backup_id
         echo "To restore this backup, run: task db:restore"
         echo "🚨 This is only usable for now because the DB is small (~10MB). When reaching a few GB, we'll need to think about something else."
     silent: true
