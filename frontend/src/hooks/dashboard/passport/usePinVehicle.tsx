@@ -17,11 +17,10 @@ export const usePostPinVehicle = (
   const postPinVehicle = async (isPinned: boolean): Promise<void> => {
     setIsSubmitting(true);
     setError(null);
-    const is_pinned = isPinned ? true : false;
     try {
       await fetchWithAuth(`${ROUTES.PIN_VEHICLE}/${vin}`, {
         method: 'POST',
-        body: JSON.stringify({ is_pinned: is_pinned }),
+        body: JSON.stringify(isPinned),
       });
     } catch (err: unknown) {
       setError(err as string);

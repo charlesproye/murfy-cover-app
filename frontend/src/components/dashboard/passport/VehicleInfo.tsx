@@ -17,6 +17,7 @@ import PassportPdf from '@/components/pdf/PassportPdf';
 import ReportModal from './report/ReportModal';
 import MiniScoreCard from './datacard/MiniScoreCard';
 import useGetPriceForecast from '@/hooks/dashboard/passport/useGetPriceForecast';
+import useGetKpiAdditional from '@/hooks/dashboard/passport/useGetKpiAdditional';
 
 const labelClass = 'text-black text-xs md:text-sm';
 const valueClass = 'text-right text-gray text-sm';
@@ -112,8 +113,10 @@ const VehicleInfoMain: React.FC<{ vin: string | undefined }> = ({ vin }) => {
 
 const VehicleStats: React.FC<{ vin: string | undefined }> = ({ vin }) => {
   const { data: infoVehicle, isLoading } = useGetInfoVehicle(vin);
+  const { data: kpiAdditional, isLoading: isKpiAdditionalLoading } =
+    useGetKpiAdditional(vin);
 
-  if (isLoading || !infoVehicle) {
+  if (isLoading || isKpiAdditionalLoading) {
     return (
       <div className={boxClass}>
         <div className="w-full h-[120px] animate-pulse flex items-center justify-center">
@@ -122,6 +125,11 @@ const VehicleStats: React.FC<{ vin: string | undefined }> = ({ vin }) => {
       </div>
     );
   }
+
+  if (!infoVehicle || !kpiAdditional) {
+    return <div className={boxClass}>No data</div>;
+  }
+
   return (
     <div className={boxClass}>
       <div className={titleClass}>
@@ -146,8 +154,18 @@ const VehicleStats: React.FC<{ vin: string | undefined }> = ({ vin }) => {
         <div className="flex justify-between items-center">
           <span className={labelClass}>Consumption</span>
           <span className="text-right text-xs md:text-sm text-gray">
-            {infoVehicle.battery_info.consumption}
+            {formatNumber(kpiAdditional.consumption)} kWh/100 km
           </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className={labelClass}>Total Cycles</span>
+          <span className="text-right text-xs md:text-sm text-gray">
+            {infoVehicle.vehicle_info.cycles} cycles
+          </span>
+        </div>
+        <div className="flex flex-col gap-y-1">
+          <span className={labelClass}>Score</span>
+          <MiniScoreCard score={infoVehicle.vehicle_info.score} />
         </div>
       </div>
     </div>
@@ -221,10 +239,6 @@ const VehicleActions: React.FC<VehicleActionsProps> = ({
               </div>
             </>
           )}
-        <div className="flex flex-col gap-y-1">
-          <span className={labelClass}>Score</span>
-          <MiniScoreCard score={infoVehicle.vehicle_info.score} />
-        </div>
       </div>
     </div>
   );
