@@ -7,6 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 
+def _to_int(value) -> int | None:
+    if value is None:
+        return None
+    return int(value)
+
+
+def _to_float(value) -> float | None:
+    if value is None:
+        return None
+    return float(value)
+
+
 async def get_kpis(vin: str, db: AsyncSession):
     query = text("""
         WITH vehicle_info AS (
@@ -406,7 +418,7 @@ async def get_infos(vin: str, db: AsyncSession):
     data = result.mappings().first()
 
     if not data:
-        print("ERREUR: Données absentes ou véhicule non affichable")
+        logger.error("Missing data or vehicle not available for VIN lookup")
         raise HTTPException(
             status_code=404, detail="Vehicle not found or not available"
         )
@@ -434,9 +446,7 @@ async def get_infos(vin: str, db: AsyncSession):
             "capacity": data["capacity"],
             "range": data["range"] if data["range"] is not None else 0,
             "consumption": data["consumption"],
-            "soh": data["soh"] * 100
-            if data["soh"]
-            else None,
+            "soh": data["soh"] * 100 if data["soh"] else None,
             "trendline": data["trendline"],
         },
         "end_of_contract_date": data["end_of_contract_date"].isoformat()
@@ -883,4 +893,3 @@ async def get_pinned_vehicle(vin: str, db: AsyncSession):
     """)
     result = await db.execute(query, {"vin": vin})
     return result.mappings().first()
-

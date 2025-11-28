@@ -10,6 +10,7 @@ from external_api.api.v1.endpoints import (
     individual,
     model,
     passport,
+    premium_report,
     static_data,
     tesla,
 )
@@ -30,6 +31,9 @@ api_router.include_router(
 )
 api_router.include_router(billing.router, prefix="/billing", tags=["Billing"])
 api_router.include_router(individual.router, prefix="/individual", tags=["Individual"])
+api_router.include_router(
+    premium_report.router, prefix="/premium_report", tags=["Reports"]
+)
 
 # Routes cachées de la documentation OpenAPI
 hidden_router = APIRouter(include_in_schema=False)
@@ -41,6 +45,4 @@ hidden_router.include_router(
     flash_report.flash_report_router, prefix="/flash_report", tags=["Flash Report"]
 )
 hidden_router.include_router(tesla.tesla_router, prefix="/tesla", tags=["Tesla"])
-
-
 api_router.include_router(hidden_router)

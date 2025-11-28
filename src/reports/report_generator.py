@@ -3,17 +3,19 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from playwright.async_api import async_playwright
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import ColumnElement
 
 from core.env_utils import get_env_var
 from core.gdrive_utils import get_google_service
 from core.gsheet_utils import get_google_client
 from core.s3.async_s3 import S3ACL, AsyncS3
 from core.sql_utils import get_sqlalchemy_engine
-from db_models.vehicle import Vehicle, VehicleData, VehicleModel
+from db_models.vehicle import PremiumReport, Vehicle, VehicleData, VehicleModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,8 +29,8 @@ class ReportGenerator:
 
     def __init__(
         self,
-        spreadsheet_id: str,
-        worksheet_name: str,
+        spreadsheet_id: str | None = None,
+        worksheet_name: str = "API",
         s3_bucket: str = "bib-premium-reports",
     ):
         """
@@ -77,6 +79,9 @@ class ReportGenerator:
         """
         Load data from Google Sheet and extract actual hyperlinks in column 'LINK'.
         """
+        if self.spreadsheet_id is None:
+            raise ValueError("Spreadsheet ID is required")
+
         logger.info(f"Loading data from Google Sheet: {self.worksheet_name}")
 
         all_values = self.worksheet.get_all_values()
@@ -124,10 +129,12 @@ class ReportGenerator:
         Enrich DataFrame with vehicle model data from database.
         """
         logger.info(f"Enriching {len(df)} vehicles with database data")
+        vin_list = df["VIN"].astype(str).dropna().tolist()
+        vehicle_vin_column = cast(ColumnElement[str], Vehicle.vin)
 
         with self.session_factory() as session:
             # Vin and ability to compute SoH
-            results = (
+            results: list[tuple[str, bool | None, bool | None]] = (
                 session.query(
                     Vehicle.vin,
                     VehicleModel.soh_data,
@@ -135,7 +142,7 @@ class ReportGenerator:
                 )
                 .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
                 .filter(Vehicle.activation_status)
-                .filter(Vehicle.vin.in_(df["VIN"].astype(str)))
+                .filter(vehicle_vin_column.in_(vin_list))
                 .all()
             )
 
@@ -143,12 +150,16 @@ class ReportGenerator:
             sohs = (
                 session.query(Vehicle.vin)
                 .join(VehicleData, Vehicle.id == VehicleData.vehicle_id)
-                .filter(Vehicle.vin.in_(df["VIN"].astype(str)))
+                .filter(vehicle_vin_column.in_(vin_list))
                 .filter(VehicleData.soh.isnot(None))
                 .all()
             )
 
-        query_df = pd.DataFrame(results, columns=["VIN", "SOH_DATA", "SOH_OEM"])
+        query_rows = [
+            {"VIN": vin, "SOH_DATA": soh_data, "SOH_OEM": soh_oem}
+            for vin, soh_data, soh_oem in results
+        ]
+        query_df = pd.DataFrame(query_rows)
         query_df["SOH"] = query_df["SOH_DATA"] | query_df["SOH_OEM"]
         merged_df = df.merge(query_df, on="VIN", how="left")
 
@@ -230,6 +241,24 @@ class ReportGenerator:
         logger.info(f"Downloaded {len(list_files)} PDFs successfully")
         return list_files
 
+    async def load_to_db(
+        self, list_files: list[tuple[str, str]], task_id: str | None = None
+    ) -> None:
+        for vin, s3_path in list_files:
+            url = f"https://{self.s3_bucket}.s3.fr-par.scw.cloud/{s3_path}"
+
+            with self.session_factory() as session:
+                stmt = session.query(Vehicle.id).where(Vehicle.vin == vin)
+                vehicle_id = stmt.scalar_one()
+
+                premium_report = PremiumReport(
+                    vehicle_id=vehicle_id,
+                    report_url=url,
+                    task_id=task_id,
+                )
+                session.add(premium_report)
+                session.commit()
+
     async def add_urls(
         self, df: pd.DataFrame, list_files: list[tuple[str, str]]
     ) -> pd.DataFrame:
@@ -307,6 +336,8 @@ class ReportGenerator:
         list_files = await self.download_pdfs_for_vins(vins_to_download)
 
         merged_df = await self.add_urls(merged_df, list_files)
+
+        await self.load_to_db(list_files)
 
         merged_df = merged_df.drop(columns=["AVAILABLE_SOH"])
 

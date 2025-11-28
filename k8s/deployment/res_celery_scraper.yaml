@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: res-celery-scraper
+  namespace: data-engineering
+  labels:
+    app: res-celery-scraper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: res-celery-scraper
+  template:
+    metadata:
+      labels:
+        app: res-celery-scraper
+    spec:
+      containers:
+      - name: res-celery-scraper
+        image: rg.fr-par.scw.cloud/data-engineering/premium_report:latest
+        imagePullPolicy: Always
+        command:
+          - celery
+          - -A
+          - reports.workers.celery_config
+          - worker
+          - --loglevel=info
+          - --queues=pdf_generation
+          - --concurrency=2
+          - --max-tasks-per-child=50
+        env:
+          - name: REDIS_HOST
+            value: valkey.data-engineering.svc
+          - name: REDIS_PORT
+            value: "6379"
+          - name: REDIS_DB_INGESTION
+            value: "1"
+          - name: S3_BUCKET
+            value: "bib-premium-reports"
+        envFrom:
+          - secretRef:
+              name: s3-secret
+          - secretRef:
+              name: get-ev-account-secret
+          - secretRef:
+              name: google-secret
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - reports.workers.celery_config
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - reports.workers.celery_config
+            - inspect
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+      restartPolicy: Always

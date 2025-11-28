@@ -111,4 +111,3 @@ async def get_price(
 ):
     response = await PassportCrud().get_price_forecast(vin, db)
     return response
-

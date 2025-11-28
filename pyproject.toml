@@ -126,6 +126,7 @@ scraping_playwright = [
     "google-api-python-client>=2.157.0",
     "pyyaml>=6.0",
     "psycopg2-binary>=2.9.9",
+    "celery>=5.4.0",
 ]
 
 external_api = [
@@ -155,6 +156,7 @@ external_api = [
     "scikit-learn>=1.5.1",
     "greenlet>=2.0.1",
     "aiohttp>=3.13",
+    "celery>=5.4.0",
 ]
 
 migrations = [

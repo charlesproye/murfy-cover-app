@@ -54,6 +54,7 @@ def get_commissioning_date(vehicle):
         ).date()
     except:
         end_date = vehicle.get("Availability_Date_To")
+
     return start_date, end_date
 
 
@@ -151,6 +152,7 @@ def get_or_create_vehicle_model(
     session: Session, vehicle: dict[str, Any], make_id: uuid.UUID, battery_id: uuid.UUID
 ) -> None:
     """Get or create a Vehicle Model record."""
+
     vehicle_id = vehicle.get("Vehicle_ID")
     evdb_model_id = str(vehicle_id) if vehicle_id is not None else None
     vehicle_model = vehicle.get("Vehicle_Model", "unknown")
@@ -228,10 +230,8 @@ def get_or_create_vehicle_model(
             model.warranty_km = vehicle.get("Battery_Warranty_Mileage")
         if vehicle.get("EVDB_Detail_URL") is not None:
             model.source = vehicle.get("EVDB_Detail_URL")
-        if start_date is not None:
-            model.commissioning_date = start_date
-        if end_date is not None:
-            model.end_of_life_date = end_date
+        model.commissioning_date = start_date
+        model.end_of_life_date = end_date
         if battery_id is not None:
             model.battery_id = battery_id
         if evdb_model_id is not None:

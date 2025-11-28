@@ -332,3 +332,12 @@ class FlashReportCombination(BaseUUIDModel):
         default=LanguageEnum.EN,
         server_default=LanguageEnum.EN,
     )
+
+
+class PremiumReport(BaseUUIDModel):
+    __tablename__ = "premium_report"
+    vehicle_id: Mapped[uuid.UUID] = Column(ForeignKey("vehicle.id"), nullable=False)
+    report_url: str = Column(String(2000), nullable=False)
+    task_id: str | None = Column(String(255))
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

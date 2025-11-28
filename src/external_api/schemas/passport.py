@@ -48,4 +48,3 @@ class PassportCrud:
 
     async def get_price_forecast(self, vin: str, db: AsyncSession | None = None):
         return await get_price_forecast(vin, db)
-
