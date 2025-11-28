@@ -17,7 +17,7 @@ const HorizontalBarPassport: React.FC<RangeBarChartProps> = ({ data }) => {
             <p className="text-gray-blue text-sm">Minimum Range</p>
           </span>
           <span className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#a1c3fa]"></div>
+            <div className="w-2 h-2 rounded-full bg-blue-less-filled"></div>
             <p className="text-gray-blue text-sm">Estimated Range</p>
           </span>
         </div>

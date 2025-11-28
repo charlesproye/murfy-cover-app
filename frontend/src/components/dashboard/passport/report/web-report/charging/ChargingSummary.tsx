@@ -27,7 +27,7 @@ const ChargingSummary: React.FC<ChargingSummaryProps> = ({ reportData }) => {
   }, [reportData.battery_info?.capacity]);
 
   return (
-    <div className="rounded-xl shadow-sm max-w-4xl w-full overflow-hidden bg-white">
+    <div className="rounded-xl shadow-xs max-w-4xl w-full overflow-hidden bg-white">
       <div className="w-full p-4 md:p-6">
         <div className="flex items-center justify-start space-x-2 mb-5">
           <div className="w-6 h-6 rounded-full flex items-center justify-center">
@@ -84,7 +84,7 @@ const ChargingSummary: React.FC<ChargingSummaryProps> = ({ reportData }) => {
             </tbody>
           </table>
         </div>
-        <div className="w-full mt-4 overflow-hidden border border-green-rapport-light rounded-lg shadow-sm flex flex-col md:flex-row">
+        <div className="w-full mt-4 overflow-hidden border border-green-rapport-light rounded-lg shadow-xs flex flex-col md:flex-row">
           <div className="bg-green-rapport-light/10 px-4 py-3 w-full flex flex-col justify-center">
             <p className="text-xs text-gray">
               {vehicleHasData

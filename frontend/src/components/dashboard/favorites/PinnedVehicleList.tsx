@@ -119,7 +119,7 @@ const PinnedVehicleList: React.FC = () => {
   const activeTabLabel = TABS.find((tab) => tab.key === activeTab)?.label || '';
 
   return (
-    <div className="w-full bg-white rounded-2xl shadow p-6">
+    <div className="w-full bg-white rounded-2xl shadow-sm p-6">
       {/* Sélecteur de VIN */}
       <div className="mb-8">
         <label htmlFor="vin" className="block text-sm text-gray mb-2">
@@ -132,7 +132,7 @@ const PinnedVehicleList: React.FC = () => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Enter a VIN"
-            className="w-1/8 px-4 py-1 border border-primary rounded-xl text-sm focus:outline-none focus:border-primary"
+            className="w-1/8 px-4 py-1 border border-primary rounded-xl text-sm focus:outline-hidden focus:border-primary"
           />
           {isLoading && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -194,7 +194,7 @@ const PinnedVehicleList: React.FC = () => {
             <button
               key={tab.key}
               className={`px-4 py-1 rounded-xl text-sm transition ${
-                activeTab === tab.key ? 'bg-primary text-white shadow' : 'text-gray'
+                activeTab === tab.key ? 'bg-primary text-white shadow-sm' : 'text-gray'
               }`}
               onClick={() => setActiveTab(tab.key)}
             >

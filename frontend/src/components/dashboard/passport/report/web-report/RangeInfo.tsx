@@ -53,7 +53,7 @@ const RangeInfo: React.FC<RangeInfoProps> = ({ reportData }) => {
   };
 
   return (
-    <div className="w-full md:w-1/2 bg-white rounded-xl p-4 md:p-6 shadow-sm">
+    <div className="w-full md:w-1/2 bg-white rounded-xl p-4 md:p-6 shadow-xs">
       <div className="flex items-center space-x-2 mb-4">
         <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
           <IconCircleCheck size={24} className="text-green-rapport" />

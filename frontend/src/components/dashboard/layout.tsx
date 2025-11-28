@@ -48,7 +48,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex flex-row min-h-[calc(100dvh)] h-[calc(100dvh)] overflow-hidden">
-      <div className="flex bg-white dark:bg-dark-white h-[calc(100dvh)] flex-col w-14 sm:w-40 md:w-56 flex-shrink-0">
+      <div className="flex bg-white dark:bg-dark-white h-[calc(100dvh)] flex-col w-14 sm:w-40 md:w-56 shrink-0">
         <div className="flex flex-col text-black dark:text-dark-dark px-2 overflow-auto z-20 h-full">
           <Link href="/dashboard">
             <div className="flex items-center mt-3 mb-3">
@@ -70,7 +70,7 @@ export default function DashboardLayout({
               </p>
             </div>
           </Link>
-          <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-2 border-[#e5e7eb]" />
+          <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-2 border-cool-gray-200" />
           <div className="mt-6 ml-0 sm:ml-2">
             <p className="hidden sm:block uppercase text-gray dark:text-dark-gray-light text-xs tracking-widest">
               {' '}
@@ -156,7 +156,7 @@ export default function DashboardLayout({
               </div>
             </Link>
           </div>
-          <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-4 border-[#e5e7eb]" />
+          <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-4 border-cool-gray-200" />
           <div className="mt-0 sm:mt-6 ml-0 sm:ml-2">
             <p className="hidden sm:block uppercase text-gray dark:text-dark-gray-light text-xs tracking-widest">
               {' '}
@@ -216,14 +216,14 @@ export default function DashboardLayout({
               </div>
             </Link>
           </div>
-          <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-4 border-[#e5e7eb] mb-3" />
+          <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-4 border-cool-gray-200 mb-3" />
           {!isActive('global') && <ChangeFleet />}
           <div className="flex mt-auto mb-4 ml-2 gap-2 items-center cursor-pointer">
             <Logout />
           </div>
         </div>
       </div>
-      <div className="flex flex-col flex-grow min-h-[calc(100dvh)] h-full overflow-auto overflow-x-hidden border-l border-gray-background">
+      <div className="flex flex-col grow min-h-[calc(100dvh)] h-full overflow-auto overflow-x-hidden border-l border-gray-background">
         <div className="bg-white flex h-14 sm:h-[70px] px-8">
           <div className="flex w-full items-center min-h-[70px]">
             <div className="flex-1">
@@ -269,7 +269,7 @@ export default function DashboardLayout({
             </div>
           </div>
         </div>
-        <div className="flex-grow lg:px-8 py-4 px-4 max-w-screen-xl w-full mx-auto">
+        <div className="grow lg:px-8 py-4 px-4 max-w-(--breakpoint-xl) w-full mx-auto">
           <Toaster position="bottom-right" richColors />
           {children}
         </div>

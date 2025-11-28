@@ -66,9 +66,9 @@ const PassPort: React.FC = () => {
           <div className="flex items-center gap-6">
             <div className="flex gap-4">
               <span className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#2d67f6]"></div>
+                <div className="w-2 h-2 rounded-full bg-blue-almost-filled"></div>
                 <p className="text-gray-blue text-sm">Vehicle SoH</p>
-                <div className="w-4 h-[2px] border-t-2 border-dashed border-[#2d67f6]"></div>
+                <div className="w-4 h-[2px] border-t-2 border-dashed border-blue-almost-filled"></div>
                 <p className="text-gray-blue text-sm">Prediction</p>
               </span>
               <span className="flex items-center gap-2">

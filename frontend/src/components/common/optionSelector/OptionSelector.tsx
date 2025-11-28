@@ -19,7 +19,7 @@ const OptionSelector: React.FC<OptionSelectorProps> = ({
       <select
         value={selectedValue}
         onChange={(event) => changeDataOption(event.target.value)}
-        className="w-full rounded-lg focus:outline-none text-[14px] leading-4 font-medium"
+        className="w-full rounded-lg focus:outline-hidden text-[14px] leading-4 font-medium"
       >
         <option value="all">All</option>
         {data?.data?.map((filter: FilterData) => (

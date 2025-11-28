@@ -216,7 +216,7 @@ const SohChart: React.FC<SohChartProps> = ({ reportData }) => {
   };
 
   return (
-    <div className="rounded-xl mb-6 shadow-sm max-w-4xl w-full overflow-hidden">
+    <div className="rounded-xl mb-6 shadow-xs max-w-4xl w-full overflow-hidden">
       <div className="bg-white w-full p-4 md:p-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center space-x-2">

@@ -58,7 +58,7 @@ const ListFilter: React.FC<ListFilterProps> = ({ selectedFilters, onFiltersChang
     <>
       <div className="flex flex-col gap-4">
         {/* Toggle pour les véhicules épinglés */}
-        <div className="flex items-center gap-4 bg-white rounded-xl shadow px-4 py-3 w-fit">
+        <div className="flex items-center gap-4 bg-white rounded-xl shadow-sm px-4 py-3 w-fit">
           <span className="font-light text-sm text-gray-blue">
             {showPinnedOnly ? 'Show all vehicles' : 'Show favorite vehicles only'}
           </span>
@@ -69,8 +69,8 @@ const ListFilter: React.FC<ListFilterProps> = ({ selectedFilters, onFiltersChang
               checked={showPinnedOnly}
               onChange={(e) => handlePinnedChange(e.target.checked)}
             />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:bg-green-500 transition-all"></div>
-            <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full shadow peer-checked:translate-x-5 transition-all"></div>
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-hidden peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:bg-green-500 transition-all"></div>
+            <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full shadow-sm peer-checked:translate-x-5 transition-all"></div>
           </label>
         </div>
 

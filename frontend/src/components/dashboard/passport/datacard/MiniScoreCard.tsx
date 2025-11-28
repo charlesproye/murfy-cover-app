@@ -27,7 +27,7 @@ const MiniScoreCard: React.FC<{ score: Score }> = ({ score }) => {
   return (
     <div className="flex items-center w-[90%] justify-center mt-2 min-w-[120px]">
       <div className="relative flex-1 flex items-center h-4">
-        <div className="flex w-full h-4 rounded overflow-hidden shadow-sm">
+        <div className="flex w-full h-4 rounded overflow-hidden shadow-xs">
           <div className="flex-1 bg-green-500" />
           <div className="flex-1 bg-green-400" />
           <div className="flex-1 bg-yellow-400" />

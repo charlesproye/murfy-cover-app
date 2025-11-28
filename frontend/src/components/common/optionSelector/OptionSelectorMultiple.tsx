@@ -74,7 +74,7 @@ const OptionSelectorMultiple: React.FC<OptionSelectorMultipleProps> = ({
       {isOpen && (
         <div
           className="absolute top-full left-0 w-full mt-2 bg-white
-          rounded-lg shadow-lg z-[1000] max-h-[280px] overflow-y-auto"
+          rounded-lg shadow-lg z-1000 max-h-[280px] overflow-y-auto"
         >
           <div className="p-2">
             <label

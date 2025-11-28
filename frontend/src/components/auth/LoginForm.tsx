@@ -22,7 +22,7 @@ const LoginForm = (): React.ReactElement => {
           type="email"
           autoComplete="email"
           placeholder="Enter your email"
-          className="w-full outline-none bg-[#F2F2F2] rounded-xl p-3 placeholder:text-[#808080]"
+          className="w-full outline-hidden bg-[#F2F2F2] rounded-xl p-3 placeholder:text-[#808080]"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -39,7 +39,7 @@ const LoginForm = (): React.ReactElement => {
           type="password"
           autoComplete="current-password"
           placeholder="Enter your password"
-          className="w-full outline-none bg-[#F2F2F2] rounded-xl p-3 placeholder:text-[#808080]"
+          className="w-full outline-hidden bg-[#F2F2F2] rounded-xl p-3 placeholder:text-[#808080]"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />

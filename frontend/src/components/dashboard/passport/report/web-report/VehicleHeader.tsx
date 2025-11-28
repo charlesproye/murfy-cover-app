@@ -43,11 +43,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   };
 
   return (
-    <div className="flex flex-col md:flex-row bg-white rounded-t-lg shadow-sm overflow-hidden mb-6 w-full">
-      <div className="flex-1 p-4 md:p-6 bg-gradient-to-b from-green-rapport-extra-light/15 via-green-rapport/5 to-green-rapport/0">
+    <div className="flex flex-col md:flex-row bg-white rounded-t-lg shadow-xs overflow-hidden mb-6 w-full">
+      <div className="flex-1 p-4 md:p-6 bg-linear-to-b from-green-rapport-extra-light/15 via-green-rapport/5 to-green-rapport/0">
         <div className="flex justify-center items-center gap-x-4">
           <div className="w-1/5 flex items-center h-full justify-center">
-            <div className="bg-white p-2 rounded-lg border border-gray/20 shadow-sm w-[140px] h-[80px] flex items-center justify-center overflow-hidden">
+            <div className="bg-white p-2 rounded-lg border border-gray/20 shadow-xs w-[140px] h-[80px] flex items-center justify-center overflow-hidden">
               <Image
                 src={getImageSrc()}
                 alt={`${brand} ${model}`}
@@ -133,7 +133,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </div>
       </div>
 
-      <div className="p-2 md:p-2 flex flex-col items-center border-l border-green-rapport/10 justify-center w-full md:w-1/3 bg-gradient-to-b from-green-rapport-extra-light/15 via-green-rapport/5 to-green-rapport/0 ">
+      <div className="p-2 md:p-2 flex flex-col items-center border-l border-green-rapport/10 justify-center w-full md:w-1/3 bg-linear-to-b from-green-rapport-extra-light/15 via-green-rapport/5 to-green-rapport/0 ">
         <ScoreCircle
           vehicle_battery_info={vehicleBatteryInfo}
           displayScale={true}

@@ -8,7 +8,7 @@ interface BatteryInfoProps {
 
 const BatteryInfo: React.FC<BatteryInfoProps> = ({ vehicleBatteryInfo }) => {
   return (
-    <div className="bg-white rounded-xl p-4 md:p-6 mb-6 shadow-sm max-w-4xl w-full">
+    <div className="bg-white rounded-xl p-4 md:p-6 mb-6 shadow-xs max-w-4xl w-full">
       <div className="flex items-center space-x-2 mb-4">
         <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
           <IconBatteryCharging className="w-16 h-16 text-green-rapport" />
@@ -60,7 +60,7 @@ const BatteryInfo: React.FC<BatteryInfoProps> = ({ vehicleBatteryInfo }) => {
       </div>
 
       <div className="flex flex-wrap md:flex-nowrap gap-1">
-        <div className="w-full overflow-hidden border border-green-rapport-light rounded-lg shadow-sm flex flex-col md:flex-row">
+        <div className="w-full overflow-hidden border border-green-rapport-light rounded-lg shadow-xs flex flex-col md:flex-row">
           <div className="bg-green-rapport-light p-4 flex flex-col justify-center items-center md:w-1/4">
             <p className="text-white text-xs uppercase font-medium">
               State of Health (SoH)

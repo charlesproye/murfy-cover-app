@@ -30,7 +30,7 @@ const SecondPage: React.FC<SecondPageProps> = ({ reportData }) => {
         {/* Contenu principal - utilise un container scrollable si nécessaire */}
         <div className="flex flex-col items-center px-6 py-4 gap-4">
           {/* State of Health */}
-          <div className="bg-white rounded-xl p-4 md:p-5 shadow-sm max-w-4xl w-full">
+          <div className="bg-white rounded-xl p-4 md:p-5 shadow-xs max-w-4xl w-full">
             <div className="flex items-center space-x-2 mb-3">
               <div className="w-6 h-6 rounded-full flex items-center justify-center">
                 <IconBulb size={18} className="text-green-rapport" />
@@ -53,7 +53,7 @@ const SecondPage: React.FC<SecondPageProps> = ({ reportData }) => {
           </div>
 
           {/* Bib Score */}
-          <div className="bg-white rounded-xl p-4 md:p-5 shadow-sm max-w-4xl w-full">
+          <div className="bg-white rounded-xl p-4 md:p-5 shadow-xs max-w-4xl w-full">
             <div className="flex items-center space-x-2 mb-3">
               <div className="w-6 h-6 rounded-full flex items-center justify-center">
                 <IconShieldCheck size={18} className="text-green-rapport" />
@@ -84,7 +84,7 @@ const SecondPage: React.FC<SecondPageProps> = ({ reportData }) => {
           </div>
 
           {/* Vehicle & Battery Warranty */}
-          <div className="bg-white rounded-xl p-4 md:p-5 shadow-sm max-w-4xl w-full">
+          <div className="bg-white rounded-xl p-4 md:p-5 shadow-xs max-w-4xl w-full">
             <div className="flex items-center space-x-2 mb-3">
               <div className="w-6 h-6 rounded-full flex items-center justify-center">
                 <IconBattery size={18} className="text-green-rapport" />
@@ -112,7 +112,7 @@ const SecondPage: React.FC<SecondPageProps> = ({ reportData }) => {
           </div>
 
           {/* Range Insights */}
-          <div className="bg-white rounded-xl p-4 md:p-5 shadow-sm max-w-4xl w-full">
+          <div className="bg-white rounded-xl p-4 md:p-5 shadow-xs max-w-4xl w-full">
             <div className="flex items-center space-x-2 mb-3">
               <div className="w-6 h-6 rounded-full flex items-center justify-center">
                 <IconRuler size={18} className="text-green-rapport" />
@@ -132,7 +132,7 @@ const SecondPage: React.FC<SecondPageProps> = ({ reportData }) => {
           </div>
 
           {/* Report Validity */}
-          <div className="bg-white rounded-xl p-4 md:p-5 shadow-sm max-w-4xl w-full">
+          <div className="bg-white rounded-xl p-4 md:p-5 shadow-xs max-w-4xl w-full">
             <div className="flex items-center space-x-2 mb-3">
               <div className="w-6 h-6 rounded-full flex items-center justify-center">
                 <IconFileCheck size={18} className="text-green-rapport" />

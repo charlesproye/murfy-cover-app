@@ -21,7 +21,7 @@ import useGetPriceForecast from '@/hooks/dashboard/passport/useGetPriceForecast'
 const labelClass = 'text-black text-xs md:text-sm';
 const valueClass = 'text-right text-gray text-sm';
 const boxClass =
-  'bg-white rounded-3xl shadow-lg p-4 flex flex-col gap-4 min-h-[180px] shadow';
+  'bg-white rounded-3xl shadow-lg p-4 flex flex-col gap-4 min-h-[180px] shadow-sm';
 const titleClass = 'flex items-center gap-2 mb-2 text-primary text-base text-left';
 
 interface VehicleInfoProps {
