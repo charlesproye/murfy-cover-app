@@ -1,6 +1,6 @@
 from logging import Logger
 
-from pyspark.sql import SparkSession, Window
+from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
@@ -18,24 +18,6 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
         super().__init__(
             make, spark=spark, force_update=force_update, logger=logger, **kwargs
         )
-
-    def fill_forward(self, tss):
-        w = (
-            Window.partitionBy("vin")
-            .orderBy("date")
-            .rowsBetween(Window.unboundedPreceding, 0)
-        )
-
-        tss = (
-            tss.withColumn(
-                "remaining_capacity_kj",
-                F.last("remaining_capacity_kj", ignorenulls=True).over(w),
-            )
-            .withColumn("soc", F.last("soc", ignorenulls=True).over(w))
-            .withColumn("soh_oem", F.last("soh_oem", ignorenulls=True).over(w))
-        )
-
-        return tss
 
     def compute_specific_features_before_aggregation(self, phase_df):
         phase_df = phase_df.withColumn("soh_oem", F.col("soh_oem") / 100)
@@ -87,4 +69,3 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
         ).agg(*agg_columns)
 
         return df_aggregated
-

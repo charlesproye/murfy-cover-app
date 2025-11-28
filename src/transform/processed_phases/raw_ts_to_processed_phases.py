@@ -36,8 +36,8 @@ class RawTsToProcessedPhases(CachedETLSpark):
         id_col: str = "vin",
         log_level: str = "INFO",
         force_update: bool = False,
-        spark: SparkSession = None,
-        pipes: PipesContext = None,
+        spark: SparkSession | None = None,
+        pipes: PipesContext | None = None,
         **kwargs,
     ):
         # Normalize make to MakeEnum if it's a string
@@ -320,6 +320,7 @@ class RawTsToProcessedPhases(CachedETLSpark):
 
         # Core of the reactor: allowing to properly judge the status, a phase to be considered as charging or discharging must bring a minimum soc gain or loss
         # If the phase lasts one point and the previous and next are of the same nature, we reassign them otherwise it's an idle
+
         df = df.withColumn(
             "charging_status",
             F.when(
@@ -455,6 +456,8 @@ class RawTsToProcessedPhases(CachedETLSpark):
             (F.unix_timestamp(col("last_date")) - F.unix_timestamp(col("first_date")))
             / 60,
         )
+
+        phase_stats = phase_stats.filter(F.col("total_soc_diff") != 0)
 
         phase_stats = phase_stats.withColumn(
             "is_usable_phase",

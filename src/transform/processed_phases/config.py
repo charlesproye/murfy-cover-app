@@ -19,16 +19,16 @@ SCALE_SOC = {
 
 # Minimum threshold to consider a charging or discharging phase
 SOC_DIFF_THRESHOLD = {
-    "tesla-fleet-telemetry": 0.05,
-    "mercedes-benz": 0.05,
-    "volvo-cars": 0.05,
-    "kia": 0.05,
-    "renault": 0.05,
-    "ford": 0.05,
-    "stellantis": 0.05,
-    "bmw": 0.05,
-    "volkswagen": 0.05,
-    "tesla": 0.05,
+    "tesla-fleet-telemetry": 0.5,
+    "mercedes-benz": 0.5,
+    "volvo-cars": 0.5,
+    "kia": 0.5,
+    "renault": 0.5,
+    "ford": 0.5,
+    "stellantis": 0.5,
+    "bmw": 0.5,
+    "volkswagen": 0.5,
+    "tesla": 0.5,
 }
 
 # Power thresholds for charging level classification
@@ -38,4 +38,3 @@ LEVEL_1_MAX_POWER = (
 LEVEL_2_MAX_POWER = (
     45  # this is to approximate the power of the charger that can go up to 44 kW
 )
-
