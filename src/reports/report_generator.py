@@ -248,8 +248,13 @@ class ReportGenerator:
             url = f"https://{self.s3_bucket}.s3.fr-par.scw.cloud/{s3_path}"
 
             with self.session_factory() as session:
-                stmt = session.query(Vehicle.id).where(Vehicle.vin == vin)
-                vehicle_id = stmt.scalar_one()
+                vehicle_id = (
+                    session.query(Vehicle.id).where(Vehicle.vin == vin).scalar()
+                )
+
+                if vehicle_id is None:
+                    logger.error(f"Vehicle with VIN {vin} not found in database")
+                    continue
 
                 premium_report = PremiumReport(
                     vehicle_id=vehicle_id,
@@ -257,6 +262,7 @@ class ReportGenerator:
                     task_id=task_id,
                 )
                 session.add(premium_report)
+
                 session.commit()
 
     async def add_urls(

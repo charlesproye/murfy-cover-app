@@ -78,6 +78,7 @@ async def generate_premium_report(
         )
 
     response = await PassportCrud().get_infos(vin, db)
+
     response_data = response if response is not None else {}
 
     task = generate_pdf_task.delay(vin)
@@ -113,6 +114,9 @@ async def get_report_status(
     response = {
         "job_id": job_id,
         "vin": vin,
+        "url": None,
+        "error": None,
+        "retry_info": None,
     }
 
     if task_result.state == "PENDING":

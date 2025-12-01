@@ -48,4 +48,4 @@ celery_app.conf.task_routes = {
 }
 
 # --- AUTODISCOVERY ---
-celery_app.autodiscover_tasks(["reports"])
+celery_app.autodiscover_tasks(["reports.workers"])
