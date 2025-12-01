@@ -274,9 +274,18 @@ class S3Service:
             )
             raise e
 
-    def read_parquet_df_spark(self, spark: SparkSession, key: str, **kwargs):
+    def read_parquet_df_spark(
+        self,
+        spark: SparkSession,
+        key: str,
+        exclude_columns: list[str] | None = None,
+        **kwargs,
+    ):
         s3_path = f"s3a://{self.bucket_name}/{key}"
-        return spark.read.option("mergeSchema", "true").parquet(s3_path, **kwargs)
+        df = spark.read.option("mergeSchema", "true").parquet(s3_path, **kwargs)
+        if exclude_columns:
+            df = df.drop(*exclude_columns)
+        return df
 
     def read_csv_df(self, key: str, **kwargs) -> DF:
         response = self._s3_client.get_object(Bucket=self.bucket_name, Key=key)
