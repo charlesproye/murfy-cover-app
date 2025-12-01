@@ -7,6 +7,7 @@ from bib_dagster.defs.spark_jobs.c_asset_pph_to_rph import raw_pph_to_rph
 from bib_dagster.defs.spark_jobs.d_asset_phases_to_results_weeks import (
     phases_to_results_weeks,
 )
+from bib_dagster.defs.spark_jobs.e_asset_results import refresh_results_models
 
 # Jobs for individual stages - useful for running single partitions
 response_to_raw_tss_job = dg.define_asset_job(
@@ -27,9 +28,9 @@ raw_pph_to_rph_job = dg.define_asset_job(
     partitions_def=MAKE_PARTITIONS,
 )
 
-phases_to_results_weeks_job = dg.define_asset_job(
-    name="phases_to_results_weeks_job",
-    selection=dg.AssetSelection.assets(phases_to_results_weeks),
+results_pipeline_job = dg.define_asset_job(
+    name="results_pipeline_job",
+    selection=dg.AssetSelection.assets(phases_to_results_weeks, refresh_results_models),
 )
 
 # Job that runs the entire pipeline (all three assets in order)
@@ -45,20 +46,20 @@ full_pipeline_job = dg.define_asset_job(
 @dg.schedule(cron_schedule="0 1 * * 1", job=full_pipeline_job)
 def full_pipeline_schedule():
     """Run the full pipeline (response -> raw -> pph -> rph) weekly on Monday for all makes."""
-    for make in MAKE_PARTITIONS:
+    for make in MAKE_PARTITIONS.get_partition_keys():
         yield dg.RunRequest(run_key=make, partition_key=make)
 
 
 @dg.multi_asset_sensor(
     monitored_assets=[dg.AssetKey("raw_pph_to_rph")],
-    job=phases_to_results_weeks_job,
+    job=results_pipeline_job,
     default_status=dg.DefaultSensorStatus.RUNNING,
 )
-def phases_to_results_weeks_sensor(context: dg.MultiAssetSensorEvaluationContext):
-    """Trigger phases_to_results_weeks after all raw_pph_to_rph partitions are materialized.
+def results_pipeline_sensor(context: dg.MultiAssetSensorEvaluationContext):
+    """Trigger results pipeline (phases_to_results_weeks -> refresh_results_models) after all raw_pph_to_rph partitions are materialized.
 
     This sensor monitors the partitioned raw_pph_to_rph asset and triggers
-    phases_to_results_weeks once all partitions have been materialized.
+    the results pipeline once all partitions have been materialized.
     """
     # Get all partition keys and check which ones have new materializations
     asset_key = dg.AssetKey("raw_pph_to_rph")
@@ -81,5 +82,5 @@ def phases_to_results_weeks_sensor(context: dg.MultiAssetSensorEvaluationContext
 @dg.schedule(cron_schedule="0 0 * * *", job=response_to_raw_tss_job)
 def full_pipeline_response_to_raw_tss_schedule():
     """Run the response to raw tss job for all makes."""
-    for make in MAKE_PARTITIONS:
+    for make in MAKE_PARTITIONS.get_partition_keys():
         yield dg.RunRequest(run_key=make, partition_key=make)

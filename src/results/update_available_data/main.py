@@ -1,10 +1,12 @@
+import logging
+
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from core.console_utils import main_decorator
 from core.sql_utils import get_sqlalchemy_engine
 
 COLUMNS_TO_CHECK = ["odometer", "soh", "soh_oem"]
+LOGGER = logging.getLogger(__name__)
 
 
 def check_columns_from_model(model_id, column_list, engine):
@@ -75,26 +77,31 @@ def update_model_columns(
         conn.execute(text(update_sql), params)
 
 
-@main_decorator
-def update_available_data():
+def update_available_data(logger: logging.Logger = LOGGER):
     engine = get_sqlalchemy_engine()
 
     with engine.connect() as conn:
         result = conn.execute(text("SELECT id FROM vehicle_model"))
         model_ids = [row[0] for row in result.fetchall()]
 
+    models_with_data = 0
+    column_counts = dict.fromkeys(COLUMNS_TO_CHECK, 0)
+
     for model_id in model_ids:
         try:
-            print(f"Checking {model_id}...")
             available_columns = check_columns_from_model(
                 model_id, COLUMNS_TO_CHECK, engine
             )
             update_model_columns(model_id, available_columns, COLUMNS_TO_CHECK, engine)
-            print(f"✅ {model_id} updated with: {available_columns}")
+            if available_columns:
+                models_with_data += 1
+                for col in available_columns:
+                    column_counts[col] += 1
         except Exception as e:
-            print(f"❌ Error for {model_id}: {e}")
+            logger.error(f"❌ Error for {model_id}: {e}")
 
-
-if __name__ == "__main__":
-    update_available_data()
-
+    return {
+        "models_processed": len(model_ids),
+        "models_with_data": models_with_data,
+        "column_availability_counts": column_counts,
+    }

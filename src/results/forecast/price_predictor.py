@@ -1,3 +1,5 @@
+from logging import Logger, getLogger
+
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
@@ -13,6 +15,8 @@ from sklearn.preprocessing import OneHotEncoder
 from core.gsheet_utils import load_excel_data
 from core.s3.s3_utils import S3Service
 from core.sql_utils import get_sqlalchemy_engine
+
+LOGGER = getLogger(__name__)
 
 
 def get_data() -> pd.DataFrame:
@@ -76,8 +80,10 @@ def get_data() -> pd.DataFrame:
     return df_info
 
 
-def train_and_save(model_name: str, target_column: str = "price") -> None:
-    print("Fetching training data...")
+def train_and_save(
+    model_name: str, target_column: str = "price", logger: Logger = LOGGER
+) -> dict[str, float | int | str]:
+    logger.info("Fetching training data for price forecast...")
     data = get_data()
 
     X = data[
@@ -112,19 +118,32 @@ def train_and_save(model_name: str, target_column: str = "price") -> None:
         ]
     )
 
-    print("Training...")
+    logger.info("Training price forecast model...")
     pipeline.fit(X, y)
 
     y_pred = pipeline.predict(X)
-    print("Metrics:")
-    print("  MAE :", mean_absolute_error(y, y_pred))
-    print("  MAPE:", mean_absolute_percentage_error(y, y_pred) * 100)
-    print("  RMSE:", root_mean_squared_error(y, y_pred))
+    mae = float(mean_absolute_error(y, y_pred))
+    mape = float(mean_absolute_percentage_error(y, y_pred) * 100)
+    rmse = float(root_mean_squared_error(y, y_pred))
+    logger.info(
+        "Training metrics - MAE: %.4f | MAPE: %.2f%% | RMSE: %.4f",
+        mae,
+        mape,
+        rmse,
+    )
 
     # Sauvegarde
     s3 = S3Service()
     s3.save_as_pickle(pipeline, f"models/{model_name}")
-    print(f"✅ Model saved to S3: {model_name}")
+    logger.info(f"✅ Model saved to S3: {model_name}")
+
+    return {
+        "model_key": model_name,
+        "training_rows": len(data),
+        "mae": mae,
+        "mape_percent": mape,
+        "rmse": rmse,
+    }
 
 
 def load_model(model_name: str):
@@ -134,4 +153,3 @@ def load_model(model_name: str):
 
 def predict(model, data: pd.DataFrame):
     return model.predict(data)
-

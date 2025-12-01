@@ -89,19 +89,19 @@ def load_and_clean_scrapping_data():
 
 def load_vehicle_data_from_db():
     query = """
-        SELECT 
-            v.vin, 
-            vm.model_name, 
-            vm.id as vehicle_model_id, 
-            vm.type, 
+        SELECT
+            v.vin,
+            vm.model_name,
+            vm.id as vehicle_model_id,
+            vm.type,
             vm.version,
-            m.make_name, 
-            vd.soh, 
-            vd.soh_oem, 
-            vd.odometer, 
-            o.oem_name, 
-            o.id as oem_id, 
-            m.id as make_id 
+            m.make_name,
+            vd.soh,
+            vd.soh_oem,
+            vd.odometer,
+            o.oem_name,
+            o.id as oem_id,
+            m.id as make_id
         FROM vehicle v
         LEFT JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
         LEFT JOIN vehicle_data vd ON vd.vehicle_id = v.id
@@ -131,14 +131,14 @@ def load_vehicle_data_from_db():
 
 def load_vehicle_models_from_db():
     query = """
-        SELECT 
-            vm.model_name, 
-            vm.id as id, 
-            vm.type, 
-            m.make_name, 
-            o.oem_name, 
-            o.id as oem_id, 
-            m.id as make_id 
+        SELECT
+            vm.model_name,
+            vm.id as id,
+            vm.type,
+            m.make_name,
+            o.oem_name,
+            o.id as oem_id,
+            m.id as make_id
         FROM vehicle_model vm
         JOIN oem o ON o.id = vm.oem_id
         JOIN make m ON m.id = vm.make_id
@@ -188,7 +188,11 @@ def clean_db_trendlines():
 def update_trendline_oem():
     df_all = load_all_data()
 
-    for oem in df_all.oem_id.unique():
+    oem_ids = [oem for oem in df_all.oem_id.unique() if pd.notna(oem)]
+    updated_oems = 0
+    skipped_oems = 0
+
+    for oem in oem_ids:
         df_temp = df_all[df_all["oem_id"] == oem]
         if filter_data(df_temp, "odometer", "vin", 50_000, 50_000, 50, 10, 10):
             mean_trend, upper_bound, lower_bound = generate_trendline_functions(
@@ -197,14 +201,27 @@ def update_trendline_oem():
             update_database_trendlines(
                 None, mean_trend, upper_bound, lower_bound, oem_id=oem
             )
+            updated_oems += 1
         else:
             logging.info(f"Can't compute trendline for oem: {oem}")
+            skipped_oems += 1
+
+    return {
+        "oem_trendlines_attempted": len(oem_ids),
+        "oem_trendlines_updated": updated_oems,
+        "oem_trendlines_skipped": skipped_oems,
+    }
 
 
 def update_trendline_model():
     logging.info("Update trendline model...")
     df_all = load_all_data()
-    for model_car in df_all["vehicle_model_id"].unique():
+
+    model_ids = [mid for mid in df_all["vehicle_model_id"].unique() if pd.notna(mid)]
+    updated_models = 0
+    skipped_models = 0
+
+    for model_car in model_ids:
         df_temp = df_all[(df_all["vehicle_model_id"] == model_car)].copy()
         try:
             if filter_data(df_temp, "odometer", "vin", 0, 0, 20, 0, 0):
@@ -216,10 +233,21 @@ def update_trendline_model():
                         model_car, mean_trend, upper_bound, lower_bound, False
                     )
                     logging.info(f"Trendline update for car model {model_car}")
+                    updated_models += 1
                 else:
                     logging.info(f"Trendline not updated for car model {model_car}")
+                    skipped_models += 1
+            else:
+                skipped_models += 1
         except Exception as e:
             logging.error(f"Error with car model: {model_car}: {e}")
+            skipped_models += 1
+
+    return {
+        "model_trendlines_attempted": len(model_ids),
+        "model_trendlines_updated": updated_models,
+        "model_trendlines_skipped": skipped_models,
+    }
 
 
 def main():
