@@ -20,14 +20,14 @@ import {
   FlashReportFormType,
   LanguageEnum,
 } from '@/components/flash-report/forms/schema';
+import type { VinDecoderTypeVersion } from '@/components/flash-report/forms/VinForm';
 
 interface FlashReportFormProps {
   vin: string;
   has_trendline: boolean;
-  make: string | null;
-  model: string | null;
-  type: string | null;
-  version: string | null;
+  make: string | undefined;
+  model: string | undefined;
+  type_version_list: VinDecoderTypeVersion[] | null;
 }
 
 interface AllMakesModelsInfo {
@@ -48,8 +48,7 @@ export const FlashReportForm = ({
   has_trendline,
   make,
   model,
-  type,
-  version,
+  type_version_list,
 }: FlashReportFormProps): React.ReactElement => {
   const router = useRouter();
   const [isLoadingSendEmail, setIsLoadingSendEmail] = useState(false);
@@ -63,9 +62,10 @@ export const FlashReportForm = ({
   const defaultValues = {
     vin: vin,
     has_trendline: has_trendline,
-    make: make === 'null' ? '' : (make ?? ''),
-    model: model === 'null' ? '' : (model ?? ''),
-    type: type === 'null' ? '' : (type ?? ''),
+    make: make ?? '',
+    model: model ?? '',
+    type:
+      type_version_list && type_version_list.length > 0 ? type_version_list[0].type : '',
     odometer: 0,
     email: '',
     language: browserLanguage.toUpperCase() as LanguageEnum,
@@ -77,7 +77,7 @@ export const FlashReportForm = ({
   });
   const makeValue = useWatch({ control: formControls.control, name: 'make' });
   const modelValue = useWatch({ control: formControls.control, name: 'model' });
-  const typeValue = useWatch({ control: formControls.control, name: 'type' });
+  const languageValue = useWatch({ control: formControls.control, name: 'language' });
 
   useEffect(() => {
     if (browserLanguage) {
@@ -87,30 +87,6 @@ export const FlashReportForm = ({
       );
     }
   }, [browserLanguage]);
-
-  const onSubmit = async (data: FlashReportFormType) => {
-    setIsLoadingSendEmail(true);
-    try {
-      const response = await fetchWithoutAuth<{ message: string }>(ROUTES.SEND_EMAIL, {
-        method: 'POST',
-        body: JSON.stringify({
-          ...data,
-          ...(makeValue === 'tesla' && modelValue === model && typeValue === type
-            ? { version: version }
-            : {}),
-        }),
-      });
-      if (!response) {
-        toast.error('Error sending report email');
-      } else {
-        setIsFinalMessage(true);
-      }
-    } catch (error) {
-      toast.error('Error sending report email: ' + (error as Error).message);
-    } finally {
-      setIsLoadingSendEmail(false);
-    }
-  };
 
   const makeOptions = useMemo(() => {
     return (
@@ -135,7 +111,7 @@ export const FlashReportForm = ({
   }, [allVehicleModels, makeValue]);
 
   const typeOptions = useMemo(() => {
-    if (makeValue === '') return [];
+    if (makeValue === '' || modelValue === '') return [];
     const models = allVehicleModels?.makes.find(
       (make) => make.make_name === makeValue,
     )?.models;
@@ -148,7 +124,40 @@ export const FlashReportForm = ({
     );
   }, [allVehicleModels, makeValue, modelValue]);
 
-  // JSX RETURN
+  const onSubmit = async (data: FlashReportFormType) => {
+    setIsLoadingSendEmail(true);
+    try {
+      const type = data.type || (typeOptions.length > 0 ? typeOptions[0].value : '');
+      const version =
+        data.make === 'tesla' &&
+        data.model === model &&
+        type_version_list &&
+        type_version_list.length > 0
+          ? type_version_list.find((t) => t.type === type)?.version
+          : undefined;
+
+      const response = await fetchWithoutAuth<{ message: string }>(ROUTES.SEND_EMAIL, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          type,
+          ...(version ? { version } : {}),
+        }),
+      });
+      if (!response) {
+        toast.error('Error sending report email');
+      } else {
+        // Clear localStorage after successful submission
+        localStorage.removeItem('flash-report-data');
+        setIsFinalMessage(true);
+      }
+    } catch (error) {
+      toast.error('Error sending report email: ' + (error as Error).message);
+    } finally {
+      setIsLoadingSendEmail(false);
+    }
+  };
+
   if (isFinalMessage) {
     return (
       <div className="flex flex-col gap-8">
@@ -174,12 +183,17 @@ export const FlashReportForm = ({
               <IconLoader2 className="w-6 h-6 animate-spin" />
             )}
 
-            <p className="text-sm text-gray-500 italic">
-              {!has_trendline
-                ? `The current VIN does not seems to be from a vehicle referenced in our
-                database. Please select it manually.`
-                : `Please confirm and specify the vehicle information below.`}
-            </p>
+            {has_trendline ? (
+              <p className="text-sm text-gray-500 italic">
+                Please confirm and specify the vehicle information below.
+              </p>
+            ) : (
+              <p className="text-sm text-warning/60 italic">
+                The current VIN does not seems to be from a vehicle referenced in our
+                database. Please select it manually among our available models listed
+                below.
+              </p>
+            )}
           </div>
 
           {!isLoadingAllVehicleModels && !allVehicleModels ? (
@@ -224,21 +238,20 @@ export const FlashReportForm = ({
                     className="w-1/2"
                   />
                 </div>
-                <div className="flex justify-center gap-4">
+                {typeOptions.length > 1 && (
                   <SelectFormInput
                     name="type"
                     label="Type"
                     placeholder="Enter your type"
                     options={typeOptions}
-                    required
                     className="w-1/2"
                   />
-                  <div className="w-1/2" />
-                </div>
+                )}
+
                 <div className="flex justify-between gap-4">
                   <NumberFormInput
                     name="odometer"
-                    label="Odometer (km)"
+                    label="Mileage (km)"
                     placeholder="Enter your odometer"
                     required
                     className="w-1/3"
@@ -261,6 +274,46 @@ export const FlashReportForm = ({
                   required
                   className="max-w-96"
                 />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  {languageValue === LanguageEnum.FR ? (
+                    <>
+                      <strong>Protection des données personnelles :</strong> Les
+                      informations collectées (VIN, données du véhicule et adresse e-mail)
+                      sont utilisées uniquement pour générer et vous envoyer votre rapport
+                      d'état de santé de batterie. Ces données ne sont pas conservées de
+                      manière permanente et ne sont utilisées à aucune autre fin.
+                      Conformément au RGPD, vous disposez d'un droit d'accès, de
+                      rectification et de suppression de vos données. Pour exercer ces
+                      droits, contactez-nous à{' '}
+                      <a
+                        href="mailto:support@bib-batteries.fr"
+                        className="text-blue-600 hover:underline"
+                      >
+                        support@bib-batteries.fr
+                      </a>
+                      . Aucune donnée supplémentaire n'est collectée sur votre véhicule.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Personal Data Protection:</strong> The information collected
+                      (VIN, vehicle data, and email address) is used solely to generate
+                      and send you your battery state-of-health report. This data is not
+                      permanently stored and is not used for any other purpose. In
+                      accordance with GDPR, you have the right to access, rectify, and
+                      delete your data. To exercise these rights, please contact us at{' '}
+                      <a
+                        href="mailto:support@bib-batteries.fr"
+                        className="text-blue-600 hover:underline"
+                      >
+                        support@bib-batteries.fr
+                      </a>
+                      . No additional data is collected on your vehicle.
+                    </>
+                  )}
+                </p>
               </div>
 
               <div className="flex w-full justify-end">

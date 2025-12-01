@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_models.enums import LanguageEnum
 from db_models.vehicle import FlashReportCombination, Make, VehicleModel
-from external_api.schemas.flash_report import VehicleSpecs
+from external_api.schemas.flash_report import VehicleSpecs, VehicleSpecsType
 from external_api.services.flash_report.flash_report import (
     get_db_names,
     get_flash_report_data,
@@ -69,7 +69,7 @@ async def test_send_vehicle_specs_tesla_vin_decoder(
     tesla_model_3_awd: VehicleModel,
 ):
     """Test VIN decoder for Tesla (requires external VIN decoder API)."""
-    vin = "LRW3E7EKXRC152510"
+    vin = "5YJ3E7EB8KF100000"
 
     result = await send_vehicle_specs(vin, db=db_session)
 
@@ -77,8 +77,10 @@ async def test_send_vehicle_specs_tesla_vin_decoder(
         has_trendline=True,
         make="tesla",
         model="model 3",
-        type="long range awd",
-        version="MT352",
+        type_version_list=[
+            VehicleSpecsType(type="long range", version="MT303"),
+            VehicleSpecsType(type="long range performance", version="MT304"),
+        ],
     )
 
 
@@ -94,8 +96,7 @@ async def test_send_vehicle_specs_vin_decoder(db_session: AsyncSession):
         has_trendline=True,
         make="renault",
         model="zoe",
-        type=None,
-        version=None,
+        type_version_list=None,
     )
 
 

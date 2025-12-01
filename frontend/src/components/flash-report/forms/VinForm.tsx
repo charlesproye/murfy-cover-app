@@ -14,12 +14,16 @@ import { StringFormInput } from '@/components/form/StringFormInput';
 import { useRouter } from 'next/navigation';
 import fetchWithAuth from '@/services/fetchWithAuth';
 
-interface VinDecoderResponse {
+export interface VinDecoderTypeVersion {
+  type: string;
+  version: string;
+}
+
+export interface VinDecoderResponse {
   has_trendline: boolean;
   make: string | null;
   model: string | null;
-  type: string | null;
-  version: string | null;
+  type_version_list: VinDecoderTypeVersion[] | null;
 }
 
 export const VinForm = (): React.ReactElement => {
@@ -41,9 +45,13 @@ export const VinForm = (): React.ReactElement => {
       if (!response) {
         toast.error('Error decoding VIN');
       } else {
-        router.push(
-          `/flash-report/step2?vin=${data.vin}&has_trendline=${response.has_trendline}&make=${response.make}&model=${response.model}&type=${response.type}&version=${response.version}`,
-        );
+        // Store the full response data along with VIN in localStorage
+        const flashReportData = {
+          vin: data.vin.trim(),
+          ...response,
+        };
+        localStorage.setItem('flash-report-data', JSON.stringify(flashReportData));
+        router.push('/flash-report/step2');
       }
     } catch (error) {
       toast.error('Error decoding VIN: ' + (error as Error).message);

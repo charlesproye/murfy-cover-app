@@ -46,9 +46,13 @@ class GenerationData(BaseModel):
     battery_info: BatteryInfo
 
 
+class VehicleSpecsType(BaseModel):
+    type: str
+    version: str
+
+
 class VehicleSpecs(BaseModel):
     has_trendline: bool
-    make: str
-    model: str
-    type: list[str] | None
-    version: list[str] | None
+    make: str | None
+    model: str | None
+    type_version_list: list[VehicleSpecsType] | None

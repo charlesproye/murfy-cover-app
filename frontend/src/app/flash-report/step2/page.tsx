@@ -1,35 +1,60 @@
 'use client';
 
 import { FlashReportForm } from '@/components/flash-report/forms/FlashReportForm';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { VinDecoderResponse } from '@/components/flash-report/forms/VinForm';
+import { Loading } from '@/components/common/loading/loading';
 
-import { useSearchParams, useRouter } from 'next/navigation';
+interface FlashReportData extends VinDecoderResponse {
+  vin: string;
+}
 
 const FlashReportStep1Page = () => {
-  const searchParams = useSearchParams();
   const router = useRouter();
+  const [flashReportData, setFlashReportData] = useState<FlashReportData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const has_trendline = searchParams.get('has_trendline');
-  const make = searchParams.get('make');
-  const model = searchParams.get('model');
-  const type = searchParams.get('type');
-  const version = searchParams.get('version');
-  const vin = searchParams.get('vin');
+  useEffect(() => {
+    try {
+      const storedData = localStorage.getItem('flash-report-data');
+      if (!storedData) {
+        router.push('/flash-report');
+        return;
+      }
 
-  if (!vin) {
-    router.push('/flash-report');
+      const parsedData: FlashReportData = JSON.parse(storedData);
+      if (!parsedData.vin) {
+        router.push('/flash-report');
+        return;
+      }
+
+      setFlashReportData(parsedData);
+    } catch (error) {
+      console.error('Error parsing flash report data from localStorage:', error);
+      localStorage.removeItem('flash-report-data');
+      router.push('/flash-report');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
+
+  if (isLoading) {
+    return <Loading />;
+  }
+
+  if (!flashReportData) {
     return null;
   }
 
   return (
-    <div className="flex flex-col gap-8 w-3/4 mx-auto mt-8">
+    <div className="flex flex-col gap-8 w-5/6 mx-auto mt-6">
       <FlashReportForm
-        vin={vin}
-        has_trendline={has_trendline === 'true'}
-        make={make}
-        model={model}
-        type={type}
-        version={version}
+        vin={flashReportData.vin}
+        has_trendline={flashReportData.has_trendline}
+        make={flashReportData.make ?? undefined}
+        model={flashReportData.model ?? undefined}
+        type_version_list={flashReportData.type_version_list}
       />
     </div>
   );

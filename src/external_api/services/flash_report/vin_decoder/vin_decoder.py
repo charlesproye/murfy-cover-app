@@ -45,6 +45,9 @@ class VinDecoder:
 
         vin_first_three_characters = vin[:3]
 
+        if vin_first_three_characters not in WMI_TO_OEM:
+            return None, None
+
         if model.capitalize() == WMI_TO_OEM[vin_first_three_characters]:
             return model, version
         else:
@@ -65,4 +68,3 @@ class VinDecoder:
             Predicted MODEL_VERSIONs.
         """
         return self.model.predict(vins).tolist()
-

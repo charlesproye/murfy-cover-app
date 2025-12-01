@@ -14,11 +14,42 @@ from core import numpy_utils
 from db_models.enums import LanguageEnum
 from db_models.vehicle import Battery, FlashReportCombination, Make, VehicleModel
 from external_api.core.config import settings
-from external_api.schemas.flash_report import GenerationData, VehicleSpecs
+from external_api.schemas.flash_report import (
+    GenerationData,
+    VehicleSpecs,
+    VehicleSpecsType,
+)
 from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
     TeslaVinDecoder,
 )
 from external_api.services.flash_report.vin_decoder.vin_decoder import VinDecoder
+
+
+async def log_vin_decoded(
+    db: AsyncSession,
+    vin: str,
+    make: str,
+    model: str,
+    type: str | None = None,
+    version: str | None = None,
+    odometer: int | None = None,
+    language: LanguageEnum = LanguageEnum.EN,
+    token: str | None = None,
+) -> None:
+    db.add(
+        FlashReportCombination(
+            vin=vin,
+            make=make,
+            model=model,
+            type=type,
+            version=version,
+            odometer=odometer,
+            language=language,
+            token=token,
+        )
+    )
+    await db.flush()
+    await db.commit()
 
 
 async def get_make_has_trendline(make_name: str, db: AsyncSession) -> bool:
@@ -103,46 +134,62 @@ async def send_vehicle_specs(vin: str, db: AsyncSession) -> VehicleSpecs:
 
         has_trendline = await get_make_has_trendline(make_db_name, db)
 
+        type_version = {}
+
         if isinstance(result.get("Version"), list):
-            types = []
             versions = result.get("Version")
             for version in versions:
                 # Match version with right type when multiples types
                 query = "select type from vehicle_model where version = :version"
                 result = await db.execute(text(query), {"version": version})
-                type_tesla = result.fetchone()[0]
-                types.append(type_tesla)
+                type_tesla = result.fetchone()[0] if result.fetchone() else None
+                if type_tesla and type_tesla not in type_version:
+                    type_version[type_tesla] = version
         else:
-            versions = [result.get("Version")]
-            types = [result.get("Type")]
+            type_version[result.get("Type")] = result.get("Version")
 
         return VehicleSpecs(
             has_trendline=has_trendline,
             make="tesla",
             model=model_db_name,
-            type=types,
-            version=versions,
+            type_version_list=[
+                VehicleSpecsType(type=type, version=version)
+                for type, version in type_version.items()
+            ],
         )
     else:
         vin_decoder = VinDecoder()
         make, model = vin_decoder.decode(vin)
 
-        if model:
-            make_db_name, model_db_name = await get_db_names(
-                make, model, type=None, db=db
+        if make:
+            if model:
+                make_db_name, model_db_name = await get_db_names(
+                    make, model, type=None, db=db
+                )
+
+                has_trendline = await get_make_has_trendline(make_db_name, db)
+
+                return VehicleSpecs(
+                    has_trendline=has_trendline,
+                    make=make_db_name,
+                    model=model_db_name,
+                    type_version_list=None,
+                )
+
+            else:  # Model not found, just make
+                return VehicleSpecs(
+                    has_trendline=False,
+                    make=make.lower().replace("ë", "e"),
+                    model=None,
+                    type_version_list=None,
+                )
+        else:  # Make not found
+            return VehicleSpecs(
+                has_trendline=False,
+                make=None,
+                model=None,
+                type_version_list=None,
             )
-        else:
-            make_db_name = make.lower().replace("ë", "e")
-
-        has_trendline = await get_make_has_trendline(make_db_name, db)
-
-        return VehicleSpecs(
-            has_trendline=has_trendline,
-            make=make_db_name,
-            model=model_db_name,
-            type=None,
-            version=None,
-        )
 
 
 async def insert_combination(

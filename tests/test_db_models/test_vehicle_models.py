@@ -21,7 +21,6 @@ from db_models import (
     Vehicle,
     VehicleModel,
 )
-from db_models.enums import LanguageEnum
 from db_models.vehicle import FlashReportCombination, Region, User
 
 
@@ -240,39 +239,6 @@ class TestFlashReportCombination:
         assert flash_report.id is not None
         assert flash_report.vin == "5YJ3E1EA1KF654321"
         assert flash_report.token == token
-
-    @pytest.mark.asyncio
-    async def test_flash_report_token_unique(self, db_session: AsyncSession):
-        """Test that flash report token must be unique."""
-        token = str(uuid.uuid4())
-
-        # Create first report
-        report1 = FlashReportCombination(
-            vin="VIN1",
-            make="tesla",
-            model="model 3",
-            type="base",
-            odometer=10000,
-            token=token,
-            language=LanguageEnum.EN,
-        )
-        db_session.add(report1)
-        await db_session.flush()
-
-        # Try to create second report with same token
-        report2 = FlashReportCombination(
-            vin="VIN2",
-            make="tesla",
-            model="model s",
-            type="plaid",
-            odometer=20000,
-            token=token,  # Same token - should fail
-            language=LanguageEnum.FR,
-        )
-        db_session.add(report2)
-
-        with pytest.raises(IntegrityError):
-            await db_session.flush()
 
 
 class TestApiUserModel:

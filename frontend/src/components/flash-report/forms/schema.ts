@@ -13,7 +13,7 @@ export const flashReportFormSchema = z.object({
   vin: z.string(),
   make: z.string().min(1, { message: 'Make is required' }),
   model: z.string().min(1, { message: 'Model is required' }),
-  type: z.string().min(1, { message: 'Type is required' }),
+  type: z.string().optional(),
   odometer: z.coerce.number().min(1, { message: 'Odometer cannot be zero' }),
   email: z.string().email(),
   language: z.enum([LanguageEnum.EN, LanguageEnum.FR]).default(LanguageEnum.EN),

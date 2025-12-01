@@ -320,11 +320,11 @@ class FlashReportCombination(BaseUUIDModel):
     __tablename__ = "flash_report_combination"
     vin: str = Column(String, nullable=False)
     make: str = Column(String, nullable=False)
-    model: str = Column(String, nullable=False)
-    type: str = Column(String, nullable=False)
+    model: str = Column(String, nullable=True)
+    type: str = Column(String, nullable=True)
     version: str | None = Column(String, nullable=True)
-    odometer: int = Column(Integer, nullable=False)
-    token: str = Column(String, nullable=False, unique=True)
+    odometer: int = Column(Integer, nullable=True)
+    token: str | None = Column(String, nullable=True)
 
     language: LanguageEnum = Column(
         SqlEnum(LanguageEnum, name="language_enum"),

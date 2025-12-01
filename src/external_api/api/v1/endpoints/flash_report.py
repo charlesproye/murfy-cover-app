@@ -1,5 +1,4 @@
-import fastapi
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select
 
@@ -14,6 +13,7 @@ from external_api.services.api_pricing import log_api_call
 from external_api.services.flash_report.flash_report import (
     get_flash_report_data,
     insert_combination,
+    log_vin_decoded,
     send_email,
     send_vehicle_specs,
 )
@@ -23,7 +23,7 @@ flash_report_router = APIRouter()
 
 @flash_report_router.post("/vin-decoder")
 async def decode_vin(
-    request: fastapi.Request,
+    request: Request,
     vin: str = Body(..., description="VIN to decode"),
     flash_report_user: User = Depends(get_flash_report_user),
     db: AsyncSession = Depends(get_db),
@@ -36,16 +36,15 @@ async def decode_vin(
     )
 
     result = await send_vehicle_specs(vin, db)
-    if not result:
-        raise HTTPException(
-            status_code=404, detail="VIN has no been found or can't be decoded"
-        )
+
+    if result.make and not result.has_trendline:
+        await log_vin_decoded(db, vin, result.make, result.model)
     return result
 
 
 @flash_report_router.post("/send-email")
 async def send_report_email(
-    request: fastapi.Request,
+    request: Request,
     data: FlashReportFormType = Body(...),
     db: AsyncSession = Depends(get_db),
     flash_report_user: User = Depends(get_flash_report_user),
@@ -75,7 +74,7 @@ async def send_report_email(
 
 @flash_report_router.get("/generation-data")
 async def get_flash_report_data_for_generation(
-    request: fastapi.Request,
+    request: Request,
     flash_report_user: User | None = Depends(get_flash_report_user),
     token: str = Query(...),
     db: AsyncSession = Depends(get_db),
@@ -101,4 +100,3 @@ async def get_flash_report_data_for_generation(
         flash_report_combination=flash_report_combination, db=db
     )
     return result
-

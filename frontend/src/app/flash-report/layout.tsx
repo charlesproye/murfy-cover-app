@@ -10,22 +10,24 @@ const FlashReportLayout = ({
 }): React.ReactElement => {
   return (
     <div className="flex flex-col md:flex-row w-screen h-screen">
-      <div className="w-full md:w-3/5 h-full flex items-center justify-center">
-        <div className="flex flex-col justify-center p-8 w-full gap-4">
-          <div className="flex flex-col items-center">
-            <Image
-              src="/logo/logo-battery-green.webp"
-              priority
-              className="-mt-[9px] -ml-4"
-              width={100}
-              height={100}
-              alt="logo bib"
-            />
-            <h1 className="text-3xl font-semibold -ml-1">EValue Flash Report</h1>
+      <div className="w-full md:w-3/5 h-full flex flex-col relative">
+        <div className="flex-1 overflow-y-auto flex items-center justify-center">
+          <div className="flex flex-col justify-center p-8 w-full gap-4">
+            <div className="flex flex-col items-center">
+              <Image
+                src="/logo/logo-battery-green.webp"
+                priority
+                className="-mt-[9px] -ml-4"
+                width={100}
+                height={100}
+                alt="logo bib"
+              />
+              <h1 className="text-3xl font-semibold -ml-1">EValue Flash Report</h1>
+            </div>
+            {children}
           </div>
-          {children}
         </div>
-        <div className="flex justify-between absolute left-0 bottom-0 w-full md:w-1/2 mb-4 px-4">
+        <div className="flex justify-between w-full mb-2 px-2 flex-shrink-0">
           <div className="flex items-center">
             <a
               className="flex items-center"
