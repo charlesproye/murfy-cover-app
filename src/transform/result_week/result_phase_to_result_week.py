@@ -63,6 +63,7 @@ class ResultPhaseToResultWeek:
             .pipe(self._agg_results_by_update_frequency)
             .groupby("VIN", observed=True)
             .apply(self._make_soh_presentable_per_vehicle, include_groups=False)
+            .pipe(self._replace_soh_over_one_hundred)
             .reset_index(level=0)
             .sort_values(["VIN", "DATE"])
         )
@@ -186,6 +187,11 @@ class ResultPhaseToResultWeek:
             df = df[outliser_mask].copy()
         if df["SOH"].count() >= 2:
             df["SOH"] = force_decay(df[["SOH", "ODOMETER"]])
+        return df
+
+    def _replace_soh_over_one_hundred(self, df: pd.DataFrame) -> pd.DataFrame:
+        if "SOH" in df.columns:
+            df["SOH"] = df["SOH"].mask(df["SOH"] > 1, 1)
         return df
 
     def compute_cycles(self, df: pd.DataFrame) -> pd.DataFrame:
