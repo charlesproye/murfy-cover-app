@@ -8,6 +8,9 @@ from transform.base_spark import BaseSpark
 from transform.result_phases.processed_phase_to_result_phase import (
     ProcessedPhaseToResultPhase,
 )
+from transform.result_phases.providers.mercedes_benz import (
+    MercedesBenzProcessedPhaseToResultPhase,
+)
 from transform.result_phases.providers.renault import RenaultProcessedPhaseToResultPhase
 from transform.result_phases.providers.stellantis import (
     StellantisProcessedPhaseToResultPhase,
@@ -15,13 +18,12 @@ from transform.result_phases.providers.stellantis import (
 from transform.result_phases.providers.tesla_fleet_telemetry import (
     TeslaFTProcessedPhaseToResultPhase,
 )
-from transform.result_phases.providers.volvo import VolvoProcessedPhaseToResultPhase
 
 PROVIDERS: dict[MakeEnum, type[ProcessedPhaseToResultPhase]] = {
     MakeEnum.bmw: ProcessedPhaseToResultPhase,
-    MakeEnum.mercedes_benz: ProcessedPhaseToResultPhase,
+    MakeEnum.mercedes_benz: MercedesBenzProcessedPhaseToResultPhase,
     MakeEnum.renault: RenaultProcessedPhaseToResultPhase,
-    MakeEnum.volvo_cars: VolvoProcessedPhaseToResultPhase,
+    MakeEnum.volvo_cars: ProcessedPhaseToResultPhase,
     MakeEnum.stellantis: StellantisProcessedPhaseToResultPhase,
     MakeEnum.kia: ProcessedPhaseToResultPhase,
     MakeEnum.ford: ProcessedPhaseToResultPhase,

@@ -23,8 +23,8 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         id_col: str = "vin",
         log_level: str = "INFO",
         force_update: bool = False,
-        spark: SparkSession = None,
-        pipes: PipesContext = None,
+        spark: SparkSession = None,  # type: ignore[assignment]
+        pipes: PipesContext = None,  # type: ignore[assignment]
         **kwargs,
     ):
         self.make = make
