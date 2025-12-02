@@ -6,7 +6,7 @@ export enum LanguageEnum {
 }
 
 export const vinDecoderSchema = z.object({
-  vin: z.string().min(17, { message: 'VIN must be 17 characters long' }),
+  vin: z.string().trim().length(17, { message: 'VIN must be 17 characters long' }),
 });
 
 export const flashReportFormSchema = z.object({

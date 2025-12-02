@@ -40,9 +40,9 @@ const TableBatteryInfo: React.FC<{ filters: SelectedFilter[] }> = ({ filters }) 
       {isLoading ? (
         <LoadingSmall />
       ) : (
-        <table className=" min-w-full mobile:min-w-auto  bg-white text-[14px] leading-4 border-spacing-y-14">
+        <table className="w-full mobile:min-w-auto bg-white text-[14px] leading-4 border-spacing-y-14">
           <thead>
-            <tr className="text-gray-light  whitespace-nowrap">
+            <tr className="text-gray-light whitespace-nowrap">
               {headers.map(({ label, filter }) => (
                 <SortTableHeader
                   key={label}
