@@ -60,6 +60,8 @@ kind: Service
 metadata:
   name: external-api
   namespace: evalue
+  labels:
+    app: external-api
 spec:
   selector:
     app: external-api
@@ -67,6 +69,7 @@ spec:
     - protocol: TCP
       port: 4000
       targetPort: 4000
+      name: http
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -94,3 +97,24 @@ spec:
             name: external-api
             port:
               number: 4000
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: external-api
+  namespace: monitoring
+  labels:
+    app: external-api
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: external-api
+  endpoints:
+    - port: http
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - evalue

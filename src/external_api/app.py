@@ -3,11 +3,13 @@ from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi_pagination import add_pagination
+from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.cors import CORSMiddleware
 
+from external_api import __VERSION__
 from external_api.api.v1 import api_router  # as api_router_v1
 from external_api.core.config import settings
 from external_api.core.http_client import HTTP_CLIENT
@@ -33,6 +35,17 @@ structlog.configure(
 )
 
 logger = structlog.get_logger()
+
+
+class MetricsProtectionMiddleware(BaseHTTPMiddleware):
+    """Block /metrics access from external requests (via ingress)"""
+
+    async def dispatch(self, request: Request, call_next):
+        # If request is for /metrics and comes through ingress (has X-Forwarded-For),
+        # block it. Internal cluster requests won't have this header.
+        if request.url.path == "/metrics" and request.headers.get("X-Forwarded-For"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        return await call_next(request)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -83,9 +96,10 @@ async def lifespan(app: FastAPI):
     Exécuté au démarrage et à l'arrêt.
     """
     # Code exécuté au démarrage
-    logger.info("Démarrage de l'API", version="1.1.0")
+    logger.info("Démarrage de l'API", version=__VERSION__)
     logger.info("Environnement", environment=settings.ENVIRONMENT)
     HTTP_CLIENT.start()
+    instrumentator.expose(app)
 
     yield
 
@@ -98,7 +112,7 @@ root_path = "/api" if settings.ENVIRONMENT == "proxy" else ""
 app = FastAPI(
     title=f"{settings.PROJECT_NAME} API",
     description="External API for accessing vehicle data with a pricing system.",
-    version="1.1.0",
+    version=__VERSION__,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     # Uncomment the following line to completely disable OpenAPI documentation:
     # openapi_url=None,
@@ -116,7 +130,7 @@ app = FastAPI(
 )
 # Configuration CORS
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware,  # type: ignore[arg-type]
     allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
     allow_credentials=True,
     allow_methods=["*"],
@@ -128,7 +142,16 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 add_pagination(app)
 
 # # Ajout du middleware de journalisation
-app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RequestLoggingMiddleware)  # type: ignore[arg-type]
+app.add_middleware(MetricsProtectionMiddleware)  # type: ignore[arg-type]
+
+instrumentator: Instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    excluded_handlers=["/redoc", "/docs", "/openapi.json", "/metrics"],
+).instrument(
+    app,
+    metric_namespace="evalue_back",
+)
 
 
 @app.get("/", include_in_schema=False)
@@ -142,7 +165,7 @@ async def root():
 
     return {
         "message": f"Welcome to the {settings.PROJECT_NAME} API",
-        "version": "1.2.0",
+        "version": __VERSION__,
         "documentation": docs_url,
     }
 

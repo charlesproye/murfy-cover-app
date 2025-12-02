@@ -19,7 +19,8 @@ spec:
         - name: ing-api-push
           image: rg.fr-par.scw.cloud/data-engineering/ingestion-push:latest
           imagePullPolicy: Always
-          command: ["uvicorn", "src.ingestion.push.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]
+          # 1 worker per pod (breaks metrics otherwise)
+          command: ["uvicorn", "src.ingestion.push.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -52,23 +53,23 @@ spec:
             - name: S3_BUCKET
               value: "bib-platform-prod-data"
       restartPolicy: Always
-
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: ing-api-push-service
   namespace: data-engineering
+  labels:
+    app: ing-api-push
 spec:
   type: ClusterIP
   selector:
     app: ing-api-push
   ports:
     - protocol: TCP
-      port: 80
+      port: 8080
       targetPort: 8080
-
+      name: http
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -97,7 +98,7 @@ spec:
               service:
                 name: ing-api-push-service
                 port:
-                  number: 80
+                  name: http
     - host: bmw.bib-services.fr
       http:
         paths:
@@ -107,7 +108,7 @@ spec:
               service:
                 name: ing-api-push-service
                 port:
-                  number: 80
+                  name: http
     - host: volkswagen.bib-services.fr
       http:
         paths:
@@ -117,7 +118,7 @@ spec:
               service:
                 name: ing-api-push-service
                 port:
-                  number: 80
+                  name: http
 
 ---
 apiVersion: autoscaling/v2
@@ -154,3 +155,24 @@ spec:
           periodSeconds: 60
       selectPolicy: Max
       stabilizationWindowSeconds: 300
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ing-api-push
+  namespace: monitoring
+  labels:
+    app: ing-api-push
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ing-api-push
+  endpoints:
+    - port: http
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - data-engineering
