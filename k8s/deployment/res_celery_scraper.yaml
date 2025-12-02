@@ -19,6 +19,12 @@ spec:
       - name: res-celery-scraper
         image: rg.fr-par.scw.cloud/data-engineering/premium_report:latest
         imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
         command:
           - celery
           - -A
