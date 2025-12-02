@@ -14,7 +14,7 @@ class VolvoProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         make="volvo-cars",
         spark: SparkSession = None,
         force_update: bool = False,
-        logger: Logger = None,
+        logger: Logger | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -24,15 +24,16 @@ class VolvoProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
     def compute_specific_features_before_aggregation(self, df_tss):
         df_tss = df_tss.withColumn(
             "SOH",
-            F.when(
-                (F.col("soc").isNotNull())
-                & (F.col("range").isNotNull())
-                & (F.col("range") != 0),
-                F.col("estimated_range")
-                / (F.col("soc") / 100.0)
-                / F.col("range")
-                / F.lit(0.87),
-            ).otherwise(None),
+            F.try_divide(
+                F.try_divide(
+                    F.try_divide(
+                        F.col("estimated_range"),
+                        F.col("soc") / F.lit(100.0),
+                    ),
+                    F.col("range"),
+                ),
+                F.lit(0.87),
+            ),
         )
 
         return df_tss
@@ -67,4 +68,3 @@ class VolvoProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
         ).agg(*agg_columns)
 
         return df_aggregated
-

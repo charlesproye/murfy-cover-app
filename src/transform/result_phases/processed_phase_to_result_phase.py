@@ -65,15 +65,6 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         pph = self.run_real_autonomy_compute(pph)
         pph = self.compute_charge_levels(pph)
 
-        self.pipes.report_asset_materialization(
-            metadata={
-                "output_path": {
-                    "raw_value": f"result_phases/{self.make}/result_phases_spark.parquet",
-                    "type": "text",
-                },
-            },
-        )
-
         return pph
 
     def compute_specific_features(self, pph: DF) -> DF:

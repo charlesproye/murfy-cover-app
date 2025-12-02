@@ -23,9 +23,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev --extra transform
 
 # Copy ONLY the essential source files - exclude EDA and other bloat
-COPY src/core/ ./src/core/
-COPY src/transform/ ./src/transform/
-COPY src/__init__.py ./src/__init__.py
+COPY src/ /app/src/
 
 # Install the project with minimal source
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -42,9 +40,7 @@ COPY --from=builder /opt/spark/jars/spark-hadoop-cloud_2.13-4.0.1.jar ${SPARK_HO
 # Copy project files needed for UV installation
 # Code beeing stored in /app/src/ is needed, because SparkApplication use local files like `local:///app/src/...` to load the code.
 COPY pyproject.toml uv.lock /app/
-COPY src/core /app/src/core
-COPY src/transform /app/src/transform
-COPY src/__init__.py /app/src/__init__.py
+COPY src/ /app/src/
 
 # Install dependencies directly into the system Python using UV (as root)
 WORKDIR /app
@@ -64,6 +60,9 @@ RUN chown -R spark:spark /app \
 
 RUN mkdir -p /home/spark/.postgresql
 COPY --chown=spark:spark ./certs/bib-prod-rdb-data-ev.pem /home/spark/.postgresql/root.crt
+
+ENV PGSSLROOTCERT=/home/spark/.postgresql/root.crt
+ENV PGSSLMODE=verify-full
 
 ENV PATH="/app/.venv/bin:$PATH"
 # spark user id

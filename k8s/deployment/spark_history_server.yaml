@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: spark-history-server
-          image: rg.fr-par.scw.cloud/bib-images/spark:1
+          image: rg.fr-par.scw.cloud/data-engineering/spark:1
           args: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
           ports:
             - containerPort: 18080

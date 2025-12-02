@@ -131,17 +131,6 @@ class RawTsToProcessedPhases(CachedETLSpark):
         # Aggregate the time series stats to the phase dataframe / OEM dependent
         phases_enriched = self.aggregate_stats(phase_tss)
 
-        self.pipes.report_asset_materialization(
-            metadata={
-                "output_path": {
-                    "raw_value": PROCESSED_PHASES_CACHE_KEY_TEMPLATE.format(
-                        make=self.make.value.replace("-", "_")
-                    ),
-                    "type": "text",
-                },
-            },
-        )
-
         return phases_enriched
 
     def _set_optimal_spark_parameters(self, tss, nb_cores: int = 8):

@@ -1,7 +1,7 @@
 type: Python
 pythonVersion: "3"
 mode: cluster
-image: "rg.fr-par.scw.cloud/bib-images/spark:1"
+image: "rg.fr-par.scw.cloud/data-engineering/spark:1"
 imagePullPolicy: Always
 sparkVersion: "4.0.1"
 sparkConf:

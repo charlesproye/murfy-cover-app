@@ -3,12 +3,7 @@
 import pathlib
 
 import yaml
-from dagster import (
-    AssetCheckResult,
-    AssetExecutionContext,
-    asset,
-    asset_check,
-)
+from dagster import AssetCheckResult, AssetExecutionContext, asset, asset_check
 from dagster_slack import slack_on_failure
 
 from bib_dagster.config import DAGSTER_SLACK_CHANNEL
@@ -17,6 +12,21 @@ from bib_dagster.defs.spark_jobs import MAKE_PARTITIONS
 from bib_dagster.pipes.pipes_spark_operator import PipesSparkApplicationClient
 from bib_dagster.pipes.spark_resources import DriverResource, ExecutorResource
 from transform.processed_phases.main import RawTsToProcessedPhasesCLI
+
+RESOURCE_CONFIGS: dict[str, dict[str, DriverResource | ExecutorResource]] = {
+    "tesla-fleet-telemetry": {
+        "driver": DriverResource(cores=3, memory="4G", memoryOverhead="512m"),
+        "executor": ExecutorResource(cores=3, memory="4G", instances=6),
+    },
+    "stellantis": {
+        "driver": DriverResource(cores=3, memory="4G", memoryOverhead="512m"),
+        "executor": ExecutorResource(cores=3, memory="4G", instances=4),
+    },
+    "default": {
+        "driver": DriverResource(cores=2, memory="3G", memoryOverhead="512m"),
+        "executor": ExecutorResource(cores=3, memory="3G", instances=3),
+    },
+}
 
 
 @slack_on_failure(DAGSTER_SLACK_CHANNEL, message_fn=format_slack_failure_message)
@@ -54,13 +64,19 @@ def raw_ts_to_pph(
     spark_spec["arguments"] = ["run", make]
     spark_spec["mainApplicationFile"] = RawTsToProcessedPhasesCLI.file_path_in_docker()
 
+    if make not in RESOURCE_CONFIGS:
+        make = "default"
+
+    driver_resource = RESOURCE_CONFIGS[make]["driver"]
+    executor_resource = RESOURCE_CONFIGS[make]["executor"]
+
     return spark_pipes.run(
         context=context,
         base_spec=spark_spec,
         namespace="spark-operator",
         cleanup=False,
-        driver_resource=DriverResource(cores=2, memory="3G", memoryOverhead="512m"),
-        executor_resource=ExecutorResource(cores=2, memory="3G", instances=3),
+        driver_resource=driver_resource,
+        executor_resource=executor_resource,
     ).get_materialize_result()
 
 
