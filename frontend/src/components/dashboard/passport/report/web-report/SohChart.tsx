@@ -36,7 +36,7 @@ const SohChart: React.FC<SohChartProps> = ({ reportData }) => {
 
   // Estimer le kilométrage actuel
   const estimatedOdometer = useMemo(() => {
-    return reportData.vehicle_info?.mileage || 30000;
+    return reportData.vehicle_info?.odometer || 30000;
   }, [reportData.vehicle_info]);
 
   // Générer un seul point pour le SoH actuel plutôt qu'une série historique

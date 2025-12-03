@@ -102,6 +102,19 @@ class VehicleModel(BaseUUIDModel):
     end_of_life_date = Column(DateTime, comment="Last time seen on the market")
     expected_consumption = Column(Integer)
     evdb_model_id: str | None = Column(String(100), nullable=True)
+    maximum_speed: int | None = Column(Integer)
+    charge_plug_location: str | None = Column(String(100))
+    charge_plug_type: str | None = Column(String(100))
+    fast_charge_max_power: int | None = Column(Integer)
+    fast_charge_duration: int | None = Column(Integer)
+    standard_charge_duration: int | None = Column(Integer)
+    ac_charge_duration: int | None = Column(Integer)
+    autonomy_city_winter: int | None = Column(Integer)
+    autonomy_city_summer: int | None = Column(Integer)
+    autonomy_highway_winter: int | None = Column(Integer)
+    autonomy_highway_summer: int | None = Column(Integer)
+    autonomy_combined_winter: int | None = Column(Integer)
+    autonomy_combined_summer: int | None = Column(Integer)
 
 
 class Battery(BaseUUIDModel):

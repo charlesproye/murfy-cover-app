@@ -101,6 +101,11 @@ async def lifespan(app: FastAPI):
     HTTP_CLIENT.start()
     instrumentator.expose(app)
 
+    for route in app.routes:
+        if hasattr(route, "path") and route.path == "/metrics":
+            route.include_in_schema = False
+            break
+
     yield
 
     logger.info("Arrêt de l'API")
@@ -110,8 +115,8 @@ async def lifespan(app: FastAPI):
 root_path = "/api" if settings.ENVIRONMENT == "proxy" else ""
 
 app = FastAPI(
-    title=f"{settings.PROJECT_NAME} API",
-    description="External API for accessing vehicle data with a pricing system.",
+    title="BIB Batteries API",
+    description="BIB Batteries API enables to access SoH, SoH estimated, dynamic and static data on your vehicles.",
     version=__VERSION__,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     # Uncomment the following line to completely disable OpenAPI documentation:
@@ -170,7 +175,7 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
 async def health_check():
     """
     Health check endpoint.

@@ -161,7 +161,7 @@ class TestGetToken:
         # Check token response
         assert "access_token" in data
         assert "token_type" in data
-        assert data["token_type"] == "bearer"
+        assert data["token_type"] == "Bearer"
 
         # Verify token is a valid JWT (basic check - has 3 parts)
         assert len(data["access_token"].split(".")) == 3

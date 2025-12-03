@@ -21,7 +21,7 @@ const FirstPage: React.FC<FirstPageProps> = ({ reportData }) => {
         brand={reportData.vehicle_info?.brand}
         model={reportData.vehicle_info?.model}
         vin={reportData.vehicle_info?.vin}
-        mileage={reportData.vehicle_info?.mileage}
+        mileage={reportData.vehicle_info?.odometer}
         immatriculation={reportData.vehicle_info?.licence_plate}
         score={reportData.vehicle_info?.score}
         start_date={reportData.vehicle_info?.start_date}

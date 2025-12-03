@@ -148,7 +148,7 @@ const VehicleStats: React.FC<{ vin: string | undefined }> = ({ vin }) => {
         <div className="flex justify-between items-center">
           <span className={labelClass}>Mileage</span>
           <span className="text-right text-xs md:text-sm text-gray">
-            {formatNumber(infoVehicle.vehicle_info.mileage)} km
+            {formatNumber(infoVehicle.vehicle_info.odometer)} km
           </span>
         </div>
         <div className="flex justify-between items-center">

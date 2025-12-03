@@ -43,12 +43,12 @@ export const ROUTES = {
 
   // STATIC DATA
   MODELS_WITH_DATA: `${BASE_URL}/static_data/models-with-data`,
-  ALL_MODELS_WITH_TRENDLINE: `${BASE_URL}/static_data/all-models-with-trendline`,
 
   // FLASH REPORT
   VIN_DECODER: `${BASE_URL}/flash_report/vin-decoder`,
   SEND_EMAIL: `${BASE_URL}/flash_report/send-email`,
   GENERATION_DATA: `${BASE_URL}/flash_report/generation-data`,
+  ALL_MODELS_WITH_TRENDLINE: `${BASE_URL}/flash_report/models-with-trendline`,
 
   // TESLA ACTIVATION
   TESLA_CREATE_USER: `${BASE_URL}/tesla/create-user`,

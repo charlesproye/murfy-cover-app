@@ -212,6 +212,19 @@ def get_or_create_vehicle_model(
             commissioning_date=start_date,
             end_of_life_date=end_date,
             evdb_model_id=evdb_model_id,
+            charge_plug_location=vehicle.get("Charge_Plug_Location"),
+            charge_plug_type=vehicle.get("Charge_Plug_Type"),
+            fast_charge_max_power=vehicle.get("Fastcharge_Power_Max"),
+            fast_charge_duration=vehicle.get("Fastcharge_ChargeTime"),
+            standard_charge_duration=vehicle.get("Charge_Standard_ChargeTime"),
+            ac_charge_duration=vehicle.get("Charge_Alternative_ChargeTime"),
+            autonomy_city_winter=vehicle.get("Range_Real_WCty"),
+            autonomy_city_summer=vehicle.get("Range_Real_BCty"),
+            autonomy_highway_winter=vehicle.get("Range_Real_WHwy"),
+            autonomy_highway_summer=vehicle.get("Range_Real_BHwy"),
+            autonomy_combined_winter=vehicle.get("Range_Real_WCmb"),
+            autonomy_combined_summer=vehicle.get("Range_Real_BCmb"),
+            maximum_speed=vehicle.get("Performance_Topspeed"),
         )
         session.add(model)
         session.flush()
@@ -236,7 +249,32 @@ def get_or_create_vehicle_model(
             model.battery_id = battery_id
         if evdb_model_id is not None:
             model.evdb_model_id = evdb_model_id
-
+        if vehicle.get("Charge_Plug_Location") is not None:
+            model.charge_plug_location = vehicle.get("Charge_Plug_Location")
+        if vehicle.get("Charge_Plug_Type") is not None:
+            model.charge_plug_type = vehicle.get("Charge_Plug_Type")
+        if vehicle.get("Fastcharge_Power_Max") is not None:
+            model.fast_charge_max_power = vehicle.get("Fastcharge_Power_Max")
+        if vehicle.get("Fastcharge_ChargeTime") is not None:
+            model.fast_charge_duration = vehicle.get("Fastcharge_ChargeTime")
+        if vehicle.get("Charge_Standard_ChargeTime") is not None:
+            model.standard_charge_duration = vehicle.get("Charge_Standard_ChargeTime")
+        if vehicle.get("Charge_Alternative_ChargeTime") is not None:
+            model.ac_charge_duration = vehicle.get("Charge_Alternative_ChargeTime")
+        if vehicle.get("Range_Real_WCty") is not None:
+            model.autonomy_city_winter = vehicle.get("Range_Real_WCty")
+        if vehicle.get("Range_Real_BCty") is not None:
+            model.autonomy_city_summer = vehicle.get("Range_Real_BCty")
+        if vehicle.get("Range_Real_WHwy") is not None:
+            model.autonomy_highway_winter = vehicle.get("Range_Real_WHwy")
+        if vehicle.get("Range_Real_BHwy") is not None:
+            model.autonomy_highway_summer = vehicle.get("Range_Real_BHwy")
+        if vehicle.get("Range_Real_WCmb") is not None:
+            model.autonomy_combined_winter = vehicle.get("Range_Real_WCmb")
+        if vehicle.get("Range_Real_BCmb") is not None:
+            model.autonomy_combined_summer = vehicle.get("Range_Real_BCmb")
+        if vehicle.get("Performance_Topspeed") is not None:
+            model.maximum_speed = vehicle.get("Performance_Topspeed")
         session.flush()
         print(f"Updated existing vehicle model: {vehicle_model} {type_car} {version}")
 

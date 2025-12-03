@@ -10,7 +10,7 @@ export interface InfoVehicleResult {
     vin: string;
     brand: string;
     model: string;
-    mileage: number;
+    odometer: number;
     score: Score;
     start_date: string;
     image: string;
@@ -31,7 +31,6 @@ export interface InfoVehicleResult {
   end_of_contract_date?: string;
   last_data_date?: string;
   activation_status?: boolean;
-  odometer?: number;
 }
 
 // Type pour la réponse API qui peut avoir des valeurs manquantes

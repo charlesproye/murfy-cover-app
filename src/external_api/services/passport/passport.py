@@ -429,7 +429,7 @@ async def get_infos(vin: str, db: AsyncSession):
             "vin": data["vin"],
             "brand": data["oem_name"],
             "model": data["model_name"],
-            "mileage": data["odometer"],
+            "odometer": data["odometer"],
             "score": data["score"],
             "start_date": data["start_date"].isoformat()
             if data["start_date"]
@@ -456,7 +456,6 @@ async def get_infos(vin: str, db: AsyncSession):
         if data["last_data_date"]
         else None,
         "activation_status": data["activation_status"],
-        "odometer": data["odometer"],
     }
 
     return formatted_data
