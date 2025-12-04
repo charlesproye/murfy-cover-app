@@ -11,14 +11,14 @@ const WarrantyInfo: React.FC<WarrantyInfoProps> = ({ vehicleBatteryInfo }) => {
   // Calcul du kilométrage restant pour la garantie
   const getWarrantyRemaining = (data: InfoVehicleResult): string => {
     const warrantyKm = data.vehicle_info?.warranty_km || 0;
-    const currentMileage = data.vehicle_info?.mileage || 0;
+    const currentMileage = data.vehicle_info?.odometer || 0;
     const remainingMileage = Math.max(0, warrantyKm - currentMileage);
     return formatNumber(remainingMileage, 'KM');
   };
 
   const calculateWarrantyKmPercentage = (data: InfoVehicleResult): number => {
     const warrantyKm = data.vehicle_info?.warranty_km || 0;
-    const currentMileage = data.vehicle_info?.mileage || 0;
+    const currentMileage = data.vehicle_info?.odometer || 0;
     if (warrantyKm <= 0) return 0;
     const percentage = ((warrantyKm - currentMileage) / warrantyKm) * 100;
     return Math.max(0, Math.min(100, percentage));

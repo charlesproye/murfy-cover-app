@@ -8,7 +8,7 @@ import { LanguageEnum } from '../flash-report/forms/schema';
 const PdfSohChart: React.FC<{ data: InfoVehicleResult }> = ({ data }) => {
   const texts = pdfTexts[LanguageEnum.EN];
   // Récupérer les vraies valeurs du véhicule
-  const mileage = data.vehicle_info?.mileage ?? 0;
+  const mileage = data.vehicle_info?.odometer ?? 0;
   const sohCurrent = data.battery_info?.soh ?? 100;
 
   // Valeurs de départ et de prédiction

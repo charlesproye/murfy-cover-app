@@ -125,7 +125,7 @@ const PdfHeader: React.FC<{ data: InfoVehicleResult }> = ({ data }) => {
                   {texts.mileage}
                 </Text>
                 <Text style={{ fontSize: 9, color: '#111827', fontWeight: 500 }}>
-                  {v.mileage ? `${v.mileage} KM` : '-'}
+                  {v.odometer ? `${v.odometer} KM` : '-'}
                 </Text>
               </View>
               <View style={{ flexDirection: 'column', gap: 2, marginLeft: 32 }}>

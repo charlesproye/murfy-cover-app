@@ -59,7 +59,7 @@ const PassportPdf: React.FC<{ data: InfoVehicleResult }> = ({ data }) => {
           <PdfRangeAndWarranty
             warranty_km={data.vehicle_info.warranty_km}
             warranty_date={data.vehicle_info.warranty_date}
-            mileage={data.vehicle_info.mileage}
+            mileage={data.vehicle_info.odometer}
             start_date={data.vehicle_info.start_date}
             range={data.battery_info.range}
             trendline={data.battery_info.trendline}
