@@ -354,3 +354,16 @@ class PremiumReport(BaseUUIDModel):
     task_id: str | None = Column(String(255))
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class VehicleStatus(BaseUUIDModel):
+    __tablename__ = "vehicle_status"
+    vehicle_id: Mapped[uuid.UUID] | None = Column(
+        ForeignKey("vehicle.id"), nullable=True
+    )
+    vin: str = Column(String(50), nullable=False)
+    status_name: str = Column(String(100), nullable=False)
+    status_value: bool = Column(Boolean, nullable=False)
+    process_step: str = Column(String(100), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

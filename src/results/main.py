@@ -4,6 +4,7 @@ from results.forecast.price_predictor import train_and_save
 from results.scoring.update_scoring import update_scoring
 from results.trendline.main import update_trendline_model, update_trendline_oem
 from results.update_available_data.main import update_available_data
+from results.vehicle_status.main import run_vehicle_status_checks
 
 LOGGER = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ def results_pipeline(logger: logging.Logger = LOGGER):
     trendline_oem_summary = update_trendline_oem() or {}
     trendline_model_summary = update_trendline_model() or {}
     price_forecast_summary = train_and_save("model_price.pkl", logger=logger) or {}
+    vehicle_status_summary = run_vehicle_status_checks(logger=logger) or {}
 
     return {
         "available_data": available_data_summary,
@@ -21,4 +23,5 @@ def results_pipeline(logger: logging.Logger = LOGGER):
         "trendline_oem": trendline_oem_summary,
         "trendline_model": trendline_model_summary,
         "price_forecast": price_forecast_summary,
+        "vehicle_status": vehicle_status_summary,
     }
