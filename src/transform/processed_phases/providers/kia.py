@@ -29,15 +29,19 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
 
         df = phase_df.withColumn(
             "soh",
-            F.col("remaining_capacity_kwh")
-            * 100
-            / (F.col("net_capacity") * F.col("soc")),
+            F.when(
+                (F.col("net_capacity") * F.col("soc")) != 0,
+                F.col("remaining_capacity_kwh")
+                * 100
+                / (F.col("net_capacity") * F.col("soc")),
+            )
+            .otherwise(None)
+            .cast("double"),
         )
-        df = df.withColumn("soh", F.col("soh").cast("double"))
 
         return df
 
-    def aggregate_stats(self, df_tss):
+    def aggregate_stats(self, phase_df):
         agg_columns = [
             # Minimum
             F.first("make", ignorenulls=True).alias("MAKE"),
@@ -52,10 +56,10 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
             F.expr("percentile_approx(soh, 0.5)").alias("SOH"),
         ]
 
-        if "consumption" in df_tss.columns:
+        if "consumption" in phase_df.columns:
             agg_columns.append(F.mean("consumption").alias("CONSUMPTION"))
 
-        df_aggregated = df_tss.groupBy(
+        df_aggregated = phase_df.groupBy(
             "VIN",
             "PHASE_INDEX",
             "DATETIME_BEGIN",

@@ -43,7 +43,7 @@ full_pipeline_job = dg.define_asset_job(
 )
 
 
-@dg.schedule(cron_schedule="0 1 * * 1", job=full_pipeline_job)
+@dg.schedule(cron_schedule="0 1 * * *", job=full_pipeline_job)
 def full_pipeline_schedule():
     """Run the full pipeline (response -> raw -> pph -> rph) weekly on Monday for all makes."""
     for make in MAKE_PARTITIONS.get_partition_keys():
