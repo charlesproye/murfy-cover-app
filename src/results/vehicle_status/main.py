@@ -1,6 +1,6 @@
 import logging
 
-from src.results.vehicle_status.vehicle_status_tracker import VehicleStatusTracker
+from results.vehicle_status.vehicle_status_tracker import VehicleStatusTracker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
