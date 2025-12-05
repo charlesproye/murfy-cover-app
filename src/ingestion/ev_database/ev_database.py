@@ -97,53 +97,105 @@ def standardize_battery_chemistry(battery_chemistry: str | None) -> str:
 
 def get_or_create_battery(session: Session, vehicle: dict[str, Any]) -> uuid.UUID:
     """Get or create a Battery record and return its ID."""
+
     battery_chemistry = standardize_battery_chemistry(vehicle.get("Battery_Chemistry"))
-    battery_manufacturer = vehicle.get("Battery_Manufacturer") or "unknown"
-    battery_name = vehicle.get("Vehicle_Model", "unknown")
+    battery_manufacturer = vehicle.get("Battery_Manufacturer")
     capacity = vehicle.get("Battery_Capacity_Full")
     net_capacity = vehicle.get("Battery_Capacity_Useable")
+    estimated_capacity = vehicle.get("Battery_Capacity_Estimate")
+    battery_modules = vehicle.get("Battery_Modules")
+    battery_cells = vehicle.get("Battery_Cells")
+    battery_weight = vehicle.get("Battery_Weight")
+    battery_architecture = vehicle.get("Battery_Architecture")
+    battery_tms = vehicle.get("Battery_TMS")
+    battery_type = vehicle.get("Battery_Type")
+    battery_voltage_nominal = vehicle.get("Battery_Voltage_Nominal")
+    battery_warranty_period = vehicle.get("Battery_Warranty_Period")
+    battery_warranty_mileage = vehicle.get("Battery_Warranty_Mileage")
 
-    battery = (
-        session.query(Battery)
-        .filter(
-            func.upper(Battery.battery_name) == battery_name.upper(),
-            func.upper(Battery.battery_chemistry) == battery_chemistry.upper(),
-            func.upper(Battery.battery_oem) == battery_manufacturer.upper(),
-            Battery.capacity == capacity,
-            Battery.net_capacity == net_capacity,
-        )
-        .first()
-    )
+    # Helper function to build filter conditions
+    def add_filter(column, value, use_upper=False):
+        if value is not None:
+            if use_upper:
+                return func.upper(column) == value.upper()
+            return column == value
+        return column.is_(None)
+
+    # Build filter conditions
+    filter_conditions = [
+        add_filter(Battery.battery_chemistry, battery_chemistry, use_upper=True),
+        add_filter(Battery.battery_oem, battery_manufacturer, use_upper=True),
+        add_filter(Battery.battery_modules, battery_modules),
+        add_filter(Battery.battery_cells, battery_cells),
+        add_filter(Battery.battery_weight, battery_weight),
+        add_filter(Battery.battery_architecture, battery_architecture),
+        add_filter(Battery.battery_tms, battery_tms),
+        add_filter(Battery.battery_voltage_nominal, battery_voltage_nominal),
+        add_filter(Battery.battery_warranty_period, battery_warranty_period),
+        add_filter(Battery.battery_warranty_mileage, battery_warranty_mileage),
+        add_filter(Battery.capacity, capacity),
+        add_filter(Battery.net_capacity, net_capacity),
+        add_filter(Battery.estimated_capacity, estimated_capacity),
+        add_filter(Battery.battery_type, battery_type),
+    ]
+
+    battery = session.query(Battery).filter(*filter_conditions).first()
 
     if not battery:
         battery = Battery(
             id=uuid.uuid4(),
-            battery_name=battery_name,
-            battery_chemistry=battery_chemistry.upper(),
-            battery_oem=battery_manufacturer.upper(),
+            battery_chemistry=battery_chemistry.upper()
+            if battery_chemistry is not None
+            else None,
+            battery_oem=battery_manufacturer.upper()
+            if battery_manufacturer is not None
+            else None,
             capacity=capacity,
             net_capacity=net_capacity,
-            source=vehicle.get("EVDB_Detail_URL"),
+            estimated_capacity=estimated_capacity,
+            battery_type=battery_type,
+            battery_modules=battery_modules,
+            battery_cells=battery_cells,
+            battery_weight=battery_weight,
+            battery_architecture=battery_architecture,
+            battery_tms=battery_tms,
+            battery_voltage_nominal=battery_voltage_nominal,
+            battery_warranty_period=battery_warranty_period,
+            battery_warranty_mileage=battery_warranty_mileage,
         )
         session.add(battery)
         session.flush()
-        print(
-            f"Created new battery: Battery Name={battery_name}, Chemistry={battery_chemistry}, "
-            f"OEM={battery_manufacturer}, Capacity={capacity}kWh, Net Capacity={net_capacity}kWh"
-        )
+        print(f"Created new battery: Battery with id {battery.id}")
     else:
-        # Update battery fields
-        battery.battery_name = battery_name
-        battery.battery_chemistry = battery_chemistry.upper()
-        battery.battery_oem = battery_manufacturer.upper()
-        battery.capacity = capacity
-        battery.net_capacity = net_capacity
-        battery.source = vehicle.get("EVDB_Detail_URL")
+        # Map field names to values with optional transformations
+        field_updates = {
+            "battery_chemistry": battery_chemistry.upper()
+            if battery_chemistry is not None
+            else None,
+            "battery_oem": battery_manufacturer.upper()
+            if battery_manufacturer is not None
+            else None,
+            "capacity": capacity,
+            "net_capacity": net_capacity,
+            "estimated_capacity": estimated_capacity,
+            "battery_type": battery_type,
+            "battery_modules": battery_modules,
+            "battery_cells": battery_cells,
+            "battery_weight": battery_weight,
+            "battery_architecture": battery_architecture,
+            "battery_tms": battery_tms,
+            "battery_voltage_nominal": battery_voltage_nominal,
+            "battery_warranty_period": battery_warranty_period,
+            "battery_warranty_mileage": battery_warranty_mileage,
+        }
+
+        # Update only non-None values
+        for field_name, value in field_updates.items():
+            if value is not None:
+                setattr(battery, field_name, value)
+
         session.flush()
-        print(
-            f"Updated existing battery: Battery Name={battery_name}, Chemistry={battery_chemistry}, "
-            f"OEM={battery_manufacturer}, Capacity={capacity}kWh, Net Capacity={net_capacity}kWh"
-        )
+        print(f"Updated existing battery with id {battery.id}")
 
     return battery.id
 
@@ -291,6 +343,7 @@ def process_vehicle(session: Session, vehicle: dict[str, Any]) -> None:
         oem_id = get_oem(session, vehicle.get("Vehicle_Make", ""))
         make_id = get_or_create_make(session, vehicle.get("Vehicle_Make", ""), oem_id)
         battery_id = get_or_create_battery(session, vehicle)
+        print(battery_id)
         get_or_create_vehicle_model(session, vehicle, make_id, battery_id)
     except Exception as e:
         print(f"Error processing vehicle {vehicle.get('Vehicle_Model')}: {e!s}")

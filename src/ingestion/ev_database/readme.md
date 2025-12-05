@@ -81,7 +81,6 @@ The module interacts with the following database tables:
 
 ### battery
 - `id` (UUID): Primary key
-- `battery_name` (text): Battery name
 - `battery_chemistry` (text): Standardized battery chemistry
 - `battery_oem` (text): Battery manufacturer
 - `capacity` (numeric): Full battery capacity
@@ -104,4 +103,3 @@ All errors are logged with appropriate error messages.
 - Battery chemistry is standardized (e.g., NMC/NCM variations are normalized)
 - All text data is stored in lowercase for consistency
 - The module includes detailed logging for tracking the data processing
-

@@ -119,12 +119,20 @@ class VehicleModel(BaseUUIDModel):
 
 class Battery(BaseUUIDModel):
     __tablename__ = "battery"
-    battery_name: str = Column(String(100))
-    source: str = Column(String(100))
+    battery_type = Column(String(100))
     battery_chemistry: str = Column(String(100))
     battery_oem: str = Column(String(100))
-    capacity = Column(Numeric(10, 2))
-    net_capacity = Column(Numeric(10, 2))
+    capacity: float | None = Column(Numeric(10, 2))
+    net_capacity: float | None = Column(Numeric(10, 2))
+    estimated_capacity: str | None = Column(String(100))
+    battery_modules: int | None = Column(Integer)
+    battery_cells: str | None = Column(String(255))
+    battery_weight: float | None = Column(Numeric(10, 2))
+    battery_architecture: str | None = Column(String(100))
+    battery_tms: str | None = Column(String(100))
+    battery_voltage_nominal: float | None = Column(Numeric(10, 2))
+    battery_warranty_period: int | None = Column(Integer)
+    battery_warranty_mileage: float | None = Column(Numeric(10, 2))
 
 
 class Vehicle(BaseUUIDModel):

@@ -221,8 +221,6 @@ async def tesla_make(db_session: AsyncSession, tesla_oem: Oem) -> Make:
 async def lfp_battery(db_session: AsyncSession) -> Battery:
     """Create a LFP battery."""
     battery = Battery(
-        battery_name="Test Battery LFP",
-        source="test",
         capacity=75.0,
         net_capacity=72.0,
     )

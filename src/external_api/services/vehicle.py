@@ -35,7 +35,6 @@ async def get_static_vehicle_data(db: AsyncSession, vin: str) -> StaticVehicleDa
             vm.model_name,
             vm.version,
             vm.type,
-            b.battery_name,
             b.battery_chemistry,
             b.capacity,
             b.net_capacity,
@@ -68,7 +67,6 @@ async def get_static_vehicle_data(db: AsyncSession, vin: str) -> StaticVehicleDa
             "model_name": record.model_name,
             "version": record.version,
             "type": record.type,
-            "battery_name": record.battery_name,
             "battery_chemistry": record.battery_chemistry,
             "capacity": float(record.capacity) if record.capacity is not None else None,
             "net_capacity": float(record.net_capacity)
@@ -266,4 +264,3 @@ async def check_vehicle_eligibility(db: AsyncSession, vin: str) -> dict:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erreur lors de la vérification de l'éligibilité du véhicule",
         )
-

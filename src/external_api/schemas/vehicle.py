@@ -9,7 +9,6 @@ class BatteryData(BaseModel):
     """Battery information"""
 
     id: UUID4 = Field(..., description="ID unique de la batterie")
-    battery_name: str = Field(..., description="Nom de la batterie")
     battery_chemistry: str | None = Field(None, description="Chimie de la batterie")
     battery_oem: str | None = Field(None, description="Fabricant de la batterie")
     capacity: float | None = Field(None, description="Capacité totale en kWh")
@@ -96,7 +95,6 @@ class StaticVehicleData(BaseModel):
     model_name: str | None = Field(None, description="Nom du modèle")
     version: str | None = Field(None, description="Version du modèle")
     type: str | None = Field(None, description="Type de véhicule")
-    battery_name: str | None = Field(None, description="Nom de la batterie")
     battery_chemistry: str | None = Field(None, description="Chimie de la batterie")
     capacity: float | None = Field(None, description="Capacité totale en kWh")
     net_capacity: float | None = Field(None, description="Capacité nette en kWh")
@@ -188,4 +186,3 @@ class VehicleEligibilityResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
