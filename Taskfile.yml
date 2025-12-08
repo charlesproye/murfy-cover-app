@@ -52,7 +52,9 @@ tasks:
         docker compose down postgres -v
         docker compose up -d postgres
         sleep 3
-        docker compose exec -T postgres pg_restore -U {{.LOCAL_DB_USER}} -d {{.LOCAL_DB_NAME}} --no-owner --no-acl < /tmp/rdb_backup.custom
+        docker compose cp /tmp/rdb_backup.custom postgres:/tmp/rdb_backup.custom
+        docker compose exec -T postgres bash -c "pg_restore --list /tmp/rdb_backup.custom | grep -v pgaudit > /tmp/rdb_restore.list"
+        docker compose exec -T postgres pg_restore -U {{.LOCAL_DB_USER}} -d {{.LOCAL_DB_NAME}} --no-owner --no-acl -L /tmp/rdb_restore.list /tmp/rdb_backup.custom
         rm /tmp/rdb_backup.custom
     silent: true
 
