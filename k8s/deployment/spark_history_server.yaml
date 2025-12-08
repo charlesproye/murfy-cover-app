@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: spark-history-server
-          image: rg.fr-par.scw.cloud/data-engineering/spark:1
+          image: rg.fr-par.scw.cloud/data-engineering/spark:latest
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false

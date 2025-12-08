@@ -177,7 +177,7 @@ services:
     build:
       context: .
       dockerfile: docker/spark.Dockerfile
-    image: rg.fr-par.scw.cloud/data-engineering/spark:1
+    image: rg.fr-par.scw.cloud/data-engineering/spark:latest
     container_name: spark-transform
     env_file:
       - ./.env

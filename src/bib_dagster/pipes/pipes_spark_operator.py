@@ -42,6 +42,9 @@ from utils.k8s import k8s_utils
 DEFAULT_WAIT_TIMEOUT = 3 * 60 * 60  # 3 hours
 DEFAULT_POLL_INTERVAL = 5.0  # 5 seconds
 DEFAULT_MAX_WAIT = 3600  # 1 hour, can be very long when cluster under load
+SPARK_HISTORY_URL_TEMPLATE = (
+    "https://spark-history.bibers.fr/history/{spark_app_id}/jobs/"
+)
 
 
 def get_spark_app_name(
@@ -556,12 +559,12 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                 context.log.info(
                     f"Creating SparkApplication {app_name} in namespace {namespace}"
                 )
-                custom_objects_api.create_namespaced_custom_object(
-                    group="sparkoperator.k8s.io",
-                    version="v1beta2",
+                spark_app_id = self._create_spark_application_with_retry(
+                    context=context,
+                    custom_objects_api=custom_objects_api,
+                    core_api=core_api,
                     namespace=namespace,
-                    plural="sparkapplications",
-                    body=spark_app,
+                    spark_app=spark_app,
                 )
 
                 # Wait for completion and consume logs
@@ -586,7 +589,7 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                     )
 
                 # Wait for SparkApplication to complete
-                final_status, spark_app_id = self._wait_for_completion(
+                final_status = self._wait_for_completion(
                     context=context,
                     custom_objects_api=custom_objects_api,
                     app_name=app_name,
@@ -604,8 +607,8 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                 }
 
                 if spark_app_id:
-                    metadata["spark_history_url"] = (
-                        f"https://spark-history.bibers.fr/history/{spark_app_id}/jobs/"
+                    metadata["spark_history_url"] = SPARK_HISTORY_URL_TEMPLATE.format(
+                        spark_app_id=spark_app_id
                     )
 
                 return PipesClientCompletedInvocation(
@@ -635,6 +638,245 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                         namespace=namespace,
                     )
 
+    def _check_submission_status(
+        self,
+        context: OpExecutionContext | AssetExecutionContext,
+        custom_objects_api: kubernetes.client.CustomObjectsApi,
+        app_name: str,
+        namespace: str,
+        submission_check_timeout: int = 500,
+        poll_interval: float = 2.0,
+    ) -> bool:
+        """Poll SparkApplication until submission succeeds or fails.
+
+        Returns True if submission succeeds, False if it fails (for retry).
+        Raises on timeout or unexpected errors.
+        """
+        context.log.info(
+            f"Polling SparkApplication {app_name} status (timeout: {submission_check_timeout}s)..."
+        )
+        start_time = time.time()
+
+        while time.time() - start_time < submission_check_timeout:
+            try:
+                app = custom_objects_api.get_namespaced_custom_object(
+                    group="sparkoperator.k8s.io",
+                    version="v1beta2",
+                    namespace=namespace,
+                    plural="sparkapplications",
+                    name=app_name,
+                )
+
+                status = app.get("status", {})
+                app_state = status.get("applicationState", {}).get("state", "")
+
+                # If no state yet, keep polling
+                if not app_state:
+                    time.sleep(poll_interval)
+                    continue
+
+                # Check for failure states
+                if app_state in ["SUBMISSION_FAILED", "FAILED"]:
+                    error_message = status.get("applicationState", {}).get(
+                        "errorMessage", "No error message"
+                    )
+                    context.log.warning(
+                        f"SparkApplication {app_name} entered {app_state} state: {error_message}"
+                    )
+                    return False
+
+                # Any other state means submission succeeded
+                context.log.info(
+                    f"SparkApplication {app_name} submission successful (state: {app_state})"
+                )
+                return True
+
+            except kubernetes.client.exceptions.ApiException as exc:
+                if exc.status == 404:
+                    raise RuntimeError(
+                        f"SparkApplication {app_name} was deleted unexpectedly"
+                    ) from exc
+                raise
+
+        # Timeout reached
+        raise TimeoutError(
+            f"SparkApplication {app_name} submission status check timed out after {submission_check_timeout}s"
+        )
+
+    def _delete_failed_spark_application(
+        self,
+        context: OpExecutionContext | AssetExecutionContext,
+        custom_objects_api: kubernetes.client.CustomObjectsApi,
+        core_api: kubernetes.client.CoreV1Api,
+        app_name: str,
+        namespace: str,
+        wait_for_cleanup: int = 60,
+    ) -> None:
+        """Delete failed SparkApplication and wait for driver pod cleanup.
+
+        Waits up to wait_for_cleanup seconds for the driver pod to be deleted
+        before proceeding. Logs warning but doesn't fail if cleanup times out.
+        """
+        try:
+            custom_objects_api.delete_namespaced_custom_object(
+                group="sparkoperator.k8s.io",
+                version="v1beta2",
+                namespace=namespace,
+                plural="sparkapplications",
+                name=app_name,
+            )
+            context.log.info(f"Deleted failed SparkApplication {app_name}")
+
+            # Wait for driver pod to be cleaned up
+            driver_pod_name = f"{app_name}-driver"
+            context.log.info(
+                f"Waiting up to {wait_for_cleanup}s for driver pod {driver_pod_name} to be deleted..."
+            )
+            start_time = time.time()
+
+            while time.time() - start_time < wait_for_cleanup:
+                try:
+                    core_api.read_namespaced_pod(driver_pod_name, namespace)
+                    # Pod still exists, keep waiting
+                    time.sleep(2)
+                except kubernetes.client.ApiException as e:
+                    if e.status == 404:
+                        # Pod deleted, we're good
+                        elapsed = time.time() - start_time
+                        context.log.info(
+                            f"Driver pod {driver_pod_name} cleaned up after {elapsed:.1f}s"
+                        )
+                        return
+                    raise
+
+            # Timeout - log warning but don't fail
+            context.log.warning(
+                f"Driver pod {driver_pod_name} still exists after {wait_for_cleanup}s. "
+                "Proceeding with retry anyway."
+            )
+
+        except kubernetes.client.exceptions.ApiException as exc:
+            if exc.status != 404:
+                context.log.warning(
+                    f"Failed to delete SparkApplication {app_name}: {exc}"
+                )
+
+    def _create_spark_application_with_retry(
+        self,
+        context: OpExecutionContext | AssetExecutionContext,
+        custom_objects_api: kubernetes.client.CustomObjectsApi,
+        core_api: kubernetes.client.CoreV1Api,
+        namespace: str,
+        spark_app: dict[str, Any],
+        max_retries: int = 3,
+        retry_delay: int = 30,
+    ) -> str | None:
+        """Create SparkApplication with retry logic for transient failures.
+
+        Retries on API errors (500s) and submission failures (SUBMISSION_FAILED).
+        Waits for full cleanup between retries to avoid "driver pod already exists" errors.
+
+        Returns spark_app_id if available, None otherwise.
+        """
+        app_name = spark_app["metadata"]["name"]
+
+        for attempt in range(max_retries):
+            try:
+                # Create the SparkApplication
+                custom_objects_api.create_namespaced_custom_object(
+                    group="sparkoperator.k8s.io",
+                    version="v1beta2",
+                    namespace=namespace,
+                    plural="sparkapplications",
+                    body=spark_app,
+                )
+                context.log.info(f"SparkApplication {app_name} created successfully")
+
+                # Check if submission succeeded
+                submission_succeeded = self._check_submission_status(
+                    context=context,
+                    custom_objects_api=custom_objects_api,
+                    app_name=app_name,
+                    namespace=namespace,
+                )
+
+                if submission_succeeded:
+                    return self._wait_for_spark_application_id(
+                        context=context,
+                        custom_objects_api=custom_objects_api,
+                        app_name=app_name,
+                        namespace=namespace,
+                    )
+
+                # Submission failed, retry if attempts remain
+                if attempt < max_retries - 1:
+                    context.log.warning(
+                        f"Retrying SparkApplication creation (attempt {attempt + 2}/{max_retries})..."
+                    )
+                    self._delete_failed_spark_application(
+                        context=context,
+                        custom_objects_api=custom_objects_api,
+                        core_api=core_api,
+                        app_name=app_name,
+                        namespace=namespace,
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    raise RuntimeError(
+                        f"SparkApplication {app_name} failed to submit after {max_retries} attempts"
+                    )
+
+            except kubernetes.client.exceptions.ApiException as exc:
+                if exc.status == 500 and attempt < max_retries - 1:
+                    context.log.warning(
+                        f"API error creating SparkApplication (attempt {attempt + 1}/{max_retries}): {exc.reason}. "
+                        f"Retrying in {retry_delay} seconds..."
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    raise
+
+    def _wait_for_spark_application_id(
+        self,
+        context: OpExecutionContext | AssetExecutionContext,
+        custom_objects_api: kubernetes.client.CustomObjectsApi,
+        app_name: str,
+        namespace: str,
+        max_wait: int = 30,
+        poll_interval: float = 2.0,
+    ) -> str | None:
+        """Poll for sparkApplicationId and log Spark History URL when available."""
+        context.log.debug(
+            "Submission succeeded but spark_app_id not yet available. Polling for ID..."
+        )
+        start = time.time()
+
+        while time.time() - start < max_wait:
+            try:
+                app = custom_objects_api.get_namespaced_custom_object(
+                    group="sparkoperator.k8s.io",
+                    version="v1beta2",
+                    namespace=namespace,
+                    plural="sparkapplications",
+                    name=app_name,
+                )
+            except kubernetes.client.exceptions.ApiException:
+                return None  # Don't fail if we can't get the ID
+
+            spark_app_id = app.get("status", {}).get("sparkApplicationId")
+            if spark_app_id:
+                context.log.info(
+                    f"Spark History Server: {SPARK_HISTORY_URL_TEMPLATE.format(spark_app_id=spark_app_id)}"
+                )
+                return spark_app_id
+
+            time.sleep(poll_interval)
+
+        context.log.warning(
+            f"Cannot get SparkApplication ID after {max_wait} seconds for SparkApplication {app_name}."
+        )
+        return None
+
     def _wait_for_driver_pod_creation(
         self,
         context: OpExecutionContext | AssetExecutionContext,
@@ -642,22 +884,10 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
         driver_pod_name: str,
         namespace: str,
         max_wait: int = DEFAULT_MAX_WAIT,
-    ):
-        """Wait for the driver pod to be created by the SparkApplication.
+    ) -> None:
+        """Wait for driver pod to be created by SparkApplication.
 
-        When multiple SparkApplications are launched simultaneously, the driver pod
-        creation can take longer than expected. This method polls for the pod's
-        existence before proceeding to check its status.
-
-        Args:
-            context: Dagster execution context
-            core_api: Kubernetes CoreV1Api client
-            driver_pod_name: Name of the driver pod to wait for
-            namespace: Kubernetes namespace
-            max_wait: Maximum time to wait in seconds
-
-        Raises:
-            TimeoutError: If the driver pod is not created within max_wait seconds
+        Raises TimeoutError if pod not created within max_wait seconds.
         """
         context.log.info(
             f"Waiting for driver pod {driver_pod_name} to be created by SparkApplication..."
@@ -694,17 +924,12 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
         custom_objects_api: kubernetes.client.CustomObjectsApi,
         app_name: str,
         namespace: str,
-    ) -> tuple[str, str | None]:
-        """Wait for SparkApplication to complete and return final state and Spark app ID.
-
-        Returns:
-            tuple: (final_state, spark_application_id) where spark_application_id may be None
-        """
+    ) -> str:
+        """Wait for SparkApplication to complete and return final state."""
         context.log.info(f"Waiting for SparkApplication {app_name} to complete...")
 
         max_attempts = int(DEFAULT_WAIT_TIMEOUT / DEFAULT_POLL_INTERVAL)
         attempt = 0
-        logged_spark_url = False
 
         while attempt < max_attempts:
             try:
@@ -718,14 +943,8 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
 
                 status = app.get("status", {})
                 app_state = status.get("applicationState", {}).get("state", "UNKNOWN")
-                spark_app_id = status.get("sparkApplicationId")
 
                 context.log.debug(f"SparkApplication state: {app_state}")
-                if spark_app_id and not logged_spark_url:
-                    context.log.info(
-                        f"Spark History Server: https://spark-history.bibers.fr/history/{spark_app_id}/jobs/"
-                    )
-                    logged_spark_url = True
 
                 # Terminal states
                 if app_state in [
@@ -741,7 +960,7 @@ class PipesSparkApplicationClient(PipesClient, TreatAsResourceParam):
                         raise RuntimeError(
                             f"SparkApplication {app_name} failed with state {app_state}: {error_message}"
                         )
-                    return app_state, spark_app_id
+                    return app_state
 
             except kubernetes.client.ApiException as e:
                 if e.status == 404:

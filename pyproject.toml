@@ -212,7 +212,7 @@ dev = [
     "ipykernel",
 ]
 
-local = ["pyspark>=4.0.1"]
+local = ["pyspark>=4.0.1", "jupyterlab"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
