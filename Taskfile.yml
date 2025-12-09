@@ -65,3 +65,7 @@ tasks:
       - sleep 5
       - task: db:local:restore
     silent: false
+
+  docker:setup:
+    cmds:
+      - docker buildx create --name multiarch --driver docker-container --bootstrap --use

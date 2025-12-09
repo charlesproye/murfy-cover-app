@@ -1,16 +1,20 @@
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:20-bookworm-slim AS deps
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Required for building sharp and other native modules
-RUN apk add --no-cache \
-  libc6-compat \
-  build-base \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential \
   python3 \
-  vips-dev \
-  pkgconfig \
+  libvips-dev \
+  pkg-config \
   autoconf \
   automake \
-  libtool
+  libtool \
+  ca-certificates \
+  git \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
@@ -23,7 +27,7 @@ RUN pnpm install --no-frozen-lockfile
 
 
 # Stage 2: Build
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 WORKDIR /app
@@ -38,17 +42,15 @@ ENV NEXT_PUBLIC_API_URL=https://get-evalue.com/api/v1
 RUN pnpm build
 
 # Stage 3: Production runtime
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 
-# Only lightweight runtime dependencies needed by sharp
-RUN apk add --no-cache \
-    libc6-compat \
-    vips-dev \
-    fftw-dev \
-    gcc \
-    g++ \
-    make \
-    libc-dev
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Runtime dependencies for sharp's shared objects
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libvips42 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

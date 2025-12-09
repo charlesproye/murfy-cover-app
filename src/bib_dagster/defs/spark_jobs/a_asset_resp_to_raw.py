@@ -58,7 +58,9 @@ def response_to_raw_tss(
         namespace="spark-operator",
         cleanup=False,
         driver_resource=DriverResource(cores=1, memory="2G", memoryOverhead="512m"),
-        executor_resource=ExecutorResource(cores=2, instances=2, memory="2G"),
+        executor_resource=ExecutorResource(
+            cores=2, instances=2, memory="7G", memoryOverhead="512m"
+        ),
     ).get_materialize_result()
 
 

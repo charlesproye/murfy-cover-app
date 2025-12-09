@@ -9,7 +9,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev --extra ingestion
 
-COPY . /app
+COPY src/ /app/src/
+COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --extra ingestion
@@ -23,6 +24,7 @@ COPY --from=builder --chown=app:app /app /app
 
 RUN mkdir -p /home/app/.postgresql
 COPY --chown=app:app ./certs/bib-prod-rdb-data-ev.pem /home/app/.postgresql/root.crt
+COPY --chown=app:app ./start_mobilisights.sh /app/start_mobilisights.sh
 
 ENV PATH="/app/.venv/bin:$PATH"
 

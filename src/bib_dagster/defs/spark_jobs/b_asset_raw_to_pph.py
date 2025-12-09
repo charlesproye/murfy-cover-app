@@ -15,16 +15,22 @@ from transform.processed_phases.main import RawTsToProcessedPhasesCLI
 
 RESOURCE_CONFIGS: dict[str, dict[str, DriverResource | ExecutorResource]] = {
     "tesla-fleet-telemetry": {
-        "driver": DriverResource(cores=3, memory="4G", memoryOverhead="512m"),
-        "executor": ExecutorResource(cores=3, memory="4G", instances=6),
+        "driver": DriverResource(cores=3, memory="11G", memoryOverhead="1G"),
+        "executor": ExecutorResource(
+            cores=3, memory="11G", instances=6, memoryOverhead="1G"
+        ),
     },
     "stellantis": {
-        "driver": DriverResource(cores=3, memory="4G", memoryOverhead="512m"),
-        "executor": ExecutorResource(cores=3, memory="4G", instances=4),
+        "driver": DriverResource(cores=3, memory="11G", memoryOverhead="1G"),
+        "executor": ExecutorResource(
+            cores=3, memory="11G", instances=4, memoryOverhead="1G"
+        ),
     },
     "default": {
-        "driver": DriverResource(cores=2, memory="3G", memoryOverhead="512m"),
-        "executor": ExecutorResource(cores=3, memory="3G", instances=3),
+        "driver": DriverResource(cores=2, memory="7G", memoryOverhead="1G"),
+        "executor": ExecutorResource(
+            cores=3, memory="11G", instances=3, memoryOverhead="1G"
+        ),
     },
 }
 

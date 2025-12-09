@@ -61,8 +61,10 @@ def raw_pph_to_rph(
         base_spec=spark_spec,
         namespace="spark-operator",
         cleanup=False,
-        driver_resource=DriverResource(cores=2, memory="3G", memoryOverhead="512m"),
-        executor_resource=ExecutorResource(cores=2, memory="3G", instances=3),
+        driver_resource=DriverResource(cores=2, memory="7G", memoryOverhead="1G"),
+        executor_resource=ExecutorResource(
+            cores=2, memory="7G", instances=3, memoryOverhead="1G"
+        ),
     ).get_materialize_result()
 
 

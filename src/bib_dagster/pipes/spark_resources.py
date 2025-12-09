@@ -11,3 +11,4 @@ class ExecutorResource(BaseModel):
     cores: int
     instances: int
     memory: str
+    memoryOverhead: str

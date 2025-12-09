@@ -9,7 +9,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev --extra ingestion
 
-COPY . /app
+COPY src/ /app/src/
+COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --extra ingestion
@@ -30,4 +31,4 @@ WORKDIR /app
 
 USER 1001
 
-CMD ["./start_hm.sh"]
+CMD ["python", "src/ingestion/high_mobility/__main__.py", "--max_workers", "8"]

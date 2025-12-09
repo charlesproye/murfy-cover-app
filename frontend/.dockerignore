@@ -45,3 +45,6 @@ lerna-debug.log*
 
 # PM2
 .pm2
+
+docker-compose.yml
+Dockerfile

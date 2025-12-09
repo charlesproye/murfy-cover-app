@@ -3,9 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
     image: rg.fr-par.scw.cloud/evalue/evalue-front:latest
     container_name: evalue-front
-    platform: linux/amd64
     restart: unless-stopped
     ports:
       - "3000:3000"

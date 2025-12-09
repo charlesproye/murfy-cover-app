@@ -7,12 +7,14 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-dev --extra ingestion
+    uv sync --locked --no-install-project --no-dev --extra transform
+    # TODO: No sure exactlly what extras are needed here
 
-COPY . /app
+COPY src/ /app/src/
+COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --extra ingestion
+    uv sync --locked --no-dev --extra transform
 
 FROM python:3.11-slim-bookworm
 
@@ -27,7 +29,4 @@ COPY --chown=app:app ./certs/bib-prod-rdb-data-ev.pem /home/app/.postgresql/root
 ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
-
 USER 1001
-
-CMD ["./start_bmw.sh"]
