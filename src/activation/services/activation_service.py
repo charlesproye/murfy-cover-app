@@ -881,42 +881,45 @@ class VehicleActivationService:
             logging.info(f"Vins to activate: {vins_to_activate}")
 
             if len(vins_to_activate) > 0:
-                await self.kia_api._activate_vins(session, vins_to_activate)
+                # Par batch de 50 vins
+                for i in range(0, len(vins_to_activate), 50):
+                    batch = vins_to_activate[i : i + 50]
+                    await self.kia_api._activate_vins(session, batch)
 
-                activated_current_states = await self._get_current_states_kia(
-                    session, vins_to_activate
-                )
+                    activated_current_states = await self._get_current_states_kia(
+                        session, batch
+                    )
 
-                for vin in vins_to_activate:
-                    if vin not in activated_current_states:
-                        vehicle_data = {
-                            "vin": vin,
-                            "Eligibility": False,
-                            "Real_Activation": False,
-                            "Activation_Error": "vin not eligible for data sharing",
-                            "API_Detail": "Le vin n'est pas éligible pour le partage de données, VIN erroné ou d'une version non prise en charge",
-                        }
-
-                    else:
-                        info = activated_current_states[vin]
-
-                        if info["status_bool"]:
+                    for vin in batch:
+                        if vin not in activated_current_states:
                             vehicle_data = {
                                 "vin": vin,
-                                "Eligibility": True,
-                                "Real_Activation": True,
-                                "Activation_Error": "",
-                                "API_Detail": "",
-                            }
-                        else:
-                            vehicle_data = {
-                                "vin": vin,
-                                "Eligibility": True,
+                                "Eligibility": False,
                                 "Real_Activation": False,
-                                "Activation_Error": info["reason"],
-                                "API_Detail": info["reason"],
+                                "Activation_Error": "vin not eligible for data sharing",
+                                "API_Detail": "Le vin n'est pas éligible pour le partage de données, VIN erroné ou d'une version non prise en charge",
                             }
-                    status_data.append(vehicle_data)
+
+                        else:
+                            info = activated_current_states[vin]
+
+                            if info["status_bool"]:
+                                vehicle_data = {
+                                    "vin": vin,
+                                    "Eligibility": True,
+                                    "Real_Activation": True,
+                                    "Activation_Error": "",
+                                    "API_Detail": "",
+                                }
+                            else:
+                                vehicle_data = {
+                                    "vin": vin,
+                                    "Eligibility": True,
+                                    "Real_Activation": False,
+                                    "Activation_Error": info["reason"],
+                                    "API_Detail": info["reason"],
+                                }
+                        status_data.append(vehicle_data)
             else:
                 logging.info("No vins to activate")
 
@@ -925,24 +928,27 @@ class VehicleActivationService:
             logging.info(f"Vins to deactivate: {vins_to_deactivate}")
 
             if len(vins_to_deactivate) > 0:
-                await self.kia_api.delete_consent(session, vins_to_deactivate)
+                # Par batch de 50 vins
+                for i in range(0, len(vins_to_deactivate), 50):
+                    batch = vins_to_deactivate[i : i + 50]
+                    await self.kia_api.delete_consent(session, batch)
 
-                deactivated_current_states = await self._get_current_states_kia(
-                    session, vins_to_deactivate
-                )
-
-                for vin, info in deactivated_current_states.items():
-                    logging.info(
-                        f"Update KIA vehicle that has just been deactivated {vin} : {info['status_bool']}"
+                    deactivated_current_states = await self._get_current_states_kia(
+                        session, batch
                     )
-                    vehicle_data = {
-                        "vin": vin,
-                        "Eligibility": True,
-                        "Real_Activation": False,
-                        "Activation_Error": "",
-                        "API_Detail": "",
-                    }
-                    status_data.append(vehicle_data)
+
+                    for vin, info in deactivated_current_states.items():
+                        logging.info(
+                            f"Update KIA vehicle that has just been deactivated {vin} : {info['status_bool']}"
+                        )
+                        vehicle_data = {
+                            "vin": vin,
+                            "Eligibility": True,
+                            "Real_Activation": False,
+                            "Activation_Error": "",
+                            "API_Detail": "",
+                        }
+                        status_data.append(vehicle_data)
             else:
                 logging.info("No vins to deactivate")
 
