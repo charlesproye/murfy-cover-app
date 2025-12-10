@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import uuid
@@ -93,8 +92,24 @@ class StellantisApi:
             vin = car.get("vin")
             status = item.get("status")
             id = item.get("_id")
-            if vin and status:
-                result[vin] = {"status": status, "id": id}
+            from_date = item.get("from")
+            if vin and status and from_date:
+                # In case of multiple contracts for the same vehicle, keep the most recent one
+                if vin in result and from_date:
+                    if datetime.fromisoformat(from_date) > datetime.fromisoformat(
+                        result[vin]["from"]
+                    ):
+                        result[vin] = {
+                            "status": status,
+                            "id": id,
+                            "from": from_date,
+                        }
+                else:
+                    result[vin] = {
+                        "status": status,
+                        "id": id,
+                        "from": from_date if from_date else None,
+                    }
         return result
 
     async def add_to_fleet(self, id: str, session: aiohttp.ClientSession):
@@ -190,4 +205,3 @@ class StellantisApi:
         except Exception as e:
             logging.error(f"Failed to delete Stellantis clearance: {e}")
             return 500, e
-
