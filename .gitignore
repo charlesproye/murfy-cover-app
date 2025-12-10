@@ -241,3 +241,6 @@ scripts/s3-benchmark.py
 
 # Dagster
 .tmp_dagster_home_*
+
+# graph
+src/notebooks/results/graphs/*
