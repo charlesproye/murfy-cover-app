@@ -8,8 +8,6 @@ from sqlalchemy.orm import sessionmaker
 from core.env_utils import get_env_var
 from core.gsheet_utils import get_google_client
 from core.s3.s3_utils import S3Service
-from core.s3.settings import S3Settings
-from core.spark_utils import create_spark_session
 from core.sql_utils import get_sqlalchemy_engine
 from db_models.vehicle import Vehicle, VehicleData, VehicleStatus
 
@@ -17,10 +15,6 @@ from db_models.vehicle import Vehicle, VehicleData, VehicleStatus
 class VehicleStatusTracker:
     def __init__(self, logger: logging.Logger):
         self.s3 = S3Service()
-        self.s3_settings = S3Settings()
-        self.spark = create_spark_session(
-            self.s3_settings.S3_KEY, self.s3_settings.S3_SECRET
-        )
         self.engine = get_sqlalchemy_engine()
         self.google_client = get_google_client()
         self.session = sessionmaker(bind=self.engine)
@@ -51,9 +45,7 @@ class VehicleStatusTracker:
         return data
 
     def _get_parquet_as_pd(self, make: str):
-        return self.s3.read_parquet_df_spark(
-            self.spark, f"result_phases/result_phases_{make}.parquet"
-        ).toPandas()
+        return self.s3.read_parquet_df(f"result_phases/result_phases_{make}.parquet")
 
     def _get_gsheet(self):
         sheet = self.google_client.open_by_key(self.fleet_info_spreadsheet_id).sheet1
@@ -216,6 +208,39 @@ class VehicleStatusTracker:
             )
         self._upsert_vehicle_status_batch(vehicle_statuses)
 
+    def check_soh_overall_availability(self, at_rph: bool = False):
+        # Update all SOH overall availability statuses to False to get only reality in case of deletion of SOH in postgres
+        with self.session() as session:
+            session.query(VehicleStatus).filter(
+                VehicleStatus.status_name
+                == f"SOH_OVERALL_AVAILABILITY{'_AT_RPH' if at_rph else ''}"
+            ).update({"status_value": False, "updated_at": datetime.now()})
+            session.commit()
+            status_names = [
+                f"{column_soh.upper()}_AVAILABILITY{'_AT_RPH' if at_rph else ''}"
+                for column_soh in ["SOH", "SOH_OEM"]
+            ]
+
+            vehicle_statuses = self._get_table(VehicleStatus)
+            data = vehicle_statuses[vehicle_statuses["status_name"].isin(status_names)]
+            vins = []
+            vehicle_statuses = []
+            for _, row in data.iterrows():
+                if row["vin"] not in vins:
+                    vehicle_statuses.append(
+                        VehicleStatus(
+                            vehicle_id=row["vehicle_id"],
+                            vin=row["vin"],
+                            status_name=f"SOH_OVERALL_AVAILABILITY{'_AT_RPH' if at_rph else ''}",
+                            status_value=True,
+                            process_step="TRANSFORM",
+                            created_at=datetime.now(),
+                            updated_at=datetime.now(),
+                        )
+                    )
+                    vins.append(row["vin"])
+            self._upsert_vehicle_status_batch(vehicle_statuses)
+
     def run_all_checks(self):
         self.logger.info("Running all checks")
         self.logger.info("> Checking required activation...")
@@ -232,4 +257,8 @@ class VehicleStatusTracker:
         self.check_column_availability("SOH")
         self.logger.info("> Checking SOH OEM availability...")
         self.check_column_availability("SOH_OEM")
+        self.logger.info("> Checking SOH overall availability at RPH...")
+        self.check_soh_overall_availability(at_rph=True)
+        self.logger.info("> Checking SOH overall availability...")
+        self.check_soh_overall_availability()
         self.logger.info("All checks completed")
