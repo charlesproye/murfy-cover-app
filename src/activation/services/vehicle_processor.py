@@ -354,11 +354,25 @@ class VehicleProcessor:
                                 model_name,
                                 model_type,
                                 version,
-                                _,
+                                date,
                             ) = await self.renault_api.get_vehicle_info(session, vin)
-                            model_id = mapping_vehicle_type(
-                                model_type, vehicle["make"], model_name, model_existing
-                            )
+
+                            model_type = model_type + " " + version
+                            if date is None:
+                                model_id = mapping_vehicle_type(
+                                    model_type,
+                                    vehicle["make"],
+                                    model_name,
+                                    model_existing,
+                                )
+                            else:
+                                model_id = mapping_vehicle_type(
+                                    model_type,
+                                    vehicle["make"],
+                                    model_name,
+                                    model_existing,
+                                    sale_year=date,
+                                )
                             if not vehicle_exists:
                                 # Since each api call to get static information is billed. We are limiting the call only to vehicles that are not in the db
                                 logging.info(
