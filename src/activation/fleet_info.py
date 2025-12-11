@@ -1,16 +1,13 @@
 import asyncio
 import re
 import time
-from datetime import datetime
 from logging import getLogger
 from typing import Any
 
 import pandas as pd
 from gspread.exceptions import APIError
 
-from core.config import *
 from core.gsheet_utils import get_google_client
-from core.pandas_utils import *
 
 from .config.credentials import SPREADSHEET_ID
 from .config.mappings import COL_DTYPES, OEM_MAPPING, mappings, suffixes_to_remove
@@ -100,7 +97,7 @@ def safe_astype_activation(df: pd.DataFrame, dtypes: dict[str, Any]) -> pd.DataF
                 else:
                     df[col] = df[col].astype(dtype)
             except Exception as e:
-                logging.warning(f"Could not convert column {col} to {dtype}: {e!s}")
+                logger.warning(f"Could not convert column {col} to {dtype}: {e!s}")
     return df
 
 
@@ -279,7 +276,7 @@ async def read_fleet_info(fleet_filter: str | None = None) -> pd.DataFrame:
     )
 
     # Convert dates with explicit format handling
-    date_columns = ["Activation date", "Deactivation date"]
+    date_columns = ["activation_date", "deactivation_date", "registration_date"]
     for col in date_columns:
         if col in df.columns:
             df[col] = pd.to_datetime(

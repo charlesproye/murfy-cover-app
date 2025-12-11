@@ -77,6 +77,7 @@ COL_DTYPES = {
     "activation_error": str,
     "activation_date": "datetime64[ns]",
     "deactivation_date": "datetime64[ns]",
+    "registration_date": "datetime64[ns]",
 }
 
 suffixes_to_remove = [

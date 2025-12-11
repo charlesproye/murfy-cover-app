@@ -296,6 +296,7 @@ class VehicleActivationService:
                         "Activation_Error": "",
                         "API_Detail": "",
                     }
+                    status_data.append(vehicle_data)
                 else:
                     vehicle_data = {
                         "vin": key,

@@ -146,11 +146,9 @@ class Vehicle(BaseUUIDModel):
     activation_status: Mapped[bool] = Column(Boolean, nullable=True)
     is_eligible: Mapped[bool] = Column(Boolean, nullable=True)
     is_pinned: Mapped[bool] = Column(Boolean, nullable=True)
-
     start_date = Column(Date)
     licence_plate: str = Column(String(50))
     end_of_contract_date = Column(Date)
-    last_date_data = Column(Date)
     __table_args__ = (
         Index("ix_vehicle_fleet_id", "fleet_id"),  # Index sur l'ID de la flotte
         Index("ix_vehicle_region_id", "region_id"),  # Index sur l'ID de la région

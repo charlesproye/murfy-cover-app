@@ -161,6 +161,7 @@ class VehicleProcessor:
     async def _get_or_create_tesla_model(
         self,
         cursor,
+        con,
         model_name: str,
         model_type: str,
         version: str,
@@ -175,7 +176,7 @@ class VehicleProcessor:
         )
         result = cursor.fetchone()
         oem_id = await self._get_oem(cursor, oem)
-        make_id = await self._get_or_create_make(cursor, make, oem_id)
+        make_id = await self._get_or_create_make(cursor, con, make, oem_id)
         if result:
             model_id = result[0]
             cursor.execute(
@@ -217,6 +218,7 @@ class VehicleProcessor:
         self,
         session: aiohttp.ClientSession,
         cursor,
+        con,
         vin: str,
         model_name: str,
         model_type: str,
@@ -233,7 +235,7 @@ class VehicleProcessor:
         model_exists = result[0] if result else None
         autonomy = result[1] if result else None
         oem_id = await self._get_oem(cursor, oem)
-        make_id = await self._get_or_create_make(cursor, make, oem_id)
+        make_id = await self._get_or_create_make(cursor, con, make, oem_id)
         if model_exists:
             if autonomy is None:
                 wltp_range = await self.renault_api.get_vehicle_wltp_range(session, vin)
@@ -272,6 +274,7 @@ class VehicleProcessor:
     async def _get_or_create_other_model(
         self,
         cursor,
+        con,
         model_name: str,
         model_type: str,
         version: str,
@@ -284,9 +287,9 @@ class VehicleProcessor:
             (model_name.lower(), model_type.lower(), version.lower()),
         )
         result = cursor.fetchone()
-        model_exists = result[0]
+        model_exists = result[0] if result else None
         oem_id = await self._get_oem(cursor, oem)
-        make_id = await self._get_or_create_make(cursor, make, oem_id)
+        make_id = await self._get_or_create_make(cursor, con, make, oem_id)
         if model_exists:
             return model_exists
         else:
@@ -297,7 +300,14 @@ class VehicleProcessor:
                     id, model_name, type, version, make_id, oem_id
                 ) VALUES (%s, %s, %s, %s, %s, %s)
             """,
-                (model_id, model_name, model_type, version, make_id, oem_id),
+                (
+                    model_id,
+                    model_name,
+                    model_type,
+                    version,
+                    make_id,
+                    oem_id,
+                ),
             )
             logging.info(
                 f"Created new model with name {model_name} and type {model_type} and version {version}"
@@ -384,8 +394,8 @@ class VehicleProcessor:
                                 insert_query = """
                                     INSERT INTO vehicle (
                                         id, vin, fleet_id, region_id, vehicle_model_id,
-                                        licence_plate, activation_status, is_eligible
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                        licence_plate, activation_status, is_eligible, start_date
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 """
                                 cursor.execute(
                                     insert_query,
@@ -398,6 +408,7 @@ class VehicleProcessor:
                                         vehicle["licence_plate"],
                                         vehicle["real_activation"],
                                         vehicle["eligibility"],
+                                        vehicle["registration_date"],
                                     ),
                                 )
                                 logging.info(
@@ -410,6 +421,7 @@ class VehicleProcessor:
                                     "is_eligible": vehicle["eligibility"],
                                     "vehicle_model_id": model_id,
                                     "vin": vin,
+                                    "start_date": vehicle["registration_date"],
                                 }
 
                                 cursor.execute(
@@ -418,7 +430,8 @@ class VehicleProcessor:
                                     SET fleet_id = %(fleet_id)s,
                                         activation_status = %(activation_status)s,
                                         is_eligible = %(is_eligible)s,
-                                        vehicle_model_id = %(vehicle_model_id)s
+                                        vehicle_model_id = %(vehicle_model_id)s,
+                                        start_date = %(start_date)s
                                     WHERE vin = %(vin)s
                                     """,
                                     update_data,
@@ -496,13 +509,13 @@ class VehicleProcessor:
                                 logging.info(
                                     f"Processing BMW vehicle {vin} | {model_name} | {model_type}"
                                 )
-                                # model_id = await self._get_or_create_other_model(cursor, model_name, model_type, 'unknown', vehicle['make'], vehicle['oem'])
+
                                 vehicle_id = str(uuid.uuid4())
                                 insert_query = """
                                     INSERT INTO vehicle (
                                         id, vin, fleet_id, region_id, vehicle_model_id,
-                                        licence_plate, activation_status, is_eligible
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                        licence_plate, activation_status, is_eligible, start_date
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 """
                                 cursor.execute(
                                     insert_query,
@@ -515,6 +528,7 @@ class VehicleProcessor:
                                         vehicle["licence_plate"],
                                         vehicle["real_activation"],
                                         vehicle["eligibility"],
+                                        vehicle["registration_date"],
                                     ),
                                 )
                                 logging.info(
@@ -527,6 +541,7 @@ class VehicleProcessor:
                                     "is_eligible": vehicle["eligibility"],
                                     "vehicle_model_id": model_id,
                                     "vin": vin,
+                                    "start_date": vehicle["registration_date"],
                                 }
 
                                 cursor.execute(
@@ -535,7 +550,8 @@ class VehicleProcessor:
                                     SET fleet_id = %(fleet_id)s,
                                         activation_status = %(activation_status)s,
                                         is_eligible = %(is_eligible)s,
-                                        vehicle_model_id = %(vehicle_model_id)s
+                                        vehicle_model_id = %(vehicle_model_id)s,
+                                        start_date = %(start_date)s
                                     WHERE vin = %(vin)s
                                     """,
                                     update_data,
@@ -617,8 +633,8 @@ class VehicleProcessor:
                             insert_query = """
                                 INSERT INTO vehicle (
                                     id, vin, fleet_id, region_id, vehicle_model_id,
-                                    licence_plate, activation_status, is_eligible
-                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                    licence_plate, activation_status, is_eligible, start_date
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """
 
                             cursor.execute(
@@ -636,6 +652,7 @@ class VehicleProcessor:
                                     await self._clean_value(
                                         vehicle["eligibility"], "bool"
                                     ),
+                                    vehicle["registration_date"],
                                 ),
                             )
                             logging.info(
@@ -643,12 +660,13 @@ class VehicleProcessor:
                             )
                         else:
                             cursor.execute(
-                                "UPDATE vehicle SET fleet_id = %s, vehicle_model_id = %s, activation_status = %s, is_eligible = %s WHERE vin = %s",
+                                "UPDATE vehicle SET fleet_id = %s, vehicle_model_id = %s, activation_status = %s, is_eligible = %s, start_date = %s WHERE vin = %s",
                                 (
                                     fleet_id,
                                     model_id,
                                     vehicle["real_activation"],
                                     vehicle["eligibility"],
+                                    vehicle["registration_date"],
                                     vehicle["vin"],
                                 ),
                             )
@@ -909,6 +927,7 @@ class VehicleProcessor:
                                 # Create/get model and related records
                                 model_id = await self._get_or_create_tesla_model(
                                     cursor,
+                                    con,
                                     model_name,
                                     model_type,
                                     version,
@@ -920,7 +939,7 @@ class VehicleProcessor:
                                 # Insert new vehicle
                                 vehicle_id = str(uuid.uuid4())
                                 cursor.execute(
-                                    "INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, activation_status, is_eligible) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                                    "INSERT INTO vehicle (id, vin, fleet_id, region_id, vehicle_model_id, licence_plate, activation_status, is_eligible, start_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                                     (
                                         vehicle_id,
                                         vin,
@@ -930,6 +949,7 @@ class VehicleProcessor:
                                         vehicle["licence_plate"],
                                         vehicle["real_activation"],
                                         vehicle["eligibility"],
+                                        vehicle["registration_date"],
                                     ),
                                 )
                                 logging.info(
@@ -940,10 +960,11 @@ class VehicleProcessor:
                                 vehicle_id = result[0]
                                 model_id = result[1]
                                 cursor.execute(
-                                    "UPDATE vehicle SET activation_status = %s, is_eligible = %s WHERE id = %s",
+                                    "UPDATE vehicle SET activation_status = %s, is_eligible = %s, start_date = %s WHERE id = %s",
                                     (
                                         vehicle["real_activation"],
                                         vehicle["eligibility"],
+                                        vehicle["registration_date"],
                                         vehicle_id,
                                     ),
                                 )
@@ -976,6 +997,7 @@ class VehicleProcessor:
                                         new_model_id = (
                                             await self._get_or_create_tesla_model(
                                                 cursor,
+                                                con,
                                                 model_name,
                                                 model_type,
                                                 api_version,
