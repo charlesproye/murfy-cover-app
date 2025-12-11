@@ -9,9 +9,7 @@ from core.gsheet_utils import load_excel_data
 from core.sql_utils import get_sqlalchemy_engine
 from results.trendline.trendline_utils import (
     clean_battery_data,
-    compute_lower_bound,
-    compute_main_trendline,
-    compute_upper_bound,
+    compute_trendline_functions,
     filter_data,
     filter_trendlines,
     prepare_data_for_fitting,
@@ -42,13 +40,7 @@ def generate_trendline_functions(df, odometer_column, soh_column):
     if df_clean.shape[0] < 20:
         return "Can't compute trendline"
     x_data, y_data = prepare_data_for_fitting(df_clean)
-    coef_mean, coef_lower, coef_upper, mean, upper_bound, lower_bound = (
-        compute_main_trendline(x_data, y_data)
-    )
-    if coef_upper[0] >= 0:
-        upper_bound = compute_upper_bound(df_clean, mean, coef_mean)
-    if coef_lower[0] >= 0:
-        lower_bound = compute_lower_bound(df_clean, mean, coef_mean)
+    mean, upper_bound, lower_bound = compute_trendline_functions(x_data, y_data)
     return mean, upper_bound, lower_bound
 
 

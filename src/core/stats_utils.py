@@ -8,9 +8,6 @@ from scipy.stats import linregress as lr
 
 from .pandas_utils import *
 
-# from transform.raw_results.get_tesla_soh_readouts import aviloo_readouts
-
-
 logger = getLogger("core.stats_utils")
 
 
@@ -234,8 +231,8 @@ def estimate_cycles(total_range: float = 0, initial_range: float = 1, soh: float
         return np.nan
 
 
-def log_function(x, a, b, c):
-    return a + b * np.log1p(x / c)
+def log_function(x, a, b):
+    return 1 + a * np.log1p(x / b)
 
 
 def compute_confidence_interval(df):
@@ -275,4 +272,3 @@ def weighted_mean(values, weights):
     if not mask.any():
         return np.nan
     return (values[mask] * weights[mask]).sum() / weights[mask].sum()
-
