@@ -1,6 +1,5 @@
 import re
 import time
-from typing import Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import numpy as np
@@ -29,7 +28,7 @@ class AramisautoScraper:
             }
         )
 
-    def get_page_content(self, url: str) -> Optional[BeautifulSoup]:
+    def get_page_content(self, url: str) -> BeautifulSoup | None:
         """Fetch the HTML content of a page"""
         try:
             response = self.session.get(url, timeout=30)
@@ -39,7 +38,7 @@ class AramisautoScraper:
             print(f"Error fetching {url}: {e}")
             return None
 
-    def extract_car_links_from_listing(self, soup: BeautifulSoup) -> List[str]:
+    def extract_car_links_from_listing(self, soup: BeautifulSoup) -> list[str]:
         """Extract all car listing links from a listing page"""
         car_links = []
 
@@ -81,81 +80,97 @@ class AramisautoScraper:
                 return True
         return False
 
-    def extract_car_info(self, car_url: str) -> Dict:
+    def extract_car_info(self, car_url: str) -> dict:
         """Extract information from a single car page"""
         soup = self.get_page_content(car_url)
         if not soup:
             return {"lien": car_url, "error": "Unable to retrieve the page"}
 
-        car_info = {"lien": car_url}
+        car_info = {
+            "lien": car_url,
+            "OEM": None,
+            "Modèle": None,
+            "Type": None,
+            "Année": None,
+            "Odomètre (km)": None,
+            "SoH": None,
+            "battery_capacity": None,
+            "price": None,
+        }
 
-        try:
-            page_text = soup.get_text()
+        # try:
+        page_text = soup.get_text()
 
-            # SoH
-            soh_partern = r"\d{2,3}\s%"
-            soh_match = re.search(soh_partern, page_text)
-            if soh_match:
-                car_info["SoH"] = soh_match.group(0)
-                print(car_info["SoH"])
+        # SoH
+        soh_partern = r"\d{2,3}\s%"
+        soh_match = re.search(soh_partern, page_text)
+        if soh_match:
+            car_info["SoH"] = soh_match.group(0)
 
-            # Odometer
-            km_pattern = r"([\d\s]+)\s*km"
-            km_match = re.search(km_pattern, page_text)
-            if km_match:
-                car_info["Odomètre (km)"] = int(
-                    km_match.group(0).replace("km", "").replace(" ", "")
+        # Odometer
+        km_pattern = r"([\d\s]+)\s*km"
+        km_match = re.search(km_pattern, page_text)
+        if km_match:
+            car_info["Odomètre (km)"] = int(
+                km_match.group(0).replace("km", "").replace(" ", "")
+            )
+
+        # Year
+        date_pattern = r"\d{1,2}\/\d{1,2}\/\d{2,4}"
+        date = re.search(date_pattern, page_text)
+        if date:
+            car_info["Année"] = int(date.group(0)[-4:].strip())
+
+        # Battery capacity
+        battery_pattern = r"\d*.\d*\s[k][W][h]"
+        battery_match = re.search(battery_pattern, page_text)
+        if battery_match:
+            car_info["battery_capacity"] = battery_match.group(0)
+
+        # Sélection du h1 dans la div
+        h1 = soup.select_one("div.price-information h1")
+
+        if h1:
+            first_em = h1.find("em")
+            if first_em:
+                car_info["Type"] = " ".join(
+                    first_em.get_text(strip=True)
+                    .replace("\n", " ")
+                    .replace("•", "")
+                    .replace("-", "")
+                    .split()
                 )
 
-            # Year
-            date_pattern = r"\d{1,2}\/\d{1,2}\/\d{2,4}"
-            date = re.search(date_pattern, page_text)
-            if date:
-                car_info["Année"] = int(date.group(0)[-4:].strip())
+        # Brand and model from URL
+        url_parts = urlparse(car_url).path.split("/")
+        if len(url_parts) >= 4 and "voitures" in url_parts:
+            try:
+                brand_index = url_parts.index("voitures") + 1
+                if brand_index < len(url_parts):
+                    car_info["OEM"] = url_parts[brand_index].replace("-", " ").title()
+                if brand_index + 1 < len(url_parts):
+                    car_info["Modèle"] = (
+                        url_parts[brand_index + 1].replace("-", " ").title()
+                    )
+            except (ValueError, IndexError):
+                pass
 
-            # Battery capacity
-            battery_pattern = r"\d*.\d*\s[k][W][h]"
-            battery_match = re.search(battery_pattern, page_text)
-            if battery_match:
-                car_info["battery_capacity"] = battery_match.group(0)
+        # Price
+        price_block = soup.select_one("div.price-amount")
+        if price_block:
+            price_text = price_block.get_text(strip=True)
+            price_clean = re.sub(r"[^\d]", "", price_text)
+            if price_clean:
+                car_info["price"] = int(price_clean)
 
-            # Full version (Type)
-            price_info_elements = soup.select(
-                ".default-body.price-information-row, .price-information-row, .default-body"
-            )
-            type_car = " ".join(price_info_elements[0].text.split())
-            car_info["Type"] = type_car
+        # except Exception as e:
+        #     car_info["error"] = f"Error extracting car data: {e}"
 
-            # Brand and model from URL
-            url_parts = urlparse(car_url).path.split("/")
-            if len(url_parts) >= 4 and "voitures" in url_parts:
-                try:
-                    brand_index = url_parts.index("voitures") + 1
-                    if brand_index < len(url_parts):
-                        car_info["OEM"] = (
-                            url_parts[brand_index].replace("-", " ").title()
-                        )
-                    if brand_index + 1 < len(url_parts):
-                        car_info["Modèle"] = (
-                            url_parts[brand_index + 1].replace("-", " ").title()
-                        )
-                except (ValueError, IndexError):
-                    pass
-            # Price
-            price_block = soup.select_one("div.price-amount")
-            if price_block:
-                price_text = price_block.get_text(strip=True)
-                price_clean = re.sub(r"[^\d]", "", price_text)
-                if price_clean:
-                    car_info["price"] = int(price_clean)
-
-        except Exception as e:
-            car_info["error"] = f"Error extracting car data: {e}"
         return car_info
 
     def scrape_electric_cars(
-        self, max_pages: int = 100, existing_links: Optional[set] = None
-    ) -> List[Dict]:
+        self, max_pages: int = 100, existing_links: set | None = None
+    ) -> list[dict]:
         """Scrape all electric cars from the AramisAuto website"""
         print("Starting electric car scraping...")
 
@@ -208,9 +223,9 @@ class AramisautoScraper:
                 "Année",
                 "Odomètre (km)",
                 "SoH",
+                "price",
                 "lien",
                 "battery_capacity",
-                "price",
             ]
         ]
 
@@ -234,6 +249,7 @@ def main():
 
     # Scrape electric car listings
     infos = scraper.scrape_electric_cars(100, existing_links=set(df_sheet["lien"]))
+
     try:
         df_infos = scraper.clean_data(infos)
 
@@ -264,23 +280,29 @@ def main():
                 model_existing,
                 row["battery_capacity"],
                 row["Année"],
-            ),
+            )
+            if pd.notna(row["OEM"])
+            and pd.notna(row["Modèle"])
+            and row["OEM"] != "unknown"
+            and row["Modèle"] != "unknown"
+            else "unknown",
             axis=1,
         )
+
         type_mapping = df_infos.merge(
             model_existing[["id", "type"]], on="id", how="left"
         )["type"]
         df_infos["Type"] = [
             mapped if mapped != "unknown" else old
-            for old, mapped in zip(df_infos["Type"], type_mapping)
+            for old, mapped in zip(df_infos["Type"], type_mapping, strict=False)
         ]
         df_infos.drop(columns="id", inplace=True)
         df_infos = df_infos.replace(np.nan, "unknown").replace(pd.NA, "unknown")
         export_to_excel(df_infos, "Courbes de tendance", "Courbes OS")
+
     except KeyError:
         print("No links with SoH to export found.")
 
 
 if __name__ == "__main__":
     main()
-

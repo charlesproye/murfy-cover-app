@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-import json
 import re
 import time
 from contextlib import suppress
 from datetime import date
-from pathlib import Path
 from urllib.parse import unquote
 
 import numpy as np
@@ -21,13 +18,16 @@ from tqdm import tqdm
 from activation.config.mappings import mapping_vehicle_type
 from core.gsheet_utils import export_to_excel, load_excel_data
 from core.sql_utils import get_connection
+from ingestion.soh_scraping.websites.utils import (
+    get_unusable_link,
+    insert_unusable_link,
+)
 
 BASE_URL = "https://www.autosphere.fr"
 SEARCH_URL_TEMPLATE = "https://www.autosphere.fr/recherche?brand=Mercedes,Bmw,Nissan,Mini,Volkswagen,Tesla,Volvo,Ford,Ds,Opel,Audi,Kia,Toyota,Peugeot,Dacia,Renault,Hyundai,Lexus,Seat,Mitsubishi,Mg&fuel_type=Electrique&from={}"
 STEP = 23
 START_OFFSET = 0
 STOP_OFFSET = 5000
-PATH_FILE = Path(__file__).parent / "link_unsuable.txt"
 
 
 def get_all_vehicle_links():
@@ -241,9 +241,7 @@ def extract_aviloo_data(wait, car_nbr, link):
 
     except Exception as e:
         print(f"[{car_nbr}] Aviloo not found: {e}")
-        with open(PATH_FILE, "a", encoding="utf-8") as f:
-            f.write(f"{link}\n")
-            f.flush()
+        insert_unusable_link(link, source="autosphere")
     return data
 
 
@@ -301,12 +299,8 @@ def extract_vehicle_info(link, car_nbr):
 def main():
     all_links = get_all_vehicle_links()
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
-    df_sheet = pd.DataFrame(columns=data_sheet[0, :7], data=data_sheet[1:, :7])
-    try:
-        with open(PATH_FILE, encoding="utf-8") as f:
-            link_already_try = {line.strip() for line in f if line.strip()}
-    except FileNotFoundError:
-        link_already_try = set()
+    df_sheet = pd.DataFrame(columns=data_sheet[0, :8], data=data_sheet[1:, :8])
+    link_already_try = set(get_unusable_link(source="autosphere"))
     links_not_fetch = set(all_links) - set(df_sheet["lien"]) - link_already_try
     all_infos = {}
     print(f"Number of link to scrappe = {len(links_not_fetch)}")
@@ -329,9 +323,9 @@ def main():
             "Année",
             "Odomètre (km)",
             "SoH",
+            "price",
             "lien",
             "battery_capacity",
-            "price",
             "WLTP",
         ]
     ]
@@ -381,4 +375,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

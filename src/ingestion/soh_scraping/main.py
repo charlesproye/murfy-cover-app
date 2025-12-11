@@ -41,4 +41,3 @@ if __name__ == "__main__":
     logger = logging.getLogger("ScraperLogger")
 
     main(args, logger)
-

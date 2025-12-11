@@ -1,7 +1,6 @@
 import re
 import time
 import unicodedata
-from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 import numpy as np
@@ -12,10 +11,12 @@ from bs4 import BeautifulSoup
 from activation.config.mappings import mapping_vehicle_type
 from core.gsheet_utils import export_to_excel, load_excel_data
 from core.sql_utils import get_connection
+from ingestion.soh_scraping.websites.utils import (
+    get_unusable_link,
+    insert_unusable_link,
+)
 
 URL = "https://www.ev-market.fr/voiture-electrique?brand_name=&model_name=&version_name=&finition_name=&brand_id=&model_id=&version_id=&min_soh_percentage=1&max_soh_percentage=&location=&latitude=&longitude=&radius=&min_price=&max_price=&min_odometer=&max_odometer=&min_year=&max_year=&min_first_registration_date=&max_first_registration_date=&min_battery_capacity=&max_battery_capacity=&min_fast_charge_power=&max_fast_charge_power=&min_range_real=&max_range_real=&min_height=&max_height=&min_length=&max_length=&min_width=&max_width=&min_width_mirrors=&max_width_mirrors="
-PATH_FILE = Path(__file__).parent / "link_unsuable.txt"
-
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; Scraper/1.0; +https://example.org/bot)"
 }
@@ -51,7 +52,7 @@ def get_car_links_from_page(url):
         return set(), None
 
 
-def scrape_all_cars(max_pages=None, delay=1):
+def scrape_all_cars(max_pages=200, delay=1):
     all_links = set()
 
     first_links, first_soup = get_car_links_from_page(URL)
@@ -62,10 +63,11 @@ def scrape_all_cars(max_pages=None, delay=1):
 
     all_links.update(first_links)
     print(f"Page 1: {len(first_links)} links found")
+    nb_new_links = len(first_links)
 
-    for page in range(2, max_pages + 1):
-        print(f"Page {page}...")
+    page = 2
 
+    while nb_new_links > 0 and page <= max_pages:
         page_url = build_page_url(URL, page)
         page_links, _ = get_car_links_from_page(page_url)
 
@@ -73,14 +75,19 @@ def scrape_all_cars(max_pages=None, delay=1):
             print(f"No link found {page}")
             break
 
+        nb_previous_links = len(all_links)
         all_links.update(page_links)
-        print(f"Page {page}: {len(page_links)} link found")
+        nb_new_links = len(all_links) - nb_previous_links
+        print(
+            f"Page {page}: {len(page_links)} link found, total number of links = {len(all_links)}"
+        )
+
+        page = page + 1
 
         if delay > 0:
             time.sleep(delay)
 
-        if len(page_links) != 20:
-            return sorted(all_links)
+    return sorted(all_links)
 
 
 def extract_autonomy_wltp(soup):
@@ -208,36 +215,21 @@ def get_car_infos(url):
 def main():
     all_car_link = scrape_all_cars(delay=1)
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
-    df_sheet = pd.DataFrame(columns=data_sheet[0, :7], data=data_sheet[1:, :7])
-    try:
-        with open(PATH_FILE, encoding="utf-8") as f:
-            link_already_try = {line.strip() for line in f if line.strip()}
-    except FileNotFoundError:
-        link_already_try = set()
+    df_sheet = pd.DataFrame(columns=data_sheet[0, :8], data=data_sheet[1:, :8])
 
-    print("link_already_try", link_already_try)
-    print("all_car_link", set(all_car_link))
-    print("df_sheet['lien']", set(df_sheet["lien"]))
-    print(
-        "set(all_car_link) - set(df_sheet['lien']) - link_already_try",
-        set(all_car_link) - set(df_sheet["lien"]) - link_already_try,
-    )
+    link_already_try = set(get_unusable_link(source="ev_market"))
     links_not_fetch = set(all_car_link) - set(df_sheet["lien"]) - link_already_try
 
     print(f"Number of link to scrappe = {len(links_not_fetch)}")
     if links_not_fetch:
-        print("No new links to scrap")
-    else:
         all_infos = {}
         for i, link in enumerate(links_not_fetch, 1):
             print(f"{i:2d}. {link}")
             try:
                 all_infos[i] = get_car_infos(link)
             except Exception as e:
-                print(f"[{i}] Erreur sur le lien {link} : {e}")
-                with open(PATH_FILE, "a", encoding="utf-8") as f:
-                    f.write(f"{link}\n")
-                    f.flush()
+                print(f"[{i}] Error on link {link}: {e}")
+                insert_unusable_link(link, source="ev_market")
             time.sleep(1)
 
         infos_clean = pd.DataFrame(all_infos).T.dropna(subset="SoH")[
@@ -248,9 +240,9 @@ def main():
                 "Année",
                 "Odomètre (km)",
                 "SoH",
+                "price",
                 "lien",
                 "battery_capacity",
-                "price",
                 "WLTP",
             ]
         ]

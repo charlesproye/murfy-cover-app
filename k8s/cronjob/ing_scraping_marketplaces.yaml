@@ -31,6 +31,8 @@ spec:
                 - secretRef:
                     name: db-data-ev-secret
                 - secretRef:
+                    name: db-data-eng-secret
+                - secretRef:
                     name: s3-secret
                 - secretRef:
                     name: google-secret

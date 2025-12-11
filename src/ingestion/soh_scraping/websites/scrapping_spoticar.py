@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import re
 import time
-from pathlib import Path
-from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -18,8 +15,11 @@ from tqdm import tqdm
 from activation.config.mappings import mapping_vehicle_type
 from core.gsheet_utils import export_to_excel, load_excel_data
 from core.sql_utils import get_connection
+from ingestion.soh_scraping.websites.utils import (
+    get_unusable_link,
+    insert_unusable_link,
+)
 
-PATH_FILE = Path(__file__).parent / "link_unsuable.txt"
 BASE_URL = "https://www.spoticar.fr"
 SEARCH_URL = "https://www.spoticar.fr/voitures-occasion?page={page}&filters[0][energy]=electrique"
 
@@ -97,7 +97,7 @@ def _text_of(element) -> str:
     return re.sub(r"\s+", " ", element.text).strip()
 
 
-def find_value_by_label(driver: webdriver.Chrome, label: str) -> Optional[str]:
+def find_value_by_label(driver: webdriver.Chrome, label: str) -> str | None:
     label_norm = label.lower()
     xpath_candidates = [
         f"//dt[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZÉÈÀÙÂÊÎÔÛÄËÏÖÜÇ', 'abcdefghijklmnopqrstuvwxyzéèàùâêîôûäëïöüç'), '{label_norm}')]/following-sibling::*[1]",
@@ -162,11 +162,11 @@ def get_info(driver, url):
         return None
 
 
-def extract_price(driver: webdriver.Chrome) -> Optional[str]:
+def extract_price(driver: webdriver.Chrome) -> str | None:
     try:
         price_el = driver.find_element(By.CSS_SELECTOR, "div.total-price-value span")
         return _text_of(price_el)
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -184,12 +184,6 @@ def scroll_slowly(driver: webdriver.Chrome, steps: int = 6, pause: float = 0.5):
         last = curr
 
 
-def add_link_to_unused_list(link):
-    with open(PATH_FILE, "a", encoding="utf-8") as f:
-        f.write(f"{link}\n")
-        f.flush()
-
-
 def get_soh(driver, url):
     page_text = _text_of(driver.find_element(By.TAG_NAME, "body"))
     try:
@@ -204,9 +198,9 @@ def get_soh(driver, url):
             if soh_match2:
                 soh = soh_match2.group(3)
         return soh
-    except Exception as e:
+    except Exception:
         print("No SoH found")
-        add_link_to_unused_list(url)
+        insert_unusable_link(url, source="spoticar")
         return None
 
 
@@ -238,7 +232,7 @@ def get_battery_capacity(version):
     return None
 
 
-def get_spoticar_data(url: str, timeout: int = 20) -> Dict[str, Optional[str]]:
+def get_spoticar_data(url: str, timeout: int = 20) -> dict[str, str | None]:
     driver = make_driver()
     try:
         driver.get(url)
@@ -267,12 +261,10 @@ def get_spoticar_data(url: str, timeout: int = 20) -> Dict[str, Optional[str]]:
 def main():
     car_links = get_all_car_links(max_pages=13)  # nbr pages
     data_sheet = load_excel_data("Courbes de tendance", "Courbes OS")
-    df_sheet = pd.DataFrame(columns=data_sheet[0, :7], data=data_sheet[1:, :7])
-    try:
-        with open(PATH_FILE, "r", encoding="utf-8") as f:
-            link_already_try = {line.strip() for line in f if line.strip()}
-    except FileNotFoundError:
-        link_already_try = set()
+    df_sheet = pd.DataFrame(columns=data_sheet[0, :8], data=data_sheet[1:, :8])
+
+    link_already_try = set(get_unusable_link(source="spoticar"))
+
     links_not_fetch = set(car_links) - set(df_sheet["lien"]) - link_already_try
 
     print(f"Number of link to scrappe = {len(links_not_fetch)}")
@@ -294,9 +286,9 @@ def main():
             "Année",
             "Odomètre (km)",
             "SoH",
+            "price",
             "lien",
             "battery_capacity",
-            "price",
             "WLTP",
         ]
     ]
@@ -333,7 +325,7 @@ def main():
     )["type"]
     infos_clean["Type"] = [
         mapped if mapped != "unknown" else old
-        for old, mapped in zip(infos_clean["Type"], type_mapping)
+        for old, mapped in zip(infos_clean["Type"], type_mapping, strict=False)
     ]
     infos_clean.drop(columns="id", inplace=True)
     infos_clean["Odomètre (km)"] = infos_clean["Odomètre (km)"].astype(float)
@@ -345,4 +337,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
