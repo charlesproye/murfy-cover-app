@@ -194,6 +194,7 @@ class VehicleData(BaseUUIDModel):
         comment="Level 3 of charging. Corresponds to charging in the range > 50kW, DC",
     )
     soh_oem = Column(Numeric(5, 2))
+    real_autonomy = Column(Numeric(10, 0))
 
 
 class Oem(BaseUUIDModel):
