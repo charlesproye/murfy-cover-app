@@ -362,14 +362,14 @@ def main():
         model_existing[["id", "type"]], on="id", how="left"
     )["type"]
     infos_clean["Type"] = [
-        mapped if mapped != "unknown" else old
+        mapped if mapped else old
         for old, mapped in zip(infos_clean["Type"], type_mapping, strict=False)
     ]
     infos_clean.drop(columns="id", inplace=True)
     infos_clean["Odomètre (km)"] = infos_clean["Odomètre (km)"].astype(float)
     infos_clean["WLTP"] = infos_clean["WLTP"].astype(float)
     infos_clean["price"] = infos_clean["price"].astype(float)
-    infos_clean = infos_clean.replace(np.nan, "unknown").replace(pd.NA, "unknown")
+    infos_clean = infos_clean.replace(np.nan, None).replace(pd.NA, None)
     export_to_excel(infos_clean, "Courbes de tendance", "Courbes OS")
 
 

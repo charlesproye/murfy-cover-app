@@ -186,8 +186,9 @@ class BMWApi:
             )
 
             if not model_entry or not model_entry.get("value"):
-                model_name = "unknown"
-                model_type = "unknown"
+                model_name = None
+                model_type = None
+                return model_name, model_type
 
             # Split the model value into name and type
             model_parts = model_entry["value"].split()
@@ -221,4 +222,3 @@ class BMWApi:
         except Exception as e:
             logging.error(f"Error checking header unit for VIN {vin}: {e!s}")
             return None
-

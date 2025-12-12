@@ -146,7 +146,7 @@ QUERY = """
         LEFT JOIN battery b
             ON b.id = vm.battery_id
         WHERE o.oem_name = 'tesla'
-        AND vm.type != 'unknown'
+        AND vm.type is not null
     )
     SELECT
         discriminative_vin,
@@ -185,7 +185,7 @@ QUERY_PARTIAL = """
         LEFT JOIN battery b
             ON b.id = vm.battery_id
         WHERE o.oem_name = 'tesla'
-        AND vm.type != 'unknown'
+        AND vm.type is not null
     )
     SELECT
         discriminative_vin,
@@ -2479,4 +2479,3 @@ WMI_TO_OEM = {
     "7A3": "Honda",
     "7A4": "Toyota",
 }
-

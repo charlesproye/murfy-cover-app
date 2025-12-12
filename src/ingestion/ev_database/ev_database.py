@@ -89,7 +89,7 @@ def get_or_create_make(
 def standardize_battery_chemistry(battery_chemistry: str | None) -> str:
     """Standardize battery chemistry values."""
     if not battery_chemistry:
-        return "unknown"
+        return None
     if "nmc" in battery_chemistry.lower() or "ncm" in battery_chemistry.lower():
         return "NMC"
     return battery_chemistry
@@ -207,11 +207,21 @@ def get_or_create_vehicle_model(
 
     vehicle_id = vehicle.get("Vehicle_ID")
     evdb_model_id = str(vehicle_id) if vehicle_id is not None else None
-    vehicle_model = vehicle.get("Vehicle_Model", "unknown")
-    type_car = vehicle.get("Vehicle_Model_Version") or "unknown"
-    version = "unknown"
+    vehicle_model = vehicle.get("Vehicle_Model")
+    type_car = vehicle.get("Vehicle_Model_Version")
+    version = None
 
-    if vehicle_model.lower() == "zoe":
+    # Early validation to prevent AttributeError on None values
+    if vehicle_model is None:
+        print(f"Warning: Vehicle_Model is None for vehicle ID {evdb_model_id}")
+
+    if (
+        vehicle_model
+        and isinstance(vehicle_model, str)
+        and vehicle_model.lower() == "zoe"
+        and type_car
+        and isinstance(type_car, str)
+    ):
         # Define the patterns to look for in the type string
         type_patterns = ["q210", "r240", "r90", "r110", "q90", "r135"]
 
@@ -230,12 +240,12 @@ def get_or_create_vehicle_model(
                 part for part in type_parts if found_type not in part.lower()
             ]
             type_car = found_type
-            version = " ".join(remaining_parts) if remaining_parts else "unknown"
+            version = " ".join(remaining_parts) if remaining_parts else None
         else:
             # Fallback to original logic if no pattern is found
             type_parts = type_car.strip().split()
-            type_car = type_parts[0] if type_parts else "unknown"
-            version = " ".join(type_parts[1:]) if len(type_parts) > 1 else "unknown"
+            type_car = type_parts[0] if type_parts else None
+            version = " ".join(type_parts[1:]) if len(type_parts) > 1 else None
 
     # Query by evdb_model_id
     model = (
@@ -250,9 +260,9 @@ def get_or_create_vehicle_model(
     if not model:
         model = VehicleModel(
             id=uuid.uuid4(),
-            model_name=vehicle_model.lower(),
-            type=type_car.lower(),
-            version=version.lower(),
+            model_name=vehicle_model.lower() if vehicle_model else "unknown",
+            type=type_car.lower() if type_car else None,
+            version=version.lower() if version else None,
             make_id=make_id,
             oem_id=oem_id,
             autonomy=vehicle.get("Range_WLTP"),

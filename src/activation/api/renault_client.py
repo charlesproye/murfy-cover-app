@@ -90,7 +90,7 @@ class RenaultApi:
 
     def _read_file(self, filename: str) -> str:
         """Read content from a file"""
-        with open(filename, "r") as f:
+        with open(filename) as f:
             return f.read().strip()
 
     def _base64_encode(self, data: str) -> str:
@@ -176,7 +176,7 @@ class RenaultApi:
                 return await response.json()
 
         except Exception as e:
-            raise Exception(f"Token generation failed: {str(e)}")
+            raise Exception(f"Token generation failed: {e!s}")
 
     async def _get_token(self) -> str:
         """Get a valid access token, renewing if necessary"""
@@ -219,27 +219,35 @@ class RenaultApi:
                     async with session.get(url, headers=headers) as response:
                         if response.status == 200:
                             data = await response.json()
-                            model = data.get("model", "renault model unknown").lower()
-                            type_and_version = data.get("version").lower()
-
-                            # Split type_and_version into version (first word) and type (remaining words)
-                            parts = type_and_version.split(maxsplit=1)
-                            version = parts[0] if parts else "renault version unknown"
-                            type_ = (
-                                parts[1] if len(parts) > 1 else "renault type unknown"
+                            model_value = data.get("model")
+                            model = model_value.lower() if model_value else None
+                            version_value = data.get("version")
+                            type_and_version = (
+                                version_value.lower() if version_value else None
                             )
 
+                            # Split type_and_version into version (first word) and type (remaining words)
+                            if type_and_version:
+                                parts = type_and_version.split(maxsplit=1)
+                                version = parts[0] if parts else None
+                                type_ = parts[1] if len(parts) > 1 else None
+                            else:
+                                version = None
+                                type_ = None
+
                             # Check if type contains any of the mapped values
-                            for key in self.type_mapping:
-                                if key in type_:
-                                    type_ = self.type_mapping[key]
-                                    break
+                            if type_:
+                                for key in self.type_mapping:
+                                    if key in type_:
+                                        type_ = self.type_mapping[key]
+                                        break
 
                             # Map the model using the mapping dictionary
-                            for key, value in self.model_mapping.items():
-                                if key in model:
-                                    model = value
-                                    break
+                            if model:
+                                for key, value in self.model_mapping.items():
+                                    if key in model:
+                                        model = value
+                                        break
 
                             return (
                                 model,
@@ -294,17 +302,17 @@ class RenaultApi:
                         await asyncio.sleep(wait_time)
                         continue
                     raise RenaultAPIError(
-                        f"Network error after {max_retries} retries: {str(e)}"
+                        f"Network error after {max_retries} retries: {e!s}"
                     )
 
             raise RenaultAPIError(f"Request failed after {max_retries} retries")
 
         except Exception as e:
-            print(f"Error getting vehicle info for VIN {vin}: {str(e)}")
+            print(f"Error getting vehicle info for VIN {vin}: {e!s}")
             return (
-                "renault model unknown",
-                "renault version unknown",
-                "renault type unknown",
+                None,
+                None,
+                None,
                 None,
             )
 
@@ -359,11 +367,11 @@ class RenaultApi:
                         await asyncio.sleep(wait_time)
                         continue
                     raise RenaultAPIError(
-                        f"Network error after {max_retries} retries: {str(e)}"
+                        f"Network error after {max_retries} retries: {e!s}"
                     )
 
             raise RenaultAPIError(f"Request failed after {max_retries} retries")
 
         except Exception as e:
-            print(f"Error getting vehicle WLTP range for VIN {vin}: {str(e)}")
+            print(f"Error getting vehicle WLTP range for VIN {vin}: {e!s}")
             return None

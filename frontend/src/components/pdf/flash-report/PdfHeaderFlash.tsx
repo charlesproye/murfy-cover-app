@@ -101,7 +101,7 @@ const PdfHeaderFlash: React.FC<{ data: GetGenerationInfo }> = ({ data }) => {
                 <Text style={{ fontSize: 9, color: '#111827', fontWeight: 500 }}>
                   {vehicleInfo?.type ? vehicleInfo?.type.toUpperCase() : '-'}
                 </Text>
-                {vehicleInfo?.version && vehicleInfo?.version !== 'unknown' && (
+                {vehicleInfo?.version && (
                   <>
                     <Text
                       style={{

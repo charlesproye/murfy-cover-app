@@ -309,7 +309,7 @@ async def get_infos(vin: str, db: AsyncSession):
             v.end_of_contract_date,
             CONCAT(INITCAP(vm.model_name),
                 CASE
-                    WHEN vm.type = 'unknown' THEN ''
+                    WHEN vm.type is null THEN ''
                     ELSE CONCAT(' ', vm.type)
                 END
             ) as model_name,

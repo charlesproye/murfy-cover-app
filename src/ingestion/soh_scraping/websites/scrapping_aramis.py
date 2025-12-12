@@ -235,8 +235,8 @@ class AramisautoScraper:
         # Ensure numeric field is integer
         df["Odomètre (km)"] = df["Odomètre (km)"].astype(int)
 
-        # Replace missing values with 'unknown'
-        df = df.replace(np.nan, "unknown").replace(pd.NA, "unknown")
+        # Replace missing values with None
+        df = df.replace(np.nan, None).replace(pd.NA, None)
         return df
 
 
@@ -293,11 +293,11 @@ def main():
             model_existing[["id", "type"]], on="id", how="left"
         )["type"]
         df_infos["Type"] = [
-            mapped if mapped != "unknown" else old
+            mapped if mapped else old
             for old, mapped in zip(df_infos["Type"], type_mapping, strict=False)
         ]
         df_infos.drop(columns="id", inplace=True)
-        df_infos = df_infos.replace(np.nan, "unknown").replace(pd.NA, "unknown")
+        df_infos = df_infos.replace(np.nan, None).replace(pd.NA, None)
         export_to_excel(df_infos, "Courbes de tendance", "Courbes OS")
 
     except KeyError:

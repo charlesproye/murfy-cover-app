@@ -200,7 +200,7 @@ async def get_model_trendline(
             detail=f"Vehicle model with id {model_id} has no trendline",
         )
 
-    if record.version is not None and record.version != "unknown":
+    if record.version is not None:
         comment = "This trendline is based on the version of the model"
     else:
         comment = ""

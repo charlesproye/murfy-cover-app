@@ -381,7 +381,7 @@ async def get_flash_report_data(
         result_version = result.fetchone()
         version = result_version[0] if result_version else None
 
-    version = version or "unknown"
+    version = version or None
 
     # Get vehicle model with battery info
     stmt = (
@@ -426,10 +426,9 @@ async def get_flash_report_data(
             "vin": flash_report_combination.vin,
             "brand": flash_report_combination.make,
             "model": flash_report_combination.model,
-            "version": version if version and version != "unknown" else None,
+            "version": version if version else None,
             "type": flash_report_combination.type
             if flash_report_combination.type
-            and flash_report_combination.type != "unknown"
             else None,
             "mileage": flash_report_combination.odometer,
             "image_url": vehicle_model.url_image,

@@ -268,27 +268,33 @@ def mapping_vehicle_type(
     if battery_capacity:
         try:
             db_df["capacity"] = db_df["capacity"].astype(float)
-        except:
+        except (ValueError, KeyError, TypeError):
             print(
                 "column battery capacity doesn't have the right name please change to capacity"
             )
     make_name = make_name.lower().replace("ë", "e")
-    type_car = type_car.lower()
 
-    ## special case for zoe
-    if model_name == "zoe":
-        pattern_1 = r"(?i)((r|q)\d+)"
-        pattern_2 = r"(?<!\d)(50|40)(?!\d)"
-        type_car_1 = re.search(pattern_1, type_car)
-        type_car_2 = re.search(pattern_2, type_car)
-        if type_car_1:
-            type_car_1 = type_car_1.group(1)
-        if type_car_2:
-            type_car_2 = type_car_2.group(1)
-        if type_car_1 is not None:
-            type_car = (str(type_car_1) + " ze" + str(type_car_2)).replace(
-                " zeNone", ""
-            )
+    # Handle None or empty type_car
+    if not type_car:
+        type_car = ""
+    else:
+        type_car = type_car.lower()
+
+        ## special case for zoe
+        if model_name == "zoe":
+            pattern_1 = r"(?i)((r|q)\d+)"
+            pattern_2 = r"(?<!\d)(50|40)(?!\d)"
+            type_car_1 = re.search(pattern_1, type_car)
+            type_car_2 = re.search(pattern_2, type_car)
+            if type_car_1:
+                type_car_1 = type_car_1.group(1)
+            if type_car_2:
+                type_car_2 = type_car_2.group(1)
+            if type_car_1 is not None:
+                type_car = (str(type_car_1) + " ze" + str(type_car_2)).replace(
+                    " zeNone", ""
+                )
+
     ## special case for scenic
     if "scenic" in model_name:
         model_name = "scenic"
@@ -298,7 +304,7 @@ def mapping_vehicle_type(
         d.sort()
         nbr = d[-1]
         model_name = nbr or model_name.lower()
-    except:
+    except (IndexError, AttributeError, TypeError):
         model_name = model_name.lower()
     # filter on OEM
     if make_name in ["mercedes", "mercedes-benz"]:
@@ -343,11 +349,11 @@ def mapping_vehicle_type(
                 return closest_rows.loc[index]["id"]
 
         # fallback: find the closest type without battery
-        except:
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError):
             match_type = process.extractOne(
                 type_car, subset["type"], scorer=fuzz.token_sort_ratio
             )
             _, _, index = match_type
             return subset.loc[index, "id"]
 
-    return "unknown"
+    return None

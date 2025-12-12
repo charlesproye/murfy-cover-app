@@ -299,7 +299,7 @@ class TeslaApi:
                     )
 
                     if not model_info:
-                        return "MTU", "unknown"
+                        return "MTU", None
 
                     # Extract version code
                     version = model_info["code"][1:]
@@ -309,7 +309,7 @@ class TeslaApi:
                     # Determine vehicle type
                     display_name = model_info["displayName"].lower()
                     if model_name not in self.TESLA_PATTERNS:
-                        return version, "unknown"
+                        return version, None
 
                     # Match vehicle type using patterns
                     vehicle_type = next(
@@ -320,7 +320,7 @@ class TeslaApi:
                             ]
                             if re.match(pattern, display_name, re.IGNORECASE)
                         ),
-                        "unknown",
+                        None,
                     )
 
                     return version, vehicle_type
@@ -332,7 +332,7 @@ class TeslaApi:
         logging.error(
             f"Failed to fetch options for VIN {vin} after {self.MAX_RETRIES} retries"
         )
-        return "MTU", "unknown"
+        return "MTU", None
 
     async def get_warranty_info(
         self, session, vin: str

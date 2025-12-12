@@ -1,6 +1,7 @@
 import { IconBatteryCharging } from '@tabler/icons-react';
 import React from 'react';
 import { InfoVehicleResult } from '@/interfaces/dashboard/passport/infoVehicle';
+import { NO_DATA } from '@/utils/formatNumber';
 
 interface BatteryInfoProps {
   vehicleBatteryInfo: InfoVehicleResult;
@@ -20,22 +21,22 @@ const BatteryInfo: React.FC<BatteryInfoProps> = ({ vehicleBatteryInfo }) => {
         <div className="flex-1 p-2  rounded-lg">
           <p className="text-gray text-sm">BATTERY OEM</p>
           <p className="font-medium text-sm truncate">
-            {vehicleBatteryInfo.battery_info?.oem || 'Unknown'}
+            {vehicleBatteryInfo.battery_info?.oem || NO_DATA}
           </p>
         </div>
 
         <div className="flex-1 p-2 rounded-lg">
           <p className="text-gray text-sm">CHEMISTRY</p>
           <p className="font-medium text-sm truncate">
-            {vehicleBatteryInfo.battery_info?.chemistry || 'Unknown'}
+            {vehicleBatteryInfo.battery_info?.chemistry || NO_DATA}
           </p>
         </div>
 
         <div className="flex-1 p-2 rounded-lg">
           <p className="text-gray text-sm">CAPACITY</p>
           <p className="font-medium text-sm truncate">
-            {vehicleBatteryInfo.battery_info?.capacity === 0
-              ? ''
+            {!vehicleBatteryInfo.battery_info?.capacity
+              ? NO_DATA
               : `${vehicleBatteryInfo.battery_info?.capacity} kWh`}
           </p>
         </div>
@@ -43,8 +44,8 @@ const BatteryInfo: React.FC<BatteryInfoProps> = ({ vehicleBatteryInfo }) => {
         <div className="flex-1 p-2 rounded-lg">
           <p className="text-gray text-sm">WLTP RANGE</p>
           <p className="font-medium text-sm truncate">
-            {vehicleBatteryInfo.battery_info?.range === 0
-              ? 'Unknown'
+            {!vehicleBatteryInfo.battery_info?.range
+              ? NO_DATA
               : `${vehicleBatteryInfo.battery_info?.range} km`}
           </p>
         </div>
@@ -52,8 +53,8 @@ const BatteryInfo: React.FC<BatteryInfoProps> = ({ vehicleBatteryInfo }) => {
         <div className="flex-1 p-2 rounded-lg">
           <p className="text-gray text-sm">CONSUMPTION</p>
           <p className="font-medium text-sm truncate">
-            {vehicleBatteryInfo.battery_info?.consumption === 0
-              ? ''
+            {!vehicleBatteryInfo.battery_info?.consumption
+              ? NO_DATA
               : `${vehicleBatteryInfo.battery_info?.consumption} kWh/100km`}
           </p>
         </div>

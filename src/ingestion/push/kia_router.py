@@ -109,4 +109,3 @@ async def token_endpoint(
     access_token = create_access_token(credentials.username)
 
     return {"access_token": access_token, "token_type": "Bearer", "expires_in": 60 * 60}
-

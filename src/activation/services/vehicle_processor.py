@@ -367,7 +367,13 @@ class VehicleProcessor:
                                 date,
                             ) = await self.renault_api.get_vehicle_info(session, vin)
 
-                            model_type = model_type + " " + version
+                            # Handle None values for model_type and version
+                            if model_type and version:
+                                model_type = model_type + " " + version
+                            elif version:
+                                model_type = version
+                            # If both are None or only model_type exists, keep model_type as is
+
                             if date is None:
                                 model_id = mapping_vehicle_type(
                                     model_type,
@@ -615,11 +621,9 @@ class VehicleProcessor:
                             else "unknown"
                         )
                         model_type = (
-                            vehicle["type"]
-                            if vehicle["type"] is not None
-                            else "unknown"
+                            vehicle["type"] if vehicle["type"] is not None else None
                         )
-                        version = "unknown"
+                        version = None
                         logging.info(
                             f"Processing vehicle {vehicle['vin']} | {vehicle['make']} | {model_name} | {model_type} | {version}"
                         )
@@ -847,12 +851,12 @@ class VehicleProcessor:
                 print(f"{'Model Name':<20} {'Type':<40} {'Version':<40} {'Count':>10}")
                 print("-" * 120)
                 for model in models_stats:
-                    model_name = model[0] or "Unknown"
-                    model_type = model[1] or "Unknown"
-                    model_version = model[2] or "Unknown"
+                    model_name = model[0] or "unknown"
+                    model_type = model[1] or None
+                    model_version = model[2] or None
                     count = model[3] or 0
                     print(
-                        f"{model_name:<20} {model_type:<40} {model_version:<40} {count:>10}"
+                        f"{(model_name or 'Unknown'):<20} {(model_type or 'Unknown'):<40} {(model_version or 'Unknown'):<40} {count:>10}"
                     )
 
                 print("\n" + "VEHICLES BY OEM".center(60))
@@ -860,18 +864,18 @@ class VehicleProcessor:
                 print(f"{'OEM':<40} {'Count':>15}")
                 print("-" * 60)
                 for oem in oem_stats:
-                    oem_name = oem[0] or "Unknown"
+                    oem_name = oem[0] or None
                     count = oem[1] or 0
-                    print(f"{oem_name:<40} {count:>15}")
+                    print(f"{(oem_name or 'Unknown'):<40} {count:>15}")
 
                 print("\n" + "VEHICLES BY REGION".center(60))
                 print("=" * 60)
                 print(f"{'Region':<40} {'Count':>15}")
                 print("-" * 60)
                 for region in region_stats:
-                    region_name = region[0] or "Unknown"
+                    region_name = region[0] or None
                     count = region[1] or 0
-                    print(f"{region_name:<40} {count:>15}")
+                    print(f"{(region_name or 'Unknown'):<40} {count:>15}")
 
                 print("\n" + "=" * 60)
                 logging.info("Vehicle summary report generated successfully")
@@ -893,7 +897,7 @@ class VehicleProcessor:
                         try:
                             vin = vehicle["vin"]
                             model_code = vin[3]
-                            model_name = TESLA_MODEL_MAPPING.get(model_code, "unknown")
+                            model_name = TESLA_MODEL_MAPPING.get(model_code, None)
                             logging.info(
                                 f"Processing Tesla vehicle {vin} with model {model_name}"
                             )
@@ -976,8 +980,8 @@ class VehicleProcessor:
                                 )
                                 current_version = cursor.fetchone()[0]
 
-                                if current_version == "unknown":
-                                    # CASE 2.2: Current version is unknown, check API
+                                if not current_version:
+                                    # CASE 2.2: Current version is None, check API
                                     (
                                         api_version,
                                         model_type,

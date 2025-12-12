@@ -4,14 +4,7 @@ export const formatNumber = (
   value: string | number | null | undefined,
   unit?: string,
 ): string => {
-  if (
-    value === null ||
-    value === undefined ||
-    value === 'unknown' ||
-    value === 'Unknown' ||
-    value === 'UNKNOWN'
-  )
-    return NO_DATA;
+  if (value === null || value === undefined) return NO_DATA;
   const num = typeof value === 'string' ? parseFloat(value.replace(/\s/g, '')) : value;
   return `${num.toLocaleString('en-US')}${unit ? ` ${unit}` : ''}`;
 };
