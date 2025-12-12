@@ -1,5 +1,7 @@
 from logging import Logger
 
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.regression import LinearRegressionModel
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
@@ -54,6 +56,8 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
             ).otherwise(None),
         )
 
+        phase_df = self._correct_soh_with_temperature(phase_df)
+
         return phase_df
 
     def aggregate_stats(self, phase_df):
@@ -88,3 +92,38 @@ class RenaultRawTsToProcessedPhases(RawTsToProcessedPhases):
         ).agg(*agg_columns)
 
         return df_aggregated
+
+    def _correct_soh_with_temperature(self, phase_df):
+        phase_df = phase_df.withColumn(
+            "outside_temperature_corrected", F.col("outside_temperature") - 14.0
+        )
+        assembler = VectorAssembler(
+            inputCols=["outside_temperature_corrected"], outputCol="features"
+        )
+        phase_df = assembler.transform(phase_df)
+
+        car_models = [
+            row["model"] for row in phase_df.select("model").distinct().collect()
+        ]
+
+        pred_cols = []
+        for model_name in car_models:
+            load_path = f"s3a://bib-platform-prod-data/models/{model_name}_temperature"
+            temp_col = f"soh_pred_{model_name}"
+            pred_cols.append(temp_col)
+            df_model = phase_df.filter(F.col("model") == model_name)
+            model = LinearRegressionModel.load(load_path)
+            df_model_pred = model.transform(df_model).withColumnRenamed(
+                "pred_soh", temp_col
+            )
+            phase_df = phase_df.join(
+                df_model_pred.select("vin", "date", temp_col),
+                on=["vin", "date"],
+                how="left",
+            )
+        expr = F.coalesce(*[F.col(c) for c in pred_cols] + [F.col("soh")])
+        phase_df = phase_df.withColumn("soh", expr)
+
+        phase_df = phase_df.drop(*pred_cols)
+
+        return phase_df
