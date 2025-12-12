@@ -36,7 +36,10 @@ class VehicleProcessor:
         self.df = df
 
     async def _clean_value(self, val, expected_type="str"):
-        if val in [None, "None", "nan", "NaN", ""]:
+        # Handle pandas NaT (Not-a-Time) objects
+        if pd.isna(val):
+            return None
+        if val in [None, "None", "nan", "NaN", "NaT", ""]:
             return None
         if expected_type == "int":
             return int(val)
@@ -656,7 +659,9 @@ class VehicleProcessor:
                                     await self._clean_value(
                                         vehicle["eligibility"], "bool"
                                     ),
-                                    vehicle["registration_date"],
+                                    await self._clean_value(
+                                        vehicle["registration_date"]
+                                    ),
                                 ),
                             )
                             logging.info(
@@ -670,7 +675,9 @@ class VehicleProcessor:
                                     model_id,
                                     vehicle["real_activation"],
                                     vehicle["eligibility"],
-                                    vehicle["registration_date"],
+                                    await self._clean_value(
+                                        vehicle["registration_date"]
+                                    ),
                                     vehicle["vin"],
                                 ),
                             )
@@ -1143,6 +1150,12 @@ class VehicleProcessor:
     #                         con.commit()
     #                     except Exception as e:
     #                         logging.error(f"Error processing Tesla particulier vehicle {vin}: {str(e)}")
+    #                         con.rollback()
+    #                         continue
+    #     except Exception as e:
+    #         logging.error(f"Error in Tesla particulier processing: {str(e)}")
+    #         raise
+
     #                         con.rollback()
     #                         continue
     #     except Exception as e:
