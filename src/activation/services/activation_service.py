@@ -535,7 +535,7 @@ class VehicleActivationService:
             self.fleet_info_df["oem"].isin(
                 ["renault", "ford", "mercedes", "volvo-cars"]
             )
-        ][["vin", "oem", "activation"]]
+        ][["vin", "oem", "activation", "eligibility"]]
 
         # Get all status from HM
         async with aiohttp.ClientSession() as session:
@@ -552,32 +552,42 @@ class VehicleActivationService:
         to_activate = {}
         to_deactivate = {}
         status_equal = {}
+        async with aiohttp.ClientSession() as session:
+            for _, row in df_hm.iterrows():
+                if row["activation"] and not row["eligibility"]:
+                    eligibility = await self.hm_api.get_eligibility(
+                        row["vin"], row["oem"], session
+                    )
+                    if eligibility:
+                        row["eligibility"] = eligibility
+                    else:
+                        row["eligibility"] = False
 
-        for _, row in df_hm.iterrows():
-            vin = row["vin"]
-            oem = row["oem"]
-            desired_status = row["activation"]
-            current_status_info = status_dict.get(
-                vin, {"status": False, "status_hm": "unknown"}
-            )
-            current_status = current_status_info["status"]
-            status_hm = current_status_info["status_hm"]
+                vin = row["vin"]
+                oem = row["oem"]
+                desired_status = row["activation"]
+                current_status_info = status_dict.get(
+                    vin, {"status": False, "status_hm": "unknown"}
+                )
+                current_status = current_status_info["status"]
+                status_hm = current_status_info["status_hm"]
 
-            entry = {
-                "oem": oem,
-                "status_desired": desired_status,
-                "current_status": current_status,
-                "reason": status_hm,
-            }
+                entry = {
+                    "oem": oem,
+                    "status_desired": desired_status,
+                    "current_status": current_status,
+                    "reason": status_hm,
+                    "eligibility": row["eligibility"],
+                }
 
-            if current_status is False and desired_status is True:
-                to_activate[vin] = entry
-            elif current_status is True and desired_status is False:
-                to_deactivate[vin] = entry
-            elif current_status == desired_status:
-                status_equal[vin] = entry
-            else:
-                pass
+                if current_status is False and desired_status is True:
+                    to_activate[vin] = entry
+                elif current_status is True and desired_status is False:
+                    to_deactivate[vin] = entry
+                elif current_status == desired_status:
+                    status_equal[vin] = entry
+                else:
+                    pass
 
         # Update status when desired status is equal to current status
         logging.info("HM Status update started")
@@ -586,7 +596,7 @@ class VehicleActivationService:
                 if values["status_desired"]:
                     vehicle_data = {
                         "vin": key,
-                        "Eligibility": values["status_desired"],
+                        "Eligibility": values["eligibility"],
                         "Real_Activation": values["status_desired"],
                         "Activation_Error": "",
                         "API_Detail": "",
@@ -595,7 +605,7 @@ class VehicleActivationService:
                 elif values["reason"] == "unknown":
                     vehicle_data = {
                         "vin": key,
-                        "Eligibility": False,
+                        "Eligibility": values["eligibility"],
                         "Real_Activation": False,
                         "Activation_Error": "Activation non demandée sur le Gsheet",
                         "API_Detail": "",
@@ -604,7 +614,7 @@ class VehicleActivationService:
                 else:
                     vehicle_data = {
                         "vin": key,
-                        "Eligibility": values["status_desired"],
+                        "Eligibility": values["eligibility"],
                         "Real_Activation": values["status_desired"],
                         "Activation_Error": values["reason"],
                         "API_Detail": "",
@@ -627,7 +637,7 @@ class VehicleActivationService:
                 if status:
                     vehicle_data = {
                         "vin": vin_dict["vin"],
-                        "Eligibility": False,
+                        "Eligibility": to_activate[vin_dict["vin"]]["eligibility"],
                         "Real_Activation": status["status"] == "approved",
                         "Activation_Error": status["status"],
                         "API_Detail": status["reason"],
@@ -636,7 +646,7 @@ class VehicleActivationService:
                 elif vin_dict["status"] == "error":
                     vehicle_data = {
                         "vin": vin_dict["vin"],
-                        "Eligibility": False,
+                        "Eligibility": to_activate[vin_dict["vin"]]["eligibility"],
                         "Real_Activation": False,
                         "Activation_Error": vin_dict.get("status"),
                         "API_Detail": vin_dict.get("description"),
