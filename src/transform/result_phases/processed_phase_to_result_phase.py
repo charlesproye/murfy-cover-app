@@ -8,6 +8,7 @@ from pyspark.sql import functions as F
 
 from core.caching_utils import CachedETLSpark
 from core.logging_utils import set_level_of_loggers_with_prefix
+from core.models.make import MakeEnum
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from transform.processed_phases.main import PROVIDERS
@@ -19,7 +20,7 @@ load_dotenv()
 class ProcessedPhaseToResultPhase(CachedETLSpark):
     def __init__(
         self,
-        make: str,
+        make: str | MakeEnum,
         id_col: str = "vin",
         log_level: str = "INFO",
         force_update: bool = False,
@@ -27,8 +28,12 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         pipes: PipesContext = None,  # type: ignore[assignment]
         **kwargs,
     ):
-        self.make = make
-        logger_name = f"transform.result_phase.{make}"
+        # Normalize make to MakeEnum if it's a string
+        if isinstance(make, str):
+            self.make = MakeEnum(make)
+        else:
+            self.make = make
+        logger_name = f"transform.result_phase.{self.make.value}"
         self.logger = getLogger(logger_name)
         set_level_of_loggers_with_prefix(log_level, logger_name)
         self.id_col = id_col
@@ -36,13 +41,12 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         self.bucket = S3Service()
         self.settings = S3Settings()
         self.pipes = pipes
+        self.force_update = force_update
 
         super().__init__(
-            RESULT_PHASES_CACHE_KEY_TEMPLATE.format(make=make.replace("-", "_")),
             "s3",
             bucket=self.bucket,
             settings=self.settings,
-            force_update=force_update,
             spark=spark,
             repartition_key="VIN",
             **kwargs,
@@ -52,11 +56,20 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         # Load the raw tss dataframe
         self.pipes.log.info(f"Running for {self.make}")
 
-        cls = PROVIDERS[self.make]
-
-        pph = cls(
-            make=self.make, spark=self.spark, logger=self.logger, pipes=self.pipes
-        ).data
+        if self.bucket.check_spark_file_exists(
+            f"processed_phases/processed_phases_{self.make.value.replace('-', '_')}.parquet"
+        ):
+            pph = self.bucket.read_parquet_df_spark(
+                spark=self.spark,
+                key=f"processed_phases/processed_phases_{self.make.value.replace('-', '_')}.parquet",
+            )
+        else:
+            pph = PROVIDERS[self.make](
+                self.make,
+                spark=self.spark,
+                force_update=self.force_update,
+                pipes=self.pipes,
+            ).run()
 
         pph = self.compute_specific_features(pph)
         pph = self.compute_soh(pph)
@@ -64,6 +77,14 @@ class ProcessedPhaseToResultPhase(CachedETLSpark):
         pph = self.compute_consumption(pph)
         pph = self.run_real_autonomy_compute(pph)
         pph = self.compute_charge_levels(pph)
+
+        self.save(
+            pph,
+            RESULT_PHASES_CACHE_KEY_TEMPLATE.format(
+                make=self.make.value.replace("-", "_")
+            ),
+            force_update=self.force_update,
+        )
 
         return pph
 

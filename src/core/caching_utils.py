@@ -79,11 +79,9 @@ class CachedETL(DF, ABC):
 class CachedETLSpark(ABC):
     def __init__(
         self,
-        path: str,
-        on: str,
+        on,
         bucket: S3Service,
         settings: S3Settings,
-        force_update: bool = False,
         spark: SparkSession = None,
         writing_mode: str | None = None,
         repartition_key: str | None = "vin",
@@ -104,39 +102,49 @@ class CachedETLSpark(ABC):
 
         if spark is None:
             spark = create_spark_session(settings.S3_KEY, settings.S3_SECRET)
-        self._spark = spark
+        self.spark = spark
         assert on in [
             "s3",
             "local_storage",
         ], "CachedETL's 'on' argument must be 's3' or 'local_storage'"
-        assert path.endswith(".parquet"), "Path must end with '.parquet'"
 
-        # Determine if we need to update the cache
-        if (
-            force_update
-            or (on == "s3" and not bucket.check_spark_file_exists(path))
-            or (on == "local_storage" and not exists(path))
-        ):
-            self.data = self.run()  # Call the abstract run method to generate data
-            if on == "s3":
-                if writing_mode == "append":
-                    bucket.append_spark_df_to_parquet(self.data, path, self.spark)
-                else:
-                    bucket.save_df_as_parquet_spark(
-                        self.data, path, self.spark, repartition_key
-                    )
-            elif on == "local_storage":
-                self.data.write.mode("overwrite").parquet(path)
-        else:
-            if on == "s3":
-                self.data = bucket.read_parquet_df_spark(spark, path, **kwargs)
-            elif on == "local_storage":
-                self.data = spark.read.parquet(path, **kwargs)
+        self.on = on
+        self.bucket = bucket
         self.settings = settings
+        self.writing_mode = writing_mode
+        self.repartition_key = repartition_key
+        self.kwargs = kwargs
 
     @abstractmethod
     def run(self) -> DF:
         """Abstract method to be implemented by subclasses to generate the DataFrame."""
+
+    def save(self, data: DF, path: str, force_update: bool = False):
+        # Determine if we need to update the cache
+        assert path.endswith(".parquet"), "Path must end with '.parquet'"
+
+        if (
+            force_update
+            or (self.on == "s3" and not self.bucket.check_spark_file_exists(path))
+            or (self.on == "local_storage" and not exists(path))
+        ):
+            if self.on == "s3":
+                if self.writing_mode == "append":
+                    self.bucket.append_spark_df_to_parquet(data, path)
+                else:
+                    self.bucket.save_df_as_parquet_spark(
+                        data, path, self.spark, self.repartition_key
+                    )
+            elif self.on == "local_storage":
+                data.write.mode("overwrite").parquet(path)
+        else:
+            if self.on == "s3":
+                data = self.bucket.read_parquet_df_spark(
+                    self.spark, path, **self.kwargs
+                )
+            elif self.on == "local_storage":
+                data = self.spark.read.parquet(path, **self.kwargs)
+        return data
 
 
 def cache_result(path_template: str, on: str, path_params: list[str] = []):

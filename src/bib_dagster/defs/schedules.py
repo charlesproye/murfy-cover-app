@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import dagster as dg
 
 from bib_dagster.defs.spark_jobs import MAKE_PARTITIONS
@@ -56,7 +58,8 @@ def full_pipeline_schedule():
     default_status=dg.DefaultSensorStatus.RUNNING,
 )
 def results_pipeline_sensor(context: dg.MultiAssetSensorEvaluationContext):
-    """Trigger results pipeline (phases_to_results_weeks -> refresh_results_models) after all raw_pph_to_rph partitions are materialized.
+    """
+    Trigger results pipeline (phases_to_results_weeks -> refresh_results_models) after all raw_pph_to_rph partitions are materialized.
 
     This sensor monitors the partitioned raw_pph_to_rph asset and triggers
     the results pipeline once all partitions have been materialized.
@@ -76,11 +79,5 @@ def results_pipeline_sensor(context: dg.MultiAssetSensorEvaluationContext):
     if materialized_partitions >= all_partitions:
         # Advance the cursor to avoid re-triggering
         context.advance_all_cursors()
-        yield dg.RunRequest(run_key="all_partitions_complete")
-
-
-@dg.schedule(cron_schedule="0 0 * * *", job=response_to_raw_tss_job)
-def full_pipeline_response_to_raw_tss_schedule():
-    """Run the response to raw tss job for all makes."""
-    for make in MAKE_PARTITIONS.get_partition_keys():
-        yield dg.RunRequest(run_key=make, partition_key=make)
+        run_key = f"all_partitions_complete_{datetime.now().isoformat()}"
+        yield dg.RunRequest(run_key=run_key)

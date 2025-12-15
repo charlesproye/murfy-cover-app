@@ -14,7 +14,6 @@ from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from core.spark_utils import (
     get_optimal_nb_partitions,
-    get_spark_available_cores,
     safe_astype_spark_with_error_handling,
 )
 from transform.fleet_info.main import get_fleet_info
@@ -54,15 +53,12 @@ class RawTsToProcessedPhases(CachedETLSpark):
         self.settings = S3Settings()
         self.pipes = pipes
         self.fleet_info = get_fleet_info()
+        self.force_update = force_update
 
         super().__init__(
-            PROCESSED_PHASES_CACHE_KEY_TEMPLATE.format(
-                make=self.make.value.replace("-", "_")
-            ),
             "s3",
             bucket=self.bucket,
             settings=self.settings,
-            force_update=force_update,
             spark=spark,
             repartition_key="VIN",
             **kwargs,
@@ -76,7 +72,6 @@ class RawTsToProcessedPhases(CachedETLSpark):
     # Check with Hugo the aggregation criteria for each metric
 
     def run(self):
-        # Load the raw tss dataframe
         self.pipes.log.info(f"Running for {self.make.value}")
 
         if self.bucket.check_spark_file_exists(
@@ -89,47 +84,52 @@ class RawTsToProcessedPhases(CachedETLSpark):
         else:
             tss = PROVIDERS[self.make](self.make, spark=self.spark).run()
 
-        # Optimize the repartition of the tss dataframe
-        optimal_partitions_nb, _ = self._set_optimal_spark_parameters(
-            tss, get_spark_available_cores(self.spark, self.logger)
-        )  # Optimize partitions
-        tss = tss.repartition("vin").coalesce(optimal_partitions_nb)
-        tss = tss.cache()
-        tss.count()  # Trigger caching lazy operations
-
-        # Harmonize, normalize and select the columns
         dynamic_config = self.bucket.read_yaml_file(f"config/{self.make.value}.yaml")
         if dynamic_config is None:
             raise ValueError(f"Config file config/{self.make.value}.yaml not found")
         tss = tss.withColumnsRenamed(
             dynamic_config["raw_tss_to_processed_phase"]["rename"]
         )
-        tss = tss.select(
-            *dynamic_config["raw_tss_to_processed_phase"]["keep"]
-        )  # Reduce column volumetry
+        tss = tss.select(*dynamic_config["raw_tss_to_processed_phase"]["keep"])
         tss = safe_astype_spark_with_error_handling(tss)
         tss = self._normalize_units_to_metric(tss)
         tss = tss.orderBy(["vin", "date"])
-
         tss = self.fill_forward(tss)
 
-        # Compute the charging status index and aggregate the phases
-        tss_phase_idx = self.compute_charge_idx(
-            tss, SOC_DIFF_THRESHOLD[self.make.value]
+        all_vins = [row["vin"] for row in tss.select("vin").distinct().collect()]
+        BATCH_SIZE = 200
+
+        batch_results = []
+
+        for i in range(0, len(all_vins), BATCH_SIZE):
+            self.logger.info(f"Processing batch {i} of {len(all_vins)}")
+
+            batch_vins = all_vins[i : i + BATCH_SIZE]
+            batch_df = tss.filter(F.col("vin").isin(batch_vins))
+
+            tss_phase_idx = self.compute_charge_idx(
+                batch_df, SOC_DIFF_THRESHOLD[self.make.value]
+            )
+            phases = self.generate_phase(tss_phase_idx)
+
+            phase_tss = self.join_metrics_to_phase(phases, batch_df)
+            phase_tss = self.compute_specific_features_before_aggregation(phase_tss)
+            phase_tss = phase_tss.orderBy("date", "vin")
+
+            phases_enriched_batch = self.aggregate_stats(phase_tss)
+            batch_results.append(phases_enriched_batch)
+
+        phases_enriched = batch_results[0]
+        for r in batch_results[1:]:
+            phases_enriched = phases_enriched.union(r)
+
+        self.save(
+            phases_enriched,
+            PROCESSED_PHASES_CACHE_KEY_TEMPLATE.format(
+                make=self.make.value.replace("-", "_")
+            ),
+            force_update=self.force_update,
         )
-        tss_phase_idx = tss_phase_idx.cache()
-        tss_phase_idx.count()  # Trigger caching lazy operations
-        phases = self.generate_phase(tss_phase_idx)
-
-        # Join the time series stats to the tss dataframe
-        phase_tss = self.join_metrics_to_phase(phases, tss)
-
-        phase_tss = self.compute_specific_features_before_aggregation(phase_tss)
-
-        phase_tss = phase_tss.orderBy("date", "vin")
-
-        # Aggregate the time series stats to the phase dataframe / OEM dependent
-        phases_enriched = self.aggregate_stats(phase_tss)
 
         return phases_enriched
 
