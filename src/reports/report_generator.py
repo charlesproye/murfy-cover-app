@@ -134,14 +134,14 @@ class ReportGenerator:
 
         with self.session_factory() as session:
             # Vin and ability to compute SoH
-            results: list[tuple[str, bool | None, bool | None]] = (
+            results: list[tuple[str, bool | None, bool | None, bool]] = (
                 session.query(
                     Vehicle.vin,
                     VehicleModel.soh_data,
                     VehicleModel.soh_oem_data,
+                    Vehicle.activation_status,
                 )
                 .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
-                .filter(Vehicle.activation_status)
                 .filter(vehicle_vin_column.in_(vin_list))
                 .all()
             )
@@ -156,15 +156,22 @@ class ReportGenerator:
             )
 
         query_rows = [
-            {"VIN": vin, "SOH_DATA": soh_data, "SOH_OEM": soh_oem}
-            for vin, soh_data, soh_oem in results
+            {
+                "VIN": vin,
+                "SOH_DATA": soh_data,
+                "SOH_OEM": soh_oem,
+                "ACTIVE": activation_status,
+            }
+            for vin, soh_data, soh_oem, activation_status in results
         ]
+
         query_df = pd.DataFrame(query_rows)
         query_df["SOH"] = query_df["SOH_DATA"] | query_df["SOH_OEM"]
         merged_df = df.merge(query_df, on="VIN", how="left")
 
-        # Is vehicle active
-        merged_df["ACTIVE"] = ~merged_df["SOH"].isna()
+        merged_df["ACTIVE"] = merged_df["ACTIVE_y"].combine_first(merged_df["SOH"])
+
+        merged_df = merged_df.drop(columns=["ACTIVE_x", "ACTIVE_y"])
 
         # Is SOH theorically computable for the model
         merged_df["SOH_COMPUTABLE"] = ~merged_df["SOH"].isna() & merged_df["SOH"]
@@ -180,6 +187,18 @@ class ReportGenerator:
             .dt.strftime("%Y-%m-%d")
             .fillna("")
         )
+
+        merged_df = merged_df[
+            [
+                "VIN",
+                "DATE_REPORT",
+                "ACTIVE",
+                "SOH_COMPUTABLE",
+                "LINK",
+                "Commentaire",
+                "AVAILABLE_SOH",
+            ]
+        ]
 
         return merged_df
 
