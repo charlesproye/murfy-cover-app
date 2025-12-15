@@ -1,8 +1,15 @@
 from logging import Logger, getLogger
 
+import numpy as np
+import pandas as pd
+import sqlalchemy as sa
+from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 
-from core.sql_utils import get_connection
+from core.numpy_utils import numpy_safe_eval
+from core.sql_utils import get_connection, get_sqlalchemy_engine
+from db_models.vehicle import Vehicle, VehicleData, VehicleModel
+from results.trendline.main import compute_trendline_functions
 
 LOGGER = getLogger(__name__)
 
@@ -186,3 +193,123 @@ def update_scoring(logger: Logger = LOGGER):
         )
 
         return {"rows_updated": total_updated, "oem_count": len(oem_ids)}
+
+
+def eval_trendline_vectorized(expr, x):
+    if expr is None:
+        return np.full_like(x, np.nan, dtype=float)
+    return numpy_safe_eval(expr, x=x)
+
+
+def compute_bib_score(logger: Logger = LOGGER):
+    stmt = (
+        select(
+            Vehicle.vin,
+            VehicleModel.id.label("model_id"),
+            VehicleData.soh.cast(sa.Float).label("soh"),
+            VehicleData.odometer.cast(sa.Float).label("odometer"),
+            VehicleModel.trendline,
+            VehicleModel.trendline_min,
+            VehicleModel.trendline_max,
+        )
+        .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
+        .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
+        .where(VehicleData.soh.isnot(None))
+        .where(VehicleData.odometer.isnot(None))
+    )
+
+    engine = get_sqlalchemy_engine()
+    df = pd.read_sql_query(stmt, engine)
+
+    results = []
+    logger.info("Compute bib_score for each model...")
+    for model_id, df_model in df.groupby("model_id"):
+        df_model = df_model.sort_values("odometer")
+        soh = df_model["soh"].to_numpy()
+        km = df_model["odometer"].to_numpy()
+
+        categories = np.full(len(df_model), "C", dtype=object)
+
+        trendline_mean = (
+            df_model["trendline"].dropna().iloc[0]["trendline"]
+            if df_model["trendline"].notna().any()
+            else None
+        )
+        trendline_max = (
+            df_model["trendline_max"].dropna().iloc[0]["trendline"]
+            if df_model["trendline_max"].notna().any()
+            else None
+        )
+        trendline_min = (
+            df_model["trendline_min"].dropna().iloc[0]["trendline"]
+            if df_model["trendline_min"].notna().any()
+            else None
+        )
+
+        # No trendlines
+        if trendline_mean is None:
+            window = 100
+            bounds = np.array(
+                [
+                    np.percentile(
+                        soh[max(0, i - window) : min(len(soh), i + window)],
+                        [5, 25, 75, 95],
+                    )
+                    for i in range(len(soh))
+                ]
+            )
+
+            p5, p25, p75, p95 = bounds.T
+
+            categories[soh >= p95] = "A"
+            categories[(soh >= p75) & (soh < p95)] = "B"
+            categories[(soh >= p25) & (soh < p75)] = "C"
+            categories[(soh >= p5) & (soh < p25)] = "D"
+            categories[soh < p5] = "E"
+
+        # trendlines
+        else:
+            t95 = eval_trendline_vectorized(trendline_max, km)
+            t5 = eval_trendline_vectorized(trendline_min, km)
+
+            _, upper, lower = compute_trendline_functions(
+                km, soh, distribution=1, interval=(5, 75)
+            )
+
+            t25 = eval_trendline_vectorized(lower["trendline"], km)
+            t75 = eval_trendline_vectorized(upper["trendline"], km)
+
+            categories[soh >= t95] = "A"
+            categories[soh < t5] = "E"
+            categories[(soh > t75) & (soh < t95)] = "B"
+            categories[(soh < t25) & (soh >= t5)] = "D"
+
+        df_model["bib_score"] = categories
+
+        # Score minimal par VIN
+        results.append(
+            df_model.sort_values("soh")
+            .groupby("vin", as_index=False)
+            .first()[["vin", "bib_score"]]
+        )
+
+    final_df = pd.concat(results, ignore_index=True)
+
+    # Update the bib_score in vehicle table
+    logger.info("Update bib_score in vehicle table...")
+    engine = get_sqlalchemy_engine()
+    final_df[["vin", "bib_score"]].to_sql(
+        "tmp_soh", engine, if_exists="replace", index=False
+    )
+
+    with get_connection() as con:
+        cur = con.cursor()
+        cur.execute("""
+            UPDATE vehicle v
+            SET bib_score = s.bib_score
+            FROM tmp_soh s
+            WHERE v.vin = s.vin
+        """)
+        con.commit()
+
+    logger.info("Bib score updated successfully")

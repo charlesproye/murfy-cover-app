@@ -143,6 +143,7 @@ class Vehicle(BaseUUIDModel):
         ForeignKey("vehicle_model.id"), nullable=False
     )
     vin: str = Column(String(50))
+    bib_score: str = Column(String(1), nullable=True)
     activation_status: Mapped[bool] = Column(Boolean, nullable=True)
     is_eligible: Mapped[bool] = Column(Boolean, nullable=True)
     is_pinned: Mapped[bool] = Column(Boolean, nullable=True)
