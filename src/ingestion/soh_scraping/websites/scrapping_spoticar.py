@@ -38,7 +38,15 @@ def make_driver():
     options.add_argument("--start-maximized")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--headless")
+    options.add_argument("--headless")  # éviter les crashes /dev/shm
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-dev-tools")
+    options.add_argument("--remote-debugging-port=9222")
+    options.add_argument("--single-process")
+    options.add_argument("--no-zygote")
+    options.add_argument("--user-data-dir=/tmp/chrome-data")
+    options.add_argument("--data-path=/tmp/chrome-data")
+    options.add_argument("--disk-cache-dir=/tmp/chrome-data")
     return webdriver.Chrome(options=options)
 
 

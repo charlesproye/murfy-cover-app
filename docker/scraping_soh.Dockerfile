@@ -46,3 +46,5 @@ ENV PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
 
 USER 1001
+
+CMD ["python", "src/ingestion/soh_scraping/main.py", "aramis", "autospherre", "ev_market", "spoticar"]

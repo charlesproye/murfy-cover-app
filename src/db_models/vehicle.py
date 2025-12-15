@@ -195,6 +195,7 @@ class VehicleData(BaseUUIDModel):
     )
     soh_oem = Column(Numeric(5, 2))
     real_autonomy = Column(Numeric(10, 0))
+    timestamp_last_data_collected = Column(DateTime)
 
 
 class Oem(BaseUUIDModel):

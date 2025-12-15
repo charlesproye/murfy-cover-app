@@ -29,6 +29,7 @@ VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
     "DATE": "timestamp",
     "CONSUMPTION": "consumption",
     "ESTIMATED_CYCLES": "cycles",
+    "TIMESTAMP_LAST_DATA_COLLECTED": "timestamp_last_data_collected",
 }
 
 LOGGER = logging.getLogger(__name__)

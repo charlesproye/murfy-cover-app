@@ -258,7 +258,7 @@ async def get_infos(vin: str, db: AsyncSession):
                 date_trunc('week', CURRENT_DATE) - INTERVAL '1 week' as start_date,
                 date_trunc('week', CURRENT_DATE) - INTERVAL '1 second' as end_date
         ),
-        latest_data AS (
+        latest_data_odometer AS (
             SELECT
                 vehicle_id,
                 timestamp as last_data_date,
@@ -268,7 +268,22 @@ async def get_infos(vin: str, db: AsyncSession):
                 consumption,
                 COALESCE(cycles, 0) as cycles
             FROM vehicle_data
-            WHERE (soh IS NOT NULL OR odometer IS NOT NULL)
+            WHERE odometer IS NOT NULL
+            AND vehicle_id = (SELECT id FROM vehicle WHERE vin = :vin)
+            ORDER BY timestamp DESC
+            LIMIT 1
+        ),
+        latest_data_soh AS (
+            SELECT
+                vehicle_id,
+                timestamp as last_data_date,
+                odometer,
+                soh,
+                soh_comparison,
+                consumption,
+                COALESCE(cycles, 0) as cycles
+            FROM vehicle_data
+            WHERE soh IS NOT NULL
             AND vehicle_id = (SELECT id FROM vehicle WHERE vin = :vin)
             ORDER BY timestamp DESC
             LIMIT 1
@@ -324,85 +339,85 @@ async def get_infos(vin: str, db: AsyncSession):
             bi.oem,
             COALESCE(
                 CASE
-                    WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.cycles
-                    ELSE ld.cycles
+                    WHEN ld_odometer.last_data_date >= (SELECT start_date FROM last_week) THEN wd.cycles
+                    ELSE ld_odometer.cycles
                 END,
                 wd.cycles,
-                ld.cycles,
+                ld_odometer.cycles,
                 0
             ) as cycles,
             COALESCE(
                 CASE
-                    WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.last_data_date
-                    ELSE ld.last_data_date
+                    WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.last_data_date
+                    ELSE ld_soh.last_data_date
                 END,
                 wd.last_data_date,
-                ld.last_data_date
+                ld_odometer.last_data_date
             ) as last_data_date,
             COALESCE(
                 CASE
-                    WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.odometer
-                    ELSE ld.odometer
+                    WHEN ld_odometer.last_data_date >= (SELECT start_date FROM last_week) THEN wd.odometer
+                    ELSE ld_odometer.odometer
                 END,
                 wd.odometer,
-                ld.odometer
+                ld_odometer.odometer
             ) as odometer,
             COALESCE(
                 CASE
-                    WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh
-                    ELSE ld.soh
+                    WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh
+                    ELSE ld_soh.soh
                 END,
                 wd.soh,
-                ld.soh
+                ld_soh.soh
             ) as soh,
             COALESCE(
                 CASE
-                    WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.consumption
-                    ELSE ld.consumption
+                    WHEN ld_odometer.last_data_date >= (SELECT start_date FROM last_week) THEN wd.consumption
+                    ELSE ld_odometer.consumption
                 END,
                 wd.consumption,
-                ld.consumption
+                ld_odometer.consumption
             ) as consumption,
             CASE
                 WHEN COALESCE(
                     CASE
-                        WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld.soh_comparison
+                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
+                        ELSE ld_soh.soh_comparison
                     END,
                     wd.soh_comparison,
-                    ld.soh_comparison
+                    ld_soh.soh_comparison
                 ) >= 3.50 THEN 'A'
                 WHEN COALESCE(
                     CASE
-                        WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld.soh_comparison
+                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
+                        ELSE ld_soh.soh_comparison
                     END,
                     wd.soh_comparison,
-                    ld.soh_comparison
+                    ld_soh.soh_comparison
                 ) >= 2.00 THEN 'B'
                 WHEN COALESCE(
                     CASE
-                        WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld.soh_comparison
+                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
+                        ELSE ld_soh.soh_comparison
                     END,
                     wd.soh_comparison,
-                    ld.soh_comparison
+                    ld_soh.soh_comparison
                 ) >= 1.45 THEN 'C'
                 WHEN COALESCE(
                     CASE
-                        WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld.soh_comparison
+                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
+                        ELSE ld_soh.soh_comparison
                     END,
                     wd.soh_comparison,
-                    ld.soh_comparison
+                    ld_soh.soh_comparison
                 ) > -0.74 THEN 'D'
                 WHEN COALESCE(
                     CASE
-                        WHEN ld.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld.soh_comparison
+                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
+                        ELSE ld_soh.soh_comparison
                     END,
                     wd.soh_comparison,
-                    ld.soh_comparison
+                    ld_soh.soh_comparison
                 ) > -4.00 THEN 'E'
                 ELSE 'F'
             END as score
@@ -410,7 +425,8 @@ async def get_infos(vin: str, db: AsyncSession):
         JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
         JOIN oem ON vm.oem_id = oem.id
         JOIN battery_info bi ON TRUE
-        LEFT JOIN latest_data ld ON ld.vehicle_id = v.id
+        LEFT JOIN latest_data_odometer ld_odometer ON ld_odometer.vehicle_id = v.id
+        LEFT JOIN latest_data_soh ld_soh ON ld_soh.vehicle_id = v.id
         LEFT JOIN weekly_data wd ON wd.vehicle_id = v.id
         WHERE v.vin = :vin
     """)

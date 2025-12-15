@@ -70,9 +70,6 @@ class ResultPhaseToResultWeek:
 
         rweek = self.compute_cycles(rweek)
 
-        if self.has_soh:
-            rweek["SOH"] = rweek.groupby("VIN", observed=True)["SOH"].ffill()
-            rweek["SOH"] = rweek.groupby("VIN", observed=True)["SOH"].bfill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].ffill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].bfill()
 
@@ -127,11 +124,12 @@ class ResultPhaseToResultWeek:
             "LEVEL_3": ("LEVEL_3", "sum"),
             "CONSUMPTION": ("CONSUMPTION", "median"),
             "RANGE": ("RANGE", "first"),
+            "TIMESTAMP_LAST_DATA_COLLECTED": ("DATETIME_END", "last"),
         }
 
         agg_dict = {
             new_col: pd.NamedAgg(src_col, func)
-            for src_col, (new_col, func) in agg_spec.items()
+            for new_col, (src_col, func) in agg_spec.items()
             if src_col in results.columns
         }
 
