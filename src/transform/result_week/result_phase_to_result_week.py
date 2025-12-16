@@ -114,7 +114,7 @@ class ResultPhaseToResultWeek:
         )
 
         agg_spec = {
-            "ODOMETER_LAST": ("ODOMETER", "last"),
+            "ODOMETER": ("ODOMETER_LAST", "last"),
             "SOH": ("SOH", "median"),
             "SOH_OEM": ("SOH_OEM", "median"),
             "MODEL": ("MODEL", "first"),
