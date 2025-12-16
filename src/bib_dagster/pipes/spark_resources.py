@@ -12,3 +12,8 @@ class ExecutorResource(BaseModel):
     instances: int
     memory: str
     memoryOverhead: str
+
+
+class JobResources(BaseModel):
+    driver: DriverResource
+    executors: ExecutorResource

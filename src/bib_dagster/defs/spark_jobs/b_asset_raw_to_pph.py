@@ -10,28 +10,32 @@ from bib_dagster.config import DAGSTER_SLACK_CHANNEL
 from bib_dagster.defs.sensors import format_slack_failure_message
 from bib_dagster.defs.spark_jobs import MAKE_PARTITIONS
 from bib_dagster.pipes.pipes_spark_operator import PipesSparkApplicationClient
-from bib_dagster.pipes.spark_resources import DriverResource, ExecutorResource
+from bib_dagster.pipes.spark_resources import (
+    DriverResource,
+    ExecutorResource,
+    JobResources,
+)
 from transform.processed_phases.main import RawTsToProcessedPhasesCLI
 
-RESOURCE_CONFIGS: dict[str, dict[str, DriverResource | ExecutorResource]] = {
-    "tesla-fleet-telemetry": {
-        "driver": DriverResource(cores=3, memory="11G", memoryOverhead="1G"),
-        "executor": ExecutorResource(
+RESOURCE_CONFIGS: dict[str, JobResources] = {
+    "tesla-fleet-telemetry": JobResources(
+        driver=DriverResource(cores=3, memory="11G", memoryOverhead="1G"),
+        executors=ExecutorResource(
             cores=3, memory="11G", instances=6, memoryOverhead="1G"
         ),
-    },
-    "stellantis": {
-        "driver": DriverResource(cores=3, memory="11G", memoryOverhead="1G"),
-        "executor": ExecutorResource(
+    ),
+    "stellantis": JobResources(
+        driver=DriverResource(cores=3, memory="11G", memoryOverhead="1G"),
+        executors=ExecutorResource(
             cores=3, memory="11G", instances=4, memoryOverhead="1G"
         ),
-    },
-    "default": {
-        "driver": DriverResource(cores=2, memory="7G", memoryOverhead="1G"),
-        "executor": ExecutorResource(
+    ),
+    "default": JobResources(
+        driver=DriverResource(cores=2, memory="7G", memoryOverhead="1G"),
+        executors=ExecutorResource(
             cores=3, memory="11G", instances=3, memoryOverhead="1G"
         ),
-    },
+    ),
 }
 
 
@@ -73,8 +77,8 @@ def raw_ts_to_pph(
     if make not in RESOURCE_CONFIGS:
         make = "default"
 
-    driver_resource = RESOURCE_CONFIGS[make]["driver"]
-    executor_resource = RESOURCE_CONFIGS[make]["executor"]
+    driver_resource = RESOURCE_CONFIGS[make].driver
+    executor_resource = RESOURCE_CONFIGS[make].executors
 
     return spark_pipes.run(
         context=context,

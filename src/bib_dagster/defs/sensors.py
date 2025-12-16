@@ -1,7 +1,5 @@
 """Sensors for monitoring Dagster runs and sending notifications."""
 
-import os
-
 from dagster import (
     DagsterRunStatus,
     DefaultSensorStatus,
@@ -10,6 +8,7 @@ from dagster import (
 )
 from dagster_slack import SlackResource, make_slack_on_run_failure_sensor
 
+from bib_dagster.config import DAGSTER_SLACK_CHANNEL, SLACK_TOKEN
 from bib_dagster.slack_utils import (
     format_slack_failure_message,
     handle_asset_check_status,
@@ -18,8 +17,8 @@ from bib_dagster.slack_utils import (
 # Create a Slack notification sensor for run failures
 # This will catch both asset materialization failures and asset check failures
 slack_failure_notifications = make_slack_on_run_failure_sensor(
-    channel="#bib-bot-test",
-    slack_token=os.getenv("SLACK_TOKEN"),
+    channel=DAGSTER_SLACK_CHANNEL,
+    slack_token=SLACK_TOKEN,
     text_fn=format_slack_failure_message,
     name="slack_failure_notifications",
 )

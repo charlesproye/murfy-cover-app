@@ -1,6 +1,11 @@
 """SQLAlchemy models for the data-engineering database."""
 
-from sqlalchemy import Column, DateTime, Integer, Numeric, String, Text, text
+from datetime import datetime
+from decimal import Decimal
+
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, text
+from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.orm import Mapped, mapped_column
 
 from db_models.data_eng.base import DataEngBase
 
@@ -8,35 +13,53 @@ from db_models.data_eng.base import DataEngBase
 class DimActivationMetric(DataEngBase):
     __tablename__ = "dim_activation_metric"
 
-    oem = Column(String(255), primary_key=True, nullable=False)
-    price_per_month = Column(Numeric(10, 2), nullable=True)
+    oem: Mapped[str] = mapped_column(String(255), primary_key=True)
+    price_per_month: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
 
 
 class FctActivationMetric(DataEngBase):
     __tablename__ = "fct_activation_metric"
 
-    date = Column("date", String(255), primary_key=True, nullable=False)
-    nb_vehicles_activated = Column(Integer, nullable=True)
-    oem = Column(String(255), primary_key=True, nullable=False)
-    updated_at = Column(DateTime, nullable=False)
+    date: Mapped[str] = mapped_column("date", String(255), primary_key=True)
+    nb_vehicles_activated: Mapped[int | None] = mapped_column(Integer)
+    oem: Mapped[str] = mapped_column(String(255), primary_key=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
 
 
 class FctScrapedUnusableLinks(DataEngBase):
     __tablename__ = "fct_scraped_unusable_links"
 
-    link = Column(String(255), primary_key=True, nullable=True)
-    source = Column("source", String(255), primary_key=True, nullable=True)
-    created_at = Column(DateTime, nullable=False, server_default=text("now()"))
+    link: Mapped[str] = mapped_column(String(255), primary_key=True)
+    source: Mapped[str] = mapped_column("source", String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("now()"))
 
 
 class DataCatalog(DataEngBase):
     __tablename__ = "data_catalog"
 
-    column_name = Column(String(255), primary_key=True, nullable=False)
-    step = Column(String(100), primary_key=True, nullable=False)
-    oem_name = Column(String(255), primary_key=True, nullable=False)
-    type = Column("type", String(100), nullable=False)
-    description = Column(Text, nullable=True)
+    column_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    step: Mapped[str] = mapped_column(String(100), primary_key=True)
+    oem_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    type: Mapped[str] = mapped_column("type", String(100))
+    description: Mapped[str | None] = mapped_column(Text)
+
+
+class Make(DataEngBase):
+    __tablename__ = "make"
+    make: Mapped[str] = mapped_column(String(255), primary_key=True)
+
+
+class SoHModel(DataEngBase):
+    __tablename__ = "soh_model"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    make: Mapped[str] = mapped_column(
+        String(255), ForeignKey("make.make", ondelete="CASCADE")
+    )
+    model_name: Mapped[str | None] = mapped_column(String(255))
+    car_model_name: Mapped[str | None] = mapped_column(String(255))
+    model_uri: Mapped[str] = mapped_column(String(2000))
+    metrics: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("now()"))
 
 
 __all__ = [
@@ -44,4 +67,6 @@ __all__ = [
     "DimActivationMetric",
     "FctActivationMetric",
     "FctScrapedUnusableLinks",
+    "Make",
+    "SoHModel",
 ]

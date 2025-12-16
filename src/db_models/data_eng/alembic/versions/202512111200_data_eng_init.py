@@ -28,8 +28,8 @@ def upgrade() -> None:
 
     op.create_table(
         "fct_scraped_unusable_links",
-        sa.Column("link", sa.String(length=255), nullable=True),
-        sa.Column("source", sa.String(length=255), nullable=True),
+        sa.Column("link", sa.String(length=255), nullable=False),
+        sa.Column("source", sa.String(length=255), nullable=False),
         sa.Column(
             "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
         ),

@@ -24,13 +24,17 @@ def get_data_eng_sessionmaker(autocommit: bool = False, autoflush: bool = False)
     """Sessionmaker factory bound to the data-engineering engine."""
     engine = get_data_eng_engine()
     return sessionmaker(
-        bind=engine, autocommit=autocommit, autoflush=autoflush, future=True
+        bind=engine,
+        autocommit=autocommit,
+        autoflush=autoflush,
+        expire_on_commit=False,
+        future=True,
     )
 
 
-def get_data_eng_session():
+def get_data_eng_session(autocommit: bool = False, autoflush: bool = False):
     """Convenience helper to get a single session instance."""
-    return get_data_eng_sessionmaker()()
+    return get_data_eng_sessionmaker(autocommit=autocommit, autoflush=autoflush)()
 
 
 __all__ = [

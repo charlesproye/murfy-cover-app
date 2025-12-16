@@ -48,7 +48,6 @@ class RawTsToProcessedPhases(CachedETLSpark):
         self.logger = getLogger(logger_name)
         set_level_of_loggers_with_prefix(log_level, logger_name)
         self.id_col = id_col
-        self.spark = spark
         self.bucket = S3Service()
         self.settings = S3Settings()
         self.pipes = pipes

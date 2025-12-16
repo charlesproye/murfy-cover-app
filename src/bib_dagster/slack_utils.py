@@ -1,4 +1,3 @@
-import os
 from collections.abc import Sequence
 
 from dagster import (
@@ -10,6 +9,8 @@ from dagster import (
 )
 from dagster._core.events.log import EventLogEntry
 from dagster_slack import SlackResource
+
+from bib_dagster.config import DAGSTER_BASE_URL, DAGSTER_SLACK_CHANNEL
 
 
 def build_and_post_slack_message_if_asset_check_failed(
@@ -27,8 +28,8 @@ def build_and_post_slack_message_if_asset_check_failed(
 
     if not asset_check_passed:
         severity_emoji = ":warning:" if asset_check_severity == "warn" else ":x:"
-        instance_base_url = os.environ["DAGIT_BASE_URL"]
-        slack_alerting_channel = os.environ["SLACK_CHANNEL"]
+        instance_base_url = DAGSTER_BASE_URL
+        slack_alerting_channel = DAGSTER_SLACK_CHANNEL
 
         slack_message_body = [
             {
@@ -99,7 +100,7 @@ def format_slack_failure_message(context: HookContext) -> str:
     return (
         f"{emoji} *{failure_type}*\n"
         + f"*Job:* {job_name}\n"
-        + f"*Run ID:* <http://{os.getenv('DAGSTER_UI_URL', 'localhost:3000')}/runs/{run_id}|{run_id}>\n"
+        + f"*Run ID:* <{DAGSTER_BASE_URL}/runs/{run_id}|{run_id}>\n"
         + (f"*Partition Key:* {partition_key}\n" if partition_key else "")
         + f"*Error:* `{error_msg}`\n"
     )

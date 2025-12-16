@@ -1,32 +1,34 @@
-import numpy as np
-from pyspark.ml.feature import VectorAssembler
-from pyspark.ml.regression import LinearRegression, LinearRegressionModel
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
-from core.pandas_utils import *
-from core.s3.s3_utils import S3Service
+from core.models import MakeEnum
 from core.spark_utils import (
     get_spark_available_cores,
     safe_astype_spark_with_error_handling,
 )
-from core.sql_utils import *
-from core.stats_utils import *
-from transform.processed_phases.config import (
-    SOC_DIFF_THRESHOLD,
-)
-from transform.processed_phases.providers.renault import RenaultRawTsToProcessedPhases
+from transform.models.base import BaseSOHModel
 
 
-class RenaultSOHModel:
+class RenaultSOHModel(BaseSOHModel):
+    """SoH model trainer for Renault vehicles using temperature correction."""
+
     def __init__(self, spark: SparkSession):
-        self.spark = spark
-        self.models = {}
-        self.bucket_name = "bib-platform-prod-data"
+        super().__init__(spark=spark, make=MakeEnum.renault)
+
+    def get_feature_columns(self) -> list[str]:
+        """Renault uses temperature correction for SoH estimation."""
+        return ["outside_temperature_filled"]
 
     def load_data(self) -> DataFrame:
+        from transform.processed_phases.config import (
+            SOC_DIFF_THRESHOLD,
+        )
+        from transform.processed_phases.providers.renault import (
+            RenaultRawTsToProcessedPhases,
+        )
+
         renault = RenaultRawTsToProcessedPhases(
-            make="renault",
+            make=self.make,
             spark=self.spark,
         )
 
@@ -34,13 +36,12 @@ class RenaultSOHModel:
             spark=self.spark,
             key=f"raw_ts/{renault.make.value}/time_series/raw_ts_spark.parquet",
         )
-        tss = tss.repartition(1).cache()
-        tss.count()
-
         optimal_partitions_nb, _ = renault._set_optimal_spark_parameters(
             tss, get_spark_available_cores(self.spark, renault.logger)
         )
-        tss = tss.repartition(1).coalesce(optimal_partitions_nb)
+
+        tss = tss.coalesce(optimal_partitions_nb).cache()
+        tss.count()
 
         tss = tss.withColumnsRenamed({"battery_level": "soc"})
         tss = safe_astype_spark_with_error_handling(tss)
@@ -53,11 +54,13 @@ class RenaultSOHModel:
         )
         tss_phase_idx = tss_phase_idx.cache()
         phases = renault.generate_phase(tss_phase_idx)
-        phases.repartition(1).cache()
+        phases.repartition(optimal_partitions_nb).cache()
         phases.count()
 
         phase_tss = renault.join_metrics_to_phase(phases, tss)
-        phase_tss = renault.compute_specific_features_before_aggregation(phase_tss)
+        phase_tss = renault.compute_specific_features_before_aggregation(
+            phase_tss, apply_soh_correction=False
+        )
 
         w_ffill = (
             Window.partitionBy("vin", "PHASE_INDEX")
@@ -91,49 +94,3 @@ class RenaultSOHModel:
         ).select("vin", "date", "outside_temperature_filled", "soh", "model")
 
         return phase_tss
-
-    def train(self, df: DataFrame):
-        self.models = {}
-
-        assembler = VectorAssembler(
-            inputCols=["outside_temperature_filled"], outputCol="features"
-        )
-        df = assembler.transform(df)
-
-        models = [row["model"] for row in df.select("model").distinct().collect()]
-
-        for model_name in models:
-            model_df = df.filter(F.col("model") == model_name)
-
-            lr = LinearRegression(
-                featuresCol="features",
-                labelCol="soh",
-                predictionCol="pred_soh",
-            )
-            lr_model = lr.fit(model_df)
-
-            self.models[model_name] = lr_model
-
-        return self.models
-
-    def save_all(self):
-        if not self.models:
-            raise ValueError("No models to save. Train models first.")
-
-        for model_name, model in self.models.items():
-            save_path = f"s3a://{self.bucket_name}/models/{model_name}_temperature"
-            model.write().overwrite().save(save_path)
-            print(f"Model saved to {save_path}")
-
-    def load_all(self, model_names: list[str]):
-        self.models = {}
-
-        for name in model_names:
-            load_path = f"s3a://{self.bucket_name}/models/{name}_temperature"
-            try:
-                model = LinearRegressionModel.load(load_path)
-                self.models[f"{name}_temperature"] = model
-            except Exception:
-                print(f"⚠️ Warning: model {name} not found in S3.")
-
-        return self.models

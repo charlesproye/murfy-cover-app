@@ -15,9 +15,11 @@ from pandas import DataFrame as DF
 from pandas import Series
 
 try:
+    from pyspark.sql import DataFrame as SparkDF
     from pyspark.sql import SparkSession
 except ImportError:
     SparkSession = None
+    SparkDF = None
 
 from core.config import EMTPY_S3_KEYS_WARNING_MSG, KEY_LIST_COLUMN_NAMES
 from core.pandas_utils import str_split_and_retain_src
@@ -97,7 +99,11 @@ class S3Service:
                 raise e
 
     def save_df_as_parquet_spark(
-        self, df: DF, key: str, spark, repartition_key: str | None = "vin"
+        self,
+        df: SparkDF,
+        key: str,
+        spark: SparkSession,
+        repartition_key: str | None = "vin",
     ):
         """
         Intended to concatenate existing data and overwrite files already present in scaleway.
@@ -170,7 +176,7 @@ class S3Service:
         ).partitionBy(repartition_key).parquet(s3_path)
 
     def append_spark_df_to_parquet(
-        self, df: DF, key: str, repartition: str | None = None
+        self, df: SparkDF, key: str, repartition: str | None = None
     ):
         s3_path = f"s3a://{self.bucket_name}/{key}"
 

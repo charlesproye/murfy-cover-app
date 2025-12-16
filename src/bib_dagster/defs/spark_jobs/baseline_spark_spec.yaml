@@ -23,6 +23,8 @@ driver:
   envFrom:
     - secretRef:
         name: db-data-ev-secret
+    - secretRef:
+        name: db-data-eng-secret
   env:
     - name: S3_KEY
       valueFrom:
@@ -53,6 +55,8 @@ executor:
   envFrom:
     - secretRef:
         name: db-data-ev-secret
+    - secretRef:
+        name: db-data-eng-secret
   env:
   - name: S3_KEY
     valueFrom:
