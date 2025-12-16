@@ -1,11 +1,12 @@
-import asyncio
 import logging
 from datetime import datetime
 
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import select, text
 
+from activation.config.config import MAKES_WITH_SOH_BIB
 from core.sql_utils import get_connection, get_sqlalchemy_engine
+from db_models.vehicle import Oem, Vehicle, VehicleModel
 
 
 async def write_metrics_to_db(logger: logging.Logger):
@@ -62,3 +63,28 @@ async def compare_active_vehicles(
     gsheet_not_in_db = vehicle_gsheet - vehicle_db
 
     return db_not_in_gsheet, gsheet_not_in_db
+
+
+async def check_vehicles_without_type_postgre(
+    vehicles_without_type_vin: list[str],
+) -> tuple[int, list[str]]:
+    engine = get_sqlalchemy_engine()
+
+    query = (
+        select(Vehicle.vin)
+        .select_from(Vehicle)
+        .join(VehicleModel, VehicleModel.id == Vehicle.vehicle_model_id)
+        .join(Oem, Oem.id == VehicleModel.oem_id)
+        .where(
+            VehicleModel.type.is_(None),
+            Vehicle.activation_status.is_(True),
+            Oem.oem_name.in_(MAKES_WITH_SOH_BIB),
+        )
+    )
+
+    with engine.connect() as con:
+        result = con.execute(query)
+        vehicles = result.fetchall()
+
+    set_vehicles = {row[0] for row in vehicles} - set(vehicles_without_type_vin)
+    return len(set_vehicles), list(set_vehicles)

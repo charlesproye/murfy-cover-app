@@ -49,7 +49,11 @@ from activation.fleet_info import read_fleet_info as fleet_info
 from activation.services.activation_service import VehicleActivationService
 from activation.services.vehicle_processor import VehicleProcessor
 from activation.utils.check_utils import ensure_admins_linked_to_fleets
-from activation.utils.metric_utils import compare_active_vehicles, write_metrics_to_db
+from activation.utils.metric_utils import (
+    check_vehicles_without_type_postgre,
+    compare_active_vehicles,
+    write_metrics_to_db,
+)
 from core.slack_utils import send_slack_message
 
 # Configure logging
@@ -59,6 +63,7 @@ logger = logging.getLogger(__name__)
 
 async def process_vehicles(owner_filter: str | None = None):
     """Main function to process vehicles in parallel."""
+
     try:
         # Initialize APIs
         bmw_api = BMWApi(
@@ -110,11 +115,14 @@ async def process_vehicles(owner_filter: str | None = None):
 
         # Get initial fleet info
         df = await fleet_info(fleet_filter=owner_filter)
-        nbr_vehicles_without_type = check_vehicles_without_type(df)
+        nbr_vehicles_without_type, vehicles_without_type_vin = (
+            check_vehicles_without_type(df)
+        )
         send_slack_message(
             METRIC_SLACK_CHANNEL_ID,
-            f"{nbr_vehicles_without_type} vehicles without type",
+            f"📊 Information - Véhicules sans type\nSource: Gsheet \nMotif: {nbr_vehicles_without_type} véhicules activés sans type renseignés sur lesquels BIB calcule un SoH. Le SoH sera probablement erroné.\n VIN: {vehicles_without_type_vin}\n",
         )
+
         # Initialize activation service
         activation_service = VehicleActivationService(
             bmw_api=bmw_api,
@@ -172,6 +180,16 @@ async def process_vehicles(owner_filter: str | None = None):
             METRIC_SLACK_CHANNEL_ID,
             f"Les véhicules suivants sont présents dans le Gsheet mais pas dans la base de données: {gsheet_not_in_db}",
         )
+
+        (
+            nbr_vehicles_without_type_postgre,
+            vehicles_without_type_vin_postgre,
+        ) = await check_vehicles_without_type_postgre(vehicles_without_type_vin)
+        send_slack_message(
+            METRIC_SLACK_CHANNEL_ID,
+            f"🐘 Information - Véhicules sans type\nSource: Postgre \nMotif: {nbr_vehicles_without_type_postgre} véhicules activés sans type renseignés sur lesquels BIB calcule un SoH. Le SoH sera probablement erroné.\n VIN: {vehicles_without_type_vin_postgre}\n",
+        )
+
     except Exception as e:
         logger.error(f"Error processing vehicles: {e!s}")
         raise

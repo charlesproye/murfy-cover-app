@@ -31,3 +31,12 @@ REASON_MAPPING = {
         "de_enrollment_ongoing": "En cours de désactivation, pas immédiat chez Volkswagen",
     },
 }
+
+MAKES_WITH_SOH_BIB = [
+    "tesla-fleet-telemetry",
+    "mercedes-benz",
+    "kia",
+    "renault",
+    "ford",
+]
+MAKES_WITH_SOH_BIB_WO_MODEL_API = ["mercedes-benz", "kia", "ford"]

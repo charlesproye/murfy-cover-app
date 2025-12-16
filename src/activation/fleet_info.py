@@ -7,11 +7,16 @@ from typing import Any
 import pandas as pd
 from gspread.exceptions import APIError
 
+from activation.config.config import MAKES_WITH_SOH_BIB_WO_MODEL_API
+from activation.config.credentials import SPREADSHEET_ID
+from activation.config.mappings import (
+    COL_DTYPES,
+    OEM_MAPPING,
+    mappings,
+    suffixes_to_remove,
+)
+from activation.config.settings import INITIAL_RETRY_DELAY, MAX_RETRIES, MAX_RETRY_DELAY
 from core.gsheet_utils import get_google_client
-
-from .config.credentials import SPREADSHEET_ID
-from .config.mappings import COL_DTYPES, OEM_MAPPING, mappings, suffixes_to_remove
-from .config.settings import INITIAL_RETRY_DELAY, MAX_RETRIES, MAX_RETRY_DELAY
 
 logger = getLogger("ingestion.vehicle_info")
 
@@ -313,12 +318,19 @@ async def read_fleet_info(fleet_filter: str | None = None) -> pd.DataFrame:
 
 def check_vehicles_without_type(fleet_info_df: pd.DataFrame) -> int:
     """Check the number of vehicles without type."""
+
     return (
         fleet_info_df[
-            (fleet_info_df["oem"] != "tesla") & (fleet_info_df["activation"] == True)
+            (fleet_info_df["oem"].isin(MAKES_WITH_SOH_BIB_WO_MODEL_API))
+            & (fleet_info_df["activation"] == True)
         ]
         .type.isna()
-        .sum()
+        .sum(),
+        fleet_info_df[
+            (fleet_info_df["oem"].isin(MAKES_WITH_SOH_BIB_WO_MODEL_API))
+            & (fleet_info_df["activation"] == True)
+            & (fleet_info_df["type"].isna())
+        ].vin.tolist(),
     )
 
 
