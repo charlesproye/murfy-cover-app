@@ -27,9 +27,6 @@ const titleClass = 'flex items-center gap-2 mb-2 text-primary text-base text-lef
 
 interface VehicleInfoProps {
   vin: string | undefined;
-  isPinned: boolean;
-  isPinLoading?: boolean;
-  onPinChange: (checked: boolean) => void;
 }
 
 const VehicleInfoMain: React.FC<{ vin: string | undefined }> = ({ vin }) => {
@@ -142,30 +139,32 @@ const VehicleStats: React.FC<{ vin: string | undefined }> = ({ vin }) => {
         <div className="flex justify-between items-center">
           <span className={labelClass}>SoH</span>
           <span className="text-right text-xs md:text-sm text-gray">
-            {infoVehicle.battery_info.soh}%
+            {formatNumber(infoVehicle.battery_info.soh, '%')}
           </span>
         </div>
         <div className="flex justify-between items-center">
           <span className={labelClass}>Mileage</span>
           <span className="text-right text-xs md:text-sm text-gray">
-            {formatNumber(infoVehicle.vehicle_info.odometer)} km
+            {formatNumber(infoVehicle.vehicle_info.odometer, 'km')}
           </span>
         </div>
         <div className="flex justify-between items-center">
           <span className={labelClass}>Consumption</span>
           <span className="text-right text-xs md:text-sm text-gray">
-            {formatNumber(kpiAdditional.consumption)} kWh/100 km
+            {formatNumber(kpiAdditional.consumption, 'kWh/100 km')}
           </span>
         </div>
         <div className="flex justify-between items-center">
           <span className={labelClass}>Total Cycles</span>
           <span className="text-right text-xs md:text-sm text-gray">
-            {infoVehicle.vehicle_info.cycles} cycles
+            {formatNumber(infoVehicle.vehicle_info.cycles, 'cycles')}
           </span>
         </div>
-        <div className="flex flex-col gap-y-1">
+        <div className="flex flex-col gap-y-1 w-full">
           <span className={labelClass}>Score</span>
-          <MiniScoreCard score={infoVehicle.vehicle_info.score} />
+          <div className="w-full flex justify-center">
+            <MiniScoreCard score={infoVehicle.vehicle_info.score} />
+          </div>
         </div>
       </div>
     </div>
@@ -174,17 +173,9 @@ const VehicleStats: React.FC<{ vin: string | undefined }> = ({ vin }) => {
 
 interface VehicleActionsProps {
   vin: string | undefined;
-  isPinned: boolean;
-  isPinLoading?: boolean;
-  onPinChange: (checked: boolean) => void;
 }
 
-const VehicleActions: React.FC<VehicleActionsProps> = ({
-  vin,
-  isPinned,
-  isPinLoading,
-  onPinChange,
-}) => {
+const VehicleActions: React.FC<VehicleActionsProps> = ({ vin }) => {
   const { data: infoVehicle, isLoading } = useGetInfoVehicle(vin);
   const { data: priceForecast } = useGetPriceForecast(vin);
 
@@ -207,12 +198,7 @@ const VehicleActions: React.FC<VehicleActionsProps> = ({
       </div>
       <div className="w-full flex flex-col justify-between gap-2">
         <BibRecommendation score={infoVehicle.vehicle_info.score} />
-        <PinVehicleSwitch
-          label="Pin to favorites"
-          isPinned={isPinned}
-          isLoading={isPinLoading}
-          onChange={onPinChange}
-        />
+        <PinVehicleSwitch vin={vin} />
 
         <div className="w-full flex justify-center">
           <div className="w-[80%] border-b border-gray/30 my-1" />
@@ -244,23 +230,13 @@ const VehicleActions: React.FC<VehicleActionsProps> = ({
   );
 };
 
-const VehicleInfo: React.FC<VehicleInfoProps> = ({
-  vin,
-  isPinned,
-  isPinLoading,
-  onPinChange,
-}) => {
+const VehicleInfo: React.FC<VehicleInfoProps> = ({ vin }) => {
   return (
     <div className="w-full bg-[#f7f8fa] p-2">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <VehicleInfoMain vin={vin} />
         <VehicleStats vin={vin} />
-        <VehicleActions
-          vin={vin}
-          isPinned={isPinned}
-          isPinLoading={isPinLoading}
-          onPinChange={onPinChange}
-        />
+        <VehicleActions vin={vin} />
       </div>
     </div>
   );

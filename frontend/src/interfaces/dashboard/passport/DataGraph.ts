@@ -1,20 +1,16 @@
 import { Score } from './ScoreCard/ScoreCardProps';
 
 export interface DataPoint {
-  soh_vehicle: number;
-  timestamp: string | null;
+  soh: number;
   odometer: number;
-  model_name: string;
-  is_current_vehicle: boolean;
-  start_date: string | null;
 }
 
 export interface DataGraphResponse {
   initial_point: DataPoint;
   data_points: DataPoint[];
-  trendline_min: string;
-  trendline_max: string;
-  trendline: string;
+  trendline_min: string | null;
+  trendline_max: string | null;
+  trendline: string | null;
 }
 
 export interface DataGraphRequestSwr {
@@ -31,6 +27,7 @@ export interface PinVehicleResponse {
     | undefined;
   isLoading: boolean;
   error: unknown;
+  mutate: () => void;
 }
 
 export type DataCardGraphResult = {

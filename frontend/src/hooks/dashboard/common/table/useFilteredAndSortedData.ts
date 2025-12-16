@@ -14,7 +14,6 @@ const useFilteredAndSortedData = <T>({
     if (!activeFilter) return data;
 
     const sortKey = activeFilter;
-    if (!sortKey) return data;
     return [...data].sort((a, b) => {
       if (typeof a[sortKey] === 'string' && typeof b[sortKey] === 'string') {
         return sortOrder === 'asc'

@@ -4,14 +4,9 @@ import { TableExtremumResult } from '@/interfaces/dashboard/home/table/Tablebran
 import fetchWithAuth from '@/services/fetchWithAuth';
 import { SortOrder } from '@/interfaces/common/filter/SortOrder';
 
-const useInfiniteTableExtremum = (
-  fleet: string | null,
-  selected: string,
-  pageSize: number = 10,
-  quality: 'Best' | 'Worst' | '',
-  sortingColumn: keyof TableExtremumResult['vehicles'][0] | '',
-  sortingOrder: SortOrder,
-): {
+const minLoadingTime = 500; // Minimum 500ms loading time
+
+interface InfiniteTableExtremumResult {
   data: TableExtremumResult['vehicles'];
   brands: TableExtremumResult['brands'];
   pagination: TableExtremumResult['pagination'] | null;
@@ -21,7 +16,16 @@ const useInfiniteTableExtremum = (
   hasNextPage: boolean;
   loadMore: () => void;
   reset: () => void;
-} => {
+}
+
+const useInfiniteTableExtremum = (
+  fleet: string | null,
+  selected: string,
+  pageSize: number = 10,
+  quality: 'Best' | 'Worst' | '',
+  sortingColumn: keyof TableExtremumResult['vehicles'][0] | '',
+  sortingOrder: SortOrder,
+): InfiniteTableExtremumResult => {
   const [data, setData] = useState<TableExtremumResult['vehicles']>([]);
   const [brands, setBrands] = useState<TableExtremumResult['brands']>([]);
   const [pagination, setPagination] = useState<TableExtremumResult['pagination'] | null>(
@@ -37,7 +41,6 @@ const useInfiniteTableExtremum = (
       if (!fleet) return;
 
       const startTime = Date.now();
-      const minLoadingTime = 500; // Minimum 500ms loading time
 
       try {
         if (isLoadMore) {
@@ -103,7 +106,7 @@ const useInfiniteTableExtremum = (
   useEffect(() => {
     reset();
     fetchData(1, false);
-  }, [fleet, selected, quality, pageSize, sortingColumn, sortingOrder]);
+  }, [fleet, selected, quality, pageSize, sortingColumn, sortingOrder, reset, fetchData]);
 
   return {
     data,

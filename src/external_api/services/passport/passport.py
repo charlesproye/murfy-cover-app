@@ -1,22 +1,13 @@
 import logging
 
 from fastapi import HTTPException
-from sqlalchemy import text
+from sqlalchemy import Numeric, cast, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from db_models.vehicle import Oem, Vehicle, VehicleData, VehicleModel
+from external_api.schemas.graph import DataGraphResponse, DataPoint
+
 logger = logging.getLogger(__name__)
-
-
-def _to_int(value) -> int | None:
-    if value is None:
-        return None
-    return int(value)
-
-
-def _to_float(value) -> float | None:
-    if value is None:
-        return None
-    return float(value)
 
 
 async def get_kpis(vin: str, db: AsyncSession):
@@ -89,166 +80,63 @@ async def get_kpis(vin: str, db: AsyncSession):
     ]
 
 
-async def get_graph_data(vin: str, period: str = "Week", db: AsyncSession = None):
-    query = text("""
-        WITH vehicle_info AS (
-            SELECT
-                v.id,
-                vm.oem_id,
-                v.start_date,
-                o.oem_name,
-                o.trendline::text as trendline,
-                o.trendline_min::text as trendline_min,
-                o.trendline_max::text as trendline_max
-            FROM vehicle v
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN oem o ON vm.oem_id = o.id
-            WHERE v.vin = :vin
-        ),
-        -- Points du véhicule actuel
-        current_vehicle_data AS (
-            SELECT DISTINCT ON (soh, odometer)
-                CASE
-                    WHEN :period = 'Month' THEN date_trunc('month', vd.timestamp)
-                    WHEN :period = 'Year' THEN date_trunc('quarter', vd.timestamp)
-                    ELSE date_trunc('week', vd.timestamp)
-                END as period_start,
-                ROUND(vd.soh::numeric, 3)*100 as soh,
-                ROUND(vd.odometer::numeric, 0) as odometer,
-                true as is_current_vehicle
-            FROM vehicle_data vd
-            JOIN vehicle_info vi ON vd.vehicle_id = vi.id
-            WHERE vd.soh IS NOT NULL AND vd.odometer IS NOT NULL
-            ORDER BY soh, odometer, period_start DESC
-        ),
-        -- Récupérer la plage de kilométrage pour le modèle
-        vehicle_range AS (
-            SELECT
-                0 as min_odometer,
-                GREATEST(
-                    60000,
-                    (SELECT MAX(odometer) * 2 FROM current_vehicle_data)
-                ) as max_odometer
-        ),
-        -- Points des autres véhicules du même OEM
-        oem_data AS (
-            SELECT DISTINCT ON (soh, odometer)
-                CASE
-                    WHEN :period = 'Month' THEN date_trunc('month', vd.timestamp)
-                    WHEN :period = 'Year' THEN date_trunc('quarter', vd.timestamp)
-                    ELSE date_trunc('week', vd.timestamp)
-                END as period_start,
-                ROUND(vd.soh::numeric, 3)*100 as soh,
-                ROUND(vd.odometer::numeric, 0) as odometer,
-                false as is_current_vehicle
-            FROM vehicle_data vd
-            JOIN vehicle v ON vd.vehicle_id = v.id
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN vehicle_info vi ON vm.oem_id = vi.oem_id
-            WHERE vd.soh IS NOT NULL
-            AND vd.odometer IS NOT NULL
-            AND v.id != vi.id
-            AND vd.odometer BETWEEN (SELECT min_odometer FROM vehicle_range) AND (SELECT max_odometer FROM vehicle_range)
-            ORDER BY soh, odometer, period_start DESC
-        ),
-        -- Combinaison des points
-        combined_points AS (
-            SELECT
-                soh as soh_vehicle,
-                period_start as timestamp,
-                odometer,
-                is_current_vehicle,
-                vi.start_date,
-                vi.trendline::text as trendline,
-                vi.trendline_min::text as trendline_min,
-                vi.trendline_max::text as trendline_max
-            FROM current_vehicle_data
-            CROSS JOIN vehicle_info vi
-            UNION ALL
-            SELECT
-                soh as soh_vehicle,
-                period_start as timestamp,
-                odometer,
-                is_current_vehicle,
-                vi.start_date,
-                vi.trendline::text as trendline,
-                vi.trendline_min::text as trendline_min,
-                vi.trendline_max::text as trendline_max
-            FROM oem_data
-            CROSS JOIN vehicle_info vi
+async def get_graph_data(vin: str, db: AsyncSession = None):
+    # Get trendlines
+    vehicle_info_query = (
+        select(
+            Oem.trendline,
+            Oem.trendline_min,
+            Oem.trendline_max,
         )
-        SELECT
-            cp.soh_vehicle,
-            cp.timestamp,
-            cp.odometer,
-            vi.oem_name,
-            cp.is_current_vehicle,
-            cp.start_date,
-            cp.trendline,
-            cp.trendline_min,
-            cp.trendline_max
-        FROM combined_points cp
-        CROSS JOIN vehicle_info vi
-        ORDER BY cp.timestamp DESC;
-    """)
-    result = await db.execute(query, {"vin": vin, "period": period})
-    data = list(reversed(result.mappings().all()))
+        .select_from(Vehicle)
+        .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
+        .join(Oem, VehicleModel.oem_id == Oem.id)
+        .where(Vehicle.vin == vin)
+    )
+    vehicle_info_result = await db.execute(vehicle_info_query)
+    vehicle_info = vehicle_info_result.mappings().first()
 
-    # Si aucune donnée n'est retournée, récupérer les informations de base du véhicule
-    if not data:
-        # Requête pour obtenir les informations de base du véhicule
-        vehicle_info_query = text("""
-            SELECT
-                v.start_date,
-                o.oem_name,
-                o.trendline_min,
-                o.trendline_max
-            FROM vehicle v
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN oem o ON vm.oem_id = o.id
-            WHERE v.vin = :vin
-        """)
-        vehicle_info_result = await db.execute(vehicle_info_query, {"vin": vin})
-        vehicle_info = vehicle_info_result.mappings().first()
+    if not vehicle_info:
+        raise HTTPException(
+            status_code=404, detail="Vehicle not found or no data available"
+        )
 
-        if not vehicle_info:
-            raise HTTPException(
-                status_code=404, detail="Vehicle not found or no data available"
-            )
+    # Get data points
+    soh_expr = (func.round(cast(VehicleData.soh, Numeric), 3) * 100).label("soh")
+    odometer_expr = func.round(cast(VehicleData.odometer, Numeric), 0).label("odometer")
 
-        # Créer un point initial avec les informations de base
-        initial_point = {
-            "soh_vehicle": 100,
-            "timestamp": vehicle_info["start_date"],
-            "odometer": 0,
-            "oem_name": vehicle_info["oem_name"],
-            "is_current_vehicle": False,
-        }
+    query = (
+        select(soh_expr, odometer_expr)
+        .select_from(Vehicle)
+        .join(VehicleData, Vehicle.id == VehicleData.vehicle_id)
+        .where(
+            Vehicle.vin == vin,
+            VehicleData.soh.isnot(None),
+            VehicleData.odometer.isnot(None),
+        )
+        .distinct()
+        .order_by(odometer_expr.asc())
+    )
+    result = await db.execute(query)
+    data = result.mappings().all()
 
-        return {
-            "initial_point": initial_point,
-            "data_points": [],
-            "trendline": [],
-            "trendline_min": vehicle_info["trendline_min"],
-            "trendline_max": vehicle_info["trendline_max"],
-        }
-
-    # Ajouter le point initial (0,100)
-    initial_point = {
-        "soh_vehicle": 100,
-        "timestamp": data[0]["start_date"],
-        "odometer": 0,
-        "oem_name": data[0]["oem_name"],
-        "is_current_vehicle": False,
-    }
-
-    return {
-        "initial_point": initial_point,
-        "data_points": data,
-        "trendline": data[0]["trendline"],
-        "trendline_min": data[0]["trendline_min"],
-        "trendline_max": data[0]["trendline_max"],
-    }
+    return DataGraphResponse(
+        initial_point=DataPoint(soh=100, odometer=0),
+        data_points=[
+            DataPoint(soh=row["soh"], odometer=row["odometer"]) for row in data
+        ]
+        if data
+        else [],
+        trendline=vehicle_info["trendline"]["trendline"]
+        if vehicle_info["trendline"]
+        else None,
+        trendline_min=vehicle_info["trendline_min"]["trendline"]
+        if vehicle_info["trendline_min"]
+        else None,
+        trendline_max=vehicle_info["trendline_max"]["trendline"]
+        if vehicle_info["trendline_max"]
+        else None,
+    )
 
 
 async def get_infos(vin: str, db: AsyncSession):
@@ -874,7 +762,7 @@ async def get_kpis_additional(vin: str, db: AsyncSession):
     # Getting global average of average consumption for each row
     consumption_average = None
     data = [row for row in raw_data if row["consumption"] is not None]
-    if len(data) > 0:
+    if len(data) > 1:
         sorted_data = sorted(data, key=lambda x: x["odometer"])
         consumption_average = 0
         total_distance = 0
@@ -885,6 +773,8 @@ async def get_kpis_additional(vin: str, db: AsyncSession):
             consumption_average += distance * row["consumption"]
             odometer_previous = row["odometer"]
         consumption_average = consumption_average / total_distance
+    elif len(data) == 1:
+        consumption_average = data[0]["consumption"]
 
     return {"consumption": consumption_average, "cycles": max_cycles}
 

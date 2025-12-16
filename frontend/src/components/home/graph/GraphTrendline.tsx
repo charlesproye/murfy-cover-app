@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import useGetTrendlineBrands from '@/hooks/dashboard/home/useGetTrendlineBrands';
 import { FilterBrands } from '../FilterBrands';
 import LoadingSmall from '@/components/common/loading/loadingSmall';
@@ -9,15 +9,19 @@ export const GraphTrendline: React.FC<GraphTrendlineProps> = ({ fleet }) => {
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const { data, isLoading } = useGetTrendlineBrands(fleet, selectedBrand);
 
-  const trendlineEquations = data?.brands.map((brand) => ({
-    brand: brand,
-    trendline: brand.trendline,
-    trendline_max: brand.trendline_max,
-    trendline_min: brand.trendline_min,
-  }));
+  const trendlineEquations = useMemo(
+    () =>
+      data?.brands.map((brand) => ({
+        brand: brand,
+        trendline: brand.trendline,
+        trendline_max: brand.trendline_max,
+        trendline_min: brand.trendline_min,
+      })) ?? [],
+    [data],
+  );
 
   useEffect(() => {
-    if (data && data.brands.length > 0) {
+    if (data && data.brands.length > 0 && !selectedBrand) {
       setSelectedBrand(data.brands[0].oem_id ?? '');
     }
   }, [data]);

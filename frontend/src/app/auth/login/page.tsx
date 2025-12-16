@@ -3,6 +3,7 @@
 import LoginForm from '@/components/auth/LoginForm';
 import Image from 'next/image';
 import React from 'react';
+
 const Login = (): React.ReactElement => {
   return (
     <div className="flex flex-col md:flex-row w-screen h-screen">
@@ -50,7 +51,7 @@ const Login = (): React.ReactElement => {
       </div>
       <div className="hidden md:block p-3 w-full md:w-1/2 relative">
         <Image
-          src="/auth/background-1.jpeg"
+          src="/auth/background-landing.jpeg"
           alt="bib presentation"
           width={400}
           height={400}

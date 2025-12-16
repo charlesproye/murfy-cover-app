@@ -4,6 +4,7 @@ import { InfoVehicleResult } from '@/interfaces/dashboard/passport/infoVehicle';
 import { Score } from '@/interfaces/dashboard/passport/ScoreCard/ScoreCardProps';
 import Image from 'next/image';
 import { IconBatteryCharging } from '@tabler/icons-react';
+import { DEFAULT_CAR_IMAGE } from '@/lib/utils';
 
 interface VehicleHeaderProps {
   brand: string;
@@ -28,20 +29,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicleBatteryInfo,
   score,
 }) => {
-  const getImageSrc = (): string => {
-    if (image) return image;
-
-    // Fallback basé sur la marque
-    const brandLower = brand?.toLowerCase() || '';
-    if (brandLower.includes('pirsche') || brandLower.includes('porsche')) {
-      return '/mercedes.jpg'; // À remplacer par image Porsche
-    } else if (brandLower.includes('mercedes')) {
-      return '/mercedes.jpg';
-    }
-
-    return '/kia.png'; // Image par défaut
-  };
-
   return (
     <div className="flex flex-col md:flex-row bg-white rounded-t-lg shadow-xs overflow-hidden mb-6 w-full">
       <div className="flex-1 p-4 md:p-6 bg-linear-to-b from-green-rapport-extra-light/15 via-green-rapport/5 to-green-rapport/0">
@@ -49,14 +36,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           <div className="w-1/5 flex items-center h-full justify-center">
             <div className="bg-white p-2 rounded-lg border border-gray/20 shadow-xs w-[140px] h-[80px] flex items-center justify-center overflow-hidden">
               <Image
-                src={getImageSrc()}
+                src={image || DEFAULT_CAR_IMAGE}
                 alt={`${brand} ${model}`}
                 width={140}
                 height={80}
                 className="object-contain w-full h-full"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = '/kia.png';
+                  target.src = DEFAULT_CAR_IMAGE;
                 }}
               />
             </div>

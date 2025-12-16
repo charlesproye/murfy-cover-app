@@ -18,10 +18,8 @@ class PassportCrud:
     async def get_kpis(self, vin: str, db: AsyncSession | None = None):
         return await get_kpis(vin, db)
 
-    async def get_graph_data(
-        self, vin: str, period: str, db: AsyncSession | None = None
-    ):
-        return await get_graph_data(vin, period, db)
+    async def get_graph_data(self, vin: str, db: AsyncSession | None = None):
+        return await get_graph_data(vin, db)
 
     async def get_infos(self, vin: str, db: AsyncSession | None = None):
         return await get_infos(vin, db)

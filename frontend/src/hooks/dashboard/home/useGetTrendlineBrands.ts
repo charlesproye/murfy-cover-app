@@ -7,11 +7,11 @@ import fetchWithAuth from '@/services/fetchWithAuth';
 import useSWR from 'swr';
 
 const useGetTrendlineBrands = (
-  fleet: string | null,
+  fleet: string,
   selectedBrand: string,
 ): ResponseTrendline => {
   const { data, isLoading, error } = useSWR(
-    `${ROUTES.TRENDLINE_BRANDS}?fleet_id=${fleet ?? ''}&brand=${selectedBrand}`,
+    `${ROUTES.TRENDLINE_BRANDS}?fleet_id=${fleet}&brand=${selectedBrand}`,
     fetchWithAuth<DashboardDataTrendline>,
     {
       revalidateOnFocus: false,

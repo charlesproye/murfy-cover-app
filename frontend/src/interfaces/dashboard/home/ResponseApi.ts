@@ -48,5 +48,5 @@ export type ResponseTrendline = {
 };
 
 export type GraphTrendlineProps = {
-  fleet: string | null;
+  fleet: string;
 };

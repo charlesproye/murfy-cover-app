@@ -1,15 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
-import {
-  IconLayoutDashboard,
-  IconHelp,
-  IconSettings,
-  IconWorld,
-  IconWallet,
-  IconCar,
-} from '@tabler/icons-react';
+import { IconLayoutDashboard, IconWorld, IconWallet, IconCar } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
@@ -17,11 +10,9 @@ import SearchBar from '../common/search';
 import Logout from '../auth/Logout';
 import { useAuth } from '@/contexts/AuthContext';
 import ChangeFleet from '../fleet/ChangeFleet';
-import useGetInfoVehicle from '@/hooks/dashboard/passport/useGetInfoVehicle';
-import LastUpdate from '../common/LastUpdate';
-import { ROUTES } from '@/routes';
-import useSWR from 'swr';
-import fetchWithAuth from '@/services/fetchWithAuth';
+import LastUpdate from '../common/last-update/LastUpdate';
+import LastUpdatePassport from '../common/last-update/LastUpdatePassport';
+import Help from '../common/Help';
 
 export default function DashboardLayout({
   children,
@@ -33,18 +24,19 @@ export default function DashboardLayout({
   const vin = real_pathname.includes('/passport/')
     ? real_pathname.split('/').pop()
     : undefined;
-
-  const { data } = useGetInfoVehicle(vin);
-  const { data: last_timestamp_with_data, isLoading: isLoadingLastTimestampWithData } =
-    useSWR(
-      `${ROUTES.GET_LAST_TIMESTAMP_WITH_DATA}?fleet_id=${fleet?.id}`,
-      fetchWithAuth<string>,
-    );
+  const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
   const isActive = (pathname: string): boolean =>
     pathname === ''
       ? real_pathname === '/dashboard'
       : real_pathname === `/dashboard/${pathname}`;
+
+  // Scroll to top of the scrollable container when navigating to /dashboard/global
+  useEffect(() => {
+    if (scrollableContainerRef.current) {
+      scrollableContainerRef.current.scrollTop = 0;
+    }
+  }, [real_pathname]);
 
   return (
     <div className="flex flex-row min-h-[calc(100dvh)] h-[calc(100dvh)] overflow-hidden">
@@ -218,41 +210,29 @@ export default function DashboardLayout({
           </div>
           <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-4 border-cool-gray-200 mb-3" />
           {!isActive('global') && <ChangeFleet />}
-          <div className="flex mt-auto mb-4 ml-2 gap-2 items-center cursor-pointer">
+          <div className="flex flex-col mt-auto mb-4 ml-2 gap-6">
+            <Help />
             <Logout />
           </div>
         </div>
       </div>
-      <div className="flex flex-col grow min-h-[calc(100dvh)] h-full overflow-auto overflow-x-hidden border-l border-gray-background">
+      <div
+        ref={scrollableContainerRef}
+        className="flex flex-col grow min-h-[calc(100dvh)] h-full overflow-auto overflow-x-hidden border-l border-gray-background scroll-smooth"
+      >
         <div className="bg-white flex h-14 sm:h-[70px] px-8">
           <div className="flex w-full items-center min-h-[70px]">
             <div className="flex-1">
               <SearchBar />
             </div>
             <div className="hidden lg:flex flex-1 justify-center">
-              {real_pathname.includes('/passport/') && data?.last_data_date ? (
-                <LastUpdate
-                  lastDate={data.last_data_date}
-                  activationStatus={data.activation_status}
-                />
+              {real_pathname.includes('/passport/') ? (
+                <LastUpdatePassport vin={vin} />
               ) : (
-                !isLoadingLastTimestampWithData && (
-                  <LastUpdate
-                    lastDate={last_timestamp_with_data}
-                    activationStatus={Boolean(last_timestamp_with_data)}
-                  />
-                )
+                <LastUpdate fleetId={fleet?.id} />
               )}
             </div>
             <div className="flex-1 flex justify-end gap-2 items-center">
-              <a
-                target="_blank"
-                className="cursor-pointer"
-                href="mailto:theophile@bib-batteries.fr"
-              >
-                <IconHelp size={20} stroke={1.7} color="gray" />
-              </a>
-              <IconSettings size={20} stroke={1.7} color="gray" />
               <div className="flex ml-3 gap-2">
                 <Image
                   alt="logo-battery-green"

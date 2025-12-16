@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo } from 'react';
+import React from 'react';
 import { IconSearch, IconX } from '@tabler/icons-react';
 import useGetSearchVehicle from '@/interfaces/common/useGetSearchVehicle';
 import Link from 'next/link';
@@ -69,4 +69,4 @@ const SearchBar: React.FC = (): React.ReactElement => {
   );
 };
 
-export default memo(SearchBar);
+export default SearchBar;

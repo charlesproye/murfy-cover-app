@@ -368,14 +368,14 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
         )
 
     # Calculate 1 month and 2 months ago using timedelta
-    # This is approximate but works well for most use cases
     one_month_since_last_data = latest_timestamp - timedelta(days=30)
     two_months_since_last_data = latest_timestamp - timedelta(days=60)
 
     # Getting fleet data in a one-month window from the last data
+    # Not used for fleet size cause we want the full number
     subquery = (
         select(
-            VehicleData.vehicle_id,
+            Vehicle.id,
             VehicleData.timestamp,
             VehicleData.odometer,
             func.round(VehicleData.soh * 100, 1).label("soh"),
@@ -386,15 +386,20 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
             Vehicle.fleet_id == fleet_id,
             VehicleData.timestamp > one_month_since_last_data,
         )
-        .order_by(VehicleData.vehicle_id, VehicleData.timestamp.desc())
-        .distinct(VehicleData.vehicle_id)
+        .order_by(Vehicle.id, VehicleData.timestamp.desc())
+        .distinct(Vehicle.id)
         .subquery()
     )
 
     query = select(
         func.round(func.avg(subquery.c.odometer)).label("avg_odometer"),
         func.round(func.avg(subquery.c.soh), 1).label("avg_soh"),
-        func.count(distinct(subquery.c.vehicle_id)).label("vehicle_count"),
+        select(func.count(distinct(Vehicle.id)))
+        .where(
+            Vehicle.fleet_id == fleet_id,
+        )
+        .scalar_subquery()
+        .label("vehicle_count"),
         func.count(case((subquery.c.is_pinned, 1))).label("pinned_count"),
     )
     result = await db.execute(
@@ -406,8 +411,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
     # Getting fleet data in a one-month window from the last data, the month before the one just above
     prev_data_row = (
         select(
-            VehicleData.id,
-            VehicleData.vehicle_id,
+            Vehicle.id,
             VehicleData.timestamp,
             VehicleData.odometer,
             func.round(VehicleData.soh * 100, 1).label("soh"),
@@ -419,15 +423,23 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
             VehicleData.timestamp < one_month_since_last_data,
             VehicleData.timestamp > two_months_since_last_data,
         )
-        .order_by(VehicleData.vehicle_id, VehicleData.timestamp.desc())
-        .distinct(VehicleData.vehicle_id)
+        .order_by(Vehicle.id, VehicleData.timestamp.desc())
+        .distinct(Vehicle.id)
         .subquery()
     )
 
     query = select(
         func.round(func.avg(prev_data_row.c.odometer)).label("avg_odometer"),
         func.round(func.avg(prev_data_row.c.soh), 1).label("avg_soh"),
-        func.count(distinct(prev_data_row.c.vehicle_id)).label("vehicle_count"),
+        select(func.count(distinct(Vehicle.id)))
+        .select_from(VehicleData)
+        .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
+        .where(
+            Vehicle.fleet_id == fleet_id,
+            VehicleData.timestamp < one_month_since_last_data,
+        )
+        .scalar_subquery()
+        .label("vehicle_count"),
         func.count(case((prev_data_row.c.is_pinned, 1))).label("pinned_count"),
     )
     result_previous = await db.execute(
@@ -651,7 +663,7 @@ def query_region_table():
     query = text("""
         WITH latest_vehicle_data AS (
             SELECT DISTINCT ON (vd.vehicle_id)
-                vd.vehicle_id,
+                v.id as vehicle_id,
                 vd.odometer,
                 ROUND((vd.soh * 100), 1) as soh,
                 v.region_id,
@@ -679,7 +691,7 @@ def query_brand_table():
     query = text("""
         WITH latest_vehicle_data AS (
             SELECT DISTINCT ON (vd.vehicle_id)
-                vd.vehicle_id,
+                v.id as vehicle_id,
                 vd.odometer,
                 ROUND((vd.soh * 100), 1) as soh,
                 vm.oem_id,
@@ -708,7 +720,7 @@ def query_all_table():
     query = text("""
         WITH latest_vehicle_data AS (
             SELECT DISTINCT ON (vd.vehicle_id)
-                vd.vehicle_id,
+                v.id as vehicle_id,
                 vd.odometer,
                 ROUND((vd.soh * 100), 1) as soh,
                 vm.oem_id,
@@ -1092,8 +1104,7 @@ async def get_extremum_soh(
                 odometer,
                 oem_name,
                 years_remaining,
-                score,
-                soh_comparison
+                score
             FROM scored_vehicles
             {sorting_clause}
             {limit_clause}

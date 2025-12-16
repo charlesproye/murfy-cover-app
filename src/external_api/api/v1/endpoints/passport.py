@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, Path, Query
+from fastapi import APIRouter, Body, Depends, Path
 
 from external_api.core.cookie_auth import (
     get_current_user_from_cookie,
@@ -15,7 +15,7 @@ router = APIRouter()
 async def kpis(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().get_kpis(vin, db)
     return response
@@ -25,10 +25,9 @@ async def kpis(
 async def graph(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    period: str = Query(..., description="The period"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
-    response = await PassportCrud().get_graph_data(vin, period, db)
+    response = await PassportCrud().get_graph_data(vin, db)
     return response
 
 
@@ -36,7 +35,7 @@ async def graph(
 async def infos(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().get_infos(vin, db)
     return response
@@ -46,7 +45,7 @@ async def infos(
 async def estimated_range(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().get_estimated_range(vin, db)
     return response
@@ -56,7 +55,7 @@ async def estimated_range(
 async def kpis_additional(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().get_kpis_additional(vin, db)
     return response
@@ -66,7 +65,7 @@ async def kpis_additional(
 async def download_rapport(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().get_download_rapport(vin, db)
     return response
@@ -76,7 +75,7 @@ async def download_rapport(
 async def charging_cycles(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().get_charging_cycles(vin, db)
     return response
@@ -87,7 +86,7 @@ async def pin_vehicle(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
     is_pinned: bool = Body(..., description="The is_pinned"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().pin_vehicle(vin, is_pinned, db)
     return response
@@ -97,7 +96,7 @@ async def pin_vehicle(
 async def get_pinned_vehicle(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().get_pinned_vehicle(vin, db)
     return response
@@ -107,7 +106,7 @@ async def get_pinned_vehicle(
 async def get_price(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
 ):
     response = await PassportCrud().get_price_forecast(vin, db)
     return response

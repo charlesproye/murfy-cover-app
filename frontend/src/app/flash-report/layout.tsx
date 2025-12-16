@@ -53,7 +53,7 @@ const FlashReportLayout = ({
       </div>
       <div className="hidden md:block p-3 w-full md:w-2/5 relative">
         <Image
-          src="/auth/background-1.jpeg"
+          src="/auth/background-landing.jpeg"
           alt="bib presentation"
           width={400}
           height={400}

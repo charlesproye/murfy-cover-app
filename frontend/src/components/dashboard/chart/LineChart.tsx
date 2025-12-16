@@ -35,40 +35,10 @@ ChartJS.register(
 
 const PREDICTION_DISTANCE = 30000;
 
-const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
-  formatDate,
-  vin,
-}) => {
-  const { data, isLoading }: DataGraphRequestSwr = useGetDataGraph(vin, formatDate);
+const LineChart: React.FC<{ vin: string | undefined }> = ({ vin }) => {
+  const { data, isLoading }: DataGraphRequestSwr = useGetDataGraph(vin);
 
-  const currentVehiclePoints = useMemo(() => {
-    if (!data?.data_points) return [];
-    const points = data.data_points.filter((point) => point.is_current_vehicle);
-    return points;
-  }, [data]);
-
-  const firstCurrentPoint = useMemo(() => {
-    return currentVehiclePoints[0];
-  }, [currentVehiclePoints]);
-
-  const lastCurrentPoint = useMemo(() => {
-    return currentVehiclePoints[currentVehiclePoints.length - 1];
-  }, [currentVehiclePoints]);
-
-  const cleanedPoints = useMemo(() => {
-    if (!data?.data_points) return [];
-
-    return data.data_points.map((point) => ({
-      x: point.odometer,
-      y: point.soh_vehicle,
-    }));
-  }, [data?.data_points]);
-
-  useMemo(() => {
-    if (cleanedPoints.length < 10) return null;
-  }, [cleanedPoints]);
-
-  // Extraction des coefficients pour les trendlines
+  // Extract coefficients for trendlines
   const coefficientsMin = data?.trendline_min
     ? parseTrendlineEquation(data.trendline_min)
     : undefined;
@@ -79,38 +49,39 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
     ? parseTrendlineEquation(data.trendline)
     : undefined;
 
-  // Points de la courbe initiale (utilise la trendline moyenne avec offset)
+  // Initial curve points (use average trendline with offset)
   const initialCurvePoints = useMemo(() => {
-    if (!firstCurrentPoint || !coefficientsAvg) return [];
+    if (!data?.data_points?.length || !coefficientsAvg) return [];
     const points = [];
     const steps = 20;
     const trendValueAtFirstPoint = calculateTrendlineY(
-      firstCurrentPoint.odometer,
+      data.data_points[0].odometer,
       coefficientsAvg,
     );
-    const offset = firstCurrentPoint.soh_vehicle - trendValueAtFirstPoint;
+    const offset = data.data_points[0].soh - trendValueAtFirstPoint;
     for (let i = 0; i <= steps; i++) {
-      const x = (i / steps) * firstCurrentPoint.odometer;
+      const x = (i / steps) * data.data_points[0].odometer;
       const y = calculateTrendlineY(x, coefficientsAvg) + offset;
       points.push({ x, y });
     }
     points[points.length - 1] = {
-      x: firstCurrentPoint.odometer,
-      y: firstCurrentPoint.soh_vehicle,
+      x: data.data_points[0].odometer,
+      y: data.data_points[0].soh,
     };
     return points;
-  }, [firstCurrentPoint, coefficientsAvg]);
+  }, [data, coefficientsAvg]);
 
-  // Points de la prédiction du véhicule actuel (utilise la trendline moyenne avec offset)
+  // Current vehicle prediction points (use average trendline with offset)
   const currentVehiclePredictionPoints = useMemo(() => {
-    if (!lastCurrentPoint || !coefficientsAvg) return [];
+    if (!data?.data_points?.length || !coefficientsAvg) return [];
+    const lastDataPoint = data.data_points[data.data_points.length - 1];
     const points = [];
-    const startOdometer = lastCurrentPoint.odometer;
+    const startOdometer = lastDataPoint.odometer;
     const endOdometer = startOdometer + PREDICTION_DISTANCE;
     const step = PREDICTION_DISTANCE / 20;
-    points.push({ x: startOdometer, y: lastCurrentPoint.soh_vehicle });
+    points.push({ x: startOdometer, y: lastDataPoint.soh });
     const trendValueAtLastPoint = calculateTrendlineY(startOdometer, coefficientsAvg);
-    const offset = lastCurrentPoint.soh_vehicle - trendValueAtLastPoint;
+    const offset = lastDataPoint.soh - trendValueAtLastPoint;
     for (let x = startOdometer + step; x <= endOdometer; x += step) {
       points.push({
         x,
@@ -118,44 +89,47 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
       });
     }
     return points;
-  }, [lastCurrentPoint, coefficientsAvg]);
+  }, [data, coefficientsAvg]);
 
-  // Courbes de tendance min, max, moyenne (pour la flotte ou la marque)
+  // Trendline min, max, average curves (for fleet or brand)
   const completeTrendlineMinPoints = useMemo(() => {
-    if (!data?.data_points?.length || !lastCurrentPoint || !coefficientsMin) return [];
-    const maxOdometer = lastCurrentPoint.odometer + PREDICTION_DISTANCE;
+    if (!data?.data_points?.length || !coefficientsMin) return [];
+    const maxOdometer =
+      data.data_points[data.data_points.length - 1].odometer + PREDICTION_DISTANCE;
     return getTrendlinePoints(0, maxOdometer, coefficientsMin);
-  }, [data?.data_points, lastCurrentPoint, coefficientsMin]);
+  }, [data, coefficientsMin]);
 
   const completeTrendlineMaxPoints = useMemo(() => {
-    if (!data?.data_points?.length || !lastCurrentPoint || !coefficientsMax) return [];
-    const maxOdometer = lastCurrentPoint.odometer + PREDICTION_DISTANCE;
+    if (!data?.data_points?.length || !coefficientsMax) return [];
+    const maxOdometer =
+      data.data_points[data.data_points.length - 1].odometer + PREDICTION_DISTANCE;
     return getTrendlinePoints(0, maxOdometer, coefficientsMax);
-  }, [data?.data_points, lastCurrentPoint, coefficientsMax]);
+  }, [data, coefficientsMax]);
 
   const completeTrendlineAvgPoints = useMemo(() => {
-    if (!data?.data_points?.length || !lastCurrentPoint || !coefficientsAvg) return [];
-    const maxOdometer = lastCurrentPoint.odometer + PREDICTION_DISTANCE;
+    if (!data?.data_points?.length || !coefficientsAvg) return [];
+    const maxOdometer =
+      data.data_points[data.data_points.length - 1].odometer + PREDICTION_DISTANCE;
     return getTrendlinePoints(0, maxOdometer, coefficientsAvg);
-  }, [data?.data_points, lastCurrentPoint, coefficientsAvg]);
+  }, [data, coefficientsAvg]);
 
   const chartData = useMemo(
     () => ({
       datasets: [
-        // Tendance complète max (historique + prédiction)
+        // Complete max trendline (history + prediction)
         {
-          label: 'Tendance Max',
+          label: 'Trendline Max',
           data: completeTrendlineMaxPoints,
-          borderColor: 'rgba(220, 0, 0, 0.8)',
+          borderColor: 'rgba(0, 180, 0, 0.8)',
           borderWidth: 2.5,
           borderDash: [5, 5],
           tension: 0.2,
           fill: false,
           pointRadius: 0,
         },
-        // Tendance moyenne (historique + prédiction)
+        // Average trendline (history + prediction)
         {
-          label: 'Tendance Moyenne',
+          label: 'Trendline Avg',
           data: completeTrendlineAvgPoints,
           borderColor: 'rgba(110, 110, 110, 0.5)',
           borderWidth: 2.5,
@@ -164,23 +138,23 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
           fill: false,
           pointRadius: 0,
         },
-        // Tendance complète min (historique + prédiction)
+        // Complete min trendline (history + prediction)
         {
-          label: 'Tendance Min',
+          label: 'Trendline Min',
           data: completeTrendlineMinPoints,
-          borderColor: 'rgba(0, 180, 0, 0.8)',
+          borderColor: 'rgba(220, 0, 0, 0.8)',
           borderWidth: 2.5,
           borderDash: [5, 5],
           tension: 0.2,
           fill: false,
           pointRadius: 0,
         },
-        // Points actuels du véhicule avec courbe initiale
+        // Current vehicle points with initial curve
         {
-          label: 'Véhicule Actuel',
+          label: 'Current Vehicle',
           data: [
             ...initialCurvePoints,
-            ...currentVehiclePoints
+            ...(data?.data_points?.length ? data.data_points : [])
               .filter((_, index, array) => {
                 if (array.length <= 40) return true;
                 const step = Math.floor(array.length / 40);
@@ -188,7 +162,7 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
               })
               .map((point) => ({
                 x: point.odometer,
-                y: point.soh_vehicle,
+                y: point.soh,
               })),
           ],
           borderColor: '#2d67f6',
@@ -209,9 +183,8 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
           },
           borderWidth: 2,
         },
-        // Prédiction du véhicule actuel
         {
-          label: 'Prédiction Véhicule',
+          label: 'Current Vehicle Prediction',
           data: currentVehiclePredictionPoints,
           borderColor: '#2d67f6',
           borderWidth: 2,
@@ -223,7 +196,7 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
       ],
     }),
     [
-      currentVehiclePoints,
+      data,
       initialCurvePoints,
       completeTrendlineMinPoints,
       completeTrendlineMaxPoints,
@@ -233,30 +206,30 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
   );
 
   const chartScales = useMemo(() => {
-    // Collecter toutes les valeurs de SoH pour déterminer les limites de l'axe Y
+    // Collect all SoH values to determine the Y axis limits
     const allValues = [
-      // Points du véhicule actuel
-      ...currentVehiclePoints.map((p) => p.soh_vehicle),
-      // Points de la courbe initiale
+      // Current vehicle points
+      ...(data?.data_points?.length ? data.data_points.map((p) => p.soh) : []),
+      // Initial curve points
       ...(initialCurvePoints?.map((p) => p.y) || []),
-      // Points de prédiction
+      // Prediction points
       ...(currentVehiclePredictionPoints?.map((p) => p.y) || []),
-      // Points des tendances
+      // Trendline points
       ...(completeTrendlineMinPoints?.map((p) => p.y) || []),
       ...(completeTrendlineMaxPoints?.map((p) => p.y) || []),
       ...(completeTrendlineAvgPoints?.map((p) => p.y) || []),
     ];
 
-    // Valeur maximale avec une marge de 5% au-dessus
+    // Maximum value with a 5% margin above
     const maxValue = Math.ceil(Math.max(...allValues)) + 5;
-    // Valeur minimale pour assurer une bonne visualisation (avec marge)
+    // Minimum value to ensure good visualization (with margin)
     const minValue = Math.floor(Math.min(...allValues) - 5);
     const range = maxValue - minValue;
-    const stepSize = Math.ceil(range / 5); // 5 graduations pour plus de précision
+    const stepSize = Math.ceil(range / 5); // 5 graduations for more precision
 
-    // Odomètre maximum pour l'axe X
-    const maxOdometer = lastCurrentPoint
-      ? lastCurrentPoint.odometer + PREDICTION_DISTANCE
+    // Maximum odometer for the X axis
+    const maxOdometer = data?.data_points?.length
+      ? data.data_points[data.data_points.length - 1].odometer + PREDICTION_DISTANCE
       : PREDICTION_DISTANCE;
 
     return {
@@ -273,7 +246,7 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
         grid: { display: false },
         border: { display: false },
         max: maxOdometer,
-        min: 0, // S'assurer que l'axe X commence à 0 km
+        min: 0, // Ensure the X axis starts at 0 km
       },
       y: {
         beginAtZero: false,
@@ -293,8 +266,7 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
       },
     };
   }, [
-    currentVehiclePoints,
-    lastCurrentPoint,
+    data,
     currentVehiclePredictionPoints,
     completeTrendlineMinPoints,
     completeTrendlineMaxPoints,
@@ -306,8 +278,12 @@ const LineChart: React.FC<{ formatDate: string; vin: string | undefined }> = ({
     return <LoadingSmall />;
   }
 
-  if (!data || !data.data_points || data.data_points.length === 0) {
-    return <p>No data available</p>;
+  if (!data || !data.data_points?.length) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className="text-gray-blue italic">No data available</p>
+      </div>
+    );
   }
 
   const options = {

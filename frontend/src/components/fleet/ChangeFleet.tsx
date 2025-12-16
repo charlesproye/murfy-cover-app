@@ -8,9 +8,11 @@ import {
 import useAuth from '@/contexts/AuthContext';
 import { IconTransfer } from '@tabler/icons-react';
 import { ReactElement } from 'react';
+import { useRouter } from 'next/navigation';
 
 const ChangeFleet = (): ReactElement => {
   const { isAuthenticated, setFleet, user, fleet } = useAuth();
+  const router = useRouter();
 
   const handleChange = (fleetId: string): void => {
     if (!isAuthenticated) return;
@@ -19,6 +21,7 @@ const ChangeFleet = (): ReactElement => {
     if (!selectedFleet) return;
 
     setFleet(selectedFleet);
+    router.push('/dashboard');
   };
 
   return (

@@ -36,7 +36,6 @@ async def login_with_cookies(
     }
 
 
-# TODO: Used by external users? Else remove
 async def get_user_by_id(db: AsyncSession, user_id: UUID4) -> GlobalUser | None:
     """
     Get a user by their ID.
@@ -76,4 +75,3 @@ async def get_user_by_id(db: AsyncSession, user_id: UUID4) -> GlobalUser | None:
         }
 
         return User(**user_dict)
-

@@ -12,7 +12,7 @@ import { formatNumber } from '@/utils/formatNumber';
 type ActiveFilter = keyof TableBrandsResult;
 
 const TableBrands: React.FC<{ fleet: string | null }> = ({ fleet }) => {
-  const [selected, setSelected] = useState<'Make' | 'Region' | 'Both'>('Make');
+  const [selected, setSelected] = useState<'Make' | 'Region'>('Make');
   const { data, isLoading } = useGetTableBrands(fleet, selected);
   const { activeFilter, sortOrder, handleChangeFilter } =
     useSortableFilter<ActiveFilter>();
@@ -21,12 +21,12 @@ const TableBrands: React.FC<{ fleet: string | null }> = ({ fleet }) => {
     {
       label: 'Make',
       filter: 'oem_name',
-      show: selected === 'Make' || selected == 'Both',
+      show: selected === 'Make',
     },
     {
       label: 'Region',
       filter: 'region_name',
-      show: selected === 'Region' || selected == 'Both',
+      show: selected === 'Region',
     },
     { label: 'Avg Soh (%)', filter: 'avg_soh', show: true },
     { label: 'Avg Mileage (km)', filter: 'avg_odometer', show: true },
@@ -49,11 +49,11 @@ const TableBrands: React.FC<{ fleet: string | null }> = ({ fleet }) => {
           <DisplayFilterButtons
             selected={selected}
             setSelected={setSelected}
-            filters={['Make', 'Region', 'Both']}
+            filters={['Make', 'Region']}
           />
         </div>
       </div>
-      <table className=" mt-4 min-w-full mobile:min-w-auto  bg-white text-[14px] leading-4 border-spacing-y-14">
+      <table className="mt-4 w-full bg-white text-[14px] leading-4 border-spacing-y-14">
         <thead>
           <tr className="text-gray-light whitespace-nowrap">
             {headers.map(

@@ -34,7 +34,7 @@ export const usePostPinVehicle = (
 };
 
 export const useGetPinVehicle = (vin: string | undefined): PinVehicleResponse => {
-  const { data, isLoading, error } = useSWR(
+  const { data, isLoading, error, mutate } = useSWR(
     `${ROUTES.GET_PINNED_VEHICLE}/${vin}`,
     fetchWithAuth<
       | {
@@ -46,5 +46,5 @@ export const useGetPinVehicle = (vin: string | undefined): PinVehicleResponse =>
       revalidateOnFocus: false,
     },
   );
-  return { data, isLoading, error };
+  return { data, isLoading, error, mutate };
 };

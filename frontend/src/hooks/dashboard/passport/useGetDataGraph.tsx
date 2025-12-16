@@ -6,12 +6,9 @@ import {
 import fetchWithAuth from '@/services/fetchWithAuth';
 import useSWR from 'swr';
 
-const useGetDataGraph = (
-  vin: string | undefined,
-  period: string,
-): DataGraphRequestSwr => {
+const useGetDataGraph = (vin: string | undefined): DataGraphRequestSwr => {
   const { data, isLoading, error } = useSWR(
-    `${ROUTES.GRAPHS}/${vin}?period=${period}`,
+    `${ROUTES.GRAPHS}/${vin}`,
     fetchWithAuth<DataGraphResponse>,
     {
       revalidateOnFocus: false,

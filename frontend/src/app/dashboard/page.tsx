@@ -11,6 +11,7 @@ import TableExtremum from '@/components/home/table/TableExtremum';
 import TablesFleet from '@/components/home/table/TableFleet';
 import GraphSoH from '@/components/home/graph/GraphSoH';
 import GraphQuantity from '@/components/home/graph/GraphQuantity';
+import LoadingSmall from '@/components/common/loading/loadingSmall';
 
 const MemoizedDataCardsHome = memo(DataCardsHome);
 
@@ -26,6 +27,7 @@ const DashboardPage = (): React.ReactElement => {
   useEffect(() => {
     toast.dismiss();
   }, []);
+
   return (
     <div className="flex flex-col h-full w-full space-y-8 py-4">
       <div className="flex flex-wrap justify-center gap-4 md:justify-center">
@@ -47,11 +49,11 @@ const DashboardPage = (): React.ReactElement => {
           <GraphQuantity fleet={fleet?.id ?? null} />
         </div>
       </div>
-      <div className="w-full bg-white rounded-lg ">
+      <div className="w-full bg-white rounded-lg">
         <TableBrands fleet={fleet?.id ?? null} />
       </div>
       <div className="w-full bg-white rounded-lg p-6">
-        <GraphTrendline fleet={fleet?.id ?? null} />
+        {fleet && fleet.id ? <GraphTrendline fleet={fleet.id} /> : <LoadingSmall />}
       </div>
       <div className="w-full bg-white rounded-lg p-6 py-4 relative">
         <TableExtremum fleet={fleet?.id ?? null} />
