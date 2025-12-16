@@ -313,6 +313,7 @@ def mapping_vehicle_type(
         subset = db_df[db_df["make_name"] == make_name].copy()
     # Find the best match
     # Returns the closest model, score_cutoff set to 0.1 for now to ensure we almost always get a result
+
     match_model = process.extractOne(
         model_name, subset["model_name"], scorer=fuzz.token_sort_ratio, score_cutoff=0.1
     )
@@ -320,6 +321,7 @@ def mapping_vehicle_type(
         match_model_name, _, _ = match_model
         # filter on model name
         subset = subset[subset["model_name"] == match_model_name]
+
         # find the battery with the closest capacity
         try:
             if battery_capacity:
@@ -340,20 +342,22 @@ def mapping_vehicle_type(
                 closest_rows = subset
             else:
                 closest_rows = subset
-            # match on type
-            match_type = process.extractOne(
-                type_car, closest_rows["type"], scorer=fuzz.token_sort_ratio
-            )
-            if match_type:
+
+            if type_car:
+                # match on type
+                match_type = process.extractOne(
+                    type_car, closest_rows["type"], scorer=fuzz.token_sort_ratio
+                )
+                if not match_type:
+                    return closest_rows.iloc[0]["id"]
                 _, _, index = match_type
                 return closest_rows.loc[index]["id"]
+            else:
+                return closest_rows.iloc[0]["id"]
 
         # fallback: find the closest type without battery
         except (ValueError, KeyError, TypeError, AttributeError, IndexError):
             match_type = process.extractOne(
                 type_car, subset["type"], scorer=fuzz.token_sort_ratio
             )
-            _, _, index = match_type
-            return subset.loc[index, "id"]
-
     return None

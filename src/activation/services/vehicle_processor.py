@@ -587,6 +587,7 @@ class VehicleProcessor:
                 & (self.df["oem"] != "")
                 & (self.df["real_activation"])
             ]
+
             print("---------------------------------------", other_df.oem.unique())
             with get_connection() as con:
                 cursor = con.cursor()
@@ -614,7 +615,7 @@ class VehicleProcessor:
                         fleet_id = await self._get_fleet_id(
                             cursor, con, vehicle["fleet"], vehicle["company"]
                         )
-                        print()
+
                         region_id = await self._get_or_create_region(
                             cursor, con, vehicle["country"]
                         )
@@ -630,9 +631,12 @@ class VehicleProcessor:
                         logging.info(
                             f"Processing vehicle {vehicle['vin']} | {vehicle['make']} | {model_name} | {model_type} | {version}"
                         )
+
+                        print(model_type, vehicle["make"], model_name, model_existing)
                         model_id = mapping_vehicle_type(
                             model_type, vehicle["make"], model_name, model_existing
                         )
+
                         logging.info(f"Model ID: {model_id}")
 
                         if not vehicle_exists:
