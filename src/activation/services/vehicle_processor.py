@@ -414,10 +414,18 @@ class VehicleProcessor:
                                         fleet_id,
                                         region_id,
                                         model_id,
-                                        vehicle["licence_plate"],
-                                        vehicle["real_activation"],
-                                        vehicle["eligibility"],
-                                        vehicle["registration_date"],
+                                        await self._clean_value(
+                                            vehicle["licence_plate"]
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["real_activation"], "bool"
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["eligibility"], "bool"
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["registration_date"]
+                                        ),
                                     ),
                                 )
                                 logging.info(
@@ -426,11 +434,17 @@ class VehicleProcessor:
                             else:
                                 update_data = {
                                     "fleet_id": fleet_id,
-                                    "activation_status": vehicle["real_activation"],
-                                    "is_eligible": vehicle["eligibility"],
+                                    "activation_status": await self._clean_value(
+                                        vehicle["real_activation"], "bool"
+                                    ),
+                                    "is_eligible": await self._clean_value(
+                                        vehicle["eligibility"], "bool"
+                                    ),
                                     "vehicle_model_id": model_id,
                                     "vin": vin,
-                                    "start_date": vehicle["registration_date"],
+                                    "start_date": await self._clean_value(
+                                        vehicle["registration_date"]
+                                    ),
                                 }
 
                                 cursor.execute(
@@ -534,10 +548,18 @@ class VehicleProcessor:
                                         fleet_id,
                                         region_id,
                                         model_id,
-                                        vehicle["licence_plate"],
-                                        vehicle["real_activation"],
-                                        vehicle["eligibility"],
-                                        vehicle["registration_date"],
+                                        await self._clean_value(
+                                            vehicle["licence_plate"]
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["real_activation"], "bool"
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["eligibility"], "bool"
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["registration_date"]
+                                        ),
                                     ),
                                 )
                                 logging.info(
@@ -546,11 +568,17 @@ class VehicleProcessor:
                             else:
                                 update_data = {
                                     "fleet_id": fleet_id,
-                                    "activation_status": vehicle["real_activation"],
-                                    "is_eligible": vehicle["eligibility"],
+                                    "activation_status": await self._clean_value(
+                                        vehicle["real_activation"], "bool"
+                                    ),
+                                    "is_eligible": await self._clean_value(
+                                        vehicle["eligibility"], "bool"
+                                    ),
                                     "vehicle_model_id": model_id,
                                     "vin": vin,
-                                    "start_date": vehicle["registration_date"],
+                                    "start_date": await self._clean_value(
+                                        vehicle["registration_date"]
+                                    ),
                                 }
 
                                 cursor.execute(
@@ -961,10 +989,18 @@ class VehicleProcessor:
                                         fleet_id,
                                         region_id,
                                         model_id,
-                                        vehicle["licence_plate"],
-                                        vehicle["real_activation"],
-                                        vehicle["eligibility"],
-                                        vehicle["registration_date"],
+                                        await self._clean_value(
+                                            vehicle["licence_plate"]
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["real_activation"], "bool"
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["eligibility"], "bool"
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["registration_date"]
+                                        ),
                                     ),
                                 )
                                 logging.info(
@@ -977,9 +1013,15 @@ class VehicleProcessor:
                                 cursor.execute(
                                     "UPDATE vehicle SET activation_status = %s, is_eligible = %s, start_date = %s WHERE id = %s",
                                     (
-                                        vehicle["real_activation"],
-                                        vehicle["eligibility"],
-                                        vehicle["registration_date"],
+                                        await self._clean_value(
+                                            vehicle["real_activation"], "bool"
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["eligibility"], "bool"
+                                        ),
+                                        await self._clean_value(
+                                            vehicle["registration_date"]
+                                        ),
                                         vehicle_id,
                                     ),
                                 )
