@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core import numpy_utils
-from db_models.vehicle import VehicleModel
+from db_models import VehicleModel
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
 from external_api.schemas.flash import SOHWithTrendline

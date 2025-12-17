@@ -1,7 +1,13 @@
 import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { IconArrowRight } from '@tabler/icons-react';
-import { VibratingButtonProps } from '@/interfaces/dashboard/form/VibratingButtonProps';
+
+type VibratingButtonProps = {
+  isError: boolean;
+  buttonText: string;
+  onClick: () => void;
+  loader?: boolean;
+};
 
 const VibratingButton: React.FC<VibratingButtonProps> = ({
   isError,

@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, Image } from '@react-pdf/renderer';
 import { GetGenerationInfo } from '@/interfaces/flash-reports';
-import { pdfTexts } from '../pdf_texts';
-import { LanguageEnum } from '@/components/flash-report/forms/schema';
+import { pdfTexts } from '@/components/pdf/pdf_texts';
+import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
 
 const PdfHeaderFlash: React.FC<{ data: GetGenerationInfo }> = ({ data }) => {
   const vehicleInfo = data?.vehicle_info;

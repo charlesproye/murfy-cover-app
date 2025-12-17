@@ -1,4 +1,4 @@
-import { Score } from './ScoreCard/ScoreCardProps';
+import { Score } from '@/interfaces/common/score';
 
 export interface DataPoint {
   soh: number;

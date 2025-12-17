@@ -15,7 +15,7 @@ from core.gdrive_utils import get_google_service
 from core.gsheet_utils import get_google_client
 from core.s3.async_s3 import S3ACL, AsyncS3
 from core.sql_utils import get_sqlalchemy_engine
-from db_models.vehicle import PremiumReport, Vehicle, VehicleData, VehicleModel
+from db_models import PremiumReport, Vehicle, VehicleData, VehicleModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

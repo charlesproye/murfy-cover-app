@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from activation.config.mappings import mapping_vehicle_type
 from core import numpy_utils
+from db_models import Battery, FlashReportCombination, Make, VehicleModel
 from db_models.enums import LanguageEnum
-from db_models.vehicle import Battery, FlashReportCombination, Make, VehicleModel
 from external_api.core.config import settings
 from external_api.schemas.flash_report import (
     GenerationData,

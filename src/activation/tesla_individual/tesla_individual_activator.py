@@ -19,8 +19,8 @@ from core.env_utils import get_env_var
 from core.slack_utils import send_slack_message
 from core.tesla.tesla_individual_api import TeslaIndividualApi
 from core.tesla.tesla_utils import TeslaRegions
+from db_models import Vehicle, VehicleModel
 from db_models.user_tokens import User, UserToken
-from db_models.vehicle import Vehicle, VehicleModel
 
 logger = logging.getLogger(__name__)
 

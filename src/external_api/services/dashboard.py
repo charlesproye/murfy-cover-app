@@ -5,7 +5,7 @@ from sqlalchemy import ARRAY, and_, bindparam, case, distinct, func, select, tex
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db_models.vehicle import Vehicle, VehicleData
+from db_models import Vehicle, VehicleData
 from external_api.schemas.user import FleetInfo
 
 

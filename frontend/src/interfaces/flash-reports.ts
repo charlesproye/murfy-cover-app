@@ -1,4 +1,4 @@
-import { LanguageEnum } from '@/components/flash-report/forms/schema';
+import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
 
 export interface GetGenerationInfo {
   has_trendline: boolean;

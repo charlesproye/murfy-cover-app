@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import TableBatteryInfo from '@/components/dashboard/global/TableBatteryInfo';
-import DataCards from '@/components/dashboard/global/datacard/DataCards';
-import ListFilter from '@/components/common/optionSelector/ListFilter';
+import TableBatteryInfo from '@/components/entities/dashboard/global/TableBatteryInfo';
+import DataCards from '@/components/entities/dashboard/global/DataCards';
+import ListFilter from '@/components/filters/optionSelector/ListFilter';
 import { SelectedFilter } from '@/interfaces/common/optionSelector/DataFilter';
-import GraphTrendlineGlobal from '@/components/dashboard/global/GraphTrendlineGlobal';
+import GraphTrendlineGlobal from '@/components/charts/global/GraphTrendlineGlobal';
 
 const Global: React.FC = () => {
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilter[]>([]);

@@ -1,7 +1,7 @@
 'use client';
 
 import { Loading } from '@/components/common/loading/loading';
-import DashboardLayout from '@/components/dashboard/layout';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 import useAuth from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import React from 'react';

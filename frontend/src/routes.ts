@@ -35,6 +35,7 @@ export const ROUTES = {
   PIN_VEHICLE: `${BASE_URL}/passport/pin_vehicle`,
   GET_PINNED_VEHICLE: `${BASE_URL}/passport/get_pinned_vehicle`,
   PRICE_FORECAST: `${BASE_URL}/passport/get_price_forecast`,
+  IS_VIN_IN_FLEETS: `${BASE_URL}/passport/is_vin_in_fleets`,
 
   // INDIVIDUAL
   PINNED_VEHICLE: `${BASE_URL}/individual/vehicles/pinned`,

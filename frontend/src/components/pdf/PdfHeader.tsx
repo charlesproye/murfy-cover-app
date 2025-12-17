@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, Image } from '@react-pdf/renderer';
 import { InfoVehicleResult } from '@/interfaces/dashboard/passport/infoVehicle';
-import { Score } from '@/interfaces/dashboard/passport/ScoreCard/ScoreCardProps';
-import { pdfTexts } from './pdf_texts';
-import { LanguageEnum } from '../flash-report/forms/schema';
+import { Score } from '@/interfaces/common/score';
+import { pdfTexts } from '@/components/pdf/pdf_texts';
+import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
 
 const scoreLabels = [
   { label: 'A', color: '#2d6d49' },

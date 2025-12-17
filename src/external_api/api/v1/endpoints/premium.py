@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db_models.vehicle import Fleet, PremiumReport, UserFleet, Vehicle, VehicleData
+from db_models import Fleet, PremiumReport, UserFleet, Vehicle, VehicleData
 from external_api.core.cookie_auth import (
     get_current_user_from_cookie,
     get_user_with_fleet,

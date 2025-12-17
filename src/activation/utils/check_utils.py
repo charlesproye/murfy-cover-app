@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from core.sql_utils import get_sqlalchemy_engine
-from db_models.vehicle import Fleet, Role, User, UserFleet
+from db_models import Fleet, Role, User, UserFleet
 
 
 def ensure_admins_linked_to_fleets(logger: logging.Logger):

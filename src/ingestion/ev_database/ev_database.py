@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, sessionmaker
 
 from core.sql_utils import get_sqlalchemy_engine
-from db_models.vehicle import Battery, Make, Oem, VehicleModel
+from db_models import Battery, Make, Oem, VehicleModel
 
 
 def fetch_api_data(url: str) -> list | None:
@@ -45,15 +45,19 @@ def get_oem(session: Session, vehicle_make: str) -> uuid.UUID | None:
 
 def get_commissioning_date(vehicle):
     "Get commissionning date and format it for the database"
-    start_date = datetime.strptime(
-        vehicle.get("Availability_Date_From"), "%m-%Y"
-    ).date()
+    try:
+        start_date = datetime.strptime(
+            vehicle.get("Availability_Date_From"), "%m-%Y"
+        ).date()
+    except (ValueError, TypeError):
+        start_date = None
+
     try:
         end_date = datetime.strptime(
             vehicle.get("Availability_Date_To"), "%m-%Y"
         ).date()
-    except:
-        end_date = vehicle.get("Availability_Date_To")
+    except (ValueError, TypeError):
+        end_date = None
 
     return start_date, end_date
 

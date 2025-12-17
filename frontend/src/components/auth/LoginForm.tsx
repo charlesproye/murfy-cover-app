@@ -2,7 +2,7 @@
 
 import useLogin from '@/hooks/auth/useLogin';
 import React from 'react';
-import VibratingButton from '../form/VibratingButton';
+import VibratingButton from '@/components/form/VibratingButton';
 
 const LoginForm = (): React.ReactElement => {
   const { email, setEmail, password, setPassword, error, handleSubmit, isLoading } =

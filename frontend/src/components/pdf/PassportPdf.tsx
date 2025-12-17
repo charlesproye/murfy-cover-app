@@ -2,13 +2,13 @@
 
 import React from 'react';
 import { Document, Page, Font, StyleSheet, View } from '@react-pdf/renderer';
-import PdfHeader from './PdfHeader';
-import PdfSohChart from './PdfSohChart';
-import PdfChargingSection from './PdfChargingSection';
-import PdfFooter from './PdfFooter';
+import PdfHeader from '@/components/pdf/PdfHeader';
+import PdfSohChart from '@/components/pdf/PdfSohChart';
+import PdfChargingSection from '@/components/pdf/PdfChargingSection';
+import PdfFooter from '@/components/pdf/PdfFooter';
 import { InfoVehicleResult } from '@/interfaces/dashboard/passport/infoVehicle';
-import PdfRangeAndWarranty from './PdfRangeAndWarranty';
-import PdfDetailedInformation from './PdfDetailedInformation';
+import PdfRangeAndWarranty from '@/components/pdf/PdfRangeAndWarranty';
+import PdfDetailedInformation from '@/components/pdf/PdfDetailedInformation';
 
 Font.register({
   family: 'Poppins',

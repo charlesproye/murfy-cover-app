@@ -5,7 +5,7 @@
  * Provides a secure alternative to localStorage
  */
 
-import { encryptData, decryptData, hashData } from './crypto';
+import { encryptData, decryptData, hashData } from '@/services/auth/crypto';
 
 // Cookie utilities
 function setCookie(name: string, value: string, days: number = 7): void {

@@ -1,16 +1,15 @@
 'use client';
 
-import DataCardsHome from '@/components/home/DataCardHome';
+import DataCardsHome from '@/components/entities/dashboard/home/DataCardHome';
 
-import React, { useEffect, memo, useState } from 'react';
+import React, { memo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import TableBrands from '@/components/home/table/TableBrands';
-import { GraphTrendline } from '@/components/home/graph/GraphTrendline';
-import { toast } from 'sonner';
-import TableExtremum from '@/components/home/table/TableExtremum';
-import TablesFleet from '@/components/home/table/TableFleet';
-import GraphSoH from '@/components/home/graph/GraphSoH';
-import GraphQuantity from '@/components/home/graph/GraphQuantity';
+import TableBrands from '@/components/entities/dashboard/home/table/TableBrands';
+import { GraphTrendline } from '@/components/charts/home/GraphTrendline';
+import TableExtremum from '@/components/entities/dashboard/home/table/TableExtremum';
+import TablesFleet from '@/components/entities/dashboard/home/table/TableFleet';
+import GraphSoH from '@/components/entities/dashboard/home/graph/GraphSoH';
+import GraphQuantity from '@/components/entities/dashboard/home/graph/GraphQuantity';
 import LoadingSmall from '@/components/common/loading/loadingSmall';
 
 const MemoizedDataCardsHome = memo(DataCardsHome);
@@ -19,14 +18,11 @@ const DashboardPage = (): React.ReactElement => {
   const { fleet } = useAuth();
   const [isDisplay, setIsDisplay] = useState<boolean>(false);
   const [clickedData, setClickedData] = useState<string | null>(null);
+
   const handleDisplayChange = (newDisplay: boolean, newValue: string | null): void => {
     setClickedData(newValue);
     setIsDisplay(newDisplay);
   };
-
-  useEffect(() => {
-    toast.dismiss();
-  }, []);
 
   return (
     <div className="flex flex-col h-full w-full space-y-8 py-4">

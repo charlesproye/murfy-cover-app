@@ -9,7 +9,7 @@ from core.env_utils import get_env_var
 from core.gsheet_utils import get_google_client
 from core.s3.s3_utils import S3Service
 from core.sql_utils import get_sqlalchemy_engine
-from db_models.vehicle import Vehicle, VehicleData, VehicleStatus
+from db_models import Vehicle, VehicleData, VehicleStatus
 
 
 class VehicleStatusTracker:

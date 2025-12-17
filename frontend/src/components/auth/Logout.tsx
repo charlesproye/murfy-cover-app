@@ -7,7 +7,7 @@ const Logout = (): React.ReactElement => {
 
   return (
     <div className="flex gap-2 cursor-pointer text-red-price" onClick={handleLogout}>
-      <p className="text-sm font-thin min-w-14">Logout</p>
+      <p className="text-sm font-thin min-w-14 mr-1">Logout</p>
       <IconLogout size={20} stroke={1.7} />
     </div>
   );

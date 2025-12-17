@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { IconSearch, IconX } from '@tabler/icons-react';
-import useGetSearchVehicle from '@/interfaces/common/useGetSearchVehicle';
+import useGetSearchVehicle from '@/hooks/utils/useGetSearchVehicle';
 import Link from 'next/link';
 import useSearchBar from '@/hooks/dashboard/common/useSearchBar';
 

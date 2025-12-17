@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, Svg, Line, Polyline, Circle, Path } from '@react-pdf/renderer';
-import { getTrendlinePoints, parseTrendlineEquation, Point } from '@/utils/regression';
+import { getTrendlinePoints, parseTrendlineEquation, Point } from '@/lib/trendline';
 import { GetGenerationInfo } from '@/interfaces/flash-reports';
-import { pdfTexts } from '../pdf_texts';
-import { LanguageEnum } from '@/components/flash-report/forms/schema';
+import { pdfTexts } from '@/components/pdf/pdf_texts';
+import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
 
 const PdfSohChartFlash: React.FC<{ data: GetGenerationInfo }> = ({ data }) => {
   const texts = pdfTexts[data?.language || LanguageEnum.EN];

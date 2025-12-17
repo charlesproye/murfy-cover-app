@@ -17,7 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select
 
-from db_models.vehicle import User
+from db_models import User
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.db.session import get_db
 from external_api.schemas.user import GetCurrentUser

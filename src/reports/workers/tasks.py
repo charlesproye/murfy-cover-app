@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from db_models.vehicle import PremiumReport
+from db_models import PremiumReport
 from reports.workers.celery_config import celery_app
 
 logger = logging.getLogger(__name__)

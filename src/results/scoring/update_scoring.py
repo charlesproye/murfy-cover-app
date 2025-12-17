@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 
 from core.numpy_utils import numpy_safe_eval
 from core.sql_utils import get_connection, get_sqlalchemy_engine
-from db_models.vehicle import Vehicle, VehicleData, VehicleModel
+from db_models import Vehicle, VehicleData, VehicleModel
 from results.trendline.main import compute_trendline_functions
 
 LOGGER = getLogger(__name__)
@@ -223,7 +223,7 @@ def compute_bib_score(logger: Logger = LOGGER):
 
     results = []
     logger.info("Compute bib_score for each model...")
-    for model_id, df_model in df.groupby("model_id"):
+    for _model_id, df_model in df.groupby("model_id"):
         df_model = df_model.sort_values("odometer")
         soh = df_model["soh"].to_numpy()
         km = df_model["odometer"].to_numpy()

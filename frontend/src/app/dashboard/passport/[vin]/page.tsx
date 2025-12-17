@@ -1,17 +1,49 @@
 'use client';
 
-import React from 'react';
-import LineChart from '@/components/dashboard/chart/LineChart';
+import React, { useEffect } from 'react';
+import LineChart from '@/components/charts/passport/LineChart';
 
-import { useParams } from 'next/navigation';
-import VehicleInfo from '@/components/dashboard/passport/VehicleInfo';
-import EstimatedRange from '@/components/dashboard/passport/EstimatedRange';
-import KpiAdditional from '@/components/dashboard/passport/KpiAdditional';
+import { useParams, useRouter } from 'next/navigation';
+import VehicleInfo from '@/components/entities/dashboard/passport/datacard/VehicleInfo';
+import EstimatedRange from '@/components/entities/dashboard/passport/EstimatedRange';
+import KpiAdditional from '@/components/entities/dashboard/passport/KpiAdditional';
 import TitleBox from '@/components/common/TitleBox';
+import fetchWithAuth from '@/services/fetchWithAuth';
+import useSWR from 'swr';
+import { ROUTES } from '@/routes';
+import { toast } from 'sonner';
+import { Loading } from '@/components/common/loading/loading';
 
 const PassPort: React.FC = () => {
+  const router = useRouter();
   const params = useParams();
   const vin = params.vin as string;
+
+  const { data, isLoading, error } = useSWR(
+    `${ROUTES.IS_VIN_IN_FLEETS}/${vin}`,
+    fetchWithAuth<{ is_in_fleets: boolean }>,
+  );
+
+  useEffect(() => {
+    if (!isLoading && !error && data?.is_in_fleets === false) {
+      toast.error('This vehicle is not in your fleets', {
+        description:
+          'Please contact your administrator to add this vehicle to your fleets',
+      });
+      return router.push('/dashboard');
+    }
+  }, [isLoading, error, data?.is_in_fleets, router]);
+
+  if (isLoading) {
+    return <Loading />;
+  }
+
+  if (error) {
+    toast.error('Error fetching vehicle data', {
+      description: 'Please try again later',
+    });
+    return router.push('/dashboard');
+  }
 
   return (
     <div className="flex flex-col h-full w-full space-y-8 pt-2">

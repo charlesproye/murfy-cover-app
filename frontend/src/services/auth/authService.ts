@@ -3,7 +3,7 @@
  * Provides a secure alternative to localStorage-based authentication
  */
 
-import { ROUTES } from '../../routes';
+import { ROUTES } from '@/routes';
 import { secureStorage, secureSessionStorage } from '@/services/auth/secureStorage';
 import { AuthResponse } from '@/interfaces/auth/auth';
 

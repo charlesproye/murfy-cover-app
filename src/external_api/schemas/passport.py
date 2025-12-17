@@ -4,6 +4,7 @@ from external_api.services.passport.passport import (
     get_charging_cycles,
     get_download_rapport,
     get_estimated_range,
+    get_fleet_id_of_vin,
     get_graph_data,
     get_infos,
     get_kpis,
@@ -15,6 +16,9 @@ from external_api.services.passport.price_forecast import get_price_forecast
 
 
 class PassportCrud:
+    async def get_fleet_id_of_vin(self, vin: str, db: AsyncSession | None = None):
+        return await get_fleet_id_of_vin(vin, db)
+
     async def get_kpis(self, vin: str, db: AsyncSession | None = None):
         return await get_kpis(vin, db)
 

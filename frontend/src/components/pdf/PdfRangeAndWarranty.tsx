@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { View, Text } from '@react-pdf/renderer';
-import { LanguageEnum } from '../flash-report/forms/schema';
-import { pdfTexts } from './pdf_texts';
-import { calculateTrendlineY, parseTrendlineEquation } from '@/utils/regression';
-import { formatNumber } from '@/utils/formatNumber';
+import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
+import { pdfTexts } from '@/components/pdf/pdf_texts';
+import { calculateTrendlineY, parseTrendlineEquation } from '@/lib/trendline';
+import { formatNumber } from '@/lib/dataDisplay';
 
 interface PdfRangeAndWarrantyProps {
   warranty_km?: number;

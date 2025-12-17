@@ -1,10 +1,10 @@
 'use client';
 
-import { VinForm } from '@/components/tesla-activation/forms/VinForm';
+import { TeslaActivationForm } from '@/components/entities/tesla-activation/forms/TeslaActivationForm';
 import React from 'react';
 
 const TeslaActivationPage = (): React.ReactElement => {
-  return <VinForm />;
+  return <TeslaActivationForm />;
 };
 
 export default TeslaActivationPage;

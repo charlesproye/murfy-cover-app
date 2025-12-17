@@ -1,4 +1,4 @@
-import { Score } from '@/interfaces/dashboard/passport/ScoreCard/ScoreCardProps';
+import { Score } from '@/interfaces/common/score';
 
 interface FetchProps {
   isLoading: boolean;

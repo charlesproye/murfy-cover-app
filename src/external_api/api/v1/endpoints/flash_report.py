@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select
 
-from db_models.vehicle import FlashReportCombination, Make, User, VehicleModel
+from db_models import FlashReportCombination, Make, User, VehicleModel
 from external_api.core.utils import get_flash_report_user
 from external_api.db.session import get_db
 from external_api.schemas.flash_report import FlashReportFormType, VehicleSpecs

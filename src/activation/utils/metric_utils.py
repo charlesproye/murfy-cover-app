@@ -6,7 +6,7 @@ from sqlalchemy import select, text
 
 from activation.config.config import MAKES_WITH_SOH_BIB
 from core.sql_utils import get_connection, get_sqlalchemy_engine
-from db_models.vehicle import Oem, Vehicle, VehicleModel
+from db_models import Oem, Vehicle, VehicleModel
 
 
 async def write_metrics_to_db(logger: logging.Logger):
@@ -47,7 +47,7 @@ async def write_metrics_to_db(logger: logging.Logger):
 async def compare_active_vehicles(
     fleet_info: pd.DataFrame,
 ) -> tuple[set[str], set[str]]:
-    active = fleet_info[fleet_info["real_activation"] == True]
+    active = fleet_info[fleet_info["real_activation"]]
 
     engine = get_sqlalchemy_engine()
 

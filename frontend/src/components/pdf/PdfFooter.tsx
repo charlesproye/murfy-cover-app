@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image } from '@react-pdf/renderer';
-import { pdfTexts } from './pdf_texts';
-import { LanguageEnum } from '../flash-report/forms/schema';
+import { pdfTexts } from '@/components/pdf/pdf_texts';
+import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
 
 interface PdfFooterProps {
   language?: LanguageEnum;

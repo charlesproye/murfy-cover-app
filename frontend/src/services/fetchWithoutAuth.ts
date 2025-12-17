@@ -1,4 +1,4 @@
-import { FetchOptions } from './fetchWithAuth';
+import { FetchOptions } from '@/services/fetchWithAuth';
 
 export const fetchWithoutAuth = async <T>(
   url: string,

@@ -11,6 +11,20 @@ from external_api.schemas.user import GetCurrentUser
 router = APIRouter()
 
 
+@router.get("/is_vin_in_fleets/{vin}", include_in_schema=False)
+async def is_vin_in_fleets(
+    db=Depends(get_db),
+    vin: str = Path(..., description="The vin"),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+):
+    fleet_id = await PassportCrud().get_fleet_id_of_vin(vin, db)
+    return {
+        "is_in_fleets": fleet_id in [fleet.id for fleet in user.fleets]
+        if fleet_id and user.fleets
+        else False
+    }
+
+
 @router.get("/kpis/{vin}", include_in_schema=False)
 async def kpis(
     db=Depends(get_db),

@@ -1,31 +1,3 @@
-export type ProgressBarProps = {
-  percentage: number;
-  label?: string;
-};
-
-export type DataPurcentageBarPdfProps = {
-  percentage: number;
-  km: number;
-  description?: string;
-};
-
-export type DonutChartProps = {
-  percentage: number;
-};
-
-export type DataCardPdfProps = {
-  icon: string;
-  title: string;
-  text: string;
-};
-
-export type DataCardFuturePdfProps = {
-  icon: string[];
-  title: string;
-  date: string;
-  text: string;
-};
-
 export type DataPdfResult = {
   id: string;
   licence_plate: string;
@@ -76,8 +48,4 @@ export type DataPdfRequestSwr = {
   data: DataPdfResult | undefined;
   isLoading: boolean;
   error: unknown;
-};
-
-export type ImagePdfProps = {
-  url: string;
 };

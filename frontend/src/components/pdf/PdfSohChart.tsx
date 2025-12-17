@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, Svg, Line, Polyline, Circle } from '@react-pdf/renderer';
 import { InfoVehicleResult } from '@/interfaces/dashboard/passport/infoVehicle';
-import { calculateTrendlineY, getTrendlinePoints } from '@/utils/regression';
-import { pdfTexts } from './pdf_texts';
-import { LanguageEnum } from '../flash-report/forms/schema';
+import { calculateTrendlineY, getTrendlinePoints } from '@/lib/trendline';
+import { pdfTexts } from '@/components/pdf/pdf_texts';
+import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
 
 const PdfSohChart: React.FC<{ data: InfoVehicleResult }> = ({ data }) => {
   const texts = pdfTexts[LanguageEnum.EN];

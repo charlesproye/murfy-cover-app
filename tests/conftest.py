@@ -14,17 +14,19 @@ from sqlalchemy.orm import sessionmaker
 from db_models import (
     Battery,
     Company,
+    FlashReportCombination,
     Fleet,
     Make,
     Oem,
+    Region,
     Role,
+    User,
     UserFleet,
     Vehicle,
     VehicleModel,
 )
 from db_models.core.config import db_settings
 from db_models.enums import LanguageEnum
-from db_models.vehicle import FlashReportCombination, Region, User
 from external_api.app import app
 from external_api.db.session import get_db
 

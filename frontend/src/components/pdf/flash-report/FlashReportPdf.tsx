@@ -2,13 +2,13 @@
 
 import React from 'react';
 import { Document, Page, Font, StyleSheet, View } from '@react-pdf/renderer';
-import PdfHeaderFlash from '../flash-report/PdfHeaderFlash';
-import PdfSohChartFlash from '../flash-report/PdfSohChartFlash';
-import PdfChargingSection from '../PdfChargingSection';
-import PdfFooter from '../PdfFooter';
+import PdfHeaderFlash from '@/components/pdf/flash-report/PdfHeaderFlash';
+import PdfSohChartFlash from '@/components/pdf/flash-report/PdfSohChartFlash';
+import PdfChargingSection from '@/components/pdf/PdfChargingSection';
+import PdfFooter from '@/components/pdf/PdfFooter';
 import { GetGenerationInfo } from '@/interfaces/flash-reports';
-import PdfRangeAndWarranty from '../PdfRangeAndWarranty';
-import PdfDetailedInformationFlash from '../flash-report/PdfDetailedInformationFlash';
+import PdfRangeAndWarranty from '@/components/pdf/PdfRangeAndWarranty';
+import PdfDetailedInformationFlash from '@/components/pdf/flash-report/PdfDetailedInformationFlash';
 
 Font.register({
   family: 'Poppins',

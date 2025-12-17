@@ -13,15 +13,17 @@ from db_models import (
     ApiUser,
     Battery,
     Company,
+    FlashReportCombination,
     Fleet,
     Make,
     Oem,
+    Region,
     Role,
+    User,
     UserFleet,
     Vehicle,
     VehicleModel,
 )
-from db_models.vehicle import FlashReportCombination, Region, User
 
 
 class TestCompanyModel:

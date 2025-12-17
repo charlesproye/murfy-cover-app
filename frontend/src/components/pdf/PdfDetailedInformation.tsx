@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Link } from '@react-pdf/renderer';
-import { LanguageEnum } from '../flash-report/forms/schema';
-import { pdfTexts } from './pdf_texts';
+import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
+import { pdfTexts } from '@/components/pdf/pdf_texts';
 
 const sectionStyle = {
   backgroundColor: '#fff',

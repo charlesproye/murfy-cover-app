@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from db_models import FlashReportCombination, Make, VehicleModel
 from db_models.enums import LanguageEnum
-from db_models.vehicle import FlashReportCombination, Make, VehicleModel
 from external_api.schemas.flash_report import VehicleSpecs, VehicleSpecsType
 from external_api.services.flash_report.flash_report import (
     get_db_names,

@@ -4,10 +4,24 @@ from fastapi import HTTPException
 from sqlalchemy import Numeric, cast, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db_models.vehicle import Oem, Vehicle, VehicleData, VehicleModel
+from db_models import Oem, Vehicle, VehicleData, VehicleModel
 from external_api.schemas.graph import DataGraphResponse, DataPoint
 
 logger = logging.getLogger(__name__)
+
+
+async def get_fleet_id_of_vin(vin: str, db: AsyncSession):
+    query = (
+        select(Vehicle.id, Vehicle.fleet_id)
+        .select_from(Vehicle)
+        .where(Vehicle.vin == vin)
+    )
+    result = await db.execute(query)
+    vehicle = result.mappings().first()
+    if not vehicle or "fleet_id" not in vehicle:
+        return False
+
+    return vehicle.fleet_id
 
 
 async def get_kpis(vin: str, db: AsyncSession):

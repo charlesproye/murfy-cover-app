@@ -1,5 +1,5 @@
 import React from 'react';
-import Download from './Download';
+import Download from '@/components/common/Download';
 import { DataTitleBox } from '@/interfaces/common/DataTitleBox';
 
 const TitleBox = ({
