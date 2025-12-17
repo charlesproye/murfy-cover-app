@@ -30,7 +30,7 @@ class ModelType(BaseModel):
     model_type: str | None = Field(None, description="Model type")
     commissioning_date: datetime | None = Field(..., description="Commissioning date")
     end_of_life_date: datetime | None = Field(..., description="End of life date")
-    has_trendline: bool = Field(..., description="Has trendline")
+    has_soh_estimation: bool = Field(..., description="Has SoH estimation")
 
 
 class VehicleModelData(BaseModel):

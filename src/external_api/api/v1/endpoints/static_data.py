@@ -67,7 +67,7 @@ def is_tesla_vin(vin: str) -> bool:
     description="Returns all electric vehicles models with their commissioning and end of life dates and whether Bib provides a trendline. If you want to get only the models with a trendline, you can set the `has_trendline` query parameter to `true`.",
 )
 async def get_models(
-    has_trendline: bool | None = Query(None),
+    has_soh_estimation: bool | None = Query(None),
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     db: AsyncSession = Depends(get_db),
 ) -> list[ModelType]:
@@ -86,9 +86,9 @@ async def get_models(
         .join(Battery, VehicleModel.battery_id == Battery.id)
     )
 
-    if has_trendline is True:
+    if has_soh_estimation is True:
         query = query.where(VehicleModel.trendline.is_not(None))
-    elif has_trendline is False:
+    elif has_soh_estimation is False:
         query = query.where(VehicleModel.trendline.is_(None))
 
     vehicules_query = await db.execute(query)
@@ -102,7 +102,7 @@ async def get_models(
             model_type=vehicule.type,
             commissioning_date=vehicule.commissioning_date,
             end_of_life_date=vehicule.end_of_life_date,
-            has_trendline=vehicule.trendline is not None,
+            has_soh_estimation=vehicule.trendline is not None,
         )
         for vehicule in vehicules
     ]
@@ -154,6 +154,7 @@ async def get_model_data(
     response_model=ModelTrendline,
     summary="Get trendline by model",
     description="Returns the trendline data for a specific model.",
+    include_in_schema=False,
 )
 async def get_model_trendline(
     model_id: uuid.UUID = Path(..., description="Model ID (UUID)"),
