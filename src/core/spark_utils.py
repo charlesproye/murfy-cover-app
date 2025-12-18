@@ -2,7 +2,8 @@
 
 import os
 
-from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 from pyspark.sql.functions import col, lit, when
 from pyspark.sql.functions import sum as spark_sum
 from pyspark.sql.types import (
@@ -518,3 +519,59 @@ def get_spark_available_cores(spark_session: SparkSession, logger=None) -> int:
         )
     return default_cores
 
+
+def compute_regression_coefficients(
+    df: DataFrame,
+    aggregate_col: str = "VIN",
+    feature_col: str = "soc",
+    target_col: str = "soh",
+    min_samples: int = 3,
+) -> DataFrame:
+    """
+    Compute regression coefficients between feature and target by aggregate_col.
+
+    Args:
+        df: DataFrame containing raw data
+        aggregate_col: Column to aggregate by
+        feature_col: Column to use as features
+        target_col: Column to use as target
+        min_samples: Minimum number of samples required to compute the regression
+
+    Returns:
+        DataFrame with columns: aggregate_col, coef, intercept
+    """
+    base = df.select(aggregate_col, feature_col, target_col).dropna(
+        subset=[aggregate_col, feature_col, target_col]
+    )
+
+    stats = base.groupBy(aggregate_col).agg(
+        F.count("*").alias("n"),
+        F.avg(feature_col).alias("x_mean"),
+        F.avg(target_col).alias("y_mean"),
+        F.var_samp(feature_col).alias("x_var"),
+        F.covar_samp(feature_col, target_col).alias("xy_covar"),
+    )
+
+    coef_df = (
+        stats.withColumn(
+            "coef",
+            F.when(
+                (F.col("n") >= min_samples) & (F.col("x_var") > 0),
+                F.col("xy_covar") / F.col("x_var"),
+            ).otherwise(F.lit(None).cast("double")),
+        )
+        .withColumn(
+            "intercept",
+            F.when(
+                F.col("coef").isNotNull(),
+                F.col("y_mean") - F.col("coef") * F.col("x_mean"),
+            ).otherwise(F.lit(None).cast("double")),
+        )
+        .select(
+            F.col(aggregate_col),
+            F.col("coef"),
+            F.col("intercept"),
+        )
+    )
+
+    return coef_df

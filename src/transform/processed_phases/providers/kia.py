@@ -2,7 +2,9 @@ from logging import Logger
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 
+from core.spark_utils import compute_regression_coefficients
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
 
 
@@ -38,7 +40,7 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
             .otherwise(None)
             .cast("double"),
         )
-
+        df = self._apply_soh_soc_correction(df)
         return df
 
     def aggregate_stats(self, phase_df):
@@ -73,3 +75,33 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
         ).agg(*agg_columns)
 
         return df_aggregated
+
+    def _apply_soh_soc_correction(self, phase_df):
+        """
+        Apply SoH correction based on linear regression between SoC and SoH.
+
+        Args:
+            phase_df: Spark DataFrame with columns 'VIN', 'soc', 'soh'
+
+        Returns:
+            Spark DataFrame with soh replaced by the corrected value
+        """
+        coef_df = compute_regression_coefficients(
+            phase_df, aggregate_col="VIN", feature_col="soc", target_col="soh"
+        )
+
+        phase_df = phase_df.join(coef_df, on="VIN", how="left")
+
+        phase_df = phase_df.withColumn(
+            "soh_updated",
+            F.when(
+                F.col("coef_soc").isNotNull(),
+                F.col("soh") / (F.col("coef") * F.col("soc") + F.col("intercept")),
+            ).otherwise(F.col("soh")),
+        )
+
+        phase_df = phase_df.drop("soh", "coef", "intercept").withColumnRenamed(
+            "soh_updated", "soh"
+        )
+
+        return phase_df
