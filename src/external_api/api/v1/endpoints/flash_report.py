@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select
 
 from db_models import FlashReportCombination, Make, User, VehicleModel
-from external_api.core.utils import get_flash_report_user
 from external_api.db.session import get_db
 from external_api.schemas.flash_report import FlashReportFormType, VehicleSpecs
 from external_api.schemas.static_data import (
@@ -20,6 +19,7 @@ from external_api.services.flash_report.flash_report import (
     send_email,
     send_vehicle_specs,
 )
+from external_api.services.user import get_flash_report_user
 
 flash_report_router = APIRouter()
 
@@ -78,7 +78,7 @@ async def send_report_email(
 @flash_report_router.get("/generation-data")
 async def get_flash_report_data_for_generation(
     request: Request,
-    flash_report_user: User | None = Depends(get_flash_report_user),
+    flash_report_user: User = Depends(get_flash_report_user),
     token: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ):

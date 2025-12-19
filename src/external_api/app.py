@@ -18,7 +18,7 @@ from external_api.core.http_client import HTTP_CLIENT
 #     "http://localhost:3000"
 # ]
 
-# Configuration du logging structuré
+# Structured logging configuration
 structlog.configure(
     processors=[
         structlog.contextvars.merge_contextvars,
@@ -49,35 +49,35 @@ class MetricsProtectionMiddleware(BaseHTTPMiddleware):
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware pour journaliser les requêtes et réponses"""
+    """Middleware to log requests and responses"""
 
     async def dispatch(self, request: Request, call_next):
         """
-        Journalise les requêtes entrantes et sortantes.
+        Log incoming and outgoing requests.
         """
-        # Journalisation de la requête entrante
+        # Log incoming request
         logger.info(
-            "Requête entrante",
+            "Incoming request",
             method=request.method,
             url=str(request.url),
             client=request.client.host if request.client else None,
         )
 
-        # Traitement de la requête
+        # Process request
         try:
             response = await call_next(request)
-            # Journalisation de la réponse
+            # Log response
             logger.info(
-                "Réponse",
+                "Response",
                 status_code=response.status_code,
                 method=request.method,
                 url=str(request.url),
             )
             return response
         except Exception as e:
-            # En cas d'erreur, journaliser et retourner une réponse d'erreur
+            # If error, log and return an error response
             logger.error(
-                "Erreur lors du traitement de la requête",
+                "Error processing request",
                 error=str(e),
                 method=request.method,
                 url=str(request.url),
@@ -85,19 +85,19 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"detail": "Erreur interne du serveur"},
+                content={"detail": "Internal server error"},
             )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Gestionnaire de cycle de vie de l'application.
-    Exécuté au démarrage et à l'arrêt.
+    Lifecycle manager of the application.
+    Executed at startup and shutdown.
     """
-    # Code exécuté au démarrage
-    logger.info("Démarrage de l'API", version=__VERSION__)
-    logger.info("Environnement", environment=settings.ENVIRONMENT)
+    # Code executed at startup
+    logger.info("API startup", version=__VERSION__)
+    logger.info("Environment", environment=settings.ENVIRONMENT)
     HTTP_CLIENT.start()
     instrumentator.expose(app)
 
@@ -108,10 +108,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    logger.info("Arrêt de l'API")
+    logger.info("API shutdown")
 
 
-# Préfixe à utiliser pour les URL OpenAPI
+# Prefix to use for OpenAPI URLs
 root_path = "/api" if settings.ENVIRONMENT == "proxy" else ""
 
 app = FastAPI(

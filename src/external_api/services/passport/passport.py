@@ -27,7 +27,7 @@ async def get_fleet_id_of_vin(vin: str, db: AsyncSession):
 async def get_kpis(vin: str, db: AsyncSession):
     query = text("""
         WITH vehicle_info AS (
-            SELECT v.id, v.vehicle_model_id, vm.url_image
+            SELECT v.id, v.vehicle_model_id, vm.url_image, v.bib_score as score
             FROM vehicle v
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             WHERE vin = :vin
@@ -38,7 +38,8 @@ async def get_kpis(vin: str, db: AsyncSession):
                 date_trunc('week', vd.timestamp) as week_start,
                 ROUND(odometer::numeric, 0) as odometer,
                 ROUND((soh::numeric * 100), 1) as soh,
-                soh_comparison
+                soh_comparison,
+                score
             FROM vehicle_data vd
             JOIN vehicle_info vi ON vd.vehicle_id = vi.id
             WHERE (odometer IS NOT NULL OR soh IS NOT NULL)
@@ -48,14 +49,7 @@ async def get_kpis(vin: str, db: AsyncSession):
         scores_by_week AS (
             SELECT
                 week_start,
-                CASE
-                    WHEN soh_comparison >= 3.50 THEN 'A'
-                    WHEN soh_comparison >= 2.00 THEN 'B'
-                    WHEN soh_comparison >= 1.45 THEN 'C'
-                    WHEN soh_comparison > -0.74 THEN 'D'
-                    WHEN soh_comparison > -4.00 THEN 'E'
-                    ELSE 'F'
-                END as value
+                score as value
             FROM weekly_data
         )
         SELECT
@@ -280,49 +274,7 @@ async def get_infos(vin: str, db: AsyncSession):
                 wd.consumption,
                 ld_odometer.consumption
             ) as consumption,
-            CASE
-                WHEN COALESCE(
-                    CASE
-                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld_soh.soh_comparison
-                    END,
-                    wd.soh_comparison,
-                    ld_soh.soh_comparison
-                ) >= 3.50 THEN 'A'
-                WHEN COALESCE(
-                    CASE
-                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld_soh.soh_comparison
-                    END,
-                    wd.soh_comparison,
-                    ld_soh.soh_comparison
-                ) >= 2.00 THEN 'B'
-                WHEN COALESCE(
-                    CASE
-                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld_soh.soh_comparison
-                    END,
-                    wd.soh_comparison,
-                    ld_soh.soh_comparison
-                ) >= 1.45 THEN 'C'
-                WHEN COALESCE(
-                    CASE
-                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld_soh.soh_comparison
-                    END,
-                    wd.soh_comparison,
-                    ld_soh.soh_comparison
-                ) > -0.74 THEN 'D'
-                WHEN COALESCE(
-                    CASE
-                        WHEN ld_soh.last_data_date >= (SELECT start_date FROM last_week) THEN wd.soh_comparison
-                        ELSE ld_soh.soh_comparison
-                    END,
-                    wd.soh_comparison,
-                    ld_soh.soh_comparison
-                ) > -4.00 THEN 'E'
-                ELSE 'F'
-            END as score
+            v.bib_score as score
         FROM vehicle v
         JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
         JOIN oem ON vm.oem_id = oem.id
@@ -573,6 +525,7 @@ async def get_download_rapport(vin: str, db: AsyncSession):
                 v.end_of_contract_date,
                 v.vin,
                 v.start_date,
+                v.bib_score as score,
                 vm.model_name,
                 vm.type,
                 b.capacity,
@@ -599,18 +552,6 @@ async def get_download_rapport(vin: str, db: AsyncSession):
             FROM vehicle_data vd
             WHERE vd.vehicle_id = (SELECT id FROM vehicle_info)
             ORDER BY vd.vehicle_id, timestamp DESC
-        ),
-        score_data AS (
-            SELECT
-                CASE
-                    WHEN soh_comparison >= 3.50 THEN 'A'
-                    WHEN soh_comparison >= 2.00 THEN 'B'
-                    WHEN soh_comparison >= 1.45 THEN 'C'
-                    WHEN soh_comparison > -0.74 THEN 'D'
-                    WHEN soh_comparison > -4.00 THEN 'E'
-                    ELSE 'F'
-                END as score
-            FROM latest_data
         ),
         soh_degradation AS (
             SELECT
@@ -669,7 +610,6 @@ async def get_download_rapport(vin: str, db: AsyncSession):
             ld.cycles,
             ld.consumption,
             ld.remaining_warranty_km,
-            sd.score,
             p.base_autonomy,
             ROUND((p.base_autonomy * p.current_soh / 100)::numeric, 0) as remaining_range,
             json_build_object(
@@ -732,7 +672,6 @@ async def get_download_rapport(vin: str, db: AsyncSession):
             ) predictions
         FROM vehicle_info vi
         LEFT JOIN latest_data ld ON true
-        LEFT JOIN score_data sd ON true
         LEFT JOIN predictions p ON true
     """)
 
@@ -793,7 +732,7 @@ async def get_kpis_additional(vin: str, db: AsyncSession):
     return {"consumption": consumption_average, "cycles": max_cycles}
 
 
-async def pin_vehicle(vin: str, is_pinned: bool, db: AsyncSession):
+async def post_pin_vehicle(vin: str, is_pinned: bool, db: AsyncSession):
     query = text("""
         UPDATE vehicle
         SET is_pinned = :is_pinned

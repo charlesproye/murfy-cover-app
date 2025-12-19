@@ -14,7 +14,7 @@ const useGetTableFleet = (
   hasMorePages: boolean;
 } => {
   const { data, isLoading, error } = useSWR(
-    `${ROUTES.GET_GROUP}?fleet_id=${fleet}&group=${label}&page=${currentPage}`,
+    `${ROUTES.SOH_BY_GROUPS}?fleet_id=${fleet}&group=${label}&page=${currentPage}`,
     fetchWithAuth<TableFleetResult>,
     {
       revalidateOnFocus: false,

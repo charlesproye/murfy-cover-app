@@ -5,8 +5,10 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import UUID4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import select
 
 from external_api.core.cookie_auth import authenticate_user, create_tokens
+from external_api.db.session import get_db
 from external_api.schemas.user import GlobalUser, User, UserLogin
 
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="token")
@@ -75,3 +77,18 @@ async def get_user_by_id(db: AsyncSession, user_id: UUID4) -> GlobalUser | None:
         }
 
         return User(**user_dict)
+
+
+async def get_flash_report_user(
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    query = select(User).where(User.email == "flash-report@bib-batteries.fr")
+    flash_report_user = (await db.execute(query)).scalar_one_or_none()
+
+    if not flash_report_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Flash report user not found",
+        )
+
+    return flash_report_user

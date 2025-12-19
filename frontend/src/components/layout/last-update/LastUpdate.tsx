@@ -11,7 +11,7 @@ interface LastUpdateProps {
 const LastUpdate: React.FC<LastUpdateProps> = ({ fleetId }) => {
   const { data: last_timestamp_with_data, isLoading: isLoadingLastTimestampWithData } =
     useSWR(
-      `${ROUTES.GET_LAST_TIMESTAMP_WITH_DATA}?fleet_id=${fleetId ?? ''}`,
+      `${ROUTES.LAST_TIMESTAMP_WITH_DATA}?fleet_id=${fleetId ?? ''}`,
       fetchWithAuth<string>,
     );
 

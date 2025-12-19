@@ -643,7 +643,7 @@ async def get_new_vehicles(fleet_id: str, period: str, db: AsyncSession):
     return result.mappings().all()
 
 
-async def search_vin(vin: str, fleets_ids: list[UUID4], db: AsyncSession):
+async def get_search_vin(vin: str, fleets_ids: list[UUID4], db: AsyncSession):
     if not fleets_ids:
         return []
 
@@ -804,14 +804,7 @@ async def get_trendline_brand(
                 vd.odometer,
                 vd.soh_comparison,
                 v.fleet_id = :fleet_id as in_fleet,
-                CASE
-                    WHEN vd.soh_comparison >= 3.50 THEN 'A'
-                    WHEN vd.soh_comparison >= 2.00 THEN 'B'
-                    WHEN vd.soh_comparison >= 1.45 THEN 'C'
-                    WHEN vd.soh_comparison > -0.74 THEN 'D'
-                    WHEN vd.soh_comparison > -4.00 THEN 'E'
-                    ELSE 'F'
-                END as score
+                v.bib_score as score
             FROM vehicle v
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
@@ -1002,7 +995,7 @@ async def get_soh_by_groups(fleet_id: str, group: str, page: int, db: AsyncSessi
     }
 
 
-async def get_extremum_soh(
+async def get_extremum_vehicles(
     fleet_id: str,
     brand: str | None,
     page: int | None,
@@ -1056,6 +1049,7 @@ async def get_extremum_soh(
             SELECT DISTINCT ON (v.id)
                 v.id,
                 v.vin,
+                v.bib_score as score,
                 ROUND((vd.soh * 100), 1) as soh,
                 vd.odometer,
                 vm.oem_id,
@@ -1083,14 +1077,7 @@ async def get_extremum_soh(
                 oem_name,
                 years_remaining,
                 soh_comparison,
-                CASE
-                    WHEN soh_comparison >= 3.50 THEN 'A'
-                    WHEN soh_comparison >= 2.00 THEN 'B'
-                    WHEN soh_comparison >= 1.45 THEN 'C'
-                    WHEN soh_comparison > -0.74 THEN 'D'
-                    WHEN soh_comparison > -4.00 THEN 'E'
-                    ELSE 'F'
-                END as score
+                score
             FROM latest_vehicle_data
         ),
         total_count AS (

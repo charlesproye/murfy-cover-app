@@ -9,7 +9,7 @@ from external_api.core.cookie_auth import (
     get_authenticated_user,
     get_current_user_with_refresh_from_cookie,
 )
-from external_api.core.utils import CrudTesla
+from external_api.core.personal_tesla import CrudTesla
 from external_api.db.session import get_db
 from external_api.schemas.user import LoginResponse, TokenResponse, UserLogin
 from external_api.services.user import login_with_cookies

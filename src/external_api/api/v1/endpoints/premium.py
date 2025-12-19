@@ -9,13 +9,13 @@ from external_api.core.cookie_auth import (
     get_user_with_fleet,
 )
 from external_api.db.session import get_db
-from external_api.schemas.passport import PassportCrud
 from external_api.schemas.premium import (
     PremiumData,
     PremiumReportGeneration,
     PremiumReportPDFUrl,
 )
 from external_api.schemas.user import GetCurrentUser
+from external_api.services.passport.passport import get_infos
 from reports.workers.tasks import generate_pdf_task
 
 router = APIRouter()
@@ -73,7 +73,7 @@ async def get_premium_data(
             status_code=400, detail="Vehicle activated but SoH is not available yet."
         )
 
-    response = await PassportCrud().get_infos(vin, db)
+    response = await get_infos(vin, db)
 
     response_data = response if response is not None else {}
 

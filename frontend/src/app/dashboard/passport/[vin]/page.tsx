@@ -14,7 +14,7 @@ import { ROUTES } from '@/routes';
 import { toast } from 'sonner';
 import { Loading } from '@/components/common/loading/loading';
 
-const PassPort: React.FC = () => {
+const PassPort = () => {
   const router = useRouter();
   const params = useParams();
   const vin = params.vin as string;

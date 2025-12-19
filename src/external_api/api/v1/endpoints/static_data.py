@@ -37,29 +37,6 @@ async def check_model_exists(model_id: uuid.UUID, db: AsyncSession) -> bool:
     return model_id
 
 
-def is_tesla_vin(vin: str) -> bool:
-    """
-    Detects if a VIN belongs to a Tesla vehicle.
-
-    Tesla VINs typically start with:
-    - 5YJ for vehicles manufactured in the United States (Model S, 3, X, Y)
-    - 7SA for vehicles manufactured in China
-    - LRW for some Chinese vehicles
-    - SFZ for some European vehicles (Berlin)
-
-    Args:
-        vin: Vehicle Identification Number
-
-    Returns:
-        bool: True if the VIN corresponds to a Tesla vehicle, False otherwise
-    """
-    if len(vin) < 3:
-        return False
-
-    tesla_prefixes = ["5YJ", "7SA", "LRW", "SFZ", "XP7"]
-    return vin[:3].upper() in tesla_prefixes
-
-
 @router.get(
     "/models",
     response_model=list[ModelType],
