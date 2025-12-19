@@ -49,6 +49,8 @@ spec:
                     name: slack-secret
                 - secretRef:
                     name: db-data-eng-secret
+                - secretRef:
+                    name: db-encryption-secret
               env:
                 - name: METRIC_SLACK_CHANNEL_ID
                   value: "C09RUV9T2UR"

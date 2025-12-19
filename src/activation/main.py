@@ -32,11 +32,12 @@ from activation.config.credentials import (
     RENAULT_KID,
     RENAULT_PWD,
     RENAULT_SCOPE,
-    SLACK_TOKEN,
     STELLANTIS_BASE_URL,
     STELLANTIS_COMPANY_ID,
     STELLANTIS_EMAIL,
     STELLANTIS_PASSWORD,
+    TESLA_CLIENT_ID,
+    TESLA_CLIENT_SECRET,
     VW_AUTH_URL,
     VW_BASE_URL,
     VW_CLIENT_PASSWORD,
@@ -109,8 +110,8 @@ async def process_vehicles(owner_filter: str | None = None):
         )
 
         tesla_api = TeslaApi(
-            slack_token=SLACK_TOKEN,
-            slack_channel_id=METRIC_SLACK_CHANNEL_ID,
+            client_id=TESLA_CLIENT_ID,
+            client_secret=TESLA_CLIENT_SECRET,
         )
 
         # Get initial fleet info

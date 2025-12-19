@@ -26,6 +26,7 @@ dependencies = [
     "pydantic>=2.11",
     "pydantic-settings>=2.11",
     "click>=8.1.7",
+    "cryptography>=46.0.3",
 ]
 
 [project.optional-dependencies]

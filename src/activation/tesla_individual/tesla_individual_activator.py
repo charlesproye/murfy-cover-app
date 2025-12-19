@@ -15,6 +15,7 @@ from activation.tesla_individual.api.credentials import (
     TESLA_VEHICLE_COMMAND_KEY_PATH,
 )
 from activation.tesla_individual.config import TESLA_TELEMETRY_CONFIG
+from core.encrypt_utils import Encrypter
 from core.env_utils import get_env_var
 from core.slack_utils import send_slack_message
 from core.tesla.tesla_individual_api import TeslaIndividualApi
@@ -30,9 +31,10 @@ class TeslaIndividualActivator:
         self.client_id = TESLA_CLIENT_ID
         self.client_secret = TESLA_CLIENT_SECRET
         self.region = TeslaRegions.EUROPE
+        self.encrypter = Encrypter()
 
     def _format_error_slack_notification(self, vin: str, reason: str):
-        if datetime.now().hour >= 16 or datetime.now().hour < 17:
+        if datetime.now().hour >= 16 and datetime.now().hour < 17:
             slack_channel_id = get_env_var("METRIC_CHANNEL_ID")
             message = (
                 f"❌ Information - Particulier Tesla\nVIN: {vin}\nMotif: {reason}\n"
@@ -78,7 +80,7 @@ class TeslaIndividualActivator:
 
         if user_token.refresh_token is None:
             tokens = await tesla_api.get_token(
-                code=user_token.code,
+                code=self.encrypter.decrypt(user_token.code),
                 redirect_uri=user_token.callback_url,
                 region=user.region,
             )

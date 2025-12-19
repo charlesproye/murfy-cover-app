@@ -13,9 +13,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import insert, select, update
 
+from core.encrypt_utils import Encrypter
 from core.tesla.tesla_individual_api import TeslaIndividualApi
 from db_models.user_tokens import User, UserToken
+from db_models.vehicle import FleetTeslaAuthenticationCode
 from external_api.core.config import settings
+from external_api.core.cookie_auth import (
+    GetCurrentUser,
+    get_current_user_from_cookie,
+    get_user,
+)
 from external_api.core.http_client import HTTP_CLIENT
 from external_api.core.utils import replace_in_url, strip_params_from_url
 from external_api.db.session import get_db
@@ -46,6 +53,7 @@ async def tesla_auth_callback(
     """
     tesla_user_query = select(User).where(User.vin == state)
     tesla_user = (await db.execute(tesla_user_query)).scalar_one_or_none()
+    encrypter = Encrypter()
 
     if not tesla_user:
         return templates.TemplateResponse(
@@ -61,16 +69,11 @@ async def tesla_auth_callback(
             },
         )
 
-    try:
-        await db.execute(
-            insert(UserToken).values(
-                user_id=tesla_user.id,
-                code=code,
-                callback_url=strip_params_from_url(request.url),
-            )
-        )
-        await db.commit()
-    except IntegrityError:
+    # Check if user already has a token (before encryption to avoid unique constraint issues)
+    existing_token_query = select(UserToken).where(UserToken.user_id == tesla_user.id)
+    existing_token = (await db.execute(existing_token_query)).scalar_one_or_none()
+
+    if existing_token:
         LOGGER.warning(
             f"User code already generated and consumed for user {tesla_user.email} with vin={tesla_user.vin}"
         )
@@ -86,6 +89,15 @@ async def tesla_auth_callback(
                 "vin": tesla_user.vin,
             },
         )
+
+    await db.execute(
+        insert(UserToken).values(
+            user_id=tesla_user.id,
+            code=encrypter.encrypt(code),
+            callback_url=strip_params_from_url(request.url),
+        )
+    )
+    await db.commit()
 
     await refresh_token(user_id=tesla_user.id, session=session, db=db)
 
@@ -152,6 +164,8 @@ async def refresh_token(
     session: aiohttp.ClientSession = Depends(HTTP_CLIENT),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
+    encrypter = Encrypter()
+
     if not all([settings.TESLA_CLIENT_ID, settings.TESLA_CLIENT_SECRET]):
         raise HTTPException(
             status_code=500, detail="Tesla credentials are not set on the server."
@@ -184,7 +198,7 @@ async def refresh_token(
 
     if user_token.refresh_token is None:
         tokens = await tesla_individual_api.get_token(
-            code=user_token.code,
+            code=encrypter.decrypt(user_token.code),
             redirect_uri=user_token.callback_url,
             region=user.region,
         )
@@ -206,3 +220,26 @@ async def refresh_token(
     await db.commit()
 
     return {"message": f"Tokens refreshed successfully for user={user_id}"}
+
+
+# Endpoint to POST authentication code for a specific account
+@tesla_router.post("/authentication-code")
+async def authentication_code(
+    authentication_code: str,
+    fleet_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
+) -> dict[str, str]:
+    encrypter = Encrypter()
+
+    await db.execute(
+        insert(FleetTeslaAuthenticationCode).values(
+            fleet_id=fleet_id,
+            authentication_code=encrypter.encrypt(authentication_code),
+        )
+    )
+    await db.commit()
+
+    return {
+        "message": f"Authentication code inserted successfully for fleet={fleet_id}"
+    }

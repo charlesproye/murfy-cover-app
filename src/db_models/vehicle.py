@@ -172,3 +172,13 @@ class VehicleStatus(BaseUUIDModel):
     process_step: str = Column(String(100), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class FleetTeslaAuthenticationCode(BaseUUIDModel):
+    __tablename__ = "fleet_tesla_authentication_code"
+    fleet_id: Mapped[uuid.UUID] = Column(
+        ForeignKey("fleet.id"), nullable=False, unique=True
+    )
+    authentication_code: Mapped[str] = Column(String, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

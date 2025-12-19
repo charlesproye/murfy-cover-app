@@ -39,12 +39,10 @@ class UserToken(BaseUUIDModel):
     __table_args__: ClassVar = {"schema": "tesla"}
 
     user_id: Mapped[uuid.UUID] = Column(ForeignKey("tesla.user.id"), nullable=False)
-    code: str = Column[str](String(63), nullable=False, unique=True)
-
+    code: Mapped[str] = Column(String, nullable=False, unique=True)
     access_token: str | None = Column[str](String(5000), nullable=True)
     refresh_token: str | None = Column[str](String(67), nullable=True)
     expires_at: datetime | None = Column[datetime](DateTime, nullable=True)
-
     callback_url: str = Column[str](
         String,
         comment="Callback URL for the user token, it must be the same one as the one used to generate the code",

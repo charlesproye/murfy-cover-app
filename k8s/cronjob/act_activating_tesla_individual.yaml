@@ -33,6 +33,8 @@ spec:
                     name: tesla-secret
                 - secretRef:
                     name: slack-secret
+                - secretRef:
+                    name: db-encryption-secret
               env:
                 - name: TESLA_VEHICLE_COMMAND_CERT_PATH
                   value: /secrets/tesla-vehicle-command/vehicle-command-tls-cert.pem

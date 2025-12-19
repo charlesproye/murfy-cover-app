@@ -39,6 +39,8 @@ spec:
             name: s3-secret
         - secretRef:
             name: db-data-ev-secret
+        - secretRef:
+            name: db-encryption-secret
         env:
         - name: ALGORITHM
           value: HS256

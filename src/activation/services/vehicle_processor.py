@@ -12,6 +12,7 @@ from activation.config.mappings import (
     mapping_vehicle_type,
 )
 from core.sql_utils import get_connection
+from external_api.db.session import get_session_maker
 
 
 class VehicleProcessor:
@@ -929,7 +930,11 @@ class VehicleProcessor:
             tesla_df = self.df[
                 (self.df["oem"] == "tesla") & (self.df["real_activation"].astype(bool))
             ]
+
             async with aiohttp.ClientSession() as session:
+                session_maker = get_session_maker()
+                async with session_maker() as db:
+                    await self.tesla_api.fetch_all_tokens(session, db)
                 with get_connection() as con:
                     cursor = con.cursor()
                     for _, vehicle in tesla_df.iterrows():
@@ -960,12 +965,15 @@ class VehicleProcessor:
                                     version,
                                     model_type,
                                 ) = await self.tesla_api.get_vehicle_options(
-                                    session, vin, model_name
+                                    session, vin, fleet_id, model_name
                                 )
                                 (
                                     warranty_km,
                                     warranty_date,
-                                ) = await self.tesla_api.get_warranty_info(session, vin)
+                                    _,
+                                ) = await self.tesla_api.get_warranty_info(
+                                    session, vin, fleet_id
+                                )
 
                                 # Create/get model and related records
                                 model_id = await self._get_or_create_tesla_model(
@@ -1039,7 +1047,10 @@ class VehicleProcessor:
                                         api_version,
                                         model_type,
                                     ) = await self.tesla_api.get_vehicle_options(
-                                        session, vehicle["vin"], model_name
+                                        session,
+                                        vehicle["vin"],
+                                        fleet_id,
+                                        model_name,
                                     )
 
                                     if api_version != "MTU":
@@ -1049,7 +1060,7 @@ class VehicleProcessor:
                                             warranty_date,
                                             _,
                                         ) = await self.tesla_api.get_warranty_info(
-                                            session, vehicle["vin"]
+                                            session, vehicle["vin"], fleet_id
                                         )
                                         new_model_id = (
                                             await self._get_or_create_tesla_model(
@@ -1076,7 +1087,7 @@ class VehicleProcessor:
                                         warranty_date,
                                         _,
                                     ) = await self.tesla_api.get_warranty_info(
-                                        session, vin
+                                        session, vehicle["vin"], fleet_id
                                     )
                                     cursor.execute(
                                         """
