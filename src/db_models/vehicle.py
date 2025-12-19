@@ -179,6 +179,6 @@ class FleetTeslaAuthenticationCode(BaseUUIDModel):
     fleet_id: Mapped[uuid.UUID] = Column(
         ForeignKey("fleet.id"), nullable=False, unique=True
     )
-    authentication_code: Mapped[str] = Column(String, nullable=False)
+    authentication_code: Mapped[str] = Column(String(2000), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
