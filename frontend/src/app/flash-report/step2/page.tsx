@@ -1,9 +1,9 @@
 'use client';
 
-import { FlashReportForm } from '@/components/flash-report/forms/FlashReportForm';
+import { FlashReportForm } from '@/components/entities/flash-report/forms/FlashReportForm';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { VinDecoderResponse } from '@/components/flash-report/forms/VinForm';
+import type { VinDecoderResponse } from '@/components/entities/flash-report/forms/VinForm';
 import { Loading } from '@/components/common/loading/loading';
 
 interface FlashReportData extends VinDecoderResponse {

@@ -20,7 +20,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }): React.ReactElement {
   const real_pathname = usePathname();
-  const { company, user, fleet } = useAuth();
+  const { user, fleet } = useAuth();
   const vin = real_pathname.includes('/passport/')
     ? real_pathname.split('/').pop()
     : undefined;
@@ -44,22 +44,14 @@ export default function DashboardLayout({
         <div className="flex flex-col text-black dark:text-dark-dark px-2 overflow-auto z-20 h-full">
           <Link href="/dashboard">
             <div className="flex items-center mt-3 mb-3">
-              {company?.name !== 'ituran' && (
-                <Image
-                  alt="logo-battery-green"
-                  priority
-                  width={34}
-                  height={34}
-                  src="/logo/logo-battery-green.webp"
-                />
-              )}
-              <p className="font-bold text-xl hidden sm:contents">
-                {company?.name === 'ituran' ? (
-                  <img src="/logo/ituran.png" alt="logo-ituran" className="w-24" />
-                ) : (
-                  'EValue'
-                )}
-              </p>
+              <Image
+                alt="logo-battery-green"
+                priority
+                width={34}
+                height={34}
+                src="/logo/logo-battery-green.webp"
+              />
+              <p className="font-bold text-xl hidden sm:contents">EValue</p>
             </div>
           </Link>
           <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-2 border-cool-gray-200" />

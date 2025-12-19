@@ -3,7 +3,7 @@
 import React from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { FlashReportGeneration } from '@/components/flash-report/FlashReportGeneration';
+import { FlashReportGeneration } from '@/components/entities/flash-report/FlashReportGeneration';
 
 const FlashReportGenerationPage = (): React.ReactElement => {
   const searchParams = useSearchParams();

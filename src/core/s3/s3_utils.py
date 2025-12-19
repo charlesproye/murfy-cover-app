@@ -369,10 +369,6 @@ class S3Service:
         )
 
     def generate_folder_presigned_url(self, folder_name):
-        # s3 = S3_Bucket()
-        # bucket_name = get_env_var("S3_BUCKET")
-        # folder_name = 'response/ituran/'
-
         response = self.generate_presigned_post(
             key=f"{folder_name}${{filename}}",
             expires_in=600000,
