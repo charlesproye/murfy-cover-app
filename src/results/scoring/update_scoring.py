@@ -310,6 +310,7 @@ def compute_bib_score(logger: Logger = LOGGER):
             FROM tmp_soh s
             WHERE v.vin = s.vin
         """)
+        # Drop temporary table
+        cur.execute("DROP TABLE IF EXISTS tmp_soh;")
         con.commit()
-
     logger.info("Bib score updated successfully")
