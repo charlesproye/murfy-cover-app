@@ -16,13 +16,14 @@ import {
 } from '@/services/auth/authService';
 import { ROUTES } from '@/routes';
 import { toast } from 'sonner';
+import { OEM } from '@/interfaces/dashboard/home/table/TablebrandResult';
 
 interface AuthContextProps {
   isLoading: boolean;
   user: User | null;
   company: Company | null;
-  fleet: Fleet | null;
-  setFleet: (fleet: Fleet | null) => void;
+  fleet: Fleet;
+  setFleet: (fleet: Fleet) => void;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   handleLogout: () => Promise<void>;
@@ -30,6 +31,14 @@ interface AuthContextProps {
 }
 
 const AUTHORIZED_ROUTES = ['/auth/login', '/flash-report', '/tesla-activation'];
+export const FLEET_ALL: Fleet = {
+  id: 'all',
+  name: 'All Fleets',
+};
+export const OEM_ALL: OEM = {
+  oem_id: 'all',
+  oem_name: 'All brands',
+};
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
@@ -42,7 +51,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [isAuth, setIsAuth] = useState(false);
-  const [fleet, setFleet] = useState<Fleet | null>(null);
+  const [fleet, setFleet] = useState<Fleet>(FLEET_ALL);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -52,11 +61,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (userData) {
       setUser(userData.user);
       setCompany(userData.company);
-      if (userData.user.fleets.length > 0) {
-        setFleet(userData.user.fleets[0]);
-      } else {
-        setFleet(null);
-      }
       setIsAuth(true);
     } else {
       await handleLogout();
@@ -110,11 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response && response.user && response.company) {
         setUser(response.user);
         setCompany(response.company);
-        if (response.user.fleets.length > 0) {
-          setFleet(response.user.fleets[0]);
-        } else {
-          setFleet(null);
-        }
+        setFleet(FLEET_ALL);
         setIsAuth(true);
         return true;
       }
@@ -158,7 +158,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setCompany(null);
       setIsAuth(false);
-      setFleet(null);
+      setFleet(FLEET_ALL);
       router.push('/auth/login');
     }
   };

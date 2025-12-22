@@ -2,14 +2,13 @@
 
 import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { IconLayoutDashboard, IconWorld, IconWallet, IconCar } from '@tabler/icons-react';
+import { IconLayoutDashboard, IconWallet, IconHeart } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
 import SearchBar from '@/components/common/search';
 import Logout from '@/components/auth/Logout';
 import { useAuth } from '@/contexts/AuthContext';
-import ChangeFleet from '@/components/layout/ChangeFleet';
 import LastUpdate from '@/components/layout/last-update/LastUpdate';
 import LastUpdatePassport from '@/components/layout/last-update/LastUpdatePassport';
 import Help from '@/components/layout/Help';
@@ -31,7 +30,6 @@ export default function DashboardLayout({
       ? real_pathname === '/dashboard'
       : real_pathname === `/dashboard/${pathname}`;
 
-  // Scroll to top of the scrollable container when navigating to /dashboard/global
   useEffect(() => {
     if (scrollableContainerRef.current) {
       scrollableContainerRef.current.scrollTop = 0;
@@ -87,32 +85,6 @@ export default function DashboardLayout({
                 </p>
               </div>
             </Link>
-            <Link href={`/dashboard/global`}>
-              <div
-                className={`${
-                  isActive('global')
-                    ? 'bg-white-clair dark:bg-dark-white-clair text-bleu-vif dark:text-dark-bleu-vif rounded-lg ml-0 px-2'
-                    : 'ml-2'
-                } cursor-pointer flex h-10 gap-2 items-center relative`}
-              >
-                <IconWorld
-                  className={`w-[22px] h-[22px] sm:w-[18px] sm:h-[18px] ${
-                    isActive('global')
-                      ? 'text-bleu-vif dark:text-dark-bleu-vif'
-                      : 'text-gray dark:text-dark-gray'
-                  }`}
-                />
-                <p
-                  className={`hidden sm:block text-sm my-auto ${
-                    isActive('global')
-                      ? 'text-bleu-vif dark:text-dark-bleu-vif font-semibold'
-                      : 'text-gray dark:text-dark-gray font-thin'
-                  }`}
-                >
-                  Global
-                </p>
-              </div>
-            </Link>
             <Link href={`/dashboard/favorites`}>
               <div
                 className={`${
@@ -121,7 +93,7 @@ export default function DashboardLayout({
                     : 'ml-2'
                 } cursor-pointer flex h-10 gap-2 items-center relative`}
               >
-                <IconCar
+                <IconHeart
                   className={`w-[22px] h-[22px] sm:w-[18px] sm:h-[18px] ${
                     isActive('favorites')
                       ? 'text-bleu-vif dark:text-dark-bleu-vif'
@@ -201,7 +173,6 @@ export default function DashboardLayout({
             </Link>
           </div>
           <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-4 border-cool-gray-200 mb-3" />
-          {!isActive('global') && <ChangeFleet />}
           <div className="flex flex-col mt-auto mb-4 ml-2 gap-2">
             <Help />
             <Logout />

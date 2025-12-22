@@ -8,6 +8,11 @@ export type TableBrandsResult = {
   region_id?: string;
 };
 
+export type OEM = {
+  oem_id: string;
+  oem_name: string;
+};
+
 export type TableExtremumResult = {
   vehicles: {
     vin: string;
@@ -16,11 +21,10 @@ export type TableExtremumResult = {
     soh: number;
     years_remaining?: number;
     score: string;
+    consumption?: number;
+    fast_charge_ratio?: number;
   }[];
-  brands: {
-    oem_id: string;
-    oem_name: string;
-  }[];
+  brands: OEM[];
   pagination: {
     page: number;
     page_size: number;

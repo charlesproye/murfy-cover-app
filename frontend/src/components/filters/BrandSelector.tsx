@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React from 'react';
+import { capitalizeFirstLetter } from '@/lib/dataDisplay';
 
 const BrandSelector: React.FC<{
   selected: string;
@@ -22,7 +23,7 @@ const BrandSelector: React.FC<{
       <SelectContent>
         {brands?.map((brand) => (
           <SelectItem key={brand.oem_id} value={brand.oem_id}>
-            {brand.oem_name}
+            {capitalizeFirstLetter(brand.oem_name)}
           </SelectItem>
         ))}
       </SelectContent>

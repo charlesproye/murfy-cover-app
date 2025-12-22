@@ -7,7 +7,6 @@ export type Brand = {
 };
 
 export type FilterBrandsProps = {
-  fleet: string | null;
   changeBrand: (brand: string) => void;
   selectedBrand: string | '';
   brands: Brand[];

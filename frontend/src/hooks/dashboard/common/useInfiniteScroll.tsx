@@ -4,7 +4,6 @@ import {
 } from '@/interfaces/common/scroll/DataScroll';
 import { useRef, useCallback, useState, useEffect } from 'react';
 
-// Interface pour les objets qui ont un VIN
 interface VehicleWithVin {
   vin: string;
   [key: string]: unknown;
@@ -43,13 +42,17 @@ const useInfiniteScroll = <T,>({
     [hasMorePages],
   );
 
+  // Reset state when fleet changes
+  useEffect(() => {
+    setPages(1);
+    setData([]);
+  }, [fleet]);
+
   useEffect(() => {
     if (dataGet?.data) {
       setData((prevData) => {
-        // Créer un Map pour dédupliquer basé sur le VIN
         const uniqueMap = new Map<string, T>();
 
-        // Ajouter d'abord les données existantes
         prevData.forEach((item: T) => {
           const vehicle = item as VehicleWithVin;
           if (vehicle.vin) {
@@ -57,7 +60,6 @@ const useInfiniteScroll = <T,>({
           }
         });
 
-        // Ajouter les nouvelles données, en écrasant les doublons
         dataGet.data?.forEach((item: T) => {
           const vehicle = item as VehicleWithVin;
           if (vehicle.vin) {
@@ -65,7 +67,6 @@ const useInfiniteScroll = <T,>({
           }
         });
 
-        // Convertir le Map en tableau
         return Array.from(uniqueMap.values());
       });
     }

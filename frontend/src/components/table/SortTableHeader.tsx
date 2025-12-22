@@ -15,7 +15,7 @@ const SortTableHeader = <ActiveFilterType extends string>({
 }: SortableTableHeaderProps<ActiveFilterType>): React.ReactNode => {
   return (
     <th
-      className="py-4 text-left font-normal cursor-pointer bg-white sticky -top-6  z-10"
+      className="py-4 text-left font-normal cursor-pointer bg-white sticky -top-6 z-10"
       onClick={() => Boolean(filter) && onChangeFilter(filter)}
     >
       <div className="flex items-center space-x-2">

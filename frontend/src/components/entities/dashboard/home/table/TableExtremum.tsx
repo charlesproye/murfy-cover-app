@@ -1,4 +1,11 @@
-import React, { useState, ReactNode, useCallback, Dispatch, SetStateAction } from 'react';
+import React, {
+  useState,
+  ReactNode,
+  useCallback,
+  Dispatch,
+  SetStateAction,
+  useEffect,
+} from 'react';
 import LoadingSmall from '@/components/common/loading/loadingSmall';
 import SortTableHeader from '@/components/table/SortTableHeader';
 import useInfiniteTableExtremum from '@/hooks/dashboard/home/useInfiniteTableExtremum';
@@ -10,9 +17,12 @@ import BrandSelector from '@/components/filters/BrandSelector';
 import DisplayFilterButtons from '@/components/filters/filter-buttons/DisplayFilterButtons';
 import { SortOrder } from '@/interfaces/common/filter/SortOrder';
 import { formatNumber } from '@/lib/dataDisplay';
+import { OEM_ALL } from '@/contexts/AuthContext';
+import PinButton from '@/components/entities/dashboard/favorites/PinButton';
+import { NO_DATA } from '@/lib/staticData';
 
 const TableExtremum: React.FC<{ fleet: string | null }> = ({ fleet }): ReactNode => {
-  const [selectedBrand, setSelectedBrand] = useState<string>('');
+  const [selectedBrand, setSelectedBrand] = useState<string>(OEM_ALL.oem_id);
   const [quality, setQuality] = useState<'Best' | 'Worst' | ''>('Best');
   const [sortingColumn, setSortingColumn] = useState<
     keyof TableExtremumResult['vehicles'][0] | ''
@@ -27,6 +37,10 @@ const TableExtremum: React.FC<{ fleet: string | null }> = ({ fleet }): ReactNode
       sortingColumn,
       sortingOrder,
     );
+
+  const resetBrand = useCallback(() => {
+    setSelectedBrand(OEM_ALL.oem_id);
+  }, [setSelectedBrand]);
 
   const handleChangeFilter = useCallback(
     (newSortingColumn: keyof TableExtremumResult['vehicles'][0]) => {
@@ -58,10 +72,17 @@ const TableExtremum: React.FC<{ fleet: string | null }> = ({ fleet }): ReactNode
     { label: 'Mileage', filter: 'odometer', show: true },
     { label: 'SoH', filter: 'soh', show: true },
     { label: 'Score', filter: 'score', show: true },
+    { label: 'Consumption (Wh/km)', filter: 'consumption', show: true },
+    { label: 'Ratio Fast-charge', filter: 'fast_charge_ratio', show: true },
     { label: 'Warranty Date', filter: '', show: true },
   ];
 
+  useEffect(() => {
+    resetBrand();
+  }, [fleet]);
+
   if (isLoading) return <LoadingSmall />;
+
   return (
     <div className="w-full rounded-lg box-border py-2">
       {/* Fixed header section */}
@@ -108,6 +129,7 @@ const TableExtremum: React.FC<{ fleet: string | null }> = ({ fleet }): ReactNode
                     />
                   ),
               )}
+              <th className="bg-white sticky -top-6 z-10" />
             </tr>
           </thead>
           <tbody>
@@ -132,8 +154,17 @@ const TableExtremum: React.FC<{ fleet: string | null }> = ({ fleet }): ReactNode
                   </td>
                   <td className="font-medium">{formatNumber(row.soh)}</td>
                   <td className="font-medium">{row.score}</td>
+                  <td className="font-medium">{formatNumber(row.consumption)}</td>
+                  <td className="font-medium">
+                    {row.fast_charge_ratio
+                      ? formatNumber(row.fast_charge_ratio * 100, '%')
+                      : NO_DATA}
+                  </td>
                   <td className="font-medium">
                     {formatNumber(row.years_remaining, 'years')}
+                  </td>
+                  <td className="font-medium">
+                    <PinButton vin={row.vin} />
                   </td>
                 </tr>
               ))}

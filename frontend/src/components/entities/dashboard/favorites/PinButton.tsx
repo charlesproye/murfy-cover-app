@@ -3,6 +3,7 @@ import {
   useGetPinVehicle,
   usePostPinVehicle,
 } from '@/hooks/dashboard/passport/usePinVehicle';
+import { IconHeart, IconHeartFilled } from '@tabler/icons-react';
 
 interface PinButtonProps {
   vin: string;
@@ -13,7 +14,6 @@ const PinButton: React.FC<PinButtonProps> = ({ vin }) => {
   const { postPinVehicle, isSubmitting } = usePostPinVehicle(vin);
   const [localPinned, setLocalPinned] = useState<boolean>(!!pinData?.is_pinned);
 
-  // Synchronise l'état local avec la donnée serveur si elle change
   useEffect(() => {
     if (typeof pinData?.is_pinned === 'boolean') {
       setLocalPinned(pinData.is_pinned);
@@ -33,18 +33,16 @@ const PinButton: React.FC<PinButtonProps> = ({ vin }) => {
     <button
       onClick={handleClick}
       disabled={isSubmitting || isPinLoading}
-      className={`px-3 py-1 rounded-lg text-xs transition-all ${
-        localPinned
-          ? 'bg-red-500 text-white hover:bg-red-600'
-          : 'bg-primary text-white hover:bg-primary/90'
-      } ${isSubmitting || isPinLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={`p-1 rounded-lg text-xs transition-all text-primary hover:bg-primary/30 ${
+        isSubmitting || isPinLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+      }`}
     >
       {isSubmitting || isPinLoading ? (
         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mx-auto"></div>
       ) : localPinned ? (
-        'Unpin'
+        <IconHeartFilled className="h-4 w-4" />
       ) : (
-        'Pin'
+        <IconHeart className="h-4 w-4" />
       )}
     </button>
   );

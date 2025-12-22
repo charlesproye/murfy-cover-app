@@ -20,18 +20,21 @@ export const GraphTrendline: React.FC<GraphTrendlineProps> = ({ fleet }) => {
     [data],
   );
 
+  // Updating selected brand when fleet changes
   useEffect(() => {
-    if (data && data.brands.length > 0 && !selectedBrand) {
+    setSelectedBrand('');
+  }, [fleet]);
+  useEffect(() => {
+    if (!isLoading && data && data.brands.length > 0 && !selectedBrand) {
       setSelectedBrand(data.brands[0].oem_id ?? '');
     }
-  }, [data]);
+  }, [isLoading, data, selectedBrand]);
 
   if (isLoading) return <LoadingSmall />;
 
   return (
     <div className="flex flex-col gap-4">
       <FilterBrands
-        fleet={fleet}
         changeBrand={setSelectedBrand}
         selectedBrand={selectedBrand}
         brands={data ? data.brands : []}

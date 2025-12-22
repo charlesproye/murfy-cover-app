@@ -3,6 +3,7 @@ import { ROUTES } from '@/routes';
 import { TableExtremumResult } from '@/interfaces/dashboard/home/table/TablebrandResult';
 import fetchWithAuth from '@/services/fetchWithAuth';
 import { SortOrder } from '@/interfaces/common/filter/SortOrder';
+import { OEM_ALL } from '@/contexts/AuthContext';
 
 const minLoadingTime = 500; // Minimum 500ms loading time
 
@@ -27,7 +28,7 @@ const useInfiniteTableExtremum = (
   sortingOrder: SortOrder,
 ): InfiniteTableExtremumResult => {
   const [data, setData] = useState<TableExtremumResult['vehicles']>([]);
-  const [brands, setBrands] = useState<TableExtremumResult['brands']>([]);
+  const [brands, setBrands] = useState<TableExtremumResult['brands']>([OEM_ALL]);
   const [pagination, setPagination] = useState<TableExtremumResult['pagination'] | null>(
     null,
   );
@@ -72,7 +73,7 @@ const useInfiniteTableExtremum = (
             setData((prev) => [...prev, ...newData]);
           } else {
             setData(newData);
-            setBrands([{ oem_id: 'All', oem_name: 'All brands' }, ...newBrands]);
+            setBrands([OEM_ALL, ...newBrands]);
           }
 
           setPagination(newPagination);

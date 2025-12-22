@@ -1,347 +1,25 @@
 from datetime import datetime, timedelta
 
 from pydantic import UUID4
-from sqlalchemy import ARRAY, and_, bindparam, case, distinct, func, select, text
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy import and_, case, distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_models import Vehicle, VehicleData
-from external_api.schemas.user import FleetInfo
 
 
-async def get_kpis(
-    fleets: list[FleetInfo] | None,
-    brands: list[UUID4] | None = None,
-    regions: list[UUID4] | None = None,
-    pinned_vehicles: bool = False,
-    db: AsyncSession = None,
-) -> list[dict]:
-    """
-    Get KPIs for the dashboard
-
-    Args:
-        fleets: List of fleet IDs
-        brands: List of brand IDs
-        regions: List of region IDs
-        pinned_vehicles: Whether to only show pinned vehicles
-        db: Database session
-
-    Returns:
-        List of KPIs
-    """
-    # Extract fleet IDs from FleetInfo objects
-    fleet_id_list = [fleet.id for fleet in fleets] if fleets else []
-
-    query = text("""
-        WITH latest_vehicle_data AS (
-            SELECT DISTINCT ON (v.id)
-                v.id,
-                vd.odometer,
-                vd.soh * 100 as soh,
-                vd.timestamp
-            FROM vehicle v
-            JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            WHERE v.fleet_id = ANY(:fleet_ids)
-            AND (:brands IS NULL OR vm.oem_id = ANY(:brands))
-            AND (:regions IS NULL OR v.region_id = ANY(:regions))
-            AND (:pinned_vehicles = false OR v.is_pinned = true)
-            ORDER BY v.id, vd.timestamp DESC
-        )
-        SELECT
-            CURRENT_DATE as week,
-            COALESCE(ROUND(AVG(odometer)), 0) as avg_odometer,
-            COALESCE(ROUND(AVG(soh), 1), 0) as avg_soh,
-            COUNT(DISTINCT id) as vehicle_count
-        FROM latest_vehicle_data
-    """).bindparams(
-        bindparam("fleet_ids", type_=ARRAY(PGUUID)),
-        bindparam("brands", type_=ARRAY(PGUUID)),
-        bindparam("regions", type_=ARRAY(PGUUID)),
-    )
-
-    result = await db.execute(
-        query,
-        {
-            "fleet_ids": fleet_id_list,
-            "brands": brands,
-            "regions": regions,
-            "pinned_vehicles": pinned_vehicles,
-        },
-    )
-
-    rows = result.mappings().all()
-    return [dict(row) for row in rows]
-
-
-async def get_scatter_plot_brands(
-    fleets: list[FleetInfo] | None,
-    brands: list[str] | None,
-    fleets_input_list: list[str],
-    pinned_vehicles: bool = False,
-    db: AsyncSession = None,
-):
-    brands_list = brands if brands else None
-    fleet_ids = [fleet.id for fleet in fleets] if fleets else []
-    fleet_list = (
-        fleet_ids
-        if not fleets_input_list or fleets_input_list[0].lower() == "all"
-        else fleets_input_list
-    )
-
-    query = text("""
-        WITH latest_vehicle_data AS (
-            SELECT DISTINCT ON (vd.vehicle_id)
-                v.vin,
-                vd.odometer,
-                ROUND((vd.soh * 100), 1) as soh,
-                vm.oem_id,
-                o.oem_name,
-                v.fleet_id,
-                f.fleet_name
-            FROM vehicle_data vd
-            JOIN vehicle v ON vd.vehicle_id = v.id
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN oem o ON vm.oem_id = o.id
-            JOIN fleet f ON v.fleet_id = f.id
-            WHERE v.fleet_id = ANY(:fleet_list)
-            AND (CAST(:brands_list AS uuid[]) IS NULL OR vm.oem_id = ANY(CAST(:brands_list AS uuid[])))
-            AND (:pinned_vehicles = false OR v.is_pinned = true)
-            ORDER BY vd.vehicle_id, vd.timestamp DESC
-        )
-        SELECT
-            vin,
-            odometer,
-            ROUND(soh, 2) as soh,
-            oem_id,
-            oem_name,
-            fleet_id,
-            fleet_name
-        FROM latest_vehicle_data
-        ORDER BY odometer DESC, fleet_name, oem_name, vin
-    """)
-
-    result = await db.execute(
-        query,
-        {
-            "fleet_list": fleet_list,
-            "brands_list": brands_list,
-            "pinned_vehicles": pinned_vehicles,
-        },
-    )
-
-    rows = result.mappings().all()
-
-    # Organiser les données par fleet puis par marque
-    fleet_data = {}
-    for row in rows:
-        fleet_key = row["fleet_name"]
-        brand_key = row["oem_name"]
-
-        # Initialiser le dictionnaire de la fleet si nécessaire
-        if fleet_key not in fleet_data:
-            fleet_data[fleet_key] = {}
-
-        # Initialiser la liste de la marque si nécessaire
-        if brand_key not in fleet_data[fleet_key]:
-            fleet_data[fleet_key][brand_key] = []
-
-        # Ajouter les données du véhicule
-        fleet_data[fleet_key][brand_key].append(
-            {"vin": row["vin"], "odometer": row["odometer"], "soh": row["soh"]}
-        )
-
-    return fleet_data
-
-
-async def get_scatter_plot_regions(
-    fleets: list[FleetInfo] | None,
-    regions: list[str] | None,
-    fleets_input_list: list[str],
-    pinned_vehicles: bool = False,
-    db: AsyncSession = None,
-):
-    regions_list = regions if regions else None
-    fleet_ids = [fleet.id for fleet in fleets] if fleets else []
-    fleet_list = (
-        fleet_ids
-        if not fleets_input_list or fleets_input_list[0].lower() == "all"
-        else fleets_input_list
-    )
-
-    query = text("""
-        WITH latest_vehicle_data AS (
-            SELECT DISTINCT ON (vd.vehicle_id)
-                v.vin,
-                vd.odometer,
-                ROUND((vd.soh * 100), 1) as soh,
-                v.region_id,
-                r.region_name,
-                v.fleet_id,
-                f.fleet_name
-            FROM vehicle_data vd
-            JOIN vehicle v ON vd.vehicle_id = v.id
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN region r ON v.region_id = r.id
-            JOIN fleet f ON v.fleet_id = f.id
-            WHERE v.fleet_id = ANY(:fleet_list)
-            AND (CAST(:regions_list AS uuid[]) IS NULL OR v.region_id = ANY(CAST(:regions_list AS uuid[])))
-            AND (:pinned_vehicles = false OR v.is_pinned = true)
-            ORDER BY vd.vehicle_id, vd.timestamp DESC
-        )
-        SELECT
-            vin,
-            odometer,
-            ROUND(soh, 2) as soh,
-            region_id,
-            region_name,
-            fleet_id,
-            fleet_name
-        FROM latest_vehicle_data
-        ORDER BY fleet_name, region_name, vin
-    """)
-
-    result = await db.execute(
-        query,
-        {
-            "fleet_list": fleet_list,
-            "regions_list": regions_list,
-            "pinned_vehicles": pinned_vehicles,
-        },
-    )
-
-    rows = result.mappings().all()
-
-    # Organiser les données par fleet puis par région
-    fleet_data = {}
-    for row in rows:
-        fleet_key = row["fleet_name"]
-        region_key = row["region_name"]
-
-        # Initialiser le dictionnaire de la fleet si nécessaire
-        if fleet_key not in fleet_data:
-            fleet_data[fleet_key] = {}
-
-        # Initialiser la liste de la région si nécessaire
-        if region_key not in fleet_data[fleet_key]:
-            fleet_data[fleet_key][region_key] = []
-
-        # Ajouter les données du véhicule
-        fleet_data[fleet_key][region_key].append(
-            {"vin": row["vin"], "odometer": row["odometer"], "soh": row["soh"]}
-        )
-
-    return fleet_data
-
-
-async def get_global_table(
-    fleets: list[FleetInfo] | None,
-    brands: list[UUID4] | None = None,
-    regions: list[UUID4] | None = None,
-    pinned_vehicles: bool = False,
-    db: AsyncSession = None,
-) -> list[dict]:
-    fleet_id_list = [fleet.id for fleet in fleets] if fleets else []
-
-    query = text("""
-        WITH latest_vehicle_data AS (
-            SELECT DISTINCT ON (vd.vehicle_id)
-                vd.vehicle_id,
-                v.fleet_id,
-                f.fleet_name,
-                vm.oem_id,
-                o.oem_name,
-                v.region_id,
-                r.region_name,
-                vd.odometer as last_odometer,
-                ROUND((vd.soh * 100), 1) as last_soh
-            FROM vehicle_data vd
-            JOIN vehicle v ON vd.vehicle_id = v.id
-            JOIN fleet f ON v.fleet_id = f.id
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN oem o ON vm.oem_id = o.id
-            JOIN region r ON v.region_id = r.id
-            WHERE v.fleet_id = ANY(:fleet_ids)
-            AND (:brands IS NULL OR vm.oem_id = ANY(:brands))
-            AND (:regions IS NULL OR v.region_id = ANY(:regions))
-            AND (:pinned_vehicles = false OR v.is_pinned = true)
-            ORDER BY vd.vehicle_id, vd.timestamp DESC
-        ),
-        aggregated_data AS (
-            SELECT
-                fleet_id,
-                fleet_name,
-                oem_id,
-                oem_name,
-                region_id,
-                region_name,
-                ROUND(AVG(last_odometer)) as avg_odometer,
-                ROUND(AVG(last_soh), 1) as avg_soh,
-                COUNT(DISTINCT vehicle_id) as vehicle_count,
-                ROUND(AVG(last_odometer) / NULLIF((100 - AVG(last_soh)), 0)) as km_per_soh_loss
-            FROM latest_vehicle_data
-            GROUP BY fleet_id, fleet_name, oem_id, oem_name, region_id, region_name
-        )
-        SELECT
-            fleet_id,
-            fleet_name,
-            oem_id,
-            oem_name,
-            region_id,
-            region_name,
-            avg_odometer,
-            avg_soh,
-            vehicle_count
-        FROM aggregated_data
-        ORDER BY
-            km_per_soh_loss DESC NULLS LAST,
-            oem_name,
-            region_name
-    """).bindparams(
-        bindparam("fleet_ids", type_=ARRAY(PGUUID)),
-        bindparam("brands", type_=ARRAY(PGUUID)),
-        bindparam("regions", type_=ARRAY(PGUUID)),
-    )
-
-    result = await db.execute(
-        query,
-        {
-            "fleet_ids": fleet_id_list,
-            "brands": brands,
-            "regions": regions,
-            "pinned_vehicles": pinned_vehicles,
-        },
-    )
-
-    return [
-        {
-            "fleet_id": str(row[0]),
-            "fleet_name": row[1],
-            "oem_id": str(row[2]),
-            "oem_name": row[3],
-            "region_id": str(row[4]),
-            "region_name": row[5],
-            "avg_odometer": float(row[6]) if row[6] is not None else None,
-            "avg_soh": float(row[7]) if row[7] is not None else None,
-            "vehicle_count": row[8],
-        }
-        for row in result.all()
-    ]
-
-
-async def get_last_timestamp_with_data(fleet_id: str, db: AsyncSession):
+async def get_last_timestamp_with_data(fleet_ids: list[str], db: AsyncSession):
     query = (
         select(func.max(VehicleData.timestamp).label("last_update"))
         .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
         .where(
             and_(
-                Vehicle.fleet_id == fleet_id,
+                Vehicle.fleet_id.in_(fleet_ids),
                 VehicleData.soh.isnot(None),
                 VehicleData.odometer.isnot(None),
             )
         )
     )
-    result = await db.execute(query, {"fleet_id": fleet_id})
+    result = await db.execute(query, {"fleet_ids": fleet_ids})
     last_update_data = result.mappings().all()
     last_update = (
         last_update_data[0]["last_update"] if len(last_update_data) > 0 else None
@@ -349,8 +27,8 @@ async def get_last_timestamp_with_data(fleet_id: str, db: AsyncSession):
     return last_update
 
 
-async def get_individual_kpis(fleet_id: str, db: AsyncSession):
-    latest_timestamp = await get_last_timestamp_with_data(fleet_id, db)
+async def get_individual_kpis(fleet_ids: list[str], db: AsyncSession):
+    latest_timestamp = await get_last_timestamp_with_data(fleet_ids, db)
     if not latest_timestamp:
         return [
             {
@@ -383,7 +61,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
         )
         .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
         .where(
-            Vehicle.fleet_id == fleet_id,
+            Vehicle.fleet_id.in_(fleet_ids),
             VehicleData.timestamp > one_month_since_last_data,
         )
         .order_by(Vehicle.id, VehicleData.timestamp.desc())
@@ -396,7 +74,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
         func.round(func.avg(subquery.c.soh), 1).label("avg_soh"),
         select(func.count(distinct(Vehicle.id)))
         .where(
-            Vehicle.fleet_id == fleet_id,
+            Vehicle.fleet_id.in_(fleet_ids),
         )
         .scalar_subquery()
         .label("vehicle_count"),
@@ -404,7 +82,10 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
     )
     result = await db.execute(
         query,
-        {"fleet_id": fleet_id, "one_month_since_last_data": one_month_since_last_data},
+        {
+            "fleet_ids": fleet_ids,
+            "one_month_since_last_data": one_month_since_last_data,
+        },
     )
     latest_data = result.mappings().all()
 
@@ -419,7 +100,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
         )
         .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
         .where(
-            Vehicle.fleet_id == fleet_id,
+            Vehicle.fleet_id.in_(fleet_ids),
             VehicleData.timestamp < one_month_since_last_data,
             VehicleData.timestamp > two_months_since_last_data,
         )
@@ -435,7 +116,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
         .select_from(VehicleData)
         .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
         .where(
-            Vehicle.fleet_id == fleet_id,
+            Vehicle.fleet_id.in_(fleet_ids),
             VehicleData.timestamp < one_month_since_last_data,
         )
         .scalar_subquery()
@@ -445,7 +126,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
     result_previous = await db.execute(
         query,
         {
-            "fleet_id": fleet_id,
+            "fleet_ids": fleet_ids,
             "one_month_since_last_data": one_month_since_last_data,
             "two_months_since_last_data": two_months_since_last_data,
         },
@@ -477,66 +158,7 @@ async def get_individual_kpis(fleet_id: str, db: AsyncSession):
     ]
 
 
-async def get_filter(
-    base_fleet: list[FleetInfo] | None,
-    fleet_id: UUID4 | None = None,
-    db: AsyncSession = None,
-) -> list[dict]:
-    """
-    Get filter data for the dashboard
-
-    Args:
-        base_fleet: List of fleet IDs
-        fleet_id: Fleet ID
-        db: Database session
-
-    Returns:
-        List of filter data
-    """
-    # Extract fleet IDs from FleetInfo objects
-    fleet_id_list = [fleet.id for fleet in base_fleet] if base_fleet else []
-
-    query = text("""
-        WITH brands AS (
-            SELECT DISTINCT ON (o.id)
-                o.id as oem_id,
-                INITCAP(o.oem_name) as oem_name
-            FROM vehicle v
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN oem o ON vm.oem_id = o.id
-            WHERE v.fleet_id = ANY(:fleet_ids)
-        ),
-        fleets AS (
-            SELECT
-                id,
-                fleet_name as name
-            FROM fleet
-            WHERE id = ANY(:fleet_ids)
-        )
-        SELECT
-            'brands' as type,
-            json_build_object(
-                'id', oem_id,
-                'name', oem_name
-            ) as data
-        FROM brands
-        UNION ALL
-        SELECT
-            'fleets' as type,
-            json_build_object(
-                'id', id,
-                'name', name
-            ) as data
-        FROM fleets
-    """)
-
-    result = await db.execute(query, {"fleet_ids": fleet_id_list})
-
-    rows = result.mappings().all()
-    return [dict(row) for row in rows]
-
-
-async def get_range_soh(fleet_id: str, type: str, db: AsyncSession):
+async def get_range_soh(fleet_ids: list[str], type: str, db: AsyncSession):
     if type == "soh":
         query = text("""
             WITH latest_vehicle_data AS (
@@ -545,7 +167,7 @@ async def get_range_soh(fleet_id: str, type: str, db: AsyncSession):
                     vd.soh * 100 as value
                 FROM vehicle_data vd
                 JOIN vehicle v ON vd.vehicle_id = v.id
-                WHERE v.fleet_id = :fleet_id
+                WHERE v.fleet_id = ANY(:fleet_ids)
                 ORDER BY vd.vehicle_id, vd.timestamp DESC
             ),
             ranges AS (
@@ -570,7 +192,7 @@ async def get_range_soh(fleet_id: str, type: str, db: AsyncSession):
                     vd.odometer as value
                 FROM vehicle_data vd
                 JOIN vehicle v ON vd.vehicle_id = v.id
-                WHERE v.fleet_id = :fleet_id
+                WHERE v.fleet_id = ANY(:fleet_ids)
                 ORDER BY vd.vehicle_id, vd.timestamp DESC
             ),
             value_bounds AS (
@@ -604,7 +226,7 @@ async def get_range_soh(fleet_id: str, type: str, db: AsyncSession):
             ORDER BY vi.lower_bound
         """)
 
-    result = await db.execute(query, {"fleet_id": fleet_id})
+    result = await db.execute(query, {"fleet_ids": fleet_ids})
     rows = result.mappings().all()
 
     return [
@@ -617,28 +239,41 @@ async def get_range_soh(fleet_id: str, type: str, db: AsyncSession):
     ]
 
 
-async def get_new_vehicles(fleet_id: str, period: str, db: AsyncSession):
+async def get_new_vehicles(fleet_ids: list[str], period: str, db: AsyncSession):
     if period not in ["monthly", "annually"]:
         period = "monthly"
 
-    # Déterminer l'intervalle et la période en fonction de la période
     interval = "4 months" if period == "monthly" else "4 years"
     period_trunc = "month" if period == "monthly" else "year"
 
     query = text(f"""
+        WITH periods AS (
+            SELECT DATE_TRUNC(:period_trunc, generate_series(
+                DATE_TRUNC(:period_trunc, CURRENT_DATE - INTERVAL '{interval}'),
+                DATE_TRUNC(:period_trunc, CURRENT_DATE),
+                INTERVAL '1 {period_trunc}'
+            )) AS period
+        ),
+        vehicle_counts AS (
+            SELECT
+                DATE_TRUNC(:period_trunc, created_at) AS period,
+                COUNT(*) AS vehicle_count
+            FROM vehicle
+            WHERE fleet_id = ANY(:fleet_ids)
+            AND created_at >= CURRENT_DATE - INTERVAL '{interval}'
+            GROUP BY period
+        )
         SELECT
-            DATE_TRUNC(:period_trunc, start_date) AS period,
-            COUNT(*) AS vehicle_count
-        FROM vehicle
-        WHERE fleet_id = :fleet_id
-        AND start_date >= CURRENT_DATE - INTERVAL '{interval}'
-        GROUP BY period
-        ORDER BY period DESC
+            p.period,
+            COALESCE(vc.vehicle_count, 0) AS vehicle_count
+        FROM periods p
+        LEFT JOIN vehicle_counts vc ON p.period = vc.period
+        ORDER BY p.period DESC
         LIMIT 4
     """)
 
     result = await db.execute(
-        query, {"fleet_id": fleet_id, "period_trunc": period_trunc}
+        query, {"fleet_ids": fleet_ids, "period_trunc": period_trunc}
     )
     return result.mappings().all()
 
@@ -671,7 +306,7 @@ def query_region_table():
             FROM vehicle v
             JOIN region r ON v.region_id = r.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            WHERE v.fleet_id = :fleet_id
+            WHERE v.fleet_id = ANY(:fleet_ids)
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
         SELECT
@@ -700,7 +335,7 @@ def query_brand_table():
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            WHERE v.fleet_id = :fleet_id
+            WHERE v.fleet_id = ANY(:fleet_ids)
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
         SELECT
@@ -732,7 +367,7 @@ def query_all_table():
             JOIN oem o ON vm.oem_id = o.id
             JOIN region r ON v.region_id = r.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            WHERE v.fleet_id = :fleet_id
+            WHERE v.fleet_id = ANY(:fleet_ids)
             AND v.activation_status = true
             ORDER BY vd.vehicle_id, vd.timestamp DESC
         )
@@ -751,7 +386,7 @@ def query_all_table():
     return query
 
 
-async def get_table_brand(fleet_id: str, filter: str, db: AsyncSession):
+async def get_table_brand(fleet_ids: list[str], filter: str, db: AsyncSession):
     if filter.lower() == "region":
         query = query_region_table()
     elif filter.lower() == "make":
@@ -759,12 +394,12 @@ async def get_table_brand(fleet_id: str, filter: str, db: AsyncSession):
     else:
         query = query_all_table()
 
-    result = await db.execute(query, {"fleet_id": fleet_id})
+    result = await db.execute(query, {"fleet_ids": fleet_ids})
     return result.mappings().all()
 
 
 async def get_trendline_brand(
-    fleet_id: str, db: AsyncSession, brand: str | None = None
+    fleet_ids: list[str], db: AsyncSession, brand: str | None = None
 ):
     query = text("""
         WITH first_brand AS (
@@ -777,7 +412,7 @@ async def get_trendline_brand(
             FROM vehicle v
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
-            WHERE v.fleet_id = :fleet_id
+            WHERE v.fleet_id = ANY(:fleet_ids)
             ORDER BY vm.oem_id
             LIMIT 1
         ),
@@ -793,7 +428,7 @@ async def get_trendline_brand(
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
             LEFT JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            WHERE v.fleet_id = :fleet_id
+            WHERE v.fleet_id = ANY(:fleet_ids)
             GROUP BY vm.oem_id, o.oem_name, o.trendline::text, o.trendline_max::text, o.trendline_min::text
         ),
         latest_vehicle_data AS (
@@ -803,7 +438,7 @@ async def get_trendline_brand(
                 ROUND((vd.soh * 100), 1) as soh,
                 vd.odometer,
                 vd.soh_comparison,
-                v.fleet_id = :fleet_id as in_fleet,
+                v.fleet_id = ANY(:fleet_ids) as in_fleet,
                 v.bib_score as score
             FROM vehicle v
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
@@ -835,7 +470,7 @@ async def get_trendline_brand(
     result = await db.execute(
         query,
         {
-            "fleet_id": fleet_id,
+            "fleet_ids": fleet_ids,
             "brand": brand
             if brand and brand != "undefined" and brand != "null" and brand != "All"
             else None,
@@ -874,30 +509,13 @@ async def get_trendline_brand(
                 }
             )
 
-    return {"brands": brands_list, "trendline": trendline}
+    brands_list_sorted = sorted(brands_list, key=lambda x: x["oem_name"].lower())
+    return {"brands": brands_list_sorted, "trendline": trendline}
 
 
-async def get_brands(fleet_id: str, db: AsyncSession):
-    query = text("""
-        SELECT DISTINCT
-            vm.oem_id,
-            o.oem_name,
-            CASE
-                WHEN ROW_NUMBER() OVER (ORDER BY o.oem_name) = 1 THEN true
-                ELSE false
-            END as is_default
-        FROM vehicle v
-        JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-        JOIN oem o ON vm.oem_id = o.id
-        WHERE v.fleet_id = :fleet_id
-        ORDER BY o.oem_name
-    """)
-
-    result = await db.execute(query, {"fleet_id": fleet_id})
-    return result.mappings().all()
-
-
-async def get_soh_by_groups(fleet_id: str, group: str, page: int, db: AsyncSession):
+async def get_soh_by_groups(
+    fleet_ids: list[str], group: str, page: int, db: AsyncSession
+):
     def convert_k_to_number(k_value: str) -> int:
         return int(k_value.lower().replace("k", "")) * 1000
 
@@ -931,7 +549,7 @@ async def get_soh_by_groups(fleet_id: str, group: str, page: int, db: AsyncSessi
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
-            WHERE v.fleet_id = :fleet_id
+            WHERE v.fleet_id = ANY(:fleet_ids)
             ORDER BY v.id, vd.timestamp DESC
         ),
         filtered_data AS (
@@ -961,7 +579,7 @@ async def get_soh_by_groups(fleet_id: str, group: str, page: int, db: AsyncSessi
     result = await db.execute(
         query,
         {
-            "fleet_id": fleet_id,
+            "fleet_ids": fleet_ids,
             "min_val": min_val,
             "max_val": max_val,
             "items_per_page": items_per_page,
@@ -996,7 +614,7 @@ async def get_soh_by_groups(fleet_id: str, group: str, page: int, db: AsyncSessi
 
 
 async def get_extremum_vehicles(
-    fleet_id: str,
+    fleet_ids: list[str],
     brand: str | None,
     page: int | None,
     page_size: int | None,
@@ -1042,7 +660,7 @@ async def get_extremum_vehicles(
             FROM vehicle v
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
-            WHERE v.fleet_id = :fleet_id
+            WHERE v.fleet_id = ANY(:fleet_ids)
             ORDER BY o.oem_name
         ),
         latest_vehicle_data AS (
@@ -1058,31 +676,28 @@ async def get_extremum_vehicles(
                 vm.warranty_date,
                 (v.start_date + (vm.warranty_date || ' years')::interval) as warranty_end_date,
                 EXTRACT(year FROM age((v.start_date + (vm.warranty_date || ' years')::interval), CURRENT_DATE)) as years_remaining,
-                vd.soh_comparison
+                vd.soh_comparison,
+                ROUND(
+                    CASE
+                        WHEN (vd.level_1 + vd.level_3) > 0
+                        THEN vd.level_3::numeric / (vd.level_1 + vd.level_2 + vd.level_3)
+                        ELSE NULL
+                    END, 3
+                ) AS fast_charge_ratio,
+                vd.consumption
             FROM vehicle v
             JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
             JOIN oem o ON vm.oem_id = o.id
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            WHERE v.fleet_id = :fleet_id
+            WHERE v.fleet_id = ANY(:fleet_ids)
             AND (:brand='' OR vm.oem_id = CAST(:brand AS uuid))
             AND vd.soh IS NOT NULL
             AND vd.soh_comparison IS NOT NULL
             ORDER BY v.id, vd.timestamp DESC
         ),
-        scored_vehicles AS (
-            SELECT
-                vin,
-                soh,
-                odometer,
-                oem_name,
-                years_remaining,
-                soh_comparison,
-                score
-            FROM latest_vehicle_data
-        ),
         total_count AS (
             SELECT COUNT(*) as total
-            FROM scored_vehicles
+            FROM latest_vehicle_data
         ),
         ordered_vehicles AS (
             SELECT
@@ -1091,8 +706,10 @@ async def get_extremum_vehicles(
                 odometer,
                 oem_name,
                 years_remaining,
-                score
-            FROM scored_vehicles
+                score,
+                fast_charge_ratio,
+                consumption
+            FROM latest_vehicle_data
             {sorting_clause}
             {limit_clause}
         )
@@ -1127,9 +744,9 @@ async def get_extremum_vehicles(
     result = await db.execute(
         query,
         {
-            "fleet_id": fleet_id,
+            "fleet_ids": fleet_ids,
             "offset": offset,
-            "brand": brand if brand and brand != "undefined" and brand != "All" else "",
+            "brand": brand if brand and brand != "undefined" and brand != "all" else "",
             "page": page,
             "page_size": page_size,
             "use_pagination": use_pagination,

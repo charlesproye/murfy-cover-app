@@ -8,20 +8,14 @@ export const ROUTES = {
 
   // DASHBOARD
   LAST_TIMESTAMP_WITH_DATA: `${BASE_URL}/dashboard/last_timestamp_with_data`,
-  KPI: `${BASE_URL}/dashboard/kpis`,
   SEARCHBAR: `${BASE_URL}/dashboard/search`,
-  FILTERS: `${BASE_URL}/dashboard/filters`,
   KPIHOME: `${BASE_URL}/dashboard/individual/kpis`,
   SOHRANGE: `${BASE_URL}/dashboard/individual/range_soh`,
   NEW_VEHICLES: `${BASE_URL}/dashboard/individual/new_vehicles`,
-  GLOBAL_DASHBOARD: `${BASE_URL}/dashboard/global_table`,
-  GLOBAL_SCATTER_BRANDS: `${BASE_URL}/dashboard/scatter_plot_brands`,
-  GLOBAL_SCATTER_REGION: `${BASE_URL}/dashboard/scatter_plot_regions`,
   SEARCH_VEHICLE: `${BASE_URL}/dashboard/search`,
   TABLE_BRANDS: `${BASE_URL}/dashboard/individual/table_brand`,
   TABLE_EXTREMUM: `${BASE_URL}/dashboard/individual/extremum_vehicles`,
   TRENDLINE_BRANDS: `${BASE_URL}/dashboard/individual/trendline_brand`,
-  BRANDS: `${BASE_URL}/dashboard/individual/brands`,
   SOH_BY_GROUPS: `${BASE_URL}/dashboard/individual/soh_by_groups`,
 
   // PASSPORT
@@ -38,9 +32,7 @@ export const ROUTES = {
   IS_VIN_IN_FLEETS: `${BASE_URL}/passport/is_vin_in_fleets`,
 
   // INDIVIDUAL
-  PINNED_VEHICLE: `${BASE_URL}/individual/vehicles/pinned`,
-  FAST_CHARGE_VEHICLE: `${BASE_URL}/individual/vehicles/fast-charge`,
-  CONSUMPTION_VEHICLE: `${BASE_URL}/individual/vehicles/consumption`,
+  PINNED_VEHICLES: `${BASE_URL}/individual/vehicles/pinned`,
 
   // STATIC DATA
   MODELS_WITH_DATA: `${BASE_URL}/static_data/models-with-data`,

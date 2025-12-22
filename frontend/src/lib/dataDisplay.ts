@@ -9,7 +9,8 @@ export const formatNumber = (
   return `${num.toLocaleString('en-US')}${unit ? ` ${unit}` : ''}`;
 };
 
-export const capitalizeFirstLetter = (val: string) => {
+export const capitalizeFirstLetter = (val?: string | null) => {
+  if (!val) return NO_DATA;
   return val.charAt(0).toUpperCase() + val.slice(1);
 };
 
