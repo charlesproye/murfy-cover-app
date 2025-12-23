@@ -9,14 +9,14 @@ export const ROUTES = {
   // DASHBOARD
   LAST_TIMESTAMP_WITH_DATA: `${BASE_URL}/dashboard/last_timestamp_with_data`,
   SEARCHBAR: `${BASE_URL}/dashboard/search`,
-  KPIHOME: `${BASE_URL}/dashboard/individual/kpis`,
-  SOHRANGE: `${BASE_URL}/dashboard/individual/range_soh`,
-  NEW_VEHICLES: `${BASE_URL}/dashboard/individual/new_vehicles`,
+  KPIHOME: `${BASE_URL}/dashboard/kpis`,
+  SOHRANGE: `${BASE_URL}/dashboard/range_soh`,
+  NEW_VEHICLES: `${BASE_URL}/dashboard/new_vehicles`,
   SEARCH_VEHICLE: `${BASE_URL}/dashboard/search`,
-  TABLE_BRANDS: `${BASE_URL}/dashboard/individual/table_brand`,
-  TABLE_EXTREMUM: `${BASE_URL}/dashboard/individual/extremum_vehicles`,
-  TRENDLINE_BRANDS: `${BASE_URL}/dashboard/individual/trendline_brand`,
-  SOH_BY_GROUPS: `${BASE_URL}/dashboard/individual/soh_by_groups`,
+  TABLE_BRANDS: `${BASE_URL}/dashboard/table_brand`,
+  TABLE_EXTREMUM: `${BASE_URL}/dashboard/extremum_vehicles`,
+  TRENDLINE_BRANDS: `${BASE_URL}/dashboard/trendline_brand`,
+  SOH_BY_GROUPS: `${BASE_URL}/dashboard/soh_by_groups`,
 
   // PASSPORT
   GRAPHS: `${BASE_URL}/passport/graph`,
@@ -31,8 +31,8 @@ export const ROUTES = {
   PRICE_FORECAST: `${BASE_URL}/passport/price_forecast`,
   IS_VIN_IN_FLEETS: `${BASE_URL}/passport/is_vin_in_fleets`,
 
-  // INDIVIDUAL
-  PINNED_VEHICLES: `${BASE_URL}/individual/vehicles/pinned`,
+  // FAVORITES
+  PINNED_VEHICLES: `${BASE_URL}/individual/favorite_table`,
 
   // STATIC DATA
   MODELS_WITH_DATA: `${BASE_URL}/static_data/models-with-data`,

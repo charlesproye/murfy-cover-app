@@ -276,7 +276,7 @@ def get_current_user_with_refresh_from_cookie():
     return current_user_refresh
 
 
-async def get_user_with_fleet(email: str, db: AsyncSession):
+async def get_user_with_fleets(email: str, db: AsyncSession):
     query = text("""
         SELECT
             u.company_id,
@@ -443,4 +443,3 @@ def extract_bearer_token_from_request(
             )
     except Exception:
         return None
-

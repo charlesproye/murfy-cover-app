@@ -1,9 +1,9 @@
 import uuid
 
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, event
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, declared_attr, mapped_column
-from sqlalchemy.sql import func, text
+from sqlalchemy.sql import DDL, func, text
 
 Base_ = declarative_base()
 ListTables = []
@@ -40,36 +40,6 @@ class Base(Base_):
     __abstract__ = True
 
 
-class BaseUUIDModel(Base):
-    @declared_attr
-    def __tablename__(cls) -> str:
-        return cls.__name__
-
-    __abstract__ = True
-    id = mapped_column(
-        UUID,
-        default=lambda: uuid.uuid4(),
-        primary_key=True,
-        index=False,
-        nullable=False,
-        comment="Unique identifier of the row",
-        server_default=text("gen_random_uuid()"),
-    )
-    updated_at = mapped_column(
-        DateTime,
-        nullable=True,
-        comment="Date of the last update to this row",
-        server_default=func.now(),
-    )
-
-    created_at = mapped_column(
-        DateTime,
-        nullable=True,
-        server_default=func.now(),
-        comment="Date of creation of this row",
-    )
-
-
 class BaseUUID(Base):
     @declared_attr
     def __tablename__(cls) -> str:
@@ -85,3 +55,86 @@ class BaseUUID(Base):
         comment="Unique identifier of the row",
         server_default=text("gen_random_uuid()"),
     )
+
+
+class BaseUUIDCreatedAt(Base):
+    @declared_attr
+    def __tablename__(cls) -> str:
+        return cls.__name__
+
+    __abstract__ = True
+    id = mapped_column(
+        UUID,
+        default=lambda: uuid.uuid4(),
+        primary_key=True,
+        index=False,
+        nullable=False,
+        comment="Unique identifier of the row",
+        server_default=text("gen_random_uuid()"),
+    )
+    created_at = mapped_column(
+        DateTime,
+        nullable=True,
+        server_default=func.now(),
+        comment="Date of creation of this row",
+    )
+
+
+class BaseUUIDModel(Base):
+    @declared_attr
+    def __tablename__(cls) -> str:
+        return cls.__name__
+
+    __abstract__ = True
+    id = mapped_column(
+        UUID,
+        default=lambda: uuid.uuid4(),
+        primary_key=True,
+        index=False,
+        nullable=False,
+        comment="Unique identifier of the row",
+        server_default=text("gen_random_uuid()"),
+    )
+    created_at = mapped_column(
+        DateTime,
+        nullable=True,
+        server_default=func.now(),
+        comment="Date of creation of this row",
+    )
+    updated_at = mapped_column(
+        DateTime,
+        nullable=True,
+        server_default=func.now(),
+        comment="Date of the last update to this row",
+    )
+
+    @classmethod
+    def __declare_last__(cls):
+        """Create trigger for automatically updating updated_at on UPDATE."""
+        # Only create trigger for non-abstract classes
+        if not cls.__dict__.get("__abstract__", False):
+            # Get table name and schema from the table metadata
+            table_name = cls.__table__.name
+            table_schema = cls.__table__.schema or "public"
+
+            # Build the full table identifier with proper quoting
+            if table_schema != "public":
+                full_table_name = f'"{table_schema}"."{table_name}"'
+                trigger_name = f"update_{table_schema}_{table_name}_updated_at"
+            else:
+                full_table_name = f'"{table_name}"'
+                trigger_name = f"update_{table_name}_updated_at"
+
+            # Sanitize trigger name (PostgreSQL limit is 63 chars)
+            trigger_name = trigger_name.replace("-", "_").replace(".", "_")
+            if len(trigger_name) > 63:
+                trigger_name = trigger_name[:63]
+
+            trigger_ddl = DDL(f"""
+                DROP TRIGGER IF EXISTS "{trigger_name}" ON {full_table_name};
+                CREATE TRIGGER "{trigger_name}"
+                BEFORE UPDATE ON {full_table_name}
+                FOR EACH ROW
+                EXECUTE FUNCTION update_updated_at_column();
+            """)
+            event.listen(cls.__table__, "after_create", trigger_ddl)

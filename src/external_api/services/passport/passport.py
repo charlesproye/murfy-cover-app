@@ -90,24 +90,45 @@ async def get_kpis(vin: str, db: AsyncSession):
 
 async def get_graph_data(vin: str, db: AsyncSession = None):
     # Get trendlines
-    vehicle_info_query = (
+    trendlines_list_query = (
         select(
-            Oem.trendline,
-            Oem.trendline_min,
-            Oem.trendline_max,
+            Oem.trendline.label("oem_trendline"),
+            Oem.trendline_min.label("oem_trendline_min"),
+            Oem.trendline_max.label("oem_trendline_max"),
+            VehicleModel.trendline.label("vehicle_model_trendline"),
+            VehicleModel.trendline_min.label("vehicle_model_trendline_min"),
+            VehicleModel.trendline_max.label("vehicle_model_trendline_max"),
         )
         .select_from(Vehicle)
         .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
         .join(Oem, VehicleModel.oem_id == Oem.id)
         .where(Vehicle.vin == vin)
     )
-    vehicle_info_result = await db.execute(vehicle_info_query)
-    vehicle_info = vehicle_info_result.mappings().first()
+    trendlines_list_result = await db.execute(trendlines_list_query)
+    trendlines_list = trendlines_list_result.mappings().first()
 
-    if not vehicle_info:
+    if not trendlines_list:
         raise HTTPException(
             status_code=404, detail="Vehicle not found or no data available"
         )
+
+    trendlines_final = {
+        "trendline": trendlines_list["vehicle_model_trendline"]
+        if trendlines_list["vehicle_model_trendline"]
+        else trendlines_list["oem_trendline"]
+        if trendlines_list["oem_trendline"]
+        else None,
+        "trendline_min": trendlines_list["vehicle_model_trendline_min"]
+        if trendlines_list["vehicle_model_trendline_min"]
+        else trendlines_list["oem_trendline_min"]
+        if trendlines_list["oem_trendline_min"]
+        else None,
+        "trendline_max": trendlines_list["vehicle_model_trendline_max"]
+        if trendlines_list["vehicle_model_trendline_max"]
+        else trendlines_list["oem_trendline_max"]
+        if trendlines_list["oem_trendline_max"]
+        else None,
+    }
 
     # Get data points
     soh_expr = (func.round(cast(VehicleData.soh, Numeric), 3) * 100).label("soh")
@@ -135,14 +156,14 @@ async def get_graph_data(vin: str, db: AsyncSession = None):
         ]
         if data
         else [],
-        trendline=vehicle_info["trendline"]["trendline"]
-        if vehicle_info["trendline"]
+        trendline=trendlines_final["trendline"].get("trendline")
+        if trendlines_final["trendline"]
         else None,
-        trendline_min=vehicle_info["trendline_min"]["trendline"]
-        if vehicle_info["trendline_min"]
+        trendline_min=trendlines_final["trendline_min"].get("trendline")
+        if trendlines_final["trendline_min"]
         else None,
-        trendline_max=vehicle_info["trendline_max"]["trendline"]
-        if vehicle_info["trendline_max"]
+        trendline_max=trendlines_final["trendline_max"].get("trendline")
+        if trendlines_final["trendline_max"]
         else None,
     )
 
@@ -293,7 +314,6 @@ async def get_infos(vin: str, db: AsyncSession):
             status_code=404, detail="Vehicle not found or not available"
         )
 
-    # Transformer les données selon l'interface InfoVehicleResult
     formatted_data = {
         "vehicle_info": {
             "vin": data["vin"],
@@ -376,27 +396,27 @@ async def get_estimated_range(vin: str, db: AsyncSession):
                 vi.autonomy as initial_autonomy,
                 cd.current_soh,
                 cd.current_odometer,
-                -- Calcul du SoH à la fin de la garantie
+                -- Calculating the SoH at the end of the warranty
                 cd.current_soh - (
                     GREATEST(0, EXTRACT(EPOCH FROM ((vi.start_date + (vi.warranty_date || ' years')::interval) - cd.current_timestamp))/86400)
                     * sd.degradation_per_day
                 ) as warranty_end_soh,
-                -- Calcul du SoH à la fin du contrat
+                -- Calculating the SoH at the end of the contract
                 cd.current_soh - (
                     GREATEST(0, EXTRACT(EPOCH FROM (vi.end_of_contract_date - cd.current_timestamp))/86400)
                     * sd.degradation_per_day
                 ) as contract_end_soh,
-                -- Estimation du kilométrage à la fin de la garantie
+                -- Estimating the odometer at the end of the warranty
                 cd.current_odometer + (
                     EXTRACT(EPOCH FROM ((vi.start_date + (vi.warranty_date || ' years')::interval) - cd.current_timestamp))/86400
                     * (cd.current_odometer / EXTRACT(EPOCH FROM (cd.current_timestamp - vi.start_date))/86400)
                 ) as warranty_end_odometer,
-                -- Estimation du kilométrage à la fin du contrat
+                -- Estimating the odometer at the end of the contract
                 cd.current_odometer + (
                     EXTRACT(EPOCH FROM (vi.end_of_contract_date - cd.current_timestamp))/86400
                     * (cd.current_odometer / EXTRACT(EPOCH FROM (cd.current_timestamp - vi.start_date))/86400)
                 ) as contract_end_odometer,
-                -- Calcul du SoH pour l'extension de 30 000km
+                -- Calculating the SoH for the extension of 30 000km
                 cd.current_soh - (30000 * CASE
                     WHEN cd.current_odometer > 0 THEN
                         (100 - cd.current_soh) / NULLIF(cd.current_odometer, 0)
@@ -427,7 +447,7 @@ async def get_estimated_range(vin: str, db: AsyncSession):
         return None
 
     current_range = {
-        "soh": round(data["current_soh"]),  # Arrondi à l'entier
+        "soh": round(data["current_soh"]),
         "range_min": round((data["initial_autonomy"] * data["current_soh"] / 100) - 10),
         "range_max": round((data["initial_autonomy"] * data["current_soh"] / 100) + 10),
         "odometer": round(data["current_odometer"]),
@@ -435,7 +455,7 @@ async def get_estimated_range(vin: str, db: AsyncSession):
 
     future_predictions = []
 
-    # Ajout de la prédiction étendue de 30 000km
+    # Adding the extended prediction of 30 000km
     if data["extended_soh"] is not None:
         extended_soh = max(round(data["extended_soh"]), 0)
         extended_soh = min(extended_soh, round(data["current_soh"]))
@@ -475,7 +495,6 @@ async def get_estimated_range(vin: str, db: AsyncSession):
                 }
             )
 
-    # Puis ajout de la fin de garantie
     if data["warranty_end_soh"] is not None:
         warranty_soh = max(round(data["warranty_end_soh"]), 0)
         warranty_soh = min(warranty_soh, round(data["current_soh"]))
@@ -516,7 +535,7 @@ async def get_charging_cycles(vin: str, db: AsyncSession):
     return result.mappings().first()
 
 
-async def get_download_rapport(vin: str, db: AsyncSession):
+async def get_download_report(vin: str, db: AsyncSession):
     query = text("""
         WITH vehicle_info AS (
             SELECT
@@ -573,28 +592,28 @@ async def get_download_rapport(vin: str, db: AsyncSession):
                 vi.autonomy as base_autonomy,
                 ld.soh as current_soh,
                 ld.odometer as current_odometer,
-                -- Calcul du SoH pour l'extension de 30 000km
+                -- Calculating the SoH for the extension of 30 000km
                 ld.soh - (30000 * CASE
                     WHEN ld.odometer > 0 THEN
                         (100 - ld.soh) / NULLIF(ld.odometer, 0)
                     ELSE NULL
                 END) as extended_soh,
-                -- Calcul du SoH à la fin du contrat
+                -- Calculating the SoH at the end of the contract
                 ld.soh - (
                     GREATEST(0, EXTRACT(EPOCH FROM (vi.end_of_contract_date - ld.timestamp))/86400)
                     * sd.degradation_per_day
                 ) as contract_end_soh,
-                -- Calcul du SoH à la fin de la garantie
+                -- Calculating the SoH at the end of the warranty
                 ld.soh - (
                     GREATEST(0, EXTRACT(EPOCH FROM ((vi.start_date + (vi.warranty_date || ' years')::interval) - ld.timestamp))/86400)
                     * sd.degradation_per_day
                 ) as warranty_end_soh,
-                -- Estimation du kilométrage à la fin du contrat
+                -- Estimating the odometer at the end of the contract
                 ld.odometer + (
                     EXTRACT(EPOCH FROM (vi.end_of_contract_date - ld.timestamp))/86400
                     * (ld.odometer / EXTRACT(EPOCH FROM (ld.timestamp - vi.start_date))/86400)
                 ) as contract_end_odometer,
-                -- Estimation du kilométrage à la fin de la garantie
+                -- Estimating the odometer at the end of the warranty
                 ld.odometer + (
                     EXTRACT(EPOCH FROM ((vi.start_date + (vi.warranty_date || ' years')::interval) - ld.timestamp))/86400
                     * (ld.odometer / EXTRACT(EPOCH FROM (ld.timestamp - vi.start_date))/86400)
@@ -706,7 +725,7 @@ async def get_kpis_additional(vin: str, db: AsyncSession):
     if len(raw_data) == 0:
         raise HTTPException(status_code=404, detail="No additional kpis data found")
 
-    # Find the maximum value of 'cycles' in raw_data, ignoring None values
+    # Finding the maximum value of 'cycles' in raw_data, ignoring None values
     max_cycles = max(
         (row["cycles"] if row["cycles"] is not None else 0 for row in raw_data),
         default=0,

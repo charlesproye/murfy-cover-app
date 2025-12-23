@@ -17,10 +17,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped
 
-from db_models.base_uuid_model import BaseUUIDModel
+from db_models.base_uuid_model import BaseUUIDCreatedAt, BaseUUIDModel
 
 
-class Region(BaseUUIDModel):
+class Region(BaseUUIDCreatedAt):
     __tablename__ = "region"
     region_name: str = Column(String(100), nullable=False)
 
@@ -111,16 +111,6 @@ class Vehicle(BaseUUIDModel):
     )
 
 
-class VehicleAggregate(BaseUUIDModel):
-    __tablename__ = "vehicle_aggregate"
-    vehicle_model_id: Mapped[uuid.UUID] = Column(
-        ForeignKey("vehicle_model.id"), nullable=False
-    )
-    avg_soh = Column(Numeric(5, 2))
-    energy_consumption = Column(Numeric(10, 2))
-    timestamp = Column(DateTime, server_default=func.now())
-
-
 class VehicleData(BaseUUIDModel):
     __tablename__ = "vehicle_data"
     vehicle_id: Mapped[uuid.UUID] = Column(ForeignKey("vehicle.id"), nullable=False)
@@ -148,17 +138,6 @@ class VehicleData(BaseUUIDModel):
     soh_oem = Column(Numeric(5, 2))
     real_autonomy = Column(Numeric(10, 0))
     timestamp_last_data_collected = Column(DateTime)
-
-
-class RegionalAggregate(BaseUUIDModel):
-    __tablename__ = "regional_aggregate"
-    region_id: Mapped[uuid.UUID] = Column(ForeignKey("region.id"), nullable=False)
-    avg_soh = Column(Numeric(5, 2))
-    avg_soc = Column(Numeric(5, 2))
-    avg_temperature = Column(Numeric(5, 2))
-    avg_voltage = Column(Numeric(10, 2))
-    energy_consumption = Column(Numeric(10, 2))
-    timestamp = Column(DateTime, server_default=func.now())
 
 
 class VehicleStatus(BaseUUIDModel):

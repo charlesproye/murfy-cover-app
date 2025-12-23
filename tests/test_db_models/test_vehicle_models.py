@@ -44,7 +44,6 @@ class TestCompanyModel:
         assert company.name == "New Test Company"
         assert company.description == "A new company"
         assert company.created_at is not None
-        assert company.updated_at is not None
 
     @pytest.mark.asyncio
     async def test_company_name_required(self, db_session: AsyncSession):

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db_models import Fleet, PremiumReport, UserFleet, Vehicle, VehicleData
 from external_api.core.cookie_auth import (
     get_current_user_from_cookie,
-    get_user_with_fleet,
+    get_user_with_fleets,
 )
 from external_api.db.session import get_db
 from external_api.schemas.premium import (
@@ -61,7 +61,7 @@ async def check_soh_available(vin: str, db: AsyncSession) -> bool:
 async def get_premium_data(
     db=Depends(get_db),
     vin: str = Path(..., description="VIN requested"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ) -> PremiumData:
     if not await check_user_allowed_to_vin(vin, user, db):
         raise HTTPException(
@@ -89,7 +89,7 @@ async def get_premium_data(
 async def generate_premium_report(
     db=Depends(get_db),
     vin: str = Path(..., description="VIN requested"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ) -> PremiumReportGeneration:
     if not await check_user_allowed_to_vin(vin, user, db):
         raise HTTPException(
@@ -120,7 +120,7 @@ async def generate_premium_report(
 async def get_report_status(
     vin: str = Path(..., description="The VIN"),
     job_id: str = Path(..., description="The Celery job ID"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
     db: AsyncSession = Depends(get_db),
 ) -> PremiumReportPDFUrl:
     if not await check_user_allowed_to_vin(vin, user, db):

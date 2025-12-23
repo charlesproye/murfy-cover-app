@@ -12,7 +12,6 @@ from db_models.company import (
 )
 from db_models.fleet import (
     Fleet,
-    FleetAggregate,
     UserFleet,
 )
 from db_models.report import (
@@ -28,9 +27,7 @@ from db_models.user_tokens import UserToken
 from db_models.vehicle import (
     Battery,
     Region,
-    RegionalAggregate,
     Vehicle,
-    VehicleAggregate,
     VehicleData,
     VehicleModel,
     VehicleStatus,
@@ -46,19 +43,16 @@ __all__ = [
     "Company",
     "FlashReportCombination",
     "Fleet",
-    "FleetAggregate",
     "Make",
     "Oem",
     "PremiumReport",
     "Region",
-    "RegionalAggregate",
     "Role",
     "User",
     "UserFleet",
     "UserTesla",
     "UserToken",
     "Vehicle",
-    "VehicleAggregate",
     "VehicleData",
     "VehicleModel",
     "VehicleStatus",

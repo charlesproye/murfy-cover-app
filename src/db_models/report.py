@@ -13,11 +13,11 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped
 
-from db_models.base_uuid_model import BaseUUIDModel
+from db_models.base_uuid_model import BaseUUID, BaseUUIDCreatedAt
 from db_models.enums import LanguageEnum
 
 
-class FlashReportCombination(BaseUUIDModel):
+class FlashReportCombination(BaseUUIDCreatedAt):
     __tablename__ = "flash_report_combination"
     vin: str = Column(String, nullable=False)
     make: str = Column(String, nullable=False)
@@ -35,7 +35,7 @@ class FlashReportCombination(BaseUUIDModel):
     )
 
 
-class PremiumReport(BaseUUIDModel):
+class PremiumReport(BaseUUID):
     __tablename__ = "premium_report"
     vehicle_id: Mapped[uuid.UUID] = Column(ForeignKey("vehicle.id"), nullable=False)
     report_url: str = Column(String(2000), nullable=False)

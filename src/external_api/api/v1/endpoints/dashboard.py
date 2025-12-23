@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Path, Query
 
 from external_api.core.cookie_auth import (
     get_current_user_from_cookie,
-    get_user_with_fleet,
+    get_user_with_fleets,
 )
 from external_api.db.session import get_db
 from external_api.schemas.user import GetCurrentUser
@@ -25,18 +25,18 @@ router = APIRouter()
 async def last_timestamp_with_data(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
     response = await get_last_timestamp_with_data(fleet_ids, db)
     return response
 
 
-@router.get("/individual/kpis", include_in_schema=False)
+@router.get("/kpis", include_in_schema=False)
 async def individual_kpis(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_individual_kpis(
         [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets], db
@@ -44,11 +44,11 @@ async def individual_kpis(
     return response
 
 
-@router.get("/individual/range_soh", include_in_schema=False)
+@router.get("/range_soh", include_in_schema=False)
 async def range_soh(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
     type: str = Query(None, description="The type"),
 ):
     fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
@@ -56,24 +56,24 @@ async def range_soh(
     return response
 
 
-@router.get("/individual/new_vehicles", include_in_schema=False)
+@router.get("/new_vehicles", include_in_schema=False)
 async def new_vehicles(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     period: str = Query(None, description="The period"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
     response = await get_new_vehicles(fleet_ids, period, db)
     return response
 
 
-@router.get("/individual/table_brand", include_in_schema=False)
+@router.get("/table_brand", include_in_schema=False)
 async def table_brand(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     filter: str = Query(None, description="The filter"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
     response = await get_table_brand(fleet_ids, filter, db)
@@ -84,39 +84,39 @@ async def table_brand(
 async def search_vin(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     fleets_ids = [fleet.id for fleet in user.fleets] if user.fleets else []
     response = await get_search_vin(vin, fleets_ids, db)
     return response
 
 
-@router.get("/individual/trendline_brand", include_in_schema=False)
+@router.get("/trendline_brand", include_in_schema=False)
 async def trendline_brand(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     brand: str = Query(None, description="The brand"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
     response = await get_trendline_brand(fleet_ids, db, brand)
     return response
 
 
-@router.get("/individual/soh_by_groups", include_in_schema=False)
+@router.get("/soh_by_groups", include_in_schema=False)
 async def soh_by_groups(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
     group: str = Query(..., description="The group"),
     page: int = Query(1, description="The page"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
     response = await get_soh_by_groups(fleet_ids, group, page, db)
     return response
 
 
-@router.get("/individual/extremum_vehicles", include_in_schema=False)
+@router.get("/extremum_vehicles", include_in_schema=False)
 async def extremum_vehicles(
     db=Depends(get_db),
     fleet_id: str = Query(..., description="The fleet id"),
@@ -131,7 +131,7 @@ async def extremum_vehicles(
     extremum: str = Query("Worst", description="The extremum"),
     sorting_column: str = Query(None, description="The sorting column"),
     sorting_order: str = Query(None, description="The sorting order"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
     response = await get_extremum_vehicles(

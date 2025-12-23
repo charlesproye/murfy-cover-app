@@ -11,10 +11,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped
 
-from db_models.base_uuid_model import BaseUUIDModel
+from db_models.base_uuid_model import BaseUUIDCreatedAt, BaseUUIDModel
 
 
-class Role(BaseUUIDModel):
+class Role(BaseUUIDCreatedAt):
     __tablename__ = "role"
     role_name: str = Column(String(50), nullable=False)
 

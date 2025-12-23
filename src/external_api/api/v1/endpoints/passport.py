@@ -2,13 +2,13 @@ from fastapi import APIRouter, Body, Depends, Path
 
 from external_api.core.cookie_auth import (
     get_current_user_from_cookie,
-    get_user_with_fleet,
+    get_user_with_fleets,
 )
 from external_api.db.session import get_db
 from external_api.schemas.user import GetCurrentUser
 from external_api.services.passport.passport import (
     get_charging_cycles,
-    get_download_rapport,
+    get_download_report,
     get_estimated_range,
     get_fleet_id_of_vin,
     get_graph_data,
@@ -27,7 +27,7 @@ router = APIRouter()
 async def is_vin_in_fleets(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     fleet_id = await get_fleet_id_of_vin(vin, db)
     return {
@@ -41,7 +41,7 @@ async def is_vin_in_fleets(
 async def kpis(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_kpis(vin, db)
     return response
@@ -51,7 +51,7 @@ async def kpis(
 async def graph(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_graph_data(vin, db)
     return response
@@ -61,7 +61,7 @@ async def graph(
 async def infos(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_infos(vin, db)
     return response
@@ -71,7 +71,7 @@ async def infos(
 async def estimated_range(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_estimated_range(vin, db)
     return response
@@ -81,7 +81,7 @@ async def estimated_range(
 async def kpis_additional(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_kpis_additional(vin, db)
     return response
@@ -91,9 +91,9 @@ async def kpis_additional(
 async def download_rapport(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
-    response = await get_download_rapport(vin, db)
+    response = await get_download_report(vin, db)
     return response
 
 
@@ -101,7 +101,7 @@ async def download_rapport(
 async def charging_cycles(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_charging_cycles(vin, db)
     return response
@@ -112,7 +112,7 @@ async def pin_vehicle(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
     is_pinned: bool = Body(..., description="The is_pinned"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await post_pin_vehicle(vin, is_pinned, db)
     return response
@@ -122,7 +122,7 @@ async def pin_vehicle(
 async def pinned_vehicle(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_pinned_vehicle(vin, db)
     return response
@@ -132,7 +132,7 @@ async def pinned_vehicle(
 async def price_forecast(
     db=Depends(get_db),
     vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleet)),
+    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_price_forecast(vin, db)
     return response

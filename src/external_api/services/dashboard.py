@@ -279,9 +279,6 @@ async def get_new_vehicles(fleet_ids: list[str], period: str, db: AsyncSession):
 
 
 async def get_search_vin(vin: str, fleets_ids: list[UUID4], db: AsyncSession):
-    if not fleets_ids:
-        return []
-
     query = text("""
         SELECT id, vin FROM vehicle
         WHERE vin ILIKE '%' || :vin || '%'
@@ -478,7 +475,7 @@ async def get_trendline_brand(
     )
     rows = result.mappings().all()
 
-    # Créer une liste unique de marques avec leur trendline
+    # Creating a list of unique brands with their trendlines
     seen_brands = set()
     brands_list = []
     for row in rows:
@@ -495,7 +492,7 @@ async def get_trendline_brand(
                 }
             )
 
-    # Créer la liste de trendline
+    # Creating the trendline list
     trendline = []
     for row in rows:
         if row["soh"] is not None:
