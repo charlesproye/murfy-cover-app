@@ -17,12 +17,7 @@ import {
   TrendlineData,
 } from '@/interfaces/dashboard/home/ResponseApi';
 import { useRouter } from 'next/navigation';
-import {
-  calculateLogarithmicRegression,
-  getTrendlinePoints,
-  parseTrendlineEquation,
-  Point,
-} from '@/lib/trendline';
+import { getTrendlinePoints, parseTrendlineEquation, Point } from '@/lib/trendline';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -42,7 +37,12 @@ const TrendlineChart: React.FC<TrendlineChartProps> = ({
       (eq) => eq.brand.oem_id === selectedBrand,
     );
 
-    if (!brandEquations) {
+    if (
+      !brandEquations ||
+      !brandEquations.trendline ||
+      !brandEquations.trendline_max ||
+      !brandEquations.trendline_min
+    ) {
       return null;
     }
 
@@ -64,45 +64,21 @@ const TrendlineChart: React.FC<TrendlineChartProps> = ({
     }
   }, [selectedBrand, trendlineEquations]);
 
-  const regressionCalculator = useMemo(() => {
-    if (!data.length || !coefficients) {
-      return null;
-    }
-
-    const points = data
-      .filter((item) => item.in_fleet)
-      .map((item) => ({
-        x: item.odometer,
-        y: item.soh,
-      }));
-
-    const result = calculateLogarithmicRegression(
-      points,
-      undefined,
-      undefined,
-      true,
-      coefficients.avg,
-    );
-
-    return Array.isArray(result) ? null : result;
-  }, [data, coefficients]);
-
   const getPointColor = (item: TrendlineData): string => {
-    if (item.score === 'A') {
-      return 'rgba(0, 200, 0, 0.8)'; // Green for score A
+    switch (item.score) {
+      case 'A':
+        return 'rgba(35, 196, 94, 0.7)'; // Green for score A
+      case 'B':
+        return 'rgba(166, 230, 55, 0.7)'; // Lime for score B
+      case 'C':
+        return 'rgba(252, 222, 68, 0.7)'; // Yellow for score C
+      case 'D':
+        return 'rgba(250, 145, 60, 0.7)'; // Orange for score D
+      case 'E':
+        return 'rgba(240, 67, 70, 0.7)'; // Red for score E
+      default:
+        return 'rgba(0, 122, 255, 0.4)'; // Blue for other scores
     }
-    if (item.score === 'F') {
-      return 'rgba(255, 0, 0, 0.8)'; // Red for score F
-    }
-
-    // For other scores, use a blue with a variable opacity
-    const maxDistance = 10;
-    if (!regressionCalculator) return 'rgba(0, 122, 255, 0.5)';
-
-    const expectedY = regressionCalculator.getTrendlineY(item.odometer);
-    const distance = item.soh - expectedY;
-    const opacity = Math.max(0.2, 1 - Math.abs(distance) / maxDistance);
-    return `rgba(0, 122, 255, ${opacity})`;
   };
 
   // Generate the trendline points for a given curve
@@ -125,7 +101,7 @@ const TrendlineChart: React.FC<TrendlineChartProps> = ({
         type: 'line' as const,
         label: 'Trendline Max',
         data: generateTrendlinePoints('max'),
-        borderColor: 'rgba(0, 200, 0, 0.7)',
+        borderColor: 'rgba(0, 200, 0, 0.9)',
         borderWidth: 2,
         borderDash: [5, 5],
         tension: 0.4,
@@ -135,7 +111,7 @@ const TrendlineChart: React.FC<TrendlineChartProps> = ({
         type: 'line' as const,
         label: 'Trendline Avg',
         data: generateTrendlinePoints('avg'),
-        borderColor: 'rgba(0, 122, 255, 0.7)',
+        borderColor: 'rgba(0, 122, 255, 0.9)',
         borderWidth: 2,
         borderDash: [5, 5],
         tension: 0.4,
@@ -145,7 +121,7 @@ const TrendlineChart: React.FC<TrendlineChartProps> = ({
         type: 'line' as const,
         label: 'Trendline Min',
         data: generateTrendlinePoints('min'),
-        borderColor: 'rgba(255, 0, 0, 0.7)',
+        borderColor: 'rgba(255, 0, 0, 0.9)',
         borderWidth: 2,
         borderDash: [5, 5],
         tension: 0.4,

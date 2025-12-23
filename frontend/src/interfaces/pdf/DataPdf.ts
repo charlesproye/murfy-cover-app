@@ -20,7 +20,7 @@ export type DataPdfResult = {
   consumption: number;
   cycles: number;
   soh: number;
-  score?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | '';
+  score?: 'A' | 'B' | 'C' | 'D' | 'E' | '';
   odometer: number;
   predictions: {
     initial: {

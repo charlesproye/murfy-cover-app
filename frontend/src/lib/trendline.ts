@@ -33,17 +33,20 @@ const DEFAULT_COEFFICIENTS: TrendlineCoefficients = {
 export const parseTrendlineEquation = (equation: string): TrendlineCoefficients => {
   try {
     // Extraction of the coefficients of the equation (supports scientific notation)
-    // Pattern: number (can be in scientific notation) + number * np.log1p(x / number)
+    // Pattern: number (can be in scientific notation) + or - number * np.log1p(x / number)
     const match = equation.match(
-      /([\d.]+(?:[eE][-+]?\d+)?)\s*\+\s*([-+]?[\d.]+(?:[eE][-+]?\d+)?)\s*\*\s*np\.log1p\(x\s*\/\s*([\d.]+(?:[eE][-+]?\d+)?)\)/,
+      /([\d.]+(?:[eE][-+]?\d+)?)\s*([+-])\s*([-+]?[\d.]+(?:[eE][-+]?\d+)?)\s*\*\s*np\.log1p\(x\s*\/\s*([\d.]+(?:[eE][-+]?\d+)?)\)/,
     );
 
     if (!match) {
       throw new Error('Invalid equation format');
     }
-    // The order in the regular expression is: (b) + (a) * np.log1p(x / (c))
-    const [, b, a, c] = match.map(Number);
-    return { a, b, c };
+    // The order in the regular expression is: (b) [+-] (a) * np.log1p(x / (c))
+    const [, b, operator, a, c] = match;
+    const aValue = Number(a);
+    // If operator is "-", negate the coefficient a (handles both positive and negative a values)
+    const finalA = operator === '-' ? -aValue : aValue;
+    return { a: finalA, b: Number(b), c: Number(c) };
   } catch (error) {
     console.error('Error parsing the equation:', error);
     return DEFAULT_COEFFICIENTS;

@@ -6,35 +6,32 @@ import { pdfTexts } from '@/components/pdf/pdf_texts';
 import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
 
 const scoreLabels = [
-  { label: 'A', color: '#2d6d49' },
-  { label: 'B', color: '#4ADE80' },
-  { label: 'C', color: '#FACC15' },
-  { label: 'D', color: '#FDBA74' },
-  { label: 'E', color: '#FB7185' },
-  { label: 'F', color: '#EF4444' },
+  { label: 'A', color: '#22C55E' }, // green-500
+  { label: 'B', color: '#a2e635' }, // lime-400
+  { label: 'C', color: '#ffe121' }, // yellow-300
+  { label: 'D', color: '#ff8a05' }, // orange-400
+  { label: 'E', color: '#fa2d37' }, // red-500
 ];
 
 const PdfHeader: React.FC<{ data: InfoVehicleResult }> = ({ data }) => {
   const v = data?.vehicle_info;
   const b = data?.battery_info;
-  const score = (v?.score || 'F') as Score;
+  const score = (v?.score || 'E') as Score;
   const texts = pdfTexts[LanguageEnum.EN];
 
   // Fonction pour déterminer la couleur du SoH basée sur le score
   const getSohColor = (letterScore: string): string => {
     switch (letterScore) {
       case 'A':
-        return '#22C55E'; // green-500
+        return scoreLabels[0].color;
       case 'B':
-        return '#4ADE80'; // green-400
+        return scoreLabels[1].color;
       case 'C':
-        return '#FACC15'; // yellow-400
+        return scoreLabels[2].color;
       case 'D':
-        return '#FB923C'; // orange-400
+        return scoreLabels[3].color;
       case 'E':
-        return '#EA580C'; // orange-600
-      case 'F':
-        return '#EF4444'; // red-500
+        return scoreLabels[4].color;
       default:
         return '#111827'; // black
     }

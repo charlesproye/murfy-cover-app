@@ -29,7 +29,7 @@ const DashboardPage = (): React.ReactElement => {
   return (
     <div className="flex flex-col h-full w-full space-y-8 py-4">
       <div className="w-full flex justify-center">
-        <div className="items-center gap-1 relative flex bg-primary/5 border-2 border-primary/20 rounded-xl w-fit p-2">
+        <div className="items-center gap-1 relative flex bg-primary/5 border-2 border-primary/20 rounded-xl w-fit p-2 hover:scale-[0.99] transition-transform duration-150">
           <IconTransfer
             color="gray"
             className="w-[22px] h-[22px] sm:w-[18px] sm:h-[18px]"
