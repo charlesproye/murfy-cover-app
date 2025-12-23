@@ -1,12 +1,17 @@
 import json
+import logging
 
 import numpy as np
 from scipy.optimize import curve_fit
 from sqlalchemy.sql import text
 
+from activation.config.settings import LOGGING_CONFIG
 from core.numpy_utils import numpy_safe_eval
 from core.sql_utils import get_sqlalchemy_engine
 from core.stats_utils import log_function
+
+logging.basicConfig(**LOGGING_CONFIG)
+logger = logging.getLogger(__name__)
 
 
 def compute_trendline_upper(true, fit, window_size=50, interval=(5, 95)):
@@ -74,19 +79,24 @@ def build_trendline_expressions(coef_mean, x_sorted, y_lower, y_upper):
     Upper bound starts at 1 and remains above mean/lower bound.
     """
     # Mean trendline
-    mean_expr = {"trendline": f"1 + {coef_mean[0]} * np.log1p(x/{coef_mean[1]})"}
+    mean_expr = {"trendline": f"1 - {abs(coef_mean[0])} * np.log1p(x/{coef_mean[1]})"}
     y_fit_mean = log_function(x_sorted, *coef_mean)
 
     # Upper bound
     delta = np.mean(y_upper - y_fit_mean)
     coef_upper_a = coef_mean[0] + delta
+    if abs(coef_upper_a) > abs(coef_mean[0]):
+        logger.info(
+            "Trendline coefficient for upper trendline is greater than the mean trendline"
+        )
+        coef_upper_a = abs(coef_mean[0]) / 2
     coef_upper_b = coef_mean[1]
     upper_expr = {"trendline": f"1 - {abs(coef_upper_a)} * np.log1p(x/{coef_upper_b})"}
 
     # Lower bound
     coef_lower, offset = fit_lower_bound(x_sorted, y_lower)
     lower_expr = {
-        "trendline": f"{offset} + {coef_lower[0]} * np.log1p(x/{coef_lower[1]})"
+        "trendline": f"{offset} - {abs(coef_lower[0])} * np.log1p(x/{coef_lower[1]})"
     }
     return mean_expr, upper_expr, lower_expr
 

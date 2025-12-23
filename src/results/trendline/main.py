@@ -60,7 +60,7 @@ def load_and_clean_scrapping_data():
             "battery_capacity",
         ],
     )
-
+    df_sheet = df_sheet[df_sheet["soh"] != ""]
     df_sheet["soh"] = (
         df_sheet["soh"].apply(lambda x: x.replace("%", "").strip()).astype(float) / 100
     )
@@ -142,7 +142,7 @@ def load_vehicle_models_from_db():
 
 
 def load_all_data():
-    logging.info("Load data")
+    logger.info("Load data")
     df_sheet = load_and_clean_scrapping_data()
     cars_models = load_vehicle_models_from_db()
     df_sheet = df_sheet.merge(
@@ -165,7 +165,7 @@ def load_all_data():
 
 
 def clean_db_trendlines():
-    logging.info("Clean db trendlines...")
+    logger.info("Clean db trendlines...")
     query = """
         UPDATE vehicle_model
         SET trendline = NULL,
@@ -195,7 +195,7 @@ def update_trendline_oem():
             )
             updated_oems += 1
         else:
-            logging.info(f"Can't compute trendline for oem: {oem}")
+            logger.info(f"Can't compute trendline for oem: {oem}")
             skipped_oems += 1
 
     return {
@@ -206,7 +206,7 @@ def update_trendline_oem():
 
 
 def update_trendline_model():
-    logging.info("Update trendline model...")
+    logger.info("Update trendline model...")
     df_all = load_all_data()
 
     model_ids = [mid for mid in df_all["vehicle_model_id"].unique() if pd.notna(mid)]
@@ -224,15 +224,15 @@ def update_trendline_model():
                     update_database_trendlines(
                         model_car, mean_trend, upper_bound, lower_bound, False
                     )
-                    logging.info(f"Trendline update for car model {model_car}")
+                    logger.info(f"Trendline update for car model {model_car}")
                     updated_models += 1
                 else:
-                    logging.info(f"Trendline not updated for car model {model_car}")
+                    logger.info(f"Trendline not updated for car model {model_car}")
                     skipped_models += 1
             else:
                 skipped_models += 1
         except Exception as e:
-            logging.error(f"Error with car model: {model_car}: {e}")
+            logger.error(f"Error with car model: {model_car}: {e}")
             skipped_models += 1
 
     return {
