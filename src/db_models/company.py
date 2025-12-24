@@ -33,3 +33,4 @@ class Make(BaseUUIDCreatedAt):
     make_name: str = Column(String(100), nullable=False)
     oem_id: Mapped[uuid.UUID] = Column(ForeignKey("oem.id"))
     description: str = Column(String)
+    image_id: Mapped[uuid.UUID] = Column(ForeignKey("asset.id"))

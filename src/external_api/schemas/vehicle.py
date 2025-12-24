@@ -40,26 +40,6 @@ class MakeData(BaseModel):
         from_attributes = True
 
 
-class VehicleModelData(BaseModel):
-    """Vehicle model information"""
-
-    id: UUID4 = Field(..., description="ID unique du modèle")
-    model_name: str = Field(..., description="Nom du modèle")
-    type: str | None = Field(None, description="Type de véhicule")
-    version: str | None = Field(None, description="Version du modèle")
-    autonomy: int | None = Field(None, description="Autonomie en km")
-    url_image: str | None = Field(None, description="URL de l'image du véhicule")
-    warranty_date: int | None = Field(None, description="Garantie en années")
-    warranty_km: float | None = Field(None, description="Garantie en km")
-    source: str | None = Field(None, description="Source des données")
-    battery: BatteryData | None = None
-    oem: OemData | None = None
-    make: MakeData | None = None
-
-    class Config:
-        from_attributes = True
-
-
 class VehicleBase(BaseModel):
     """Base vehicle information"""
 

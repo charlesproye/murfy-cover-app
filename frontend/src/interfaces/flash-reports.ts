@@ -10,7 +10,7 @@ export interface GetGenerationInfo {
     type: string | null;
     version: string | null;
     mileage: number;
-    image_url: string;
+    image_url: string | null;
     warranty_date: number;
     warranty_km: number;
   };

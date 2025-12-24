@@ -4,6 +4,7 @@ import { InfoVehicleResult } from '@/interfaces/dashboard/passport/infoVehicle';
 import { Score } from '@/interfaces/common/score';
 import { pdfTexts } from '@/components/pdf/pdf_texts';
 import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
+import { DEFAULT_CAR_IMAGE } from '@/lib/staticData';
 
 const scoreLabels = [
   { label: 'A', color: '#22C55E' }, // green-500
@@ -72,7 +73,7 @@ const PdfHeader: React.FC<{ data: InfoVehicleResult }> = ({ data }) => {
             }}
           >
             <Image
-              src={v.image || '/car-placeholder.jpg'}
+              src={v.image_url || DEFAULT_CAR_IMAGE}
               style={{ width: 80, height: 60, borderRadius: 8, objectFit: 'cover' }}
             />
           </View>

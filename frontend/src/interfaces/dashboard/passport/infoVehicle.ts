@@ -13,7 +13,7 @@ export interface InfoVehicleResult {
     odometer: number;
     score: Score;
     start_date: string;
-    image: string;
+    image_url: string | null;
     licence_plate: string;
     warranty_km: number;
     warranty_date: number;

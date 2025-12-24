@@ -3,6 +3,7 @@ import { View, Text, Image } from '@react-pdf/renderer';
 import { GetGenerationInfo } from '@/interfaces/flash-reports';
 import { pdfTexts } from '@/components/pdf/pdf_texts';
 import { LanguageEnum } from '@/components/entities/flash-report/forms/schema';
+import { DEFAULT_CAR_IMAGE } from '@/lib/staticData';
 
 const PdfHeaderFlash: React.FC<{ data: GetGenerationInfo }> = ({ data }) => {
   const vehicleInfo = data?.vehicle_info;
@@ -43,7 +44,7 @@ const PdfHeaderFlash: React.FC<{ data: GetGenerationInfo }> = ({ data }) => {
             }}
           >
             <Image
-              src={vehicleInfo?.image_url || '/car-placeholder.jpg'}
+              src={vehicleInfo?.image_url || DEFAULT_CAR_IMAGE}
               style={{ width: 80, height: 60, borderRadius: 8, objectFit: 'cover' }}
             />
           </View>

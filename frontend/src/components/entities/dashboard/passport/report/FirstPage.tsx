@@ -21,7 +21,7 @@ const FirstPage: React.FC<FirstPageProps> = ({ reportData }) => {
         immatriculation={reportData.vehicle_info?.licence_plate}
         score={reportData.vehicle_info?.score}
         start_date={reportData.vehicle_info?.start_date}
-        image={reportData.vehicle_info?.image}
+        image_url={reportData.vehicle_info?.image_url}
         vehicleBatteryInfo={reportData}
       />
 

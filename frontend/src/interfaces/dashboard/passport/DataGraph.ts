@@ -1,5 +1,3 @@
-import { Score } from '@/interfaces/common/score';
-
 export interface DataPoint {
   soh: number;
   odometer: number;
@@ -29,15 +27,3 @@ export interface PinVehicleResponse {
   error: unknown;
   mutate: () => void;
 }
-
-export type DataCardGraphResult = {
-  title: string;
-  data: number[] | Score[];
-  url_image: string;
-};
-
-export type DataCardGraphRequestSwr = {
-  data: DataCardGraphResult[] | undefined;
-  isLoading: boolean;
-  error: unknown;
-};

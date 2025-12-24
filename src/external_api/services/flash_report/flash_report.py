@@ -8,10 +8,11 @@ import pandas as pd
 from fastapi import HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from activation.config.mappings import mapping_vehicle_type
 from core import numpy_utils
-from db_models import Battery, FlashReportCombination, Make, VehicleModel
+from db_models import Asset, Battery, FlashReportCombination, Make, VehicleModel
 from db_models.enums import LanguageEnum
 from external_api.core.config import settings
 from external_api.schemas.flash_report import (
@@ -23,6 +24,7 @@ from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
     TeslaVinDecoder,
 )
 from external_api.services.flash_report.vin_decoder.vin_decoder import VinDecoder
+from external_api.services.s3 import get_make_image_url, get_model_image_url
 
 
 async def log_vin_decoded(
@@ -364,6 +366,9 @@ async def get_flash_report_data(
     db: AsyncSession = None,
 ) -> GenerationData:
     version = flash_report_combination.version
+    # Create aliases for Asset to differentiate make_image and model_image
+    MakeImage = aliased(Asset)
+    ModelImage = aliased(Asset)
 
     # If Tesla and no version, get version from vehicle_model
     if flash_report_combination.make == "tesla" and not version:
@@ -385,9 +390,18 @@ async def get_flash_report_data(
 
     # Get vehicle model with battery info
     stmt = (
-        select(VehicleModel, Battery)
+        select(
+            VehicleModel,
+            Battery,
+            ModelImage.public_url.label("model_image_public_url"),
+            ModelImage.name.label("model_image_name"),
+            MakeImage.public_url.label("make_image_public_url"),
+            MakeImage.name.label("make_image_name"),
+        )
         .outerjoin(Make, Make.id == VehicleModel.make_id)
         .outerjoin(Battery, Battery.id == VehicleModel.battery_id)
+        .outerjoin(ModelImage, VehicleModel.image_id == ModelImage.id)
+        .outerjoin(MakeImage, Make.image_id == MakeImage.id)
         .where(
             (Make.make_name == flash_report_combination.make)
             & (VehicleModel.model_name == flash_report_combination.model)
@@ -402,7 +416,14 @@ async def get_flash_report_data(
             status_code=404,
             detail=f"Cannot get back vehicle model from token {flash_report_combination.make=}, {flash_report_combination.model=}, {flash_report_combination.type=}, {version=}.",
         )
-    vehicle_model, battery = row
+    (
+        vehicle_model,
+        battery,
+        model_image_public_url,
+        model_image_name,
+        make_image_public_url,
+        make_image_name,
+    ) = row
 
     if not vehicle_model.trendline:
         trendline = None
@@ -419,6 +440,16 @@ async def get_flash_report_data(
             expression=trendline, x=flash_report_combination.odometer
         )
 
+    image_url = None
+    if model_image_public_url:
+        image_url = model_image_public_url
+    elif model_image_name:
+        image_url = get_model_image_url(model_image_name)
+    elif make_image_public_url:
+        image_url = make_image_public_url
+    elif make_image_name:
+        image_url = get_make_image_url(make_image_name)
+
     return GenerationData(
         has_trendline=status,
         language=flash_report_combination.language,
@@ -431,7 +462,7 @@ async def get_flash_report_data(
             if flash_report_combination.type
             else None,
             "mileage": flash_report_combination.odometer,
-            "image_url": vehicle_model.url_image,
+            "image_url": image_url,
             "warranty_date": vehicle_model.warranty_date,
             "warranty_km": vehicle_model.warranty_km,
         },

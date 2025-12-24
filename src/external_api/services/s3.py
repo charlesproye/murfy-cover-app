@@ -12,6 +12,7 @@ from fastapi import HTTPException
 
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
+from db_models.enums import AssetTypeEnum
 from external_api.core.config import settings
 
 
@@ -23,7 +24,7 @@ def _get_s3_service() -> S3Service:
         S3_REGION=getattr(
             settings, "S3_REGION", "fr-par"
         ),  # Default to fr-par if not set
-        S3_BUCKET=settings.S3_BUCKET,
+        S3_BUCKET=settings.S3_BUCKET_ASSETS,
         S3_KEY=settings.S3_KEY,
         S3_SECRET=settings.S3_SECRET,
     )
@@ -67,6 +68,14 @@ def get_file_url(file_full_path: str) -> str:
         )
     except Exception as e:
         raise Exception(f"Error getting file_full_path signed url: {e}") from e
+
+
+def get_model_image_url(image_name: str):
+    return get_file_url(f"{AssetTypeEnum.car_images.value}/{image_name}")
+
+
+def get_make_image_url(image_name: str):
+    return get_file_url(f"{AssetTypeEnum.make_images.value}/{image_name}")
 
 
 # UPLOAD FILES

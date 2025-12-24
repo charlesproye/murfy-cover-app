@@ -178,10 +178,6 @@ mappings = {
             ],
             "model_clean": lambda m: "zoe",
             "metadata": {
-                "url_image": {
-                    "R110": "https://olinn.eu/sites/default/files/styles/max_650/public/images/zoe-1-2.png?itok=WtFDoX9b",
-                    "R135": "https://carvo.ch/assets/images/models/md-5/medium/renault-zoe.png",
-                },
                 "warranty_km": 160000,
                 "warranty_date": {"R110": 8, "R135": 6},
                 "capacity": {"R110": 52, "R135": 52},
@@ -224,7 +220,6 @@ mappings = {
             ],
             "model_clean": lambda m: "xc40",
             "metadata": {
-                "url_image": "https://cas.volvocars.com/image/dynamic/MY25_2417/536/exterior-v1/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/default.png?market=fr&client=ccs-self-service&fallback&angle=4&w=750&bg=00000000",
                 "warranty_km": 160000,
                 "warranty_date": 8,
                 "capacity": {

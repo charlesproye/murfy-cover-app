@@ -52,6 +52,7 @@ class Settings(BaseSettings):
 
     # S3
     S3_BUCKET: str = os.getenv("S3_BUCKET", "")
+    S3_BUCKET_ASSETS: str = os.getenv("S3_BUCKET_ASSETS", "")
     S3_KEY: str = os.getenv("S3_KEY", "")
     S3_SECRET: str = os.getenv("S3_SECRET", "")
     S3_ENDPOINT: str = os.getenv("S3_ENDPOINT", "")

@@ -151,8 +151,18 @@ async def get_all_models_with_trendline(
             makes_dict[make_name][model_name][model_type] = []
 
         # Add version if not already present
-        if version not in makes_dict[make_name][model_name][model_type]:
-            makes_dict[make_name][model_name][model_type].append(version)
+        # Check if the value is None (meaning no versions) before using 'in' operator
+        versions_list = makes_dict[make_name][model_name][model_type]
+        if versions_list is None:
+            # Already set to None (no versions), skip
+            continue
+
+        if version not in versions_list:
+            if version:
+                versions_list.append(version)
+            else:
+                # Set to None to indicate no versions for this type
+                makes_dict[make_name][model_name][model_type] = None
 
     # Convert to Pydantic models
     makes = []
@@ -161,7 +171,8 @@ async def get_all_models_with_trendline(
         for model_name, types_dict in models_dict.items():
             types = []
             for model_type, versions in types_dict.items():
-                types.append(TypeInfo(model_type=model_type, versions=versions))
+                if model_type:
+                    types.append(TypeInfo(model_type=model_type, versions=versions))
             models.append(ModelInfo(model_name=model_name, types=types))
         makes.append(MakeInfo(make_name=make_name, models=models))
 

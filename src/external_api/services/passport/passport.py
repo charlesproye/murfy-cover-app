@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_models import Oem, Vehicle, VehicleData, VehicleModel
 from external_api.schemas.graph import DataGraphResponse, DataPoint
+from external_api.services.s3 import get_make_image_url, get_model_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -22,70 +23,6 @@ async def get_fleet_id_of_vin(vin: str, db: AsyncSession):
         return False
 
     return vehicle.fleet_id
-
-
-async def get_kpis(vin: str, db: AsyncSession):
-    query = text("""
-        WITH vehicle_info AS (
-            SELECT v.id, v.vehicle_model_id, vm.url_image, v.bib_score as score
-            FROM vehicle v
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            WHERE vin = :vin
-        ),
-        weekly_data AS (
-            SELECT DISTINCT ON (date_trunc('week', vd.timestamp))
-                vehicle_id,
-                date_trunc('week', vd.timestamp) as week_start,
-                ROUND(odometer::numeric, 0) as odometer,
-                ROUND((soh::numeric * 100), 1) as soh,
-                soh_comparison,
-                score
-            FROM vehicle_data vd
-            JOIN vehicle_info vi ON vd.vehicle_id = vi.id
-            WHERE (odometer IS NOT NULL OR soh IS NOT NULL)
-            ORDER BY date_trunc('week', vd.timestamp) DESC, vd.timestamp DESC
-            LIMIT 2
-        ),
-        scores_by_week AS (
-            SELECT
-                week_start,
-                score as value
-            FROM weekly_data
-        )
-        SELECT
-            title,
-            array_agg(value ORDER BY week_start DESC) as data,
-            MAX(vi.url_image) as url_image
-        FROM (
-            SELECT 'SoH' as title, CAST(soh AS text) as value, week_start
-            FROM weekly_data
-            UNION ALL
-            SELECT 'Odometer' as title, CAST(odometer AS text) as value, week_start
-            FROM weekly_data
-            UNION ALL
-            SELECT 'Score' as title, value, week_start
-            FROM scores_by_week
-        ) combined_data
-        CROSS JOIN vehicle_info vi
-        GROUP BY title
-    """)
-
-    result = await db.execute(query, {"vin": vin})
-    rows = result.mappings().all()
-
-    # Convert to list of dicts with numeric values
-    return [
-        {
-            "title": row["title"],
-            "data": [
-                float(val) if row["title"] == "SoH" else int(val) for val in row["data"]
-            ]
-            if row["title"] in ["SoH", "Odometer"]
-            else row["data"],
-            "url_image": row["url_image"],
-        }
-        for row in rows
-    ]
 
 
 async def get_graph_data(vin: str, db: AsyncSession = None):
@@ -226,11 +163,23 @@ async def get_infos(vin: str, db: AsyncSession):
                 b.battery_chemistry as chemistry,
                 b.capacity,
                 b.battery_oem as oem,
-                COALESCE(vm.autonomy, 0) as range,
-                vm.url_image
+                COALESCE(vm.autonomy, 0) as range
             FROM battery b
             JOIN vehicle_model vm ON b.id = vm.battery_id
             JOIN vehicle v ON vm.id = v.vehicle_model_id
+            WHERE v.vin = :vin
+        ),
+        images_list AS (
+            SELECT
+                model_image.public_url as model_image_public_url,
+                model_image.name as model_image_name,
+                make_image.public_url as make_image_public_url,
+                make_image.name as make_image_name
+            FROM vehicle_model vm
+            JOIN vehicle v ON vm.id = v.vehicle_model_id
+            LEFT JOIN asset model_image ON vm.image_id = model_image.id
+            LEFT JOIN make ON vm.make_id = make.id
+            LEFT JOIN asset make_image ON make.image_id = make_image.id
             WHERE v.vin = :vin
         )
         SELECT
@@ -252,7 +201,10 @@ async def get_infos(vin: str, db: AsyncSession):
             bi.chemistry,
             bi.capacity,
             bi.range,
-            bi.url_image,
+            il.model_image_public_url,
+            il.model_image_name,
+            il.make_image_public_url,
+            il.make_image_name,
             bi.oem,
             COALESCE(
                 CASE
@@ -300,6 +252,7 @@ async def get_infos(vin: str, db: AsyncSession):
         JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
         JOIN oem ON vm.oem_id = oem.id
         JOIN battery_info bi ON TRUE
+        LEFT JOIN images_list il ON TRUE
         LEFT JOIN latest_data_odometer ld_odometer ON ld_odometer.vehicle_id = v.id
         LEFT JOIN latest_data_soh ld_soh ON ld_soh.vehicle_id = v.id
         LEFT JOIN weekly_data wd ON wd.vehicle_id = v.id
@@ -314,6 +267,16 @@ async def get_infos(vin: str, db: AsyncSession):
             status_code=404, detail="Vehicle not found or not available"
         )
 
+    image_url = None
+    if data["model_image_public_url"]:
+        image_url = data["model_image_public_url"]
+    elif data["model_image_name"]:
+        image_url = get_model_image_url(data["model_image_name"])
+    elif data["make_image_public_url"]:
+        image_url = data["make_image_public_url"]
+    elif data["make_image_name"]:
+        image_url = get_make_image_url(data["make_image_name"])
+
     formatted_data = {
         "vehicle_info": {
             "vin": data["vin"],
@@ -324,7 +287,7 @@ async def get_infos(vin: str, db: AsyncSession):
             "start_date": data["start_date"].isoformat()
             if data["start_date"]
             else None,
-            "image": data["url_image"],
+            "image_url": image_url,
             "licence_plate": data["licence_plate"],
             "warranty_date": data["warranty_date"],
             "warranty_km": data["warranty_km"],
@@ -533,171 +496,6 @@ async def get_charging_cycles(vin: str, db: AsyncSession):
     """)
     result = await db.execute(query, {"vin": vin})
     return result.mappings().first()
-
-
-async def get_download_report(vin: str, db: AsyncSession):
-    query = text("""
-        WITH vehicle_info AS (
-            SELECT
-                v.id,
-                v.licence_plate,
-                v.end_of_contract_date,
-                v.vin,
-                v.start_date,
-                v.bib_score as score,
-                vm.model_name,
-                vm.type,
-                b.capacity,
-                vm.autonomy,
-                vm.warranty_date,
-                vm.warranty_km,
-                vm.url_image,
-                o.oem_name
-            FROM vehicle v
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN battery b ON vm.battery_id = b.id
-            JOIN oem o ON vm.oem_id = o.id
-            WHERE v.vin = :vin
-        ),
-        latest_data AS (
-            SELECT DISTINCT ON (vd.vehicle_id)
-                ROUND(odometer::numeric, 0) odometer,
-                ROUND(soh::numeric, 2)*100 soh,
-                ROUND((odometer / (SELECT autonomy FROM vehicle_info))::numeric, 0) as cycles,
-                consumption,
-                timestamp,
-                soh_comparison,
-                GREATEST(0, (SELECT warranty_km FROM vehicle_info) - ROUND(odometer::numeric, 0)) remaining_warranty_km
-            FROM vehicle_data vd
-            WHERE vd.vehicle_id = (SELECT id FROM vehicle_info)
-            ORDER BY vd.vehicle_id, timestamp DESC
-        ),
-        soh_degradation AS (
-            SELECT
-                CASE
-                    WHEN ld.odometer > 0 THEN
-                        (100 - ld.soh) / NULLIF(ld.odometer, 0)
-                    ELSE NULL
-                END as degradation_per_km,
-                CASE
-                    WHEN EXTRACT(EPOCH FROM (ld.timestamp - vi.start_date)) > 0 THEN
-                        (100 - ld.soh) / NULLIF(EXTRACT(EPOCH FROM (ld.timestamp - vi.start_date))/86400, 0)
-                    ELSE NULL
-                END as degradation_per_day
-            FROM latest_data ld
-            CROSS JOIN vehicle_info vi
-        ),
-        predictions AS (
-            SELECT
-                vi.autonomy as base_autonomy,
-                ld.soh as current_soh,
-                ld.odometer as current_odometer,
-                -- Calculating the SoH for the extension of 30 000km
-                ld.soh - (30000 * CASE
-                    WHEN ld.odometer > 0 THEN
-                        (100 - ld.soh) / NULLIF(ld.odometer, 0)
-                    ELSE NULL
-                END) as extended_soh,
-                -- Calculating the SoH at the end of the contract
-                ld.soh - (
-                    GREATEST(0, EXTRACT(EPOCH FROM (vi.end_of_contract_date - ld.timestamp))/86400)
-                    * sd.degradation_per_day
-                ) as contract_end_soh,
-                -- Calculating the SoH at the end of the warranty
-                ld.soh - (
-                    GREATEST(0, EXTRACT(EPOCH FROM ((vi.start_date + (vi.warranty_date || ' years')::interval) - ld.timestamp))/86400)
-                    * sd.degradation_per_day
-                ) as warranty_end_soh,
-                -- Estimating the odometer at the end of the contract
-                ld.odometer + (
-                    EXTRACT(EPOCH FROM (vi.end_of_contract_date - ld.timestamp))/86400
-                    * (ld.odometer / EXTRACT(EPOCH FROM (ld.timestamp - vi.start_date))/86400)
-                ) as contract_end_odometer,
-                -- Estimating the odometer at the end of the warranty
-                ld.odometer + (
-                    EXTRACT(EPOCH FROM ((vi.start_date + (vi.warranty_date || ' years')::interval) - ld.timestamp))/86400
-                    * (ld.odometer / EXTRACT(EPOCH FROM (ld.timestamp - vi.start_date))/86400)
-                ) as warranty_end_odometer
-            FROM vehicle_info vi
-            CROSS JOIN latest_data ld
-            CROSS JOIN soh_degradation sd
-        )
-        SELECT
-            vi.*,
-            ld.odometer,
-            ld.soh,
-            ld.cycles,
-            ld.consumption,
-            ld.remaining_warranty_km,
-            p.base_autonomy,
-            ROUND((p.base_autonomy * p.current_soh / 100)::numeric, 0) as remaining_range,
-            json_build_object(
-                'initial', json_build_object(
-                    'soh', 100,
-                    'range_min', p.base_autonomy,
-                    'range_max', p.base_autonomy,
-                    'odometer', 0
-                ),
-                'current', json_build_object(
-                    'soh', ROUND(p.current_soh),
-                    'range_min', GREATEST(0, ROUND((p.base_autonomy * p.current_soh / 100) - 10)),
-                    'range_max', GREATEST(0, ROUND((p.base_autonomy * p.current_soh / 100) + 10)),
-                    'odometer', ROUND(p.current_odometer)
-                ),
-                'predictions', (
-                    SELECT array_agg(prediction)
-                    FROM (
-                        SELECT
-                            CASE
-                                WHEN p.extended_soh IS NOT NULL
-                                AND ROUND(p.extended_soh) > 0
-                                AND ROUND(p.extended_soh) < ROUND(p.current_soh) THEN
-                                    json_build_object(
-                                        'soh', ROUND(p.extended_soh),
-                                        'range_min', GREATEST(0, ROUND((p.base_autonomy * p.extended_soh / 100) - 10)),
-                                        'range_max', GREATEST(0, ROUND((p.base_autonomy * p.extended_soh / 100) + 10)),
-                                        'odometer', ROUND(p.current_odometer + 30000)
-                                    )
-                            END as prediction
-                        UNION ALL
-                        SELECT
-                            CASE
-                                WHEN p.contract_end_soh IS NOT NULL
-                                AND ROUND(p.contract_end_soh) > 0
-                                AND ROUND(p.contract_end_soh) < ROUND(p.current_soh) THEN
-                                    json_build_object(
-                                        'soh', ROUND(p.contract_end_soh),
-                                        'range_min', GREATEST(0, ROUND((p.base_autonomy * p.contract_end_soh / 100) - 10)),
-                                        'range_max', GREATEST(0, ROUND((p.base_autonomy * p.contract_end_soh / 100) + 10)),
-                                        'odometer', ROUND(p.contract_end_odometer)
-                                    )
-                            END
-                        UNION ALL
-                        SELECT
-                            CASE
-                                WHEN p.warranty_end_soh IS NOT NULL
-                                AND ROUND(p.warranty_end_soh) > 0
-                                AND ROUND(p.warranty_end_soh) < ROUND(p.current_soh) THEN
-                                    json_build_object(
-                                        'soh', ROUND(p.warranty_end_soh),
-                                        'range_min', GREATEST(0, ROUND((p.base_autonomy * p.warranty_end_soh / 100) - 10)),
-                                        'range_max', GREATEST(0, ROUND((p.base_autonomy * p.warranty_end_soh / 100) + 10)),
-                                        'odometer', ROUND(p.warranty_end_odometer)
-                                    )
-                            END
-                    ) subq
-                    WHERE prediction IS NOT NULL
-                )
-            ) predictions
-        FROM vehicle_info vi
-        LEFT JOIN latest_data ld ON true
-        LEFT JOIN predictions p ON true
-    """)
-
-    result = await db.execute(query, {"vin": vin})
-    data = result.mappings().first()
-
-    return data
 
 
 async def get_kpis_additional(vin: str, db: AsyncSession):

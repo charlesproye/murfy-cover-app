@@ -10,6 +10,11 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 's3.fr-par.scw.cloud',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'static-assets.tesla.com',
         pathname: '/**',
       },

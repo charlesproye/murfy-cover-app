@@ -12,7 +12,7 @@ interface VehicleHeaderProps {
   vin: string;
   immatriculation: string;
   mileage: number | string;
-  image: string;
+  image_url: string | null;
   score: Score;
   start_date: string;
   vehicleBatteryInfo: InfoVehicleResult;
@@ -24,7 +24,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vin,
   mileage,
   immatriculation,
-  image,
+  image_url,
   start_date,
   vehicleBatteryInfo,
   score,
@@ -36,7 +36,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           <div className="w-1/5 flex items-center h-full justify-center">
             <div className="bg-white p-2 rounded-lg border border-gray/20 shadow-xs w-[140px] h-[80px] flex items-center justify-center overflow-hidden">
               <Image
-                src={image || DEFAULT_CAR_IMAGE}
+                src={image_url || DEFAULT_CAR_IMAGE}
                 alt={`${brand} ${model}`}
                 width={140}
                 height={80}

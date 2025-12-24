@@ -34,7 +34,7 @@ class VehicleModel(BaseUUIDModel):
     make_id: Mapped[uuid.UUID] = Column(ForeignKey("make.id"))
     battery_id: Mapped[uuid.UUID] = Column(ForeignKey("battery.id"))
     autonomy = Column(Integer)
-    url_image: str = Column(String(2000))
+    image_id: Mapped[uuid.UUID] = Column(ForeignKey("asset.id"))
     warranty_date = Column(Integer)
     warranty_km = Column(Numeric(10, 2))
     source: str = Column(String(100))

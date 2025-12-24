@@ -10,6 +10,9 @@ from db_models.company import (
     Make,
     Oem,
 )
+from db_models.files import (
+    Asset,
+)
 from db_models.fleet import (
     Fleet,
     UserFleet,
@@ -39,6 +42,7 @@ __all__ = [
     "ApiPricingPlan",
     "ApiUser",
     "ApiUserPricing",
+    "Asset",
     "Battery",
     "Company",
     "FlashReportCombination",

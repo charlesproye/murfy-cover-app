@@ -8,12 +8,10 @@ from external_api.db.session import get_db
 from external_api.schemas.user import GetCurrentUser
 from external_api.services.passport.passport import (
     get_charging_cycles,
-    get_download_report,
     get_estimated_range,
     get_fleet_id_of_vin,
     get_graph_data,
     get_infos,
-    get_kpis,
     get_kpis_additional,
     get_pinned_vehicle,
     post_pin_vehicle,
@@ -35,16 +33,6 @@ async def is_vin_in_fleets(
         if fleet_id and user.fleets
         else False
     }
-
-
-@router.get("/kpis/{vin}", include_in_schema=False)
-async def kpis(
-    db=Depends(get_db),
-    vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
-):
-    response = await get_kpis(vin, db)
-    return response
 
 
 @router.get("/graph/{vin}", include_in_schema=False)
@@ -84,16 +72,6 @@ async def kpis_additional(
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_kpis_additional(vin, db)
-    return response
-
-
-@router.get("/download_rapport/{vin}", include_in_schema=False)
-async def download_rapport(
-    db=Depends(get_db),
-    vin: str = Path(..., description="The vin"),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
-):
-    response = await get_download_report(vin, db)
     return response
 
 

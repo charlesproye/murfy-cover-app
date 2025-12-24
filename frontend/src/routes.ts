@@ -20,12 +20,10 @@ export const ROUTES = {
 
   // PASSPORT
   GRAPHS: `${BASE_URL}/passport/graph`,
-  KPIGRAPH: `${BASE_URL}/passport/kpis`,
   CHARGING_CYCLES: `${BASE_URL}/passport/charging-cycles`,
   INFO_VEHICLE: `${BASE_URL}/passport/infos`,
   ESTIMATED_RANGE: `${BASE_URL}/passport/estimated_range`,
   KPIS_ADDITIONAL: `${BASE_URL}/passport/kpis_additional`,
-  PDF: `${BASE_URL}/passport/download_rapport`,
   PIN_VEHICLE: `${BASE_URL}/passport/pin_vehicle`,
   GET_PINNED_VEHICLE: `${BASE_URL}/passport/pinned_vehicle`,
   PRICE_FORECAST: `${BASE_URL}/passport/price_forecast`,

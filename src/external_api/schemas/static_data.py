@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class TypeInfo(BaseModel):
     model_type: str = Field(..., description="Model type")
-    versions: list[str] = Field(..., description="Versions")
+    versions: list[str] | None = Field(None, description="Versions")
 
 
 class ModelInfo(BaseModel):
