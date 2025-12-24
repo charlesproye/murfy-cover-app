@@ -27,9 +27,9 @@ class Region(BaseUUIDCreatedAt):
 
 class VehicleModel(BaseUUIDModel):
     __tablename__ = "vehicle_model"
-    model_name: str = Column(String(100), nullable=False)
-    type: str = Column(String(50))
-    version: str = Column(String(50))
+    model_name: Mapped[str] = Column(String(100), nullable=False)
+    type: Mapped[str | None] = Column(String(50))
+    version: Mapped[str | None] = Column(String(50))
     oem_id: Mapped[uuid.UUID] = Column(ForeignKey("oem.id"))
     make_id: Mapped[uuid.UUID] = Column(ForeignKey("make.id"))
     battery_id: Mapped[uuid.UUID] = Column(ForeignKey("battery.id"))
@@ -51,11 +51,11 @@ class VehicleModel(BaseUUIDModel):
     soh_oem_data: bool = Column(Boolean, default=False)
     commissioning_date = Column(DateTime, comment="First time seen on the market")
     end_of_life_date = Column(DateTime, comment="Last time seen on the market")
-    expected_consumption = Column(Integer)
-    evdb_model_id: str | None = Column(String(100), nullable=True)
-    maximum_speed: int | None = Column(Integer)
-    charge_plug_location: str | None = Column(String(100))
-    charge_plug_type: str | None = Column(String(100))
+    expected_consumption: Mapped[int | None] = Column(Integer)
+    evdb_model_id: Mapped[str | None] = Column(String(100), nullable=True)
+    maximum_speed: Mapped[int | None] = Column(Integer)
+    charge_plug_location: Mapped[str | None] = Column(String(100))
+    charge_plug_type: Mapped[str | None] = Column(String(100))
     fast_charge_max_power: int | None = Column(Integer)
     fast_charge_duration: int | None = Column(Integer)
     standard_charge_duration: int | None = Column(Integer)
@@ -70,10 +70,10 @@ class VehicleModel(BaseUUIDModel):
 
 class Battery(BaseUUIDModel):
     __tablename__ = "battery"
-    battery_type = Column(String(100))
-    battery_chemistry: str = Column(String(100))
-    battery_oem: str = Column(String(100))
-    capacity: float | None = Column(Numeric(10, 2))
+    battery_type: Mapped[str | None] = Column(String(100))
+    battery_chemistry: Mapped[str | None] = Column(String(100))
+    battery_oem: Mapped[str | None] = Column(String(100))
+    capacity: Mapped[float | None] = Column(Numeric(10, 2))
     net_capacity: float | None = Column(Numeric(10, 2))
     estimated_capacity: str | None = Column(String(100))
     battery_modules: int | None = Column(Integer)
@@ -93,14 +93,14 @@ class Vehicle(BaseUUIDModel):
     vehicle_model_id: Mapped[uuid.UUID] = Column(
         ForeignKey("vehicle_model.id"), nullable=False
     )
-    vin: str = Column(String(50))
-    bib_score: str = Column(String(1), nullable=True)
+    vin: Mapped[str | None] = Column(String(50))
+    bib_score: Mapped[str | None] = Column(String(1), nullable=True)
     activation_status: Mapped[bool] = Column(Boolean, nullable=True)
     is_eligible: Mapped[bool] = Column(Boolean, nullable=True)
     is_pinned: Mapped[bool] = Column(Boolean, nullable=True)
-    start_date = Column(Date)
-    licence_plate: str = Column(String(50))
-    end_of_contract_date = Column(Date)
+    start_date: Mapped[Date | None] = Column(Date)
+    licence_plate: Mapped[str | None] = Column(String(50))
+    end_of_contract_date: Mapped[Date | None] = Column(Date)
     __table_args__ = (
         Index("ix_vehicle_fleet_id", "fleet_id"),  # Index sur l'ID de la flotte
         Index("ix_vehicle_region_id", "region_id"),  # Index sur l'ID de la région
@@ -114,14 +114,14 @@ class Vehicle(BaseUUIDModel):
 class VehicleData(BaseUUIDModel):
     __tablename__ = "vehicle_data"
     vehicle_id: Mapped[uuid.UUID] = Column(ForeignKey("vehicle.id"), nullable=False)
-    odometer = Column(Numeric(10, 2))
-    region: str = Column(String(100))
-    speed = Column(Numeric(5, 2))
-    location = Column(String(100))
-    soh = Column(Numeric(5, 3))
-    cycles = Column(Numeric(10, 2))
-    consumption = Column(Numeric(5, 3))
-    soh_comparison = Column(Numeric(6, 3))
+    odometer: Mapped[float | None] = Column(Numeric(10, 2))
+    region: Mapped[str | None] = Column(String(100))
+    speed: Mapped[float | None] = Column(Numeric(5, 2))
+    location: Mapped[str | None] = Column(String(100))
+    soh: Mapped[float | None] = Column(Numeric(5, 3))
+    cycles: Mapped[float | None] = Column(Numeric(10, 2))
+    consumption: Mapped[float | None] = Column(Numeric(5, 3))
+    soh_comparison: Mapped[float | None] = Column(Numeric(6, 3))
     timestamp = Column(DateTime, server_default=func.now())
     level_1 = Column(
         Numeric(6, 2),

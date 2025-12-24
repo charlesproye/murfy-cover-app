@@ -1,0 +1,152 @@
+
+    <!-- Page container -->
+    <div class="full-page">
+
+        <!-- Informations sur la recharge -->
+        <div class="w-[547px] h-60 bg-white rounded-3xl p-4 flex flex-col">
+            <div class="flex justify-between items-center mb-2">
+                <div class="flex items-center gap-2">
+                    <div class="h-2.5 w-2.5 text-[#00F095]">{{ read_svg("svg/soh.svg")|safe }}</div>
+                    <div class="block-title">Informations sur la recharge</div>
+                </div>
+                <div class="flex items-center gap-1">
+                    <div class="text-black text-[7px] font-medium">
+                        Pour le véhicule <span class="font-bold">{{ vehicle.model }}</span>
+                    </div>
+                    <div class="w-5 h-5 rounded-lg border border-gray-100 flex items-center justify-center p-0.5">
+                        {% if vehicle.image_url %}
+                        <img src="{{ vehicle.image_url }}" class="w-full h-full object-contain">
+                        {% else %}
+                        <div class="w-16 h-16 fill-[#004d33]">{{ read_svg("svg/car-placeholder.svg")|safe }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-neutral-500 text-[7px] mb-4 leading-tight">
+                Ces données représentent les différents types de recharge disponibles pour le véhicule {{ vehicle.model }}, classés par
+                puissance et type de courant. Temps et coût pour une recharge de 20% à 80% sont fournis.
+            </div>
+
+            <div class="h-6 bg-neutral-100 rounded-sm mb-2 flex items-center px-2">
+                <div class="w-[60px] text-black text-[7px] font-black">Type</div>
+                <div class="flex-1 text-center text-black text-[7px] font-black">Temps et coût de recharge (20% - 80%)</div>
+                <div class="w-[120px] text-black text-[7px] font-black pl-6">Typical</div>
+                <div class="w-[60px] text-black text-[7px] font-black text-right">Puissance</div>
+            </div>
+
+            <div class="flex flex-col gap-[7px] flex-1">
+                {% for item in charging_data %}
+                <div class="flex items-center px-2 h-6">
+                    <div class="w-[60px] text-black text-[7px] font-bold">{{ item.type }}</div>
+                    <div class="flex-1 h-6 bg-emerald-50/50 rounded-full flex items-center p-[2px]">
+                        <div class="h-5 bg-[linear-gradient(to_right,#f0fff4_0%,#4ade80_20%,#22c55e_50%,#1a2e1a_100%)] rounded-full flex items-center justify-end pr-3"
+                             style="width: {{ item.percentage }}%; min-width: 20px;">
+                            {% if item.percentage > 40 %}
+                            <span class="text-[7px] font-bold text-white">{{ item.duration }} - {{ item.cost|number_format }} €</span>
+                            {% endif %}
+                        </div>
+                        {% if item.percentage <= 40 %}
+                        <div class="ml-4 text-[7px] font-bold text-black">{{ item.duration }} - {{ item.cost|number_format }} €</div>
+                        {% endif %}
+                    </div>
+                    <div class="w-[120px] text-black text-[7px] font-medium pl-6">{{ item.typical }}</div>
+                    <div class="w-[60px] text-black text-[7px] font-medium text-right">{{ item.power }} kW</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Garantie véhicule & batterie -->
+        <div class="w-[547px] h-[280px] bg-white rounded-3xl p-4 flex flex-col">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="h-2.5 w-2.5 [&>svg]:w-full [&>svg]:h-full">{{ read_svg("svg/shield.svg")|safe }}</div>
+                <div class="block-title">Garantie véhicule & batterie</div>
+            </div>
+
+            <div class="text-neutral-500 text-[7px] mb-4 leading-tight">
+                Les véhicules électriques sont assortis de deux garanties constructeur : la <span class="font-bold text-neutral-600">garantie véhicule</span> et la <span class="font-bold text-neutral-600">garantie batterie</span>, qui garantit que la batterie conserve un certain niveau de capacité et de performance.
+            </div>
+
+            <div class="flex gap-4 flex-1">
+                <!-- Garantie Véhicule -->
+                <div class="flex-1 rounded-3xl border border-gray-200 p-3 flex flex-col gap-2">
+                    <div class="text-black text-xs font-medium">Garantie véhicule</div>
+                    <div class="h-16 bg-gray-50 rounded flex items-center justify-center">
+                        {% if vehicle.image_url %}
+                        <img src="{{ vehicle.image_url }}" class="w-full h-full object-contain mix-blend-multiply opacity-80">
+                        {% else %}
+                        <div class="w-16 h-16 fill-[#004d33]">{{ read_svg("svg/car-placeholder.svg")|safe }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="text-black text-[7px] font-medium leading-tight">
+                        La garantie véhicule couvre le moteur, la transmission, l'électronique embarquée et les systèmes de contrôle du véhicule, généralement valable 5 ans.
+                    </div>
+                    <div class="mt-auto text-center text-neutral-400 text-[5px] font-medium">Image non contractuelle.</div>
+                </div>
+
+                <!-- Garantie Batterie -->
+                <div class="flex-[1.8] rounded-3xl border border-gray-200 p-3 flex gap-3">
+                    <div class="flex flex-col gap-2 flex-1">
+                        <div class="text-black text-xs font-medium">Garantie batterie</div>
+                        <img src="https://bib-batteries-assets.s3.fr-par.scw.cloud/battery_pack_256.jpg" class="w-[114px] rounded object-cover">
+                        <div class="text-black text-[7px] font-medium leading-tight">
+                            La garantie batterie est spécifiquement liée àu fonctionnement électrique et à la santé de la batterie. Elle garantit un certain niveau de capacité et de performance, généralement plus de 70% SoH.
+                        </div>
+                        <div class="mt-auto text-center text-neutral-400 text-[5px] font-medium">Image non contractuelle.</div>
+                    </div>
+                    <div class="flex flex-col justify-center gap-1.5 flex-1">
+                        <div class="text-black text-[7px] font-medium">
+                            Pour le véhicule <span class="font-bold">{{ vehicle.model }}</span> :
+                        </div>
+                        <div class="text-black text-base font-medium leading-[0.9] tracking-tight">
+                            {{ battery.warranty_years }} ans <br />
+                            ou {{ battery.warranty_km|number_format }} km
+                        </div>
+                        <div class="text-black text-[7px] font-medium mt-1 leading-tight">
+                            Ces informations peuvent varier en fonction de la marque et du constructeur. Plus de détails peuvent être trouvés sur <a href="https://www.bib-batteries.fr" class="text-sky-400 underline">la page de garantie batterie de Bib</a>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-4">
+            <!-- Informations sur l'autonomie -->
+            <div class="flex-1 h-32 bg-white rounded-3xl p-4 flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <div class="h-2.5 w-2.5 [&>svg]:w-full [&>svg]:h-full">{{ read_svg("svg/search.svg")|safe }}</div>
+                    <div class="block-title">Informations sur l'autonomie</div>
+                </div>
+                <div class="text-neutral-500 text-[7px] leading-tight">
+                    Bib compare l'autonomie WLTP (Worldwide Harmonized Light Vehicle Test Procedure), telle qu'annoncée par le constructeur au moment de la production du véhicule, avec l'autonomie actuelle observée lors de la surveillance du véhicule par Bib Batteries. Cette comparaison permet d'évaluer l'évolution des performances de la batterie du véhicule au fil du temps et leur adéquation avec les estimations initiales du constructeur, ce qui permet de mieux comprendre l'efficacité énergétique actuelle du véhicule.
+                </div>
+            </div>
+
+            <!-- Validité du rapport -->
+            <div class="flex-1 h-32 bg-white rounded-3xl p-4 flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <div class="h-2.5 w-2.5 [&>svg]:w-full [&>svg]:h-full">{{ read_svg("svg/verified.svg")|safe }}</div>
+                    <div class="block-title">Validité du rapport</div>
+                </div>
+                <div class="text-neutral-500 text-[7px] leading-tight">
+                    Ce rapport estime les performances et l'état du présent véhicule électrique au moment du test sur la base de données fournies lors du suivi du milliers d'autres véhicules similaires. Ce rapport ne constitue pas une garantie des performances et de l'état du véhicule, et toute modification apportée au véhicule après le test peut invalider ce rapport. Les conditions générales complètes sont disponibles sur <a href="https://www.bib-batteries.fr" class="text-sky-400 underline">www.bib-batteries.fr</a>.
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="w-[547px] h-[64px] bottom-[25px] left-6 absolute rounded-3xl border border-white">
+            <div class="w-[95px] h-[40px] left-6 top-[11px] absolute">{{ read_svg("svg/logo.svg")|safe }}</div>
+            <div class="h-10 px-5 py-1.5 left-[269px] top-[11px] absolute bg-black/5 rounded-full flex flex-col justify-center">
+                {% if report.uuid %}
+                <div class="text-black text-[8px] font-medium">N°{{ report.uuid }}</div>
+                {% endif %}
+                <div class="text-black text-[9px] font-medium">Date de délivrance : {{ report.date }}</div>
+            </div>
+            <div class="w-10 h-10 left-[489px] top-[11px] absolute bg-black/5 rounded-full flex items-center justify-center">
+                <div class="text-black text-[9px] font-medium">2/2</div>
+            </div>
+            <div class="w-32 left-[132px] top-[15px] absolute text-black text-[7px]">Le score Bib compare l'état de santé (SoH) de la voiture à celui de véhicules similaires (odomètre et âge similaires).</div>
+        </div>
+    </div>

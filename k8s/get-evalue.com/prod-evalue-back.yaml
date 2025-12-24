@@ -58,6 +58,10 @@ spec:
           value: "bib-platform-prod-assets"
         - name: SMTP_EMAIL
           value: "flash-report@bib-batteries.fr"
+        - name: PREMIUM_REPORT_S3_BUCKET
+          value: "bib-premium-reports"
+        - name: GOTENBERG_URL
+          value: "http://gotenberg.data-engineering.svc:3000"
 ---
 apiVersion: v1
 kind: Service

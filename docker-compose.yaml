@@ -250,6 +250,12 @@ services:
     # image: rg.fr-par.scw.cloud/bib-images-dev/dagster-user-deployment:latest
     container_name: dagster-user-deployment
 
+  gotenberg:
+    image: gotenberg/gotenberg
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
 volumes:
   redis_data:
     driver: local

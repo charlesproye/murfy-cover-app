@@ -133,6 +133,7 @@ app = FastAPI(
     ],
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
 )
+
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,  # type: ignore[arg-type]

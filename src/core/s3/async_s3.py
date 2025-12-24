@@ -43,6 +43,7 @@ class AsyncS3:
         custom_config: Config | None = None,
         settings: S3Settings | None = None,
         bucket: str | None = None,
+        disable_checksum: bool = False,
     ):
         """
         Initialize AsyncS3 client.
@@ -53,6 +54,8 @@ class AsyncS3:
             custom_config: Optional custom boto3 Config for specialized use cases
                          (e.g., disabling checksum validation for specific providers)
             settings: Optional S3Settings instance for custom configuration
+            bucket: Optional default bucket name
+            disable_checksum: If True, disable payload signing for faster uploads (less safe)
         """
         if settings is not None:
             self._settings = settings
@@ -79,14 +82,56 @@ class AsyncS3:
             self._boto_config = custom_config
         else:
             # Configure boto3 with explicit SSL enforcement
+            s3_config: dict[str, Any] = {"addressing_style": "path"}
+            if disable_checksum:
+                # Disable payload signing for faster uploads (trade-off: less integrity checking)
+                s3_config["payload_signing_enabled"] = False
+
             self._boto_config = Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "path"},
+                s3=s3_config,
                 max_pool_connections=max_concurrency,
             )
 
+        # Persistent client for reuse across requests (created on first use)
+        self._persistent_client: AsyncS3Client | None = None
+        self._persistent_client_cm: Any | None = None  # Context manager reference
+        self._client_lock = asyncio.Lock()
+
+    async def _get_persistent_client(self) -> AsyncS3Client:
+        """
+        Get or create a persistent S3 client that's reused across requests.
+
+        This eliminates the overhead of creating new clients for each request,
+        providing significant performance improvements for high-frequency operations.
+        """
+        if self._persistent_client is None:
+            async with self._client_lock:
+                # Double-check after acquiring lock
+                if self._persistent_client is None:
+                    # Store context manager so we can properly close it later
+                    self._persistent_client_cm = self.session.client(
+                        "s3",
+                        region_name=self._settings.S3_REGION,
+                        endpoint_url=self._settings.S3_ENDPOINT,
+                        aws_access_key_id=self._settings.S3_KEY,
+                        aws_secret_access_key=self._settings.S3_SECRET,
+                        use_ssl=True,
+                        verify=True,
+                        config=self._boto_config,
+                    )
+                    # Enter context and store the client
+                    self._persistent_client = (
+                        await self._persistent_client_cm.__aenter__()
+                    )
+        assert (
+            self._persistent_client is not None
+        )  # Type guard: always initialized above
+        return self._persistent_client
+
     @asynccontextmanager
     async def _client(self) -> AsyncGenerator[AsyncS3Client, None]:
+        """Create a temporary S3 client (use _get_persistent_client for better performance)."""
         async with self.session.client(
             "s3",
             region_name=self._settings.S3_REGION,
@@ -169,11 +214,41 @@ class AsyncS3:
         return results
 
     async def upload_file(
-        self, path: str, file: bytes, acl: S3ACL = S3ACL.PRIVATE
+        self,
+        path: str,
+        file: bytes,
+        acl: S3ACL = S3ACL.PRIVATE,
+        bucket: str | None = None,
     ) -> None:
         """Upload a file with a canned ACL (default private)."""
         async with self._sem, self._client() as client:
-            await client.put_object(Bucket=self.bucket, Key=path, Body=file, ACL=acl)
+            await client.put_object(
+                Bucket=bucket or self.bucket, Key=path, Body=file, ACL=acl
+            )
+
+    async def upload_file_fast(
+        self,
+        path: str,
+        file: bytes,
+        acl: S3ACL = S3ACL.PRIVATE,
+        bucket: str | None = None,
+        client: AsyncS3Client | None = None,
+    ) -> None:
+        """
+        Upload a file with persistent client reuse for maximum performance.
+
+        By default, uses a persistent client that's reused across all requests,
+        eliminating connection setup overhead. Respects max_concurrency limit
+        for safe operation. You can optionally pass a custom client.
+        """
+        async with self._sem:
+            if client is None:
+                # Use persistent client (reused across requests)
+                client = await self._get_persistent_client()
+
+            await client.put_object(
+                Bucket=bucket or self.bucket, Key=path, Body=file, ACL=acl
+            )
 
     async def upload_files(self, files: dict[str, bytes]) -> list[Any]:
         """
@@ -283,6 +358,20 @@ class AsyncS3:
                 "get_object",
                 Params={"Bucket": self.bucket, "Key": path},
             )
+
+    async def close(self) -> None:
+        """
+        Close the persistent client connection.
+
+        Call this during application shutdown to properly clean up resources.
+        """
+        if self._persistent_client_cm is not None:
+            async with self._client_lock:
+                if self._persistent_client_cm is not None:
+                    # Call __aexit__ on the context manager, not the client
+                    await self._persistent_client_cm.__aexit__(None, None, None)
+                    self._persistent_client = None
+                    self._persistent_client_cm = None
 
 
 def get_async_s3() -> AsyncS3:

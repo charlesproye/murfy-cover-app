@@ -244,3 +244,4 @@ scripts/s3-benchmark.py
 
 # graph
 src/notebooks/results/graphs/*
+output/*

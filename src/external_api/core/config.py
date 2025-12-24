@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_EMAIL: EmailStr | None = None
     FIRST_SUPERUSER_PASSWORD: str | None = None
 
+    # Gotenberg
+    GOTENBERG_URL: str = os.getenv("GOTENBERG_URL", "http://localhost:3000")
+    PREMIUM_REPORT_S3_BUCKET: str = os.getenv(
+        "PREMIUM_REPORT_S3_BUCKET", "bib-premium-reports"
+    )
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | list[str]) -> list[str] | str:

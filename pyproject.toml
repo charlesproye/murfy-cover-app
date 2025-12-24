@@ -198,6 +198,13 @@ orchestration = [
     "dagster-dg-cli",
 ]
 
+# PDF Reports module dependencies
+reports = [
+    "jinja2>=3.1.2",
+    "numpy>=1.26.0",
+    "httpx>=0.25.0",
+]
+
 [dependency-groups]
 # Full development environment with all dependencies
 dev = [
@@ -286,6 +293,7 @@ addopts = [
 ]
 markers = [
     "asyncio: mark test as async",
+    "gotenberg: mark test as requiring a Gotenberg PDF service",
     "integration: mark test as integration test (requires external APIs, database, S3, etc.)",
     "unit: mark test as unit test (self-sufficient, no external dependencies)",
 ]

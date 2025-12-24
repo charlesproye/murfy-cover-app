@@ -1,7 +1,10 @@
+from typing import Any
+
 import numpy as np
+from numpy.typing import NDArray
 
 
-def numpy_safe_eval(expression: str, **params) -> float | np.ndarray:
+def numpy_safe_eval(expression: str, **params) -> NDArray[Any]:
     """
     Evaluate a mathematical expression safely, ensuring that numpy is imported before evaluation.
 

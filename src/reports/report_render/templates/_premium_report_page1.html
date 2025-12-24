@@ -1,0 +1,376 @@
+
+    <div class="full-page">
+        <!-- Top Section: Vehicle Info + State of Health -->
+        <div class="flex gap-4">
+            <!-- Vehicle Info Card -->
+            <div class="w-[347px] h-[224px] bg-[linear-gradient(to_bottom_right,#064e3b_0%,#022c19_70%)] text-white relative rounded-3xl shadow-[0_12px_30px_rgba(0,0,0,0.25)] p-2 flex flex-col gap-3">
+                <!-- Decorative circuit pattern SVG -->
+                <svg class="absolute inset-0 opacity-10 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="0.5"/>
+                    </pattern>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                    <path d="M50 50 h 100 v 50 h -50" stroke="#73c9b3" stroke-width="1" fill="none" />
+                    <circle cx="150" cy="100" r="3" fill="#73c9b3" />
+                </svg>
+
+                <div class="relative z-10 flex gap-3 h-[112px]">
+                    <!-- Vehicle Image -->
+                    <div class="w-[108px] h-[108px] bg-white rounded-2xl p-1 flex items-center justify-center">
+                        {% if vehicle.image_url %}
+                        <img src="{{ vehicle.image_url }}" alt="{{ vehicle.model }}" class="w-full h-full object-contain">
+                        {% else %}
+                        <div class="w-16 h-16 fill-[#004d33]">{{ read_svg("svg/car-placeholder.svg")|safe }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Vehicle Info -->
+                    <div class="flex-1 flex flex-col">
+                        <h2 class="font-bold text-[14px] text-center">{{ vehicle.oem|title }} {{ vehicle.model|title }}</h2>
+
+                        <div class="grid grid-cols-2 gap-x-[18px] gap-y-2">
+                            <div class="col-span-2">
+                                <p class="text-[#CCEDDC] text-[6px] font-bold uppercase tracking-[0.04em] mb-[3px]">VIN</p>
+                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.vin }}</p>
+                            </div>
+
+                            <div>
+                                <p class="text-[#CCEDDC] text-[6px] font-bold uppercase tracking-[0.04em] mb-[3px]">Immatriculation</p>
+                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.registration }}</p>
+                            </div>
+
+                            <div>
+                                <p class="text-[#CCEDDC] text-[6px] font-bold uppercase tracking-[0.04em] mb-[3px]">Type</p>
+                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.type }}</p>
+                            </div>
+
+                            <div>
+                                <p class="text-[#CCEDDC] text-[6px] font-bold uppercase tracking-[0.04em] mb-[3px]">Kilométrage</p>
+                                <p class="text-[11px] leading-[15px]">{{ vehicle.mileage|number_format }} KM</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Battery Section -->
+                <div class="relative z-10 w-[331px] h-[84px]">
+                    <div class="absolute left-[12px] top-0 z-20 -translate-y-1/2 rounded-lg border border-white/25 bg-[#022c19] px-2.5 py-0.5 text-[#CCEDDC] text-[11px] font-bold shadow-[0_0_0_2px_#022c19]">
+                        Batterie
+                    </div>
+
+                    <div class="absolute inset-0 rounded-2xl border border-white/25 bg-white/10 px-3 pt-[22px] pb-2">
+                        <div class="grid grid-cols-[1.35fr_0.75fr_1.25fr_0.85fr] gap-x-3">
+                            <div>
+                                <p class="text-[6px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85 truncate">Fabricant</p>
+                                <p class="mt-[2px] text-[11px] leading-[12px] truncate">{{ battery.manufacturer }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[6px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85 truncate">Chimie</p>
+                                <p class="mt-[2px] text-[11px] leading-[12px]">{{ battery.chemistry }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[6px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85 truncate">Type de batterie</p>
+                                <p class="mt-[2px] text-[11px] leading-[12px] truncate">{{ battery.type }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[6px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85">Capacité</p>
+                                <p class="mt-[2px] text-[11px] leading-[12px]">{{ battery.capacity }} kWh</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-[5px] grid grid-cols-[1fr_1fr_1.3fr] gap-x-3">
+                            <div>
+                                <p class="text-[7px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85 truncate">Autonomie WLTP</p>
+                                <p class="mt-[2px] text-[12px] leading-[12px]">{{ battery.wltp_range }} km</p>
+                            </div>
+                            <div>
+                                <p class="text-[7px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85">Consommation</p>
+                                <p class="mt-[2px] text-[11px] leading-[12px] truncate">{{ battery.consumption }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[7px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85">Port de charge</p>
+                                <p class="mt-[2px] text-[12px] leading-[12px]">{{ vehicle.charging_port }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- State of Health Card -->
+            <div class="w-[184px] h-[223px] bg-[linear-gradient(to_bottom_left,#009D69_0%,#00F095_70%)] relative rounded-3xl overflow-hidden flex flex-col items-center p-3 shadow-lg">
+                <!-- Network mesh pattern -->
+                <svg class="absolute inset-0 opacity-25 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="0" y1="45" x2="184" y2="45" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="0" y1="90" x2="184" y2="90" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="0" y1="135" x2="184" y2="135" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="0" y1="180" x2="184" y2="180" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="46" y1="0" x2="46" y2="223" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="92" y1="0" x2="92" y2="223" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="138" y1="0" x2="138" y2="223" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <circle cx="46" cy="45" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="92" cy="45" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="138" cy="45" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="46" cy="90" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="92" cy="90" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="138" cy="90" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="46" cy="135" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="92" cy="135" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="138" cy="135" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="46" cy="180" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="92" cy="180" r="2" fill="rgba(255,255,255,0.5)"/>
+                    <circle cx="138" cy="180" r="2" fill="rgba(255,255,255,0.5)"/>
+                </svg>
+
+                <div class="self-start mb-2 relative z-10">
+                    <span class="bg-[#05442B] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm">Rapport Premium</span>
+                </div>
+
+                <h1 class="self-start text-emerald-900 text-2xl font-black font-['DM_Sans'] uppercase leading-5">
+                    STATE<br>OF<br>HEALTH
+                </h1>
+
+                <div class="text-emerald-900 text-6xl font-normal font-['Space_Grotesk'] leading-[68px]">
+                    {{ soh_data.value|round(0)|int }}%
+                </div>
+
+                <div class="border border-white/50 bg-[linear-gradient(135deg,#80F8CA_0%,#FFFFFF_50%,#80F8CA_100%)] h-[42px] w-[168px] rounded-[20px] flex items-center justify-around px-1.5 relative z-10">
+                    <div class="w-4 h-5 rounded bg-[#2C6D49] {% if soh_data.grade == 'A' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'A' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">A</div>
+                    <div class="w-4 h-5 rounded bg-[#49DE80] {% if soh_data.grade == 'B' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'B' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">B</div>
+                    <div class="w-4 h-5 rounded bg-[#FACC14] {% if soh_data.grade == 'C' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'C' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">C</div>
+                    <div class="w-4 h-5 rounded bg-[#FDBA74] {% if soh_data.grade == 'D' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'D' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">D</div>
+                    <div class="w-4 h-5 rounded bg-[#FB7815] {% if soh_data.grade == 'E' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'E' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">E</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-[547px] h-[229px] rounded-3xl bg-white p-4">
+            <div class="block-title mb-1 flex items-center gap-1.5 text-[#00F095]">
+                <div class="h-2.5 w-2.5 [&>svg]:w-full [&>svg]:h-full">{{ read_svg("svg/soh.svg")|safe }}</div>
+                <span class="text-[#0F0F0F]">État de santé de la batterie</span>
+            </div>
+            <div class="text-gray-600 text-[9px] mb-2 leading-tight">
+                Le SoH (État de Santé) représente la santé de votre batterie par rapport à son état neuf.
+                Une batterie neuve a un SoH de 100%. La dégradation naturelle réduit ce pourcentage au fil du temps et des cycles de charge.
+            </div>
+            <div class="h-[130px]">
+                <canvas id="sohTrendChart" width="1030" height="260" class="block !w-[515px] !h-[130px]"></canvas>
+                <div class="flex gap-4 mt-2 text-[8px] text-gray-600">
+                    <div class="flex items-center gap-1.5">
+                        <div class="w-5 h-[3px] bg-[#00896a] rounded-full"></div>
+                        <span>SoH</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <div class="w-5 h-[2px] border-t-2 border-dashed border-[#5fac97]"></div>
+                        <span>Prédiction</span>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                (function() {
+                    const canvas = document.getElementById('sohTrendChart');
+                    if (!canvas) return;
+
+                    document.fonts.ready.then(function() {
+                        const ctx = canvas.getContext('2d');
+                        const d = {{ soh_data|tojson|safe }};
+                        const yMin = Math.floor(Math.min(...d.soh_min) - 1);
+                        const yMax = Math.ceil(Math.max(...d.soh_max) + 1);
+
+                        // Convert to {x, y} format for linear scale
+                        const toXY = (arr) => d.odometer_points.map((km, i) => ({x: km, y: arr[i]}));
+
+                        // Find split index at current_km and add current point to connect both segments
+                        const splitIdx = d.odometer_points.findIndex(km => km >= d.current_km);
+                        const currentPt = {x: d.current_km, y: d.value};
+                        const solidData = [...toXY(d.soh_trendline).slice(0, splitIdx), currentPt];
+                        const dottedData = [currentPt, ...toXY(d.soh_trendline).slice(splitIdx)];
+
+                        // Gradient fill for the solid (actual) portion
+                        const solidGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                        solidGradient.addColorStop(0, 'rgba(0, 180, 100, 0.25)');
+                        solidGradient.addColorStop(1, 'rgba(0, 180, 100, 0.02)');
+
+                        new Chart(canvas, {
+                            type: 'line',
+                            data: {
+                                datasets: [
+                                    // Confidence band (behind everything)
+                                    {
+                                        label: 'Max',
+                                        data: toXY(d.soh_max),
+                                        borderColor: 'transparent',
+                                        pointRadius: 0,
+                                        fill: '+1',
+                                        backgroundColor: 'rgba(0, 220, 130, 0.12)',
+                                        tension: 0.2
+                                    },
+                                    {
+                                        label: 'Min',
+                                        data: toXY(d.soh_min),
+                                        borderColor: 'transparent',
+                                        pointRadius: 0,
+                                        fill: false,
+                                        tension: 0.2
+                                    },
+                                    // Actual SoH line with gradient fill
+                                    {
+                                        label: 'SoH',
+                                        data: solidData,
+                                        borderColor: '#00896a',
+                                        borderWidth: 3.5,
+                                        pointRadius: 0,
+                                        backgroundColor: solidGradient,
+                                        tension: 0.2
+                                    },
+                                    // Predicted SoH (dotted, slightly muted)
+                                    {
+                                        label: 'SoH (predicted)',
+                                        data: dottedData,
+                                        borderColor: '#5fac97',
+                                        borderWidth: 2.5,
+                                        borderDash: [6, 4],
+                                        pointRadius: 0,
+                                        fill: false,
+                                        tension: 0.2
+                                    },
+                                    // Current point (on top with white ring)
+                                    {
+                                        label: 'Current',
+                                        data: [{x: d.current_km, y: d.value}],
+                                        borderColor: '#ffffff',
+                                        backgroundColor: '#00896a',
+                                        borderWidth: 3,
+                                        pointRadius: 9,
+                                        pointHoverRadius: 10
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: false,
+                                maintainAspectRatio: true,
+                                devicePixelRatio: 2,
+                                animation: false,
+                                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                                scales: {
+                                    y: {
+                                        title: { display: true, text: 'Evolution du SoH', font: { size: 14, weight: 500 } },
+                                        min: yMin,
+                                        max: yMax,
+                                        ticks: { callback: v => v + ' %', stepSize: 2, font: { size: 14 }, maxTicksLimit: 8, color: '#555' },
+                                        grid: { color: '#eaeaea', lineWidth: 1 }
+                                    },
+                                    x: {
+                                        type: 'linear',
+                                        min: 0,
+                                        max: d.odometer_points[d.odometer_points.length - 1],
+                                        title: { display: true, text: 'Kilométrage (km)', font: { size: 14, weight: 500 } },
+                                        ticks: { maxTicksLimit: 5, font: { size: 14 }, color: '#555' },
+                                        grid: { display: false }
+                                    }
+                                }
+                            }
+                        });
+                    });
+                })();
+            </script>
+            <div class="text-right text-gray-400 text-[7px] mt-1">
+                Données collectées par Bib Batteries
+            </div>
+        </div>
+
+        <!-- Two Column Section -->
+        <div class="flex gap-4">
+            <!-- Autonomy Section -->
+            <div class="w-[265px] h-[223px] rounded-3xl bg-white p-4">
+                <div class="block-title mb-2 flex items-center gap-2">
+                    <div class="h-2.5 w-2.5 [&>svg]:w-full [&>svg]:h-full fill-[#00F095]">{{ read_svg("svg/autonomie.svg")|safe }}</div>
+                    Autonomie
+                </div>
+                <div class="text-gray-600 text-[8px] leading-tight mb-3">
+                    Bib compare l'autonomie WLTP annoncée par le constructeur avec l'autonomie réelle observée lors du suivi du véhicule par Bib Batteries.
+                </div>
+                <table class="w-full text-[9px]">
+                    <thead class="font-black text-black text-[7px]">
+                        <tr class="h-6 bg-neutral-100 rounded-sm grid grid-cols-3">
+                            <th class="text-left pl-2 py-1.5">Cycle</th>
+                            <th class="text-right py-1.5">
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="w-[10px] h-[10px] [&>svg]:w-full [&>svg]:h-full">{{ read_svg("svg/summer.svg")|safe }}</span>
+                                    <span>Ete</span>
+                                </span>
+                            </th>
+                            <th class="text-right pr-2 py-1.5">
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="w-[10px] h-[10px] [&>svg]:w-full [&>svg]:h-full">{{ read_svg("svg/winter.svg")|safe }}</span>
+                                    <span>Hiver</span>
+                                </span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-black text-[7px] font-medium">
+                        {% for row in autonomy_data %}
+                        <tr class="border-t border-[#F5F5F5] grid grid-cols-3 py-1.5">
+                            <td class="text-left pl-2">{{ row.cycle }}</td>
+                            <td class="text-right">{{ row.summer }}</td>
+                            <td class="text-right pr-2">{{ row.winter }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Warranty Section -->
+            <div class="w-[266px] h-[223px] rounded-3xl bg-white p-4 flex flex-col">
+                <div class="block-title mb-2 flex items-center gap-2">
+                    <div class="h-2.5 w-2.5 [&>svg]:w-full [&>svg]:h-full fill-[#00F095]">{{ read_svg("svg/garantie.svg")|safe }}</div>
+                    Garantie de la batterie
+                </div>
+                <div class="text-gray-600 text-[8px] leading-tight mb-3">
+                    Les véhicules électriques sont assortis de deux garanties constructeur : la garantie véhicule et <span class="font-bold text-gray-900">la garantie batterie</span>, qui garantit que la batterie conserve un certain niveau de capacité et de performance.
+                </div>
+
+                <div class="mb-2">
+                    <div class="text-[9px] text-gray-800 flex justify-between mb-1">
+                        <span class="font-medium">Kilométrage restant sous garantie</span>
+                        <span class="font-bold">{{ warranty_data.remaining_km|number_format }} km</span>
+                    </div>
+                    <div class="bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                        <div class="bg-[linear-gradient(to_right,#00EF95_0%,#00462D_100%)] h-full rounded-full" style="width: {{ warranty_data.km_percentage }}%;"></div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="text-[9px] text-gray-800 flex justify-between mb-1">
+                        <span class="font-medium">Durée de garantie restante</span>
+                        <span class="font-bold">{{ warranty_data.remaining_time }}</span>
+                    </div>
+                    <div class="bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                        <div class="bg-[linear-gradient(to_right,#00EF95_0%,#00462D_100%)] h-full rounded-full" style="width: {{ warranty_data.time_percentage }}%;"></div>
+                    </div>
+                </div>
+
+                <div class="px-2 py-1 bg-emerald-400/10 rounded flex gap-2">
+                    <div class="p-0.5" style="fill: #05442B;">{{ read_svg("svg/autonomie.svg")|safe }}</div>
+                    <div class="flex-1 text-[#05442B] text-[8px]">
+                        La garantie de la batterie originale de ce véhicule garantit au moins
+                        <span class="font-bold">70% d'état de santé (SoH) pour {{ battery.warranty_years }} ans ou {{ battery.warranty_km|number_format }} km</span>, le premier événement arrivant.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="w-[547px] h-[64px] bottom-[25px] left-6 absolute rounded-3xl border border-white">
+            <div class="w-[95px] h-[40px] left-6 top-[11px] absolute">{{ read_svg("svg/logo.svg")|safe }}</div>
+            <div class="h-10 px-5 py-1.5 left-[269px] top-[11px] absolute bg-black/5 rounded-full flex flex-col justify-center">
+                {% if report.uuid %}
+                <div class="text-black text-[8px] font-medium">N°{{ report.uuid }}</div>
+                {% endif %}
+                <div class="text-black text-[9px] font-medium">Date de délivrance : {{ report.date }}</div>
+            </div>
+            <div class="w-10 h-10 left-[489px] top-[11px] absolute bg-black/5 rounded-full flex items-center justify-center">
+                <div class="text-black text-[9px] font-medium">1/2</div>
+            </div>
+            <div class="w-32 left-[132px] top-[15px] absolute text-black text-[7px]">Le score Bib compare l'état de santé (SoH) de la voiture à celui de véhicules similaires (odomètre et âge similaires).</div>
+        </div>
+    </div>
