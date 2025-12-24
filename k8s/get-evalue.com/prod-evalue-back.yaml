@@ -55,7 +55,7 @@ spec:
         - name: S3_BUCKET
           value: "bib-platform-prod-data"
         - name: S3_BUCKET_ASSETS
-          value: "bib-platform-prod-assets"
+          value: "bib-batteries-assets"
         - name: SMTP_EMAIL
           value: "flash-report@bib-batteries.fr"
         - name: PREMIUM_REPORT_S3_BUCKET

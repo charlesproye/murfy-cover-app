@@ -15,6 +15,11 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'bib-batteries-assets.s3.fr-par.scw.cloud',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'static-assets.tesla.com',
         pathname: '/**',
       },
