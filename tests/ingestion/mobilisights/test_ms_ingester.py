@@ -17,14 +17,17 @@ def api():
     MS_BASE_URL = os.getenv("MS_BASE_URL")
     MS_EMAIL = os.getenv("MS_EMAIL")
     MS_PASSWORD = os.getenv("MS_PASSWORD")
-    MS_FLEET_ID = os.getenv("MS_FLEET_ID")
     MS_COMPANY = os.getenv("MS_COMPANY")
+
+    assert MS_BASE_URL is not None, "MS_BASE_URL must be set in environment"
+    assert MS_EMAIL is not None, "MS_EMAIL must be set in environment"
+    assert MS_PASSWORD is not None, "MS_PASSWORD must be set in environment"
+    assert MS_COMPANY is not None, "MS_COMPANY must be set in environment"
 
     ms_api = MSApi(
         base_url=MS_BASE_URL,
         email=MS_EMAIL,
         password=MS_PASSWORD,
-        fleet_id=MS_FLEET_ID,
         company=MS_COMPANY,
     )
 

@@ -87,7 +87,7 @@ def test_remove_paths_wildcard():
         },
     }
 
-    assert _remove_paths(test_data, [["datetime"], ["*", "datetime"]]) == {
+    assert _remove_paths(test_data, [("datetime",), ("*", "datetime")]) == {
         "test": "value",
         "odometer": {
             "value": 100,
@@ -108,4 +108,3 @@ def test_ingestion_cache_with_min_change_interval(fake_redis):
 
     time.sleep(0.2)
     assert cache.json_in_db(vin="1234567890", json_data=test_data) is False
-

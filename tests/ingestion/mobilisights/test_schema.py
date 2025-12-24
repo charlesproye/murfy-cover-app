@@ -39,4 +39,3 @@ def test_bool_parsing():
     car_state = decoder.decode(json_data)
 
     assert car_state.vin == "1234567890"
-

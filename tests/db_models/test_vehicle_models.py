@@ -11,18 +11,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_models import (
     ApiUser,
-    Battery,
     Company,
     FlashReportCombination,
     Fleet,
-    Make,
-    Oem,
-    Region,
-    Role,
     User,
     UserFleet,
     Vehicle,
-    VehicleModel,
+)
+from tests.factories import (
+    BatteryFactory,
+    CompanyFactory,
+    FleetFactory,
+    MakeFactory,
+    OemFactory,
+    RegionFactory,
+    RoleFactory,
+    UserFactory,
+    VehicleModelFactory,
 )
 
 
@@ -32,13 +37,11 @@ class TestCompanyModel:
     @pytest.mark.asyncio
     async def test_create_company(self, db_session: AsyncSession):
         """Test creating a company."""
-        company = Company(
+        company = await CompanyFactory.create_async(
+            session=db_session,
             name="New Test Company",
             description="A new company",
         )
-        db_session.add(company)
-        await db_session.flush()
-        await db_session.refresh(company)
 
         assert company.id is not None
         assert company.name == "New Test Company"
@@ -62,50 +65,47 @@ class TestUserModel:
     """Test suite for User model."""
 
     @pytest.mark.asyncio
-    async def test_create_user(
-        self, db_session: AsyncSession, foo_company: Company, admin_role: Role
-    ):
+    async def test_create_user(self, db_session: AsyncSession):
         """Test creating a user."""
-        user = User(
-            company_id=foo_company.id,
-            role_id=admin_role.id,
+        company = await CompanyFactory.create_async(session=db_session)
+        role = await RoleFactory.create_async(session=db_session)
+
+        user = await UserFactory.create_async(
+            session=db_session,
+            company_id=company.id,
+            role_id=role.id,
             email="newuser@example.com",
             first_name="New",
             last_name="User",
-            password="hashedpassword",
             phone="+33987654321",
             is_active=True,
         )
-        db_session.add(user)
-        await db_session.flush()
-        await db_session.refresh(user)
 
         assert user.id is not None
         assert user.email == "newuser@example.com"
         assert user.first_name == "New"
-        assert user.company_id == foo_company.id
+        assert user.company_id == company.id
 
     @pytest.mark.asyncio
-    async def test_user_email_unique(
-        self, db_session: AsyncSession, foo_company: Company, admin_role: Role
-    ):
+    async def test_user_email_unique(self, db_session: AsyncSession):
         """Test that user email must be unique."""
+        company = await CompanyFactory.create_async(session=db_session)
+        role = await RoleFactory.create_async(session=db_session)
+
         # Create first user
-        user1 = User(
-            company_id=foo_company.id,
-            role_id=admin_role.id,
+        await UserFactory.create_async(
+            session=db_session,
+            company_id=company.id,
+            role_id=role.id,
             email="duplicate@example.com",
             first_name="User",
             last_name="One",
-            password="password1",
         )
-        db_session.add(user1)
-        await db_session.flush()
 
         # Try to create second user with same email
         user2 = User(
-            company_id=foo_company.id,
-            role_id=admin_role.id,
+            company_id=company.id,
+            role_id=role.id,
             email="duplicate@example.com",  # Same email - should fail
             first_name="User",
             last_name="Two",
@@ -117,15 +117,14 @@ class TestUserModel:
             await db_session.flush()
 
     @pytest.mark.asyncio
-    async def test_user_company_foreign_key(
-        self, db_session: AsyncSession, admin_role: Role
-    ):
+    async def test_user_company_foreign_key(self, db_session: AsyncSession):
         """Test that user must have a valid company_id (foreign key)."""
+        role = await RoleFactory.create_async(session=db_session)
         invalid_company_id = uuid.uuid4()
 
         user = User(
             company_id=invalid_company_id,  # Non-existent company
-            role_id=admin_role.id,
+            role_id=role.id,
             email="test@example.com",
             first_name="Test",
             password="password",
@@ -140,18 +139,28 @@ class TestVehicleModel:
     """Test suite for Vehicle model."""
 
     @pytest.mark.asyncio
-    async def test_create_vehicle(
-        self,
-        db_session: AsyncSession,
-        foo_fleet: Fleet,
-        france_region: Region,
-        tesla_model_3_awd: VehicleModel,
-    ):
+    async def test_create_vehicle(self, db_session: AsyncSession):
         """Test creating a vehicle."""
+        # Build dependency chain
+        company = await CompanyFactory.create_async(session=db_session)
+        fleet = await FleetFactory.create_async(
+            session=db_session, fleet_name="Test Fleet", company_id=company.id
+        )
+        region = await RegionFactory.create_async(session=db_session)
+        oem = await OemFactory.create_async(session=db_session)
+        make = await MakeFactory.create_async(session=db_session, oem_id=oem.id)
+        battery = await BatteryFactory.create_async(session=db_session)
+        vehicle_model = await VehicleModelFactory.create_async(
+            session=db_session,
+            oem_id=oem.id,
+            make_id=make.id,
+            battery_id=battery.id,
+        )
+
         vehicle = Vehicle(
-            fleet_id=foo_fleet.id,
-            region_id=france_region.id,
-            vehicle_model_id=tesla_model_3_awd.id,
+            fleet_id=fleet.id,
+            region_id=region.id,
+            vehicle_model_id=vehicle_model.id,
             vin="NEWVIN123456789",
             licence_plate="XY-789-ZZ",
             activation_status=True,
@@ -163,19 +172,18 @@ class TestVehicleModel:
 
         assert vehicle.id is not None
         assert vehicle.vin == "NEWVIN123456789"
-        assert vehicle.fleet_id == foo_fleet.id
+        assert vehicle.fleet_id == fleet.id
 
     @pytest.mark.asyncio
-    async def test_vehicle_foreign_keys(
-        self, db_session: AsyncSession, france_region: Region
-    ):
+    async def test_vehicle_foreign_keys(self, db_session: AsyncSession):
         """Test that vehicle requires valid foreign keys."""
+        region = await RegionFactory.create_async(session=db_session)
         invalid_fleet_id = uuid.uuid4()
         invalid_model_id = uuid.uuid4()
 
         vehicle = Vehicle(
             fleet_id=invalid_fleet_id,  # Non-existent fleet
-            region_id=france_region.id,
+            region_id=region.id,
             vehicle_model_id=invalid_model_id,  # Non-existent model
             vin="TESTVIN",
         )
@@ -189,31 +197,27 @@ class TestVehicleModelTable:
     """Test suite for VehicleModel table."""
 
     @pytest.mark.asyncio
-    async def test_create_vehicle_model(
-        self,
-        db_session: AsyncSession,
-        tesla_oem: Oem,
-        tesla_make: Make,
-        lfp_battery: Battery,
-    ):
+    async def test_create_vehicle_model(self, db_session: AsyncSession):
         """Test creating a vehicle model with all relationships."""
-        vehicle_model = VehicleModel(
+        oem = await OemFactory.create_async(session=db_session)
+        make = await MakeFactory.create_async(session=db_session, oem_id=oem.id)
+        battery = await BatteryFactory.create_async(session=db_session)
+
+        vehicle_model = await VehicleModelFactory.create_async(
+            session=db_session,
             model_name="Model Y",
             type="Performance AWD",
             version="2023",
-            oem_id=tesla_oem.id,
-            make_id=tesla_make.id,
-            battery_id=lfp_battery.id,
+            oem_id=oem.id,
+            make_id=make.id,
+            battery_id=battery.id,
             autonomy=525,
             source="test",
         )
-        db_session.add(vehicle_model)
-        await db_session.flush()
-        await db_session.refresh(vehicle_model)
 
         assert vehicle_model.id is not None
         assert vehicle_model.model_name == "Model Y"
-        assert vehicle_model.oem_id == tesla_oem.id
+        assert vehicle_model.oem_id == oem.id
 
 
 class TestFlashReportCombination:
@@ -246,11 +250,19 @@ class TestApiUserModel:
     """Test suite for ApiUser model."""
 
     @pytest.mark.asyncio
-    async def test_create_api_user(self, db_session: AsyncSession, foo_user: User):
+    async def test_create_api_user(self, db_session: AsyncSession):
         """Test creating an API user."""
+        company = await CompanyFactory.create_async(session=db_session)
+        role = await RoleFactory.create_async(session=db_session)
+        user = await UserFactory.create_async(
+            session=db_session,
+            company_id=company.id,
+            role_id=role.id,
+        )
+
         api_key = str(uuid.uuid4())
         api_user = ApiUser(
-            user_id=foo_user.id,
+            user_id=user.id,
             api_key=api_key,
             is_active=True,
         )
@@ -260,42 +272,31 @@ class TestApiUserModel:
 
         assert api_user.id is not None
         assert api_user.api_key == api_key
-        assert api_user.user_id == foo_user.id
+        assert api_user.user_id == user.id
 
     @pytest.mark.asyncio
-    async def test_api_user_key_unique(
-        self, db_session: AsyncSession, foo_company: Company
-    ):
+    async def test_api_user_key_unique(self, db_session: AsyncSession):
         """Test that API key must be unique."""
-        # Need to create users with different emails
-        role = Role(role_name="test_role")
-        db_session.add(role)
-        await db_session.flush()
-        await db_session.refresh(role)
+        company = await CompanyFactory.create_async(session=db_session)
+        role = await RoleFactory.create_async(session=db_session)
 
-        user1 = User(
-            company_id=foo_company.id,
+        user1 = await UserFactory.create_async(
+            session=db_session,
+            company_id=company.id,
             role_id=role.id,
             email="apiuser1@example.com",
             first_name="API",
             last_name="User1",
-            password="password",
         )
-        db_session.add(user1)
-        await db_session.flush()
-        await db_session.refresh(user1)
 
-        user2 = User(
-            company_id=foo_company.id,
+        user2 = await UserFactory.create_async(
+            session=db_session,
+            company_id=company.id,
             role_id=role.id,
             email="apiuser2@example.com",
             first_name="API",
             last_name="User2",
-            password="password",
         )
-        db_session.add(user2)
-        await db_session.flush()
-        await db_session.refresh(user2)
 
         api_key = str(uuid.uuid4())
 
@@ -324,54 +325,45 @@ class TestRelationships:
     """Test suite for model relationships."""
 
     @pytest.mark.asyncio
-    async def test_user_company_relationship(
-        self, db_session: AsyncSession, admin_role: Role
-    ):
+    async def test_user_company_relationship(self, db_session: AsyncSession):
         """Test user-company relationship."""
+        role = await RoleFactory.create_async(session=db_session)
+
         # Create company
-        company = Company(name="Relationship Test Company")
-        db_session.add(company)
-        await db_session.flush()
-        await db_session.refresh(company)
+        company = await CompanyFactory.create_async(
+            session=db_session, name="Relationship Test Company"
+        )
 
         # Create user with company
-        user = User(
+        user = await UserFactory.create_async(
+            session=db_session,
             company_id=company.id,
-            role_id=admin_role.id,
+            role_id=role.id,
             email="relationship@example.com",
             first_name="Test",
-            password="password",
         )
-        db_session.add(user)
-        await db_session.flush()
-        await db_session.refresh(user)
 
         assert user.company_id == company.id
 
     @pytest.mark.asyncio
-    async def test_user_fleet_relationship(
-        self,
-        db_session: AsyncSession,
-        foo_company: Company,
-        admin_role: Role,
-    ):
+    async def test_user_fleet_relationship(self, db_session: AsyncSession):
         """Test user-fleet relationship through UserFleet."""
+        company = await CompanyFactory.create_async(session=db_session)
+        role = await RoleFactory.create_async(session=db_session)
+
         # Create user
-        user = User(
-            company_id=foo_company.id,
-            role_id=admin_role.id,
+        user = await UserFactory.create_async(
+            session=db_session,
+            company_id=company.id,
+            role_id=role.id,
             email="fleetuser@example.com",
             first_name="Fleet",
-            password="password",
         )
-        db_session.add(user)
-        await db_session.flush()
-        await db_session.refresh(user)
 
         # Create fleet
         fleet = Fleet(
             fleet_name="Test Fleet Relationship",
-            company_id=foo_company.id,
+            company_id=company.id,
         )
         db_session.add(fleet)
         await db_session.flush()
@@ -381,7 +373,7 @@ class TestRelationships:
         user_fleet = UserFleet(
             user_id=user.id,
             fleet_id=fleet.id,
-            role_id=admin_role.id,
+            role_id=role.id,
         )
         db_session.add(user_fleet)
         await db_session.flush()
@@ -391,25 +383,21 @@ class TestRelationships:
         assert user_fleet.fleet_id == fleet.id
 
     @pytest.mark.asyncio
-    async def test_vehicle_model_relationships(
-        self,
-        db_session: AsyncSession,
-        tesla_oem: Oem,
-        tesla_make: Make,
-        lfp_battery: Battery,
-    ):
+    async def test_vehicle_model_relationships(self, db_session: AsyncSession):
         """Test vehicle model relationships with OEM, make, and battery."""
-        vehicle_model = VehicleModel(
+        oem = await OemFactory.create_async(session=db_session)
+        make = await MakeFactory.create_async(session=db_session, oem_id=oem.id)
+        battery = await BatteryFactory.create_async(session=db_session)
+
+        vehicle_model = await VehicleModelFactory.create_async(
+            session=db_session,
             model_name="Relationship Test Model",
-            oem_id=tesla_oem.id,
-            make_id=tesla_make.id,
-            battery_id=lfp_battery.id,
+            oem_id=oem.id,
+            make_id=make.id,
+            battery_id=battery.id,
             source="test",
         )
-        db_session.add(vehicle_model)
-        await db_session.flush()
-        await db_session.refresh(vehicle_model)
 
-        assert vehicle_model.oem_id == tesla_oem.id
-        assert vehicle_model.make_id == tesla_make.id
-        assert vehicle_model.battery_id == lfp_battery.id
+        assert vehicle_model.oem_id == oem.id
+        assert vehicle_model.make_id == make.id
+        assert vehicle_model.battery_id == battery.id

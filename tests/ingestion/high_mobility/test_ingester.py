@@ -26,7 +26,7 @@ def hm_ingester(fake_redis):
 @pytest.fixture
 def vehicules(hm_ingester: HMIngester) -> list[Vehicle]:
     clearances = hm_ingester._fetch_clearances()
-
+    assert clearances is not None, "Failed to fetch clearances from High Mobility API"
     return clearances
 
 
@@ -36,6 +36,7 @@ def test_process_vehicle_renault(
     vehicule = next(v for v in vehicules if v.brand == "renault")
 
     parsed_data = hm_ingester._process_vehicle(vehicule, auto_upload=False)
+    assert parsed_data is not None, "First call should return data, not cached"
     assert json.loads(parsed_data)["vin"] == vehicule.vin
 
     parsed_data_2nd = hm_ingester._process_vehicle(vehicule, auto_upload=False)
@@ -48,6 +49,7 @@ def test_process_vehicle_mercedes_benz(
     vehicule = next(v for v in vehicules if v.brand == "mercedes-benz")
 
     parsed_data = hm_ingester._process_vehicle(vehicule, auto_upload=False)
+    assert parsed_data is not None, "First call should return data, not cached"
     assert json.loads(parsed_data)["vin"] == vehicule.vin
 
     parsed_data_2nd = hm_ingester._process_vehicle(vehicule, auto_upload=False)
@@ -60,6 +62,7 @@ def test_process_vehicle_ford(
     vehicule = next(v for v in vehicules if v.brand == "ford")
 
     parsed_data = hm_ingester._process_vehicle(vehicule, auto_upload=False)
+    assert parsed_data is not None, "First call should return data, not cached"
     assert json.loads(parsed_data)["vin"] == vehicule.vin
 
     parsed_data_2nd = hm_ingester._process_vehicle(vehicule, auto_upload=False)
@@ -72,6 +75,7 @@ def test_process_vehicle_kia(
     vehicule = next(v for v in vehicules if v.brand == "kia")
 
     parsed_data = hm_ingester._process_vehicle(vehicule, auto_upload=False)
+    assert parsed_data is not None, "First call should return data, not cached"
     assert json.loads(parsed_data)["vin"] == vehicule.vin
 
     parsed_data_2nd = hm_ingester._process_vehicle(vehicule, auto_upload=False)
@@ -84,6 +88,7 @@ def test_process_vehicle_volvo_cars(
     vehicule = next(v for v in vehicules if v.brand == "volvo-cars")
 
     parsed_data = hm_ingester._process_vehicle(vehicule, auto_upload=False)
+    assert parsed_data is not None, "First call should return data, not cached"
     assert json.loads(parsed_data)["vin"] == vehicule.vin
 
     parsed_data_2nd = hm_ingester._process_vehicle(vehicule, auto_upload=False)

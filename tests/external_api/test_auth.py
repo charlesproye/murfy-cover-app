@@ -5,9 +5,47 @@ Tests for login, logout, token refresh, and security.
 
 import httpx
 import pytest
+import pytest_asyncio
 from fastapi import status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_models import User, UserFleet
+from tests.factories import CompanyFactory, FleetFactory, RoleFactory, UserFactory
+
+
+@pytest_asyncio.fixture
+async def foo_user(db_session: AsyncSession) -> User:
+    """Create a test user with company and role."""
+    company = await CompanyFactory.create_async(session=db_session)
+    role = await RoleFactory.create_async(session=db_session)
+    user = await UserFactory.create_async(
+        session=db_session,
+        company_id=company.id,
+        role_id=role.id,
+        email="testuser@example.com",
+        first_name="Test",
+        last_name="User",
+    )
+    return user
+
+
+@pytest_asyncio.fixture
+async def foo_user_fleet(db_session: AsyncSession, foo_user: User) -> UserFleet:
+    """Create a test user-fleet relationship."""
+    role = await RoleFactory.create_async(session=db_session)
+    fleet = await FleetFactory.create_async(
+        session=db_session, company_id=foo_user.company_id, fleet_name="Test Fleet"
+    )
+
+    user_fleet = UserFleet(
+        user_id=foo_user.id,
+        fleet_id=fleet.id,
+        role_id=role.id,
+    )
+    db_session.add(user_fleet)
+    await db_session.flush()
+    await db_session.refresh(user_fleet)
+    return user_fleet
 
 
 def extract_cookies_from_response(response: httpx.Response) -> dict[str, str]:

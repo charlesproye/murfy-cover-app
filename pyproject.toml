@@ -207,10 +207,12 @@ dev = [
     "pytest-cov>=6.0.0",
     "httpx>=0.25.0",
     "ruff",
+    "ty>=0.0.6",
     "nbstripout",
     "fakeredis>=2.31.3",
     "py-spy>=0.4.1",
     "ipykernel",
+    "polyfactory>=3.2.0",
 ]
 
 local = ["pyspark>=4.0.1", "jupyterlab"]

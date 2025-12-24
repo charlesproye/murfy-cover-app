@@ -13,17 +13,13 @@ def test_numpy_safe_eval():
         20
     )
 
-    assert (
-        numpy_safe_eval("np.sqrt(x)", x=np.array([9, 16, 25])) == np.array([3, 4, 5])
-    ).all()
-
-    assert (
-        round(
-            numpy_safe_eval("1.022 + -0.0142 * np.log1p(x/12.536)", x=1e5),
-            2,
-        )
-        == 0.89
+    result = numpy_safe_eval("np.sqrt(x)", x=np.array([9, 16, 25])) == np.array(
+        [3, 4, 5]
     )
+    assert np.all(result)
+
+    numpy_result = numpy_safe_eval("1.022 + -0.0142 * np.log1p(x/12.536)", x=1e5)
+    assert round(float(numpy_result), 2) == 0.89
 
 
 def test_numpy_safe_eval_forbidden():

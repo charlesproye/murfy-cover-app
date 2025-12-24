@@ -29,7 +29,7 @@ async def test_download_folder_in_batches():
         f"Downloaded {total_files} files in {elapsed:.2f}s ({total_files / elapsed:.1f} files/s)"
     )
 
-    file0 = json.loads(next(batch.values()))
+    file0 = json.loads(next(iter(batch.values())))
     assert file0.get("vin") == vin
 
     if total_files > 100:  # Only check performance for substantial datasets
