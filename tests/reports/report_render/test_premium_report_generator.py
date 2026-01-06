@@ -127,12 +127,8 @@ async def test_generate_premium_report_html(tmp_path: Path) -> None:
     assert "280 km" in html_content  # autonomy_combined_winter
 
     # Verify warranty data is calculated and present
-    assert (
-        "140 000" in html_content or "140000" in html_content
-    )  # Remaining km (160000 - 20000)
-    assert (
-        "5 ans" in html_content or "4 ans" in html_content
-    )  # Remaining warranty time (should be ~5 years)
+    assert "140 000" in html_content  # Remaining km (160000 - 20000)
+    assert "6 mois" in html_content  # 8 - 7.5 years
 
     # Verify warranty info text uses dynamic values
     assert "8 ans" in html_content  # warranty_years

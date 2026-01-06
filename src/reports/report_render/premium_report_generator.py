@@ -58,6 +58,7 @@ class PremiumReportGenerator:
         )
 
         self.jinja_env.filters["number_format"] = self._number_format
+        self.jinja_env.filters["default_value"] = self._default_value
         self.jinja_env.globals["read_svg"] = self._read_svg
 
         # Initialize components
@@ -152,8 +153,8 @@ class PremiumReportGenerator:
         # Calculate remaining time
         remaining_years = 0
         remaining_months = 0
-        time_percentage = 100
-        time_str = "Inconnu"  # Default when start_date is missing
+        time_percentage = None
+        time_str = None  # Default when start_date is missing
 
         if vehicle.start_date:
             # Convert Date to datetime for calculations
@@ -185,7 +186,7 @@ class PremiumReportGenerator:
                 time_str = f"{remaining_years} ans"
             elif remaining_months > 0:
                 time_str = f"{remaining_months} mois"
-            elif time_percentage >= 100:
+            elif time_percentage and time_percentage >= 100:
                 time_str = "Expiré"
             else:
                 # Edge case: warranty active but less than 1 month remaining
@@ -195,8 +196,11 @@ class PremiumReportGenerator:
             remaining_km=remaining_km,
             km_percentage=100 - km_percentage,  # Inverted for progress bar (remaining)
             remaining_time=time_str,
-            time_percentage=100
-            - time_percentage,  # Inverted for progress bar (remaining)
+            time_percentage=(
+                100 - time_percentage
+            )  # Inverted for progress bar (remaining)
+            if time_percentage is not None
+            else None,
             warranty_years=warranty_years,
             warranty_km=int(warranty_km),
         )
@@ -206,14 +210,6 @@ class PremiumReportGenerator:
         """Calculate charging durations and costs for 20% to 80% charge."""
         if not capacity_kwh:
             return []
-
-        # Prices per kWh for each type (from frontend lib)
-        prices = {
-            "Slow": 0.1696,
-            "Medium": 0.3,
-            "Fast": 0.495,
-            "Fastest": 0.605,
-        }
 
         # Power in kW for each type
         powers = {
@@ -231,15 +227,14 @@ class PremiumReportGenerator:
             "Fastest": "Supercharger",
         }
 
-        # We charge from 20% to 80% = 60% of capacity
-        energy_to_charge = float(capacity_kwh) * 0.6
+        # We charge from 10% to 80% = 70% of capacity
+        energy_to_charge = float(capacity_kwh) * 0.7
 
         results = []
         durations = []
 
         for type_name in ["Slow", "Medium", "Fast", "Fastest"]:
             power = powers[type_name]
-            price = prices[type_name]
 
             duration_hours = energy_to_charge / power
             durations.append(duration_hours)
@@ -249,14 +244,11 @@ class PremiumReportGenerator:
             minutes = int((duration_hours - hours) * 60)
             duration_str = f"{hours}h{minutes:02d}"
 
-            cost = energy_to_charge * price
-
             results.append(
                 ChargingInfo(
                     type=type_name,
                     duration=duration_str,
                     duration_hours=duration_hours,
-                    cost=round(cost, 1),
                     power=power,
                     typical=typical_names[type_name],
                     percentage=0.0,  # Will be set below
@@ -302,24 +294,31 @@ class PremiumReportGenerator:
             ValueError: If required data is missing
         """
         vin = vehicle.vin
+        if vin is None:
+            raise ValueError("VIN is required")
+
         logger.info(f"Generating report data for VIN: {vin}")
 
         if vehicle_data.soh is None:
             raise ValueError(f"SoH data not available for VIN: {vin}")
 
         if (
-            not vehicle_model.trendline
-            or not vehicle_model.trendline_min
-            or not vehicle_model.trendline_max
+            not (vehicle_model.trendline or oem.trendline)
+            or not (vehicle_model.trendline_min or oem.trendline_min)
+            or not (vehicle_model.trendline_max or oem.trendline_max)
         ):
             raise ValueError(f"No trendline data available for VIN: {vin}")
 
         current_km = vehicle_data.odometer or 0
         max_km = int(vehicle_model.warranty_km or 160000)
 
-        trendline_eq = vehicle_model.trendline.get("trendline")
-        trendline_min_eq = vehicle_model.trendline_min.get("trendline")
-        trendline_max_eq = vehicle_model.trendline_max.get("trendline")
+        trendline_eq = (vehicle_model.trendline or oem.trendline).get("trendline")
+        trendline_min_eq = (vehicle_model.trendline_min or oem.trendline_min).get(
+            "trendline"
+        )
+        trendline_max_eq = (vehicle_model.trendline_max or oem.trendline_max).get(
+            "trendline"
+        )
 
         if not trendline_eq or not trendline_min_eq or not trendline_max_eq:
             raise ValueError(f"Invalid trendline equations for VIN: {vin}")
@@ -448,6 +447,22 @@ class PremiumReportGenerator:
             return f"{num:,.0f}".replace(",", separator)
         except (ValueError, TypeError):
             return str(value)
+
+    @staticmethod
+    def _default_value(value: Any, default: str = "-") -> str:
+        """
+        Return a default value if the input is None or empty.
+
+        Args:
+            value: Value to check
+            default: Default value to return (default: "-")
+
+        Returns:
+            Original value if not None/empty, otherwise the default
+        """
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return default
+        return str(value)
 
     def _read_svg(
         self, relative_path: str, css_classes: list[str] | None = None

@@ -92,7 +92,6 @@ class ChargingInfo(BaseModel):
     type: str = Field(description="Charger speed category (Slow/Medium/Fast/Fastest)")
     duration: str = Field(description="Formatted charging duration (e.g., '7h44')")
     duration_hours: float = Field(description="Charging duration in hours")
-    cost: float = Field(description="Estimated charging cost in euros")
     power: int = Field(description="Charging power in kW")
     typical: str = Field(
         description="Typical charging location (e.g., 'Wall box', 'Supercharger')"
@@ -123,11 +122,11 @@ class WarrantyInfo(BaseModel):
     km_percentage: float = Field(
         description="Percentage of warranty mileage remaining (0-100)"
     )
-    remaining_time: str = Field(
-        description="Remaining warranty time (e.g., '5 ans et 3 mois')"
+    remaining_time: str | None = Field(
+        None, description="Remaining warranty time (e.g., '5 ans et 3 mois')"
     )
-    time_percentage: float = Field(
-        description="Percentage of warranty time remaining (0-100)"
+    time_percentage: float | None = Field(
+        None, description="Percentage of warranty time remaining (0-100)"
     )
     warranty_years: int = Field(description="Total warranty duration in years")
     warranty_km: int = Field(description="Total warranty mileage limit in km")

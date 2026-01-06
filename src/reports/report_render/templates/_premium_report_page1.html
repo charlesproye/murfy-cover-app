@@ -31,17 +31,17 @@
                         <div class="grid grid-cols-2 gap-x-[18px] gap-y-2">
                             <div class="col-span-2">
                                 <p class="text-[#CCEDDC] text-[6px] font-bold uppercase tracking-[0.04em] mb-[3px]">VIN</p>
-                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.vin }}</p>
+                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.vin|default_value }}</p>
                             </div>
 
                             <div>
                                 <p class="text-[#CCEDDC] text-[6px] font-bold uppercase tracking-[0.04em] mb-[3px]">Immatriculation</p>
-                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.registration }}</p>
+                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.registration|default_value }}</p>
                             </div>
 
                             <div>
                                 <p class="text-[#CCEDDC] text-[6px] font-bold uppercase tracking-[0.04em] mb-[3px]">Type</p>
-                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.type }}</p>
+                                <p class="text-[11px] leading-[15px] truncate">{{ vehicle.type|default_value }}</p>
                             </div>
 
                             <div>
@@ -66,11 +66,11 @@
                             </div>
                             <div>
                                 <p class="text-[6px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85 truncate">Chimie</p>
-                                <p class="mt-[2px] text-[11px] leading-[12px]">{{ battery.chemistry }}</p>
+                                <p class="mt-[2px] text-[11px] leading-[12px]">{{ battery.chemistry|default_value }}</p>
                             </div>
                             <div>
                                 <p class="text-[6px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85 truncate">Type de batterie</p>
-                                <p class="mt-[2px] text-[11px] leading-[12px] truncate">{{ battery.type }}</p>
+                                <p class="mt-[2px] text-[11px] leading-[12px] truncate">{{ battery.type|default_value }}</p>
                             </div>
                             <div>
                                 <p class="text-[6px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85">Capacité</p>
@@ -85,11 +85,11 @@
                             </div>
                             <div>
                                 <p class="text-[7px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85">Consommation</p>
-                                <p class="mt-[2px] text-[11px] leading-[12px] truncate">{{ battery.consumption }}</p>
+                                <p class="mt-[2px] text-[11px] leading-[12px] truncate">{{ battery.consumption|default_value }}</p>
                             </div>
                             <div>
                                 <p class="text-[7px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85">Port de charge</p>
-                                <p class="mt-[2px] text-[12px] leading-[12px]">{{ vehicle.charging_port }}</p>
+                                <p class="mt-[2px] text-[12px] leading-[12px]">{{ vehicle.charging_port|default_value }}</p>
                             </div>
                         </div>
                     </div>
@@ -333,10 +333,10 @@
                 <div class="mb-2">
                     <div class="text-[9px] text-gray-800 flex justify-between mb-1">
                         <span class="font-medium">Kilométrage restant sous garantie</span>
-                        <span class="font-bold">{{ warranty_data.remaining_km|number_format }} km</span>
+                        <span class="font-bold">{{ warranty_data.remaining_km|default_value|number_format }} km</span>
                     </div>
                     <div class="bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                        <div class="bg-[linear-gradient(to_right,#00EF95_0%,#00462D_100%)] h-full rounded-full" style="width: {{ warranty_data.km_percentage }}%;"></div>
+                        <div class="bg-[linear-gradient(to_right,#00EF95_0%,#00462D_100%)] h-full rounded-full" style="width: {{ warranty_data.km_percentage|default(0) }}%;"></div>
                     </div>
                 </div>
 
@@ -346,7 +346,7 @@
                         <span class="font-bold">{{ warranty_data.remaining_time }}</span>
                     </div>
                     <div class="bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                        <div class="bg-[linear-gradient(to_right,#00EF95_0%,#00462D_100%)] h-full rounded-full" style="width: {{ warranty_data.time_percentage }}%;"></div>
+                        <div class="bg-[linear-gradient(to_right,#00EF95_0%,#00462D_100%)] h-full rounded-full" style="width: {{ warranty_data.time_percentage|default(0) }}%;"></div>
                     </div>
                 </div>
 
