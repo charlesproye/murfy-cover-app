@@ -1,11 +1,12 @@
 """Models for vehicle-related tables"""
 
 import uuid
+from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     JSON,
     Boolean,
-    Column,
     Date,
     DateTime,
     ForeignKey,
@@ -15,92 +16,98 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import Mapped, mapped_column
 
 from db_models.base_uuid_model import BaseUUIDCreatedAt, BaseUUIDModel
 
 
 class Region(BaseUUIDCreatedAt):
     __tablename__ = "region"
-    region_name: str = Column(String(100), nullable=False)
+    region_name: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
 class VehicleModel(BaseUUIDModel):
     __tablename__ = "vehicle_model"
-    model_name: Mapped[str] = Column(String(100), nullable=False)
-    type: Mapped[str | None] = Column(String(50))
-    version: Mapped[str | None] = Column(String(50))
-    oem_id: Mapped[uuid.UUID] = Column(ForeignKey("oem.id"))
-    make_id: Mapped[uuid.UUID] = Column(ForeignKey("make.id"))
-    battery_id: Mapped[uuid.UUID] = Column(ForeignKey("battery.id"))
-    autonomy = Column(Integer)
-    image_id: Mapped[uuid.UUID] = Column(ForeignKey("asset.id"))
-    warranty_date = Column(Integer)
-    warranty_km = Column(Numeric(10, 2))
-    source: str = Column(String(100))
-    trendline = Column(JSON)
-    trendline_min = Column(JSON)
-    trendline_max = Column(JSON)
-    trendline_bib: bool = Column(
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[str | None] = mapped_column(String(50))
+    version: Mapped[str | None] = mapped_column(String(50))
+    oem_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("oem.id"))
+    make_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("make.id"))
+    battery_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("battery.id"))
+    autonomy: Mapped[int | None] = mapped_column(Integer)
+    image_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("asset.id"))
+    warranty_date: Mapped[int | None] = mapped_column(Integer)
+    warranty_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    source: Mapped[str | None] = mapped_column(String(100))
+    trendline: Mapped[dict | None] = mapped_column(JSON)
+    trendline_min: Mapped[dict | None] = mapped_column(JSON)
+    trendline_max: Mapped[dict | None] = mapped_column(JSON)
+    trendline_bib: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         comment="If the trendline is based on SoH calculated by BIB",
     )
-    odometer_data: bool = Column(Boolean, default=False)
-    soh_data: bool = Column(Boolean, default=False)
-    soh_oem_data: bool = Column(Boolean, default=False)
-    commissioning_date = Column(DateTime, comment="First time seen on the market")
-    end_of_life_date = Column(DateTime, comment="Last time seen on the market")
-    expected_consumption: Mapped[int | None] = Column(Integer)
-    evdb_model_id: Mapped[str | None] = Column(String(100), nullable=True)
-    maximum_speed: Mapped[int | None] = Column(Integer)
-    charge_plug_location: Mapped[str | None] = Column(String(100))
-    charge_plug_type: Mapped[str | None] = Column(String(100))
-    fast_charge_max_power: int | None = Column(Integer)
-    fast_charge_duration: int | None = Column(Integer)
-    standard_charge_duration: int | None = Column(Integer)
-    ac_charge_duration: int | None = Column(Integer)
-    autonomy_city_winter: int | None = Column(Integer)
-    autonomy_city_summer: int | None = Column(Integer)
-    autonomy_highway_winter: int | None = Column(Integer)
-    autonomy_highway_summer: int | None = Column(Integer)
-    autonomy_combined_winter: int | None = Column(Integer)
-    autonomy_combined_summer: int | None = Column(Integer)
+    odometer_data: Mapped[bool] = mapped_column(Boolean, default=False)
+    soh_data: Mapped[bool] = mapped_column(Boolean, default=False)
+    soh_oem_data: Mapped[bool] = mapped_column(Boolean, default=False)
+    commissioning_date: Mapped[datetime | None] = mapped_column(
+        DateTime, comment="First time seen on the market"
+    )
+    end_of_life_date: Mapped[datetime | None] = mapped_column(
+        DateTime, comment="Last time seen on the market"
+    )
+    expected_consumption: Mapped[int | None] = mapped_column(Integer)
+    evdb_model_id: Mapped[str | None] = mapped_column(String(100))
+    maximum_speed: Mapped[int | None] = mapped_column(Integer)
+    charge_plug_location: Mapped[str | None] = mapped_column(String(100))
+    charge_plug_type: Mapped[str | None] = mapped_column(String(100))
+    fast_charge_max_power: Mapped[int | None] = mapped_column(Integer)
+    fast_charge_duration: Mapped[int | None] = mapped_column(Integer)
+    standard_charge_duration: Mapped[int | None] = mapped_column(Integer)
+    ac_charge_duration: Mapped[int | None] = mapped_column(Integer)
+    autonomy_city_winter: Mapped[int | None] = mapped_column(Integer)
+    autonomy_city_summer: Mapped[int | None] = mapped_column(Integer)
+    autonomy_highway_winter: Mapped[int | None] = mapped_column(Integer)
+    autonomy_highway_summer: Mapped[int | None] = mapped_column(Integer)
+    autonomy_combined_winter: Mapped[int | None] = mapped_column(Integer)
+    autonomy_combined_summer: Mapped[int | None] = mapped_column(Integer)
 
 
 class Battery(BaseUUIDModel):
     __tablename__ = "battery"
-    battery_type: Mapped[str | None] = Column(String(100))
-    battery_chemistry: Mapped[str | None] = Column(String(100))
-    battery_oem: Mapped[str | None] = Column(String(100))
-    capacity: Mapped[float | None] = Column(Numeric(10, 2))
-    net_capacity: float | None = Column(Numeric(10, 2))
-    estimated_capacity: str | None = Column(String(100))
-    battery_modules: int | None = Column(Integer)
-    battery_cells: str | None = Column(String(255))
-    battery_weight: float | None = Column(Numeric(10, 2))
-    battery_architecture: str | None = Column(String(100))
-    battery_tms: str | None = Column(String(100))
-    battery_voltage_nominal: float | None = Column(Numeric(10, 2))
-    battery_warranty_period: int | None = Column(Integer)
-    battery_warranty_mileage: float | None = Column(Numeric(10, 2))
+    battery_type: Mapped[str | None] = mapped_column(String(100))
+    battery_chemistry: Mapped[str | None] = mapped_column(String(100))
+    battery_oem: Mapped[str | None] = mapped_column(String(100))
+    capacity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    net_capacity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    estimated_capacity: Mapped[str | None] = mapped_column(String(100))
+    battery_modules: Mapped[int | None] = mapped_column(Integer)
+    battery_cells: Mapped[str | None] = mapped_column(String(255))
+    battery_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    battery_architecture: Mapped[str | None] = mapped_column(String(100))
+    battery_tms: Mapped[str | None] = mapped_column(String(100))
+    battery_voltage_nominal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    battery_warranty_period: Mapped[int | None] = mapped_column(Integer)
+    battery_warranty_mileage: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
 
 
 class Vehicle(BaseUUIDModel):
     __tablename__ = "vehicle"
-    fleet_id: Mapped[uuid.UUID] = Column(ForeignKey("fleet.id"), nullable=False)
-    region_id: Mapped[uuid.UUID] = Column(ForeignKey("region.id"), nullable=False)
-    vehicle_model_id: Mapped[uuid.UUID] = Column(
+    fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleet.id"), nullable=False)
+    region_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("region.id"), nullable=False
+    )
+    vehicle_model_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("vehicle_model.id"), nullable=False
     )
-    vin: Mapped[str | None] = Column(String(50))
-    bib_score: Mapped[str | None] = Column(String(1), nullable=True)
-    activation_status: Mapped[bool] = Column(Boolean, nullable=True)
-    is_eligible: Mapped[bool] = Column(Boolean, nullable=True)
-    is_pinned: Mapped[bool] = Column(Boolean, nullable=True)
-    start_date: Mapped[Date | None] = Column(Date)
-    licence_plate: Mapped[str | None] = Column(String(50))
-    end_of_contract_date: Mapped[Date | None] = Column(Date)
+    vin: Mapped[str | None] = mapped_column(String(50))
+    bib_score: Mapped[str | None] = mapped_column(String(1))
+    activation_status: Mapped[bool | None] = mapped_column(Boolean)
+    is_eligible: Mapped[bool | None] = mapped_column(Boolean)
+    is_pinned: Mapped[bool | None] = mapped_column(Boolean)
+    start_date: Mapped[date | None] = mapped_column(Date)
+    licence_plate: Mapped[str | None] = mapped_column(String(50))
+    end_of_contract_date: Mapped[date | None] = mapped_column(Date)
     __table_args__ = (
         Index("ix_vehicle_fleet_id", "fleet_id"),  # Index sur l'ID de la flotte
         Index("ix_vehicle_region_id", "region_id"),  # Index sur l'ID de la région
@@ -113,51 +120,51 @@ class Vehicle(BaseUUIDModel):
 
 class VehicleData(BaseUUIDModel):
     __tablename__ = "vehicle_data"
-    vehicle_id: Mapped[uuid.UUID] = Column(ForeignKey("vehicle.id"), nullable=False)
-    odometer: Mapped[float | None] = Column(Numeric(10, 2))
-    region: Mapped[str | None] = Column(String(100))
-    speed: Mapped[float | None] = Column(Numeric(5, 2))
-    location: Mapped[str | None] = Column(String(100))
-    soh: Mapped[float | None] = Column(Numeric(5, 3))
-    cycles: Mapped[float | None] = Column(Numeric(10, 2))
-    consumption: Mapped[float | None] = Column(Numeric(5, 3))
-    soh_comparison: Mapped[float | None] = Column(Numeric(6, 3))
-    timestamp = Column(DateTime, server_default=func.now())
-    level_1 = Column(
+    vehicle_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("vehicle.id"), nullable=False
+    )
+    odometer: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    region: Mapped[str | None] = mapped_column(String(100))
+    speed: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    location: Mapped[str | None] = mapped_column(String(100))
+    soh: Mapped[Decimal | None] = mapped_column(Numeric(5, 3))
+    cycles: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    consumption: Mapped[Decimal | None] = mapped_column(Numeric(5, 3))
+    soh_comparison: Mapped[Decimal | None] = mapped_column(Numeric(6, 3))
+    timestamp: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    level_1: Mapped[Decimal | None] = mapped_column(
         Numeric(6, 2),
         comment="Level 1 of charging. Corresponds to charging in the range 1.4-1.9 kW, 120V, AC, 12-16 Ah",
     )
-    level_2 = Column(
+    level_2: Mapped[Decimal | None] = mapped_column(
         Numeric(6, 2),
         comment="Level 2 of charging. Corresponds to charging in the range 1.9.3-19.2 kW, 208V, AC, 32-64 Ah",
     )
-    level_3 = Column(
+    level_3: Mapped[Decimal | None] = mapped_column(
         Numeric(6, 2),
         comment="Level 3 of charging. Corresponds to charging in the range > 50kW, DC",
     )
-    soh_oem = Column(Numeric(5, 2))
-    real_autonomy = Column(Numeric(10, 0))
-    timestamp_last_data_collected = Column(DateTime)
+    soh_oem: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    real_autonomy: Mapped[Decimal | None] = mapped_column(Numeric(10, 0))
+    timestamp_last_data_collected: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class VehicleStatus(BaseUUIDModel):
     __tablename__ = "vehicle_status"
-    vehicle_id: Mapped[uuid.UUID] | None = Column(
-        ForeignKey("vehicle.id"), nullable=True
-    )
-    vin: str = Column(String(50), nullable=False)
-    status_name: str = Column(String(100), nullable=False)
-    status_value: bool = Column(Boolean, nullable=False)
-    process_step: str = Column(String(100), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    vehicle_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("vehicle.id"))
+    vin: Mapped[str] = mapped_column(String(50), nullable=False)
+    status_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    status_value: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    process_step: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class FleetTeslaAuthenticationCode(BaseUUIDModel):
     __tablename__ = "fleet_tesla_authentication_code"
-    fleet_id: Mapped[uuid.UUID] = Column(
+    fleet_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fleet.id"), nullable=False, unique=True
     )
-    authentication_code: Mapped[str] = Column(String(2000), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    authentication_code: Mapped[str] = mapped_column(String(2000), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

@@ -17,7 +17,8 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+if config.config_file_name:
+    fileConfig(config.config_file_name)
 
 
 target_metadata = Base.metadata
@@ -111,6 +112,8 @@ async def run_migrations_online():
     In this scenario we need to create an Engine
     and associate a connection with the context.
     """
+    if not url:
+        raise ValueError("Database URL is not configured")
     connectable = create_async_engine(url, echo=False, future=True)
 
     async with connectable.connect() as connection:
