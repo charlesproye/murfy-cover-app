@@ -100,8 +100,7 @@ def mask_out_outliers_by_interquartile_range(soh_values: Series) -> Series:
 
 def force_monotonic_decrease(values: Series) -> Series:
     """
-    Ajuste les valeurs de SoH pour garantir une décroissance tout en minimisant
-    l'écart avec les valeurs brutes.
+    Adjust the SoH values to ensure a decrease while minimizing the gap with the raw values.
     """
     values = values.copy()
     notna_values = values.dropna()
@@ -175,11 +174,11 @@ def evaluate_single_soh_estimation(results: DF, soh_col: DF) -> DF:
 
 def force_decay(df, window_size=3, max_drop=0.003):
     """
-    Génère une série strictement décroissante à partir d'une liste de valeurs en :
+    Generate a strictly decreasing series from a list of values by:
       - Calcule d'abord une moyenne mobile,
-      - En choisissant un point de départ proche du maximum (pour refléter les meilleures valeurs),
-      - Puis en s'assurant qu'entre deux points consécutifs, la diminution ne dépasse pas max_drop,
-        et que la série ne stagne pas sur plus de 2 points.
+      - Choosing a starting point close to the maximum (to reflect the best values),
+      - Then ensuring that between two consecutive points, the decrease does not exceed max_drop,
+        and that the series does not stagnate for more than 2 points.
     """
     # Calcul de la moyenne mobile
     smoothed = df["SOH"].rolling(window=window_size, min_periods=2).mean().values
@@ -212,22 +211,22 @@ def force_decay(df, window_size=3, max_drop=0.003):
 
 
 def estimate_cycles(total_range: float = 0, initial_range: float = 1, soh: float = 1.0):
-    """Calcule le nombre estimé de cycles
+    """Calculate the estimated number of cycles
 
     Args:
-        total_range (float): nombre de km parcouru
-        initial_range (float): autonomie initiale du véhicule
-        soh (float, optional): SoH du véhicule
+        total_range (float): vehcile total range
+        initial_range (float):initial autonomy
+        soh (float, optional): vehicle SoH value
 
     Returns:
-        float: le nombre de cycle de la batterie
+        float: the number of cycles of the battery
     """
-    if soh is np.nan:
+    if pd.isna(soh) is True:
         soh = 1
     try:
         total_cycle = total_range / (initial_range * (soh + 1) / 2)
         return round(total_cycle)
-    except:
+    except (ZeroDivisionError, ValueError, TypeError):
         return np.nan
 
 

@@ -68,10 +68,10 @@ class ResultPhaseToResultWeek:
             .sort_values(["VIN", "DATE"])
         )
 
-        rweek = self.compute_cycles(rweek)
-
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].ffill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].bfill()
+
+        rweek = self.compute_cycles(rweek)
 
         return rweek
 
