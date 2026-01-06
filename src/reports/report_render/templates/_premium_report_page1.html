@@ -175,7 +175,7 @@
                         const ctx = canvas.getContext('2d');
                         const d = {{ soh_data|tojson|safe }};
                         const yMin = Math.floor(Math.min(...d.soh_min) - 1);
-                        const yMax = Math.ceil(Math.max(...d.soh_max) + 1);
+                        const yMax = Math.min(Math.ceil(Math.max(...d.soh_max) + 1), 100);
 
                         // Convert to {x, y} format for linear scale
                         const toXY = (arr) => d.odometer_points.map((km, i) => ({x: km, y: arr[i]}));

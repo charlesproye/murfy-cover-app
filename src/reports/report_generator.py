@@ -247,11 +247,9 @@ class ReportGenerator:
                     logger.error(f"Error downloading PDF for {vin}: {e}")
                     continue
 
-                # Upload to S3 as a public object
+                # Upload to S3 as a private object (presigned URLs will be generated on-demand)
                 s3_path = f"{self.worksheet_name.upper()}/{datetime.now().strftime('%Y%m%d')}/{vin}_{uuid.uuid4()}.pdf"
-                await self.s3_client.upload_file(
-                    s3_path, pdf_bytes, acl=S3ACL.PUBLIC_READ
-                )
+                await self.s3_client.upload_file(s3_path, pdf_bytes, acl=S3ACL.PRIVATE)
 
                 list_files.append((vin, s3_path))
 
@@ -263,9 +261,12 @@ class ReportGenerator:
     async def load_to_db(
         self, list_files: list[tuple[str, str]], task_id: str | None = None
     ) -> None:
-        for vin, s3_path in list_files:
-            url = f"https://{self.s3_bucket}.s3.fr-par.scw.cloud/{s3_path}"
+        """
+        Load report S3 URIs to database.
 
+        Stores S3 URIs (s3://bucket/path format) so presigned URLs can be generated on-demand.
+        """
+        for vin, s3_path in list_files:
             with self.session_factory() as session:
                 vehicle_id = (
                     session.query(Vehicle.id).where(Vehicle.vin == vin).scalar()
@@ -275,9 +276,12 @@ class ReportGenerator:
                     logger.error(f"Vehicle with VIN {vin} not found in database")
                     continue
 
+                # Store as S3 URI (s3://bucket/path)
+                s3_uri = f"s3://{self.s3_bucket}/{s3_path}"
+
                 premium_report = PremiumReport(
                     vehicle_id=vehicle_id,
-                    report_url=url,
+                    report_url=s3_uri,
                     task_id=task_id,
                 )
                 session.add(premium_report)

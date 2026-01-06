@@ -1,13 +1,14 @@
 """Service for generating premium reports synchronously."""
 
 import logging
-import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.s3.async_s3 import S3ACL, AsyncS3
+from core.s3.async_s3 import AsyncS3
 from db_models.company import Oem
 from db_models.report import PremiumReport
 from db_models.vehicle import (
@@ -20,6 +21,100 @@ from external_api.core.config import settings
 from reports.report_render.premium_report_generator import PremiumReportGenerator
 
 logger = logging.getLogger(__name__)
+
+
+async def get_existing_report_for_today(
+    vehicle: Vehicle, db: AsyncSession
+) -> PremiumReport | None:
+    """
+    Check if a premium report already exists for the given vehicle today.
+
+    Args:
+        vehicle: Vehicle DB model
+        db: Database session
+
+    Returns:
+        PremiumReport if found, None otherwise
+    """
+    # Use UTC date to match database server timezone (PostgreSQL now() returns UTC)
+    today = datetime.now(UTC).date()
+    stmt = select(PremiumReport).where(
+        PremiumReport.vehicle_id == vehicle.id,
+        func.date(PremiumReport.created_at) == today,
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def _save_report_with_race_handling(
+    vehicle: Vehicle,
+    report_uuid: str,
+    db: AsyncSession,
+    s3_client: AsyncS3,
+    s3_uri: str,
+) -> str:
+    """
+    Save premium report to database with race condition handling.
+
+    Attempts to insert the report. If a race condition occurs (IntegrityError due to
+    unique constraint violation), fetches and returns the existing report instead.
+    When a race occurs, cleans up the orphaned S3 file to prevent storage waste.
+
+    Args:
+        vehicle: Vehicle DB model
+        report_uuid: UUID for the report
+        db: Database session
+        s3_client: AsyncS3 client for cleanup operations
+        s3_uri: S3 path of the uploaded file (for cleanup on race condition)
+
+    Returns:
+        S3 URI of the saved report (either newly created or existing from concurrent request)
+
+    Raises:
+        IntegrityError: If an unexpected integrity error occurs
+    """
+    premium_report = PremiumReport(
+        vehicle_id=vehicle.id,
+        report_url=s3_uri,
+        id=uuid.UUID(report_uuid),
+        task_id=None,  # No task ID for sync generation
+    )
+    db.add(premium_report)
+
+    try:
+        await db.commit()
+        logger.info(f"Report saved to database with S3 URI: {s3_uri}")
+        return s3_uri
+    except IntegrityError:
+        # Race condition: another request created a report while we were generating
+        await db.rollback()
+        logger.warning(
+            f"Race condition detected for VIN {vehicle.vin}, fetching existing report"
+        )
+
+        existing_report = await get_existing_report_for_today(vehicle, db)
+        if existing_report:
+            # Clean up the orphaned S3 file that was just uploaded
+            try:
+                await s3_client.delete_file(s3_uri=s3_uri)
+                logger.info(
+                    f"Cleaned up orphaned S3 file due to race condition: {s3_uri}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to clean up orphaned S3 file {s3_uri}: {e}", exc_info=True
+                )
+
+            logger.info(
+                f"Returning existing report S3 URI from concurrent request: {existing_report.report_url}"
+            )
+            return existing_report.report_url  # This is the S3 URI
+        else:
+            # This should never happen, but handle it gracefully
+            logger.error(
+                f"IntegrityError but no existing report found for VIN {vehicle.vin}"
+            )
+            raise
 
 
 async def generate_premium_report_sync(
@@ -49,7 +144,7 @@ async def generate_premium_report_sync(
         s3_bucket: S3 bucket name for storing PDFs
 
     Returns:
-        S3 URL of the generated PDF
+        S3 URI of the uploaded PDF (stored in database for presigned URL generation)
 
     Raises:
         ValueError: If required data is missing
@@ -58,7 +153,13 @@ async def generate_premium_report_sync(
     vin = vehicle.vin
     logger.info(f"Starting synchronous PDF generation for VIN: {vin}")
 
-    # Initialize the premium report generator
+    existing_report = await get_existing_report_for_today(vehicle, db)
+    if existing_report:
+        logger.info(
+            f"Report already exists for VIN {vin} today, returning existing S3 URI: {existing_report.report_url}"
+        )
+        return existing_report.report_url  # Return S3 URI
+
     generator = PremiumReportGenerator(gotenberg_url=gotenberg_url)
 
     report_uuid = str(uuid.uuid4())
@@ -72,13 +173,11 @@ async def generate_premium_report_sync(
         report_uuid=report_uuid,
     )
 
-    # Use the main template which includes both pages with proper page breaks
     html_content = generator.render_template(
         data=report_data,
         embed_assets=True,
     )
 
-    # Generate PDF asynchronously (non-blocking)
     pdf_bytes = await generator.generate_pdf(
         html_content=html_content,
     )
@@ -87,28 +186,16 @@ async def generate_premium_report_sync(
         f"PDF generated successfully for VIN {vin}, size: {len(pdf_bytes) / 1024:.2f} KB"
     )
 
-    start = time.time()
-    # Upload to S3 using persistent client (reused across all requests)
-    s3_path = f"sync/{datetime.now().strftime('%Y%m%d')}/{vin}_{uuid.uuid4()}.pdf"
+    s3_uri = f"s3://{s3_bucket}/sync/{vin}/{datetime.now(UTC).strftime('%Y%m%d')}_{uuid.uuid4()}.pdf"
     await s3_client.upload_file_fast(
-        s3_path, pdf_bytes, acl=S3ACL.PUBLIC_READ, bucket=s3_bucket
+        s3_uri=s3_uri,
+        file=pdf_bytes,
     )
 
-    # Construct public URL
-    url = f"https://{s3_bucket}.s3.fr-par.scw.cloud/{s3_path}"
-
-    # Save to database
-    premium_report = PremiumReport(
-        vehicle_id=vehicle.id,
-        report_url=url,
-        id=uuid.UUID(report_uuid),
-        task_id=None,  # No task ID for sync generation
+    return await _save_report_with_race_handling(
+        vehicle=vehicle,
+        report_uuid=report_uuid,
+        db=db,
+        s3_client=s3_client,
+        s3_uri=s3_uri,
     )
-    db.add(premium_report)
-    await db.commit()
-
-    logger.info(
-        f"PDF uploaded to S3 and saved to database: {url} in {time.time() - start:.2f} seconds"
-    )
-
-    return url

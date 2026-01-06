@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -38,3 +38,13 @@ class PremiumReport(BaseUUID):
     task_id: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    # Unique constraint: one report per vehicle per day (UTC date)
+    __table_args__ = (
+        Index(
+            "ix_premium_report_vehicle_date_unique",
+            vehicle_id,
+            func.date(created_at),
+            unique=True,
+        ),
+    )

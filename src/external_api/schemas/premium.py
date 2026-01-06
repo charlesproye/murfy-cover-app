@@ -57,7 +57,9 @@ class BatteryReportInfo(BaseModel):
     type: str | None = Field(None, description="Battery type (e.g., LITHIUM-ION)")
     capacity: float = Field(description="Battery capacity in kWh")
     wltp_range: str = Field(description="WLTP certified range in km")
-    consumption: str = Field(description="Average consumption in kWh/100km")
+    consumption: int | None = Field(
+        None, description="Average consumption in kWh/100km"
+    )
     warranty_years: int = Field(description="Battery warranty duration in years")
     warranty_km: int = Field(description="Battery warranty mileage limit in km")
 

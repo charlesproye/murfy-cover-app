@@ -14,6 +14,7 @@ from db_models.vehicle import (
     Battery,
     VehicleModel,
 )
+from external_api.core.config import settings
 from external_api.core.cookie_auth import (
     get_current_user_from_cookie,
     get_user_with_fleets,
@@ -27,7 +28,9 @@ from external_api.schemas.premium import (
     PremiumReportSync,
 )
 from external_api.schemas.user import GetCurrentUser
-from external_api.services.premium.report_generation import generate_premium_report_sync
+from external_api.services.premium.report_generation import (
+    generate_premium_report_sync,
+)
 from reports import reports_utils
 from reports.report_render.premium_report_generator import PremiumReportGenerator
 from reports.workers.tasks import generate_pdf_task
@@ -155,6 +158,7 @@ async def get_report_status(
     job_id: str = Path(..., description="The Celery job ID"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
     db: AsyncSession = Depends(get_db),
+    s3_client: AsyncS3 = Depends(get_s3_client_fast),
 ) -> PremiumReportPDFUrl:
     if not await check_user_allowed_to_vin(vin, user, db):
         raise HTTPException(
@@ -182,7 +186,10 @@ async def get_report_status(
     elif task_result.state == "SUCCESS":
         message = "PDF generated successfully"
         if premium_report and premium_report.report_url:
-            url = premium_report.report_url
+            url = await s3_client.get_presigned_url(
+                s3_uri=premium_report.report_url,
+                expires_in=settings.PREMIUM_REPORT_S3_SIGNED_URI_EXPIRES_IN,
+            )
 
     elif task_result.state == "FAILURE":
         message = "PDF generation failed"
@@ -194,7 +201,10 @@ async def get_report_status(
     else:
         if premium_report and premium_report.report_url:
             message = "PDF generated successfully"
-            url = premium_report.report_url
+            url = await s3_client.get_presigned_url(
+                s3_uri=premium_report.report_url,
+                expires_in=settings.PREMIUM_REPORT_S3_SIGNED_URI_EXPIRES_IN,
+            )
         else:
             message = f"Unknown state: {task_result.state}"
 
@@ -296,7 +306,6 @@ async def get_premium_report_html_endpoint(
     ) = await fetch_report_required_data(vin, db)
 
     try:
-        # Generate HTML
         generator = PremiumReportGenerator()
         html_content = await generator.generate_premium_report_html(
             vehicle=vehicle,
@@ -341,8 +350,7 @@ async def generate_premium_report_sync_endpoint(
     ) = await fetch_report_required_data(vin, db)
 
     try:
-        # Generate PDF synchronously
-        url = await generate_premium_report_sync(
+        s3_uri = await generate_premium_report_sync(
             vehicle=vehicle,
             vehicle_model=vehicle_model,
             battery=battery,
@@ -353,9 +361,14 @@ async def generate_premium_report_sync_endpoint(
             image_url=image_url,
         )
 
+        presigned_url = await s3_client.get_presigned_url(
+            s3_uri=s3_uri,
+            expires_in=settings.PREMIUM_REPORT_S3_SIGNED_URI_EXPIRES_IN,
+        )
+
         return PremiumReportSync(
             vin=vin,
-            url=url,
+            url=presigned_url,
             message="PDF generated and uploaded successfully",
         )
     except ValueError as e:

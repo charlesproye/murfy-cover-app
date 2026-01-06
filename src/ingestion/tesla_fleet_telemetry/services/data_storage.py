@@ -51,9 +51,9 @@ def _get_tesla_s3_client() -> AsyncS3:
                 "addressing_style": "path",
                 "payload_signing_enabled": False,
                 "use_accelerate_endpoint": False,
-                "checksum_validation": False,  # Disable for Tesla compatibility
-                "use_dualstack_endpoint": False,
-            },
+                "checksum_validation": False,  # type: ignore[dict-item]  # Disable for Tesla compatibility
+                "use_dualstack_endpoint": False,  # type: ignore[dict-item]
+            },  # type: ignore[arg-type]
             connect_timeout=5,
             read_timeout=60,
             retries={"max_attempts": 3, "mode": "standard"},
@@ -255,7 +255,7 @@ async def _cleanup_vehicle_data(
         batch_size = 100
         for i in range(0, len(files_to_delete), batch_size):
             batch = files_to_delete[i : i + batch_size]
-            delete_tasks = [s3_client.delete_file(key) for key in batch]
+            delete_tasks = [s3_client.delete_file(path=key) for key in batch]
             await asyncio.gather(*delete_tasks)
 
         logger.info(

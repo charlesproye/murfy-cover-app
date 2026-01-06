@@ -18,8 +18,8 @@ try:
     from pyspark.sql import DataFrame as SparkDF
     from pyspark.sql import SparkSession
 except ImportError:
-    SparkSession = None
-    SparkDF = None
+    SparkSession = None  # type: ignore[assignment]
+    SparkDF = None  # type: ignore[assignment]
 
 from core.config import EMTPY_S3_KEYS_WARNING_MSG, KEY_LIST_COLUMN_NAMES
 from core.pandas_utils import str_split_and_retain_src
@@ -81,7 +81,7 @@ class S3Service:
             return True  # If no exception, the key exists
         except Exception as e:
             # Check if the error code is 404, which means the key does not exist
-            if e.response["Error"]["Code"] == "404":
+            if isinstance(e, ClientError) and e.response["Error"]["Code"] == "404":
                 return False
             else:
                 raise e
@@ -93,7 +93,7 @@ class S3Service:
             )
             return "Contents" in response
         except Exception as e:
-            if e.response["Error"]["Code"] == "404":
+            if isinstance(e, ClientError) and e.response["Error"]["Code"] == "404":
                 return False
             else:
                 raise e
@@ -169,7 +169,7 @@ class S3Service:
                 raise e
 
         # Optimized writing
-        df_write.repartition(repartition_key).coalesce(32).write.mode(
+        df_write.repartition(repartition_key).coalesce(32).write.mode(  # type: ignore[attr-defined]
             "overwrite"
         ).option("parquet.compression", "snappy").option(
             "parquet.block.size", 67108864
@@ -200,7 +200,7 @@ class S3Service:
         keys = keys[keys.str.endswith(".json")]
         if len(keys) == 0:
             self.logger.info(EMTPY_S3_KEYS_WARNING_MSG.format(keys_prefix=brand))
-            return DF(None, columns=KEY_LIST_COLUMN_NAMES)
+            return DF(None, columns=KEY_LIST_COLUMN_NAMES)  # type: ignore[arg-type]
         # Only retain .json responses
         # Responses are organized as follows: response/brand_name/vin/date-of-response.json
         keys = str_split_and_retain_src(keys, "/")
@@ -262,7 +262,7 @@ class S3Service:
 
         try:
             # Configure S3FileSystem with custom endpoint for Scaleway
-            s3_fs = fs.S3FileSystem(
+            s3_fs = fs.S3FileSystem(  # type: ignore[attr-defined]
                 region=self._settings.S3_REGION,
                 access_key=self._settings.S3_KEY,
                 secret_key=self._settings.S3_SECRET,
@@ -580,3 +580,35 @@ class S3Service:
                     files.append(key)
 
         return sorted(folders), sorted(files)
+
+
+def parse_s3_uri(s3_uri: str) -> tuple[str, str]:
+    """
+    Parse an S3 URI into bucket and path components.
+
+    Args:
+        s3_uri: S3 URI in format 's3://bucket/path/to/file.pdf'
+
+    Returns:
+        Tuple of (bucket, path)
+
+    Raises:
+        ValueError: If URI format is invalid
+    """
+    if not s3_uri.startswith("s3://"):
+        raise ValueError(f"Invalid S3 URI format: {s3_uri}")
+
+    # Remove 's3://' prefix and split on first '/'
+    uri_without_prefix = s3_uri[5:]  # Remove 's3://'
+    parts = uri_without_prefix.split("/", 1)
+
+    if len(parts) != 2:
+        raise ValueError(f"Invalid S3 URI format: {s3_uri}")
+
+    bucket, path = parts
+    if not bucket:
+        raise ValueError(
+            f"Invalid S3 URI format: bucket name cannot be empty in {s3_uri}"
+        )
+
+    return bucket, path

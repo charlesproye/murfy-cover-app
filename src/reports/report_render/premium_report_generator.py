@@ -134,7 +134,7 @@ class PremiumReportGenerator:
     def _calculate_warranty_remaining(
         vehicle: Vehicle,
         vehicle_model: VehicleModel,
-        current_km: float,
+        current_km: int,
     ) -> WarrantyInfo:
         """
         Calculate remaining warranty based on mileage and time.
@@ -302,29 +302,26 @@ class PremiumReportGenerator:
         if vehicle_data.soh is None:
             raise ValueError(f"SoH data not available for VIN: {vin}")
 
-        if (
-            not (vehicle_model.trendline or oem.trendline)
-            or not (vehicle_model.trendline_min or oem.trendline_min)
-            or not (vehicle_model.trendline_max or oem.trendline_max)
-        ):
+        # Select trendline data (vehicle-specific or OEM fallback)
+        trendline = vehicle_model.trendline or oem.trendline
+        trendline_min = vehicle_model.trendline_min or oem.trendline_min
+        trendline_max = vehicle_model.trendline_max or oem.trendline_max
+
+        if not trendline or not trendline_min or not trendline_max:
             raise ValueError(f"No trendline data available for VIN: {vin}")
 
-        current_km = vehicle_data.odometer or 0
+        current_km = int(vehicle_data.odometer or 0)
         max_km = int(vehicle_model.warranty_km or 160000)
 
-        trendline_eq = (vehicle_model.trendline or oem.trendline).get("trendline")
-        trendline_min_eq = (vehicle_model.trendline_min or oem.trendline_min).get(
-            "trendline"
-        )
-        trendline_max_eq = (vehicle_model.trendline_max or oem.trendline_max).get(
-            "trendline"
-        )
+        trendline_eq = trendline.get("trendline")
+        trendline_min_eq = trendline_min.get("trendline")
+        trendline_max_eq = trendline_max.get("trendline")
 
         if not trendline_eq or not trendline_min_eq or not trendline_max_eq:
             raise ValueError(f"Invalid trendline equations for VIN: {vin}")
 
         soh_chart_data = self.generate_soh_data(
-            current_km=int(current_km),
+            current_km=current_km,
             max_km=max_km,
             trendline_eq=trendline_eq,
             trendline_min_eq=trendline_min_eq,
@@ -360,9 +357,9 @@ class PremiumReportGenerator:
             type=battery.battery_type,
             capacity=float(battery.capacity) if battery.capacity else 0.0,
             wltp_range=str(vehicle_model.autonomy),
-            consumption=str(
-                vehicle_model.expected_consumption or vehicle_data.consumption
-            ),
+            consumption=int(vehicle_data.consumption)
+            if vehicle_data.consumption
+            else vehicle_model.expected_consumption,
             warranty_years=warranty_info.warranty_years,
             warranty_km=warranty_info.warranty_km,
         )

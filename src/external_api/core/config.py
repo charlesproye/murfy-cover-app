@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "EValue"
 
     # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY")
-    ALGORITHM: str = os.getenv("ALGORITHM")
-    ENCRYPT_KEY: str = os.getenv("ENCRYPT_KEY")
+    SECRET_KEY: str = os.environ["SECRET_KEY"]
+    ALGORITHM: str = os.environ["ALGORITHM"]
+    ENCRYPT_KEY: str = os.environ["ENCRYPT_KEY"]
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
     )  # 1 hour
@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     PREMIUM_REPORT_S3_BUCKET: str = os.getenv(
         "PREMIUM_REPORT_S3_BUCKET", "bib-premium-reports"
     )
+    PREMIUM_REPORT_S3_SIGNED_URI_EXPIRES_IN: int = 24 * 60 * 60  # 24 hours
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

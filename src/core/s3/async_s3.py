@@ -12,6 +12,8 @@ from botocore.client import Config
 from botocore.exceptions import ClientError
 from types_aiobotocore_s3.client import S3Client as AsyncS3Client
 
+from core.s3.s3_utils import parse_s3_uri
+
 from .settings import S3Settings, get_s3_settings
 
 T = TypeVar("T")
@@ -82,14 +84,16 @@ class AsyncS3:
             self._boto_config = custom_config
         else:
             # Configure boto3 with explicit SSL enforcement
-            s3_config: dict[str, Any] = {"addressing_style": "path"}
+            s3_config = {
+                "addressing_style": "path",
+            }
             if disable_checksum:
                 # Disable payload signing for faster uploads (trade-off: less integrity checking)
                 s3_config["payload_signing_enabled"] = False
 
             self._boto_config = Config(
                 signature_version="s3v4",
-                s3=s3_config,
+                s3=s3_config,  # type: ignore[arg-type]
                 max_pool_connections=max_concurrency,
             )
 
@@ -110,7 +114,7 @@ class AsyncS3:
                 # Double-check after acquiring lock
                 if self._persistent_client is None:
                     # Store context manager so we can properly close it later
-                    self._persistent_client_cm = self.session.client(
+                    self._persistent_client_cm = self.session.client(  # type: ignore[call-overload]
                         "s3",
                         region_name=self._settings.S3_REGION,
                         endpoint_url=self._settings.S3_ENDPOINT,
@@ -132,7 +136,7 @@ class AsyncS3:
     @asynccontextmanager
     async def _client(self) -> AsyncGenerator[AsyncS3Client, None]:
         """Create a temporary S3 client (use _get_persistent_client for better performance)."""
-        async with self.session.client(
+        async with self.session.client(  # type: ignore[call-overload]
             "s3",
             region_name=self._settings.S3_REGION,
             endpoint_url=self._settings.S3_ENDPOINT,
@@ -228,8 +232,10 @@ class AsyncS3:
 
     async def upload_file_fast(
         self,
-        path: str,
-        file: bytes,
+        *,
+        s3_uri: str | None = None,
+        path: str | None = None,
+        file: bytes | None = None,
         acl: S3ACL = S3ACL.PRIVATE,
         bucket: str | None = None,
         client: AsyncS3Client | None = None,
@@ -241,6 +247,11 @@ class AsyncS3:
         eliminating connection setup overhead. Respects max_concurrency limit
         for safe operation. You can optionally pass a custom client.
         """
+        if s3_uri is not None:
+            bucket, path = parse_s3_uri(s3_uri)
+        elif path is None:
+            raise ValueError("Either s3_uri or path must be provided")
+
         async with self._sem:
             if client is None:
                 # Use persistent client (reused across requests)
@@ -272,10 +283,18 @@ class AsyncS3:
 
             return await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def delete_file(self, path: str) -> bool:
+    async def delete_file(
+        self, *, s3_uri: str | None = None, path: str | None = None
+    ) -> bool:
+        bucket: str | None = None
+        if s3_uri is not None:
+            bucket, path = parse_s3_uri(s3_uri)
+        if bucket is None and path is None:
+            raise ValueError("Either s3_uri or bucket and path must be provided")
+
         async with self._sem, self._client() as client:
             try:
-                await client.delete_object(Bucket=self.bucket, Key=path)
+                await client.delete_object(Bucket=bucket or self.bucket, Key=path)
                 return True
             except ClientError as e:
                 if e.response["Error"]["Code"] == "NoSuchKey":
@@ -352,11 +371,35 @@ class AsyncS3:
             self.logger.error(f"Erreur de lecture du fichier YAML {path} : {e}")
             raise
 
-    async def get_presigned_url(self, path: str) -> str:
+    async def get_presigned_url(
+        self,
+        *,
+        s3_uri: str | None = None,
+        path: str | None = None,
+        bucket: str | None = None,
+        expires_in: int = 3600,
+    ) -> str:
+        """
+        Generate a presigned URL for downloading a file from S3.
+
+        Args:
+            path: S3 key/path to the file
+            expires_in: URL expiration time in seconds (default: 3600 = 1 hour)
+            bucket: Optional bucket name (uses default if not specified)
+
+        Returns:
+            Presigned URL string
+        """
+        if s3_uri is not None:
+            bucket, path = parse_s3_uri(s3_uri)
+        elif path is None:
+            raise ValueError("Either s3_uri or path must be provided")
+
         async with self._client() as client:
             return await client.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": self.bucket, "Key": path},
+                Params={"Bucket": bucket or self.bucket, "Key": path},
+                ExpiresIn=expires_in,
             )
 
     async def close(self) -> None:
