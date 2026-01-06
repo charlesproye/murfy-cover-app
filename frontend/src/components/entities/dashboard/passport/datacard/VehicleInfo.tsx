@@ -12,9 +12,9 @@ import useGetInfoVehicle from '@/hooks/dashboard/passport/useGetInfoVehicle';
 import { formatNumber } from '@/lib/dataDisplay';
 import BibRecommendation from '@/components/entities/dashboard/passport/report/BibRecommendation';
 import PinVehicleSwitch from '@/components/entities/dashboard/passport/datacard/PinVehicleSwitch';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import PassportPdf from '@/components/pdf/PassportPdf';
-import ReportModal from '@/components/entities/dashboard/passport/report/ReportModal';
+import HtmlReportModal from '@/components/entities/dashboard/passport/report/HtmlReportModal';
+import { ROUTES } from '@/routes';
+import fetchWithAuth from '@/services/fetchWithAuth';
 import MiniScoreCard from '@/components/entities/dashboard/passport/datacard/MiniScoreCard';
 import useGetPriceForecast from '@/hooks/dashboard/passport/useGetPriceForecast';
 import useGetKpiAdditional from '@/hooks/dashboard/passport/useGetKpiAdditional';
@@ -32,8 +32,38 @@ interface VehicleInfoProps {
 const VehicleInfoMain: React.FC<{ vin: string | undefined }> = ({ vin }) => {
   const { data: infoVehicle, isLoading } = useGetInfoVehicle(vin);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
 
-  if (isLoading || !infoVehicle) {
+  const handleDownloadPdf = async () => {
+    if (!vin) return;
+
+    setIsPdfLoading(true);
+    try {
+      const response = await fetchWithAuth<{ vin: string; url: string; message: string }>(
+        `${ROUTES.PREMIUM_REPORT_PDF_SYNC}/${vin}/generate_report_sync`,
+        { method: 'POST' },
+      );
+
+      // Validate that response.url exists and is a non-empty string
+      if (
+        !response?.url ||
+        typeof response.url !== 'string' ||
+        response.url.trim() === ''
+      ) {
+        throw new Error('Invalid PDF URL received from server');
+      }
+
+      // Open PDF in new tab
+      window.open(response.url, '_blank');
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsPdfLoading(false);
+    }
+  };
+
+  if (isLoading || !infoVehicle || !vin) {
     return (
       <div className={boxClass}>
         <div className="w-full h-[120px] animate-pulse flex items-center justify-center">
@@ -84,25 +114,20 @@ const VehicleInfoMain: React.FC<{ vin: string | undefined }> = ({ vin }) => {
           >
             <IconEye className="w-4 h-4" /> See Report
           </button>
-          <PDFDownloadLink
-            document={<PassportPdf data={infoVehicle} />}
-            fileName="Battery_Report.pdf"
+          <button
+            onClick={handleDownloadPdf}
+            disabled={isPdfLoading}
+            className={`bg-white border border-primary/30 shadow-md rounded-full px-4 py-2 text-xs flex items-center gap-2 font-bold text-primary hover:bg-primary/10 transition-colors w-auto min-w-[120px] justify-center ${
+              isPdfLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+            }`}
           >
-            {({ loading }) => (
-              <div
-                className={`bg-white border border-primary/30 shadow-md rounded-full px-4 py-2 text-xs flex items-center gap-2 font-bold text-primary hover:bg-primary/10 transition-colors w-auto min-w-[120px] justify-center ${
-                  loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                }`}
-              >
-                <IconDownload className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                Download Report
-              </div>
-            )}
-          </PDFDownloadLink>
+            <IconDownload className={`w-4 h-4 ${isPdfLoading ? 'animate-spin' : ''}`} />
+            Download Report
+          </button>
         </div>
       </div>
-      {showReportModal && (
-        <ReportModal onClose={() => setShowReportModal(false)} data={infoVehicle} />
+      {showReportModal && vin && (
+        <HtmlReportModal onClose={() => setShowReportModal(false)} vin={vin} />
       )}
     </div>
   );

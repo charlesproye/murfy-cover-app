@@ -29,6 +29,10 @@ export const ROUTES = {
   PRICE_FORECAST: `${BASE_URL}/passport/price_forecast`,
   IS_VIN_IN_FLEETS: `${BASE_URL}/passport/is_vin_in_fleets`,
 
+  // PREMIUM
+  PREMIUM_REPORT_HTML: `${BASE_URL}/premium`,
+  PREMIUM_REPORT_PDF_SYNC: `${BASE_URL}/premium`,
+
   // FAVORITES
   PINNED_VEHICLES: `${BASE_URL}/individual/favorite_table`,
 
