@@ -2,7 +2,6 @@ from logging import Logger
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 
 from core.spark_utils import compute_regression_coefficients
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
@@ -86,6 +85,7 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
         Returns:
             Spark DataFrame with soh replaced by the corrected value
         """
+
         coef_df = compute_regression_coefficients(
             phase_df, aggregate_col="VIN", feature_col="soc", target_col="soh"
         )
@@ -95,7 +95,7 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
         phase_df = phase_df.withColumn(
             "soh_updated",
             F.when(
-                F.col("coef_soc").isNotNull(),
+                F.col("coef").isNotNull(),
                 F.col("soh") / (F.col("coef") * F.col("soc") + F.col("intercept")),
             ).otherwise(F.col("soh")),
         )
