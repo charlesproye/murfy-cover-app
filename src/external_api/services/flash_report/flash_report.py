@@ -389,6 +389,7 @@ async def get_flash_report_data(
     version = version or None
 
     # Get vehicle model with battery info
+    # Order by trendline to prioritize non-null trendline
     stmt = (
         select(
             VehicleModel,
@@ -407,6 +408,7 @@ async def get_flash_report_data(
             & (VehicleModel.model_name == flash_report_combination.model)
             & (VehicleModel.type == flash_report_combination.type)
             & (VehicleModel.version == version)
+            & (VehicleModel.trendline.isnot(None))
         )
     )
     result = await db.execute(stmt)
