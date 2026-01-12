@@ -76,7 +76,7 @@
                         </div>
                         <div class="mt-auto text-center text-neutral-400 text-[5px] font-medium">Image non contractuelle.</div>
                     </div>
-                    <div class="flex flex-col justify-center gap-1.5 flex-1">
+                    <div class="flex flex-col gap-1.5 flex-1">
                         <div class="text-black text-[7px] font-medium">
                             Pour le véhicule <span class="font-bold">{{ vehicle.model }}</span> :
                         </div>
@@ -84,7 +84,7 @@
                             {{ battery.warranty_years }} ans <br />
                             ou {{ battery.warranty_km|number_format }} km
                         </div>
-                        <div class="text-black text-[7px] font-medium mt-1 leading-tight">
+                        <div class="text-black text-[7px] font-medium mt-[44px] leading-tight">
                             Ces informations peuvent varier en fonction de la marque et du constructeur. Plus de détails peuvent être trouvés sur <a href="https://www.bib-batteries.fr" class="text-sky-400 underline">la page de garantie batterie de Bib</a>.
                         </div>
                     </div>
@@ -119,7 +119,7 @@
         <!-- Footer -->
         <div class="w-[547px] h-[64px] bottom-[25px] left-6 absolute rounded-3xl border border-white">
             <div class="w-[95px] h-[40px] left-6 top-[11px] absolute">{{ read_svg("svg/logo.svg")|safe }}</div>
-            <div class="h-10 px-5 py-1.5 left-[269px] top-[11px] absolute bg-black/5 rounded-full flex flex-col justify-center">
+            <div class="h-10 px-[1.15rem] py-1.5 left-[269px] top-[11px] absolute bg-black/5 rounded-full flex flex-col justify-center">
                 {% if report.uuid %}
                 <div class="text-black text-[8px] font-medium">N°{{ report.uuid }}</div>
                 {% endif %}

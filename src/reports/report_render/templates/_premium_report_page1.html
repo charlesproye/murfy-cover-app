@@ -3,17 +3,8 @@
         <!-- Top Section: Vehicle Info + State of Health -->
         <div class="flex gap-4">
             <!-- Vehicle Info Card -->
-            <div class="w-[347px] h-[224px] bg-[linear-gradient(to_bottom_right,#064e3b_0%,#022c19_70%)] text-white relative rounded-3xl shadow-[0_12px_30px_rgba(0,0,0,0.25)] p-2 flex flex-col gap-3">
-                <!-- Decorative circuit pattern SVG -->
-                <svg class="absolute inset-0 opacity-10 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="0.5"/>
-                    </pattern>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
-                    <path d="M50 50 h 100 v 50 h -50" stroke="#73c9b3" stroke-width="1" fill="none" />
-                    <circle cx="150" cy="100" r="3" fill="#73c9b3" />
-                </svg>
-
+            <!-- box-shadow doesn't render correctly in Safari PDF, so we switch to a border -->
+            <div class="w-[355px] h-[232px] bg-[linear-gradient(to_bottom_right,#064e3b_0%,#022c19_70%)] text-white relative rounded-3xl p-2 flex flex-col gap-3 border-4 border-[#1b4130]">
                 <div class="relative z-10 flex gap-3 h-[112px]">
                     <!-- Vehicle Image -->
                     <div class="w-[108px] h-[108px] bg-white rounded-2xl p-1 flex items-center justify-center">
@@ -53,12 +44,12 @@
                 </div>
 
                 <!-- Battery Section -->
-                <div class="relative z-10 w-[331px] h-[84px]">
+                <div class="relative z-10 w-[331px] h-[84px] top-[3px]">
                     <div class="absolute left-[12px] top-0 z-20 -translate-y-1/2 rounded-lg border border-white/25 bg-[#022c19] px-2.5 py-0.5 text-[#CCEDDC] text-[11px] font-bold shadow-[0_0_0_2px_#022c19]">
                         Batterie
                     </div>
 
-                    <div class="absolute inset-0 rounded-2xl border border-white/25 bg-white/10 px-3 pt-[22px] pb-2">
+                    <div class="absolute inset-0 rounded-2xl border border-white/25 bg-white/10 px-3 pt-[20px] pb-2">
                         <div class="grid grid-cols-[1.35fr_0.75fr_1.25fr_0.85fr] gap-x-3">
                             <div>
                                 <p class="text-[6px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85 truncate">Fabricant</p>
@@ -97,16 +88,16 @@
             </div>
 
             <!-- State of Health Card -->
-            <div class="w-[184px] h-[223px] bg-[linear-gradient(to_bottom_left,#009D69_0%,#00F095_70%)] relative rounded-3xl overflow-hidden flex flex-col items-center p-3 shadow-lg">
+            <div class="w-[192px] h-[232px] bg-[linear-gradient(to_bottom_left,#009D69_0%,#00F095_70%)] relative rounded-3xl overflow-hidden flex flex-col items-center p-3 border-4 border-[#40FFB8]">
                 <!-- Network mesh pattern -->
-                <svg class="absolute inset-0 opacity-25 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-                    <line x1="0" y1="45" x2="184" y2="45" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-                    <line x1="0" y1="90" x2="184" y2="90" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-                    <line x1="0" y1="135" x2="184" y2="135" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-                    <line x1="0" y1="180" x2="184" y2="180" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-                    <line x1="46" y1="0" x2="46" y2="223" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-                    <line x1="92" y1="0" x2="92" y2="223" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-                    <line x1="138" y1="0" x2="138" y2="223" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                <svg class="absolute inset-0 opacity-25 pointer-events-none z-0" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="0" y1="45" x2="192" y2="45" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="0" y1="90" x2="192" y2="90" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="0" y1="135" x2="192" y2="135" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="0" y1="180" x2="192" y2="180" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="46" y1="0" x2="46" y2="232" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="92" y1="0" x2="92" y2="232" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+                    <line x1="138" y1="0" x2="138" y2="232" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
                     <circle cx="46" cy="45" r="2" fill="rgba(255,255,255,0.5)"/>
                     <circle cx="92" cy="45" r="2" fill="rgba(255,255,255,0.5)"/>
                     <circle cx="138" cy="45" r="2" fill="rgba(255,255,255,0.5)"/>
@@ -125,15 +116,15 @@
                     <span class="bg-[#05442B] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm">Rapport Premium</span>
                 </div>
 
-                <h1 class="self-start text-emerald-900 text-2xl font-black font-['DM_Sans'] uppercase leading-5">
+                <h1 class="self-start text-emerald-900 text-2xl font-black font-['DM_Sans'] uppercase leading-5 relative z-10">
                     STATE<br>OF<br>HEALTH
                 </h1>
 
-                <div class="text-emerald-900 text-6xl font-normal font-['Space_Grotesk'] leading-[68px]">
+                <div class="text-emerald-900 text-6xl font-normal font-['Space_Grotesk'] leading-[68px] relative z-10">
                     {{ soh_data.value|round(0)|int }}%
                 </div>
 
-                <div class="border border-white/50 bg-[linear-gradient(135deg,#80F8CA_0%,#FFFFFF_50%,#80F8CA_100%)] h-[42px] w-[168px] rounded-[20px] flex items-center justify-around px-1.5 relative z-10">
+                <div class="border border-white/50 bg-[linear-gradient(135deg,#80F8CA_0%,#FFFFFF_50%,#80F8CA_100%)] h-[42px] w-[160px] rounded-[20px] flex items-center justify-around px-1.5 relative z-10 top-[5px]">
                     <div class="w-4 h-5 rounded bg-[#2C6D49] {% if soh_data.grade == 'A' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'A' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">A</div>
                     <div class="w-4 h-5 rounded bg-[#49DE80] {% if soh_data.grade == 'B' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'B' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">B</div>
                     <div class="w-4 h-5 rounded bg-[#FACC14] {% if soh_data.grade == 'C' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'C' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">C</div>
@@ -257,7 +248,7 @@
                                         title: { display: true, text: 'Evolution du SoH', font: { size: 14, weight: 500 } },
                                         min: yMin,
                                         max: yMax,
-                                        ticks: { callback: v => v + ' %', stepSize: 2, font: { size: 14 }, maxTicksLimit: 8, color: '#555' },
+                                        ticks: { callback: v => Math.round(v) + ' %', stepSize: 2, font: { size: 14 }, maxTicksLimit: 8, color: '#555' },
                                         grid: { color: '#eaeaea', lineWidth: 1 }
                                     },
                                     x: {
@@ -362,7 +353,7 @@
         <!-- Footer -->
         <div class="w-[547px] h-[64px] bottom-[25px] left-6 absolute rounded-3xl border border-white">
             <div class="w-[95px] h-[40px] left-6 top-[11px] absolute">{{ read_svg("svg/logo.svg")|safe }}</div>
-            <div class="h-10 px-5 py-1.5 left-[269px] top-[11px] absolute bg-black/5 rounded-full flex flex-col justify-center">
+            <div class="h-10 px-[1.15rem] py-1.5 left-[269px] top-[11px] absolute bg-black/5 rounded-full flex flex-col justify-center">
                 {% if report.uuid %}
                 <div class="text-black text-[8px] font-medium">N°{{ report.uuid }}</div>
                 {% endif %}
