@@ -6,8 +6,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.sql_utils import get_async_db
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
-from external_api.db.session import get_db
 from external_api.schemas.api import ApiUserBillingInfo
 from external_api.schemas.api import ApiUserRead as ApiUser
 from external_api.schemas.pricing import UserBillingInfo
@@ -24,7 +24,7 @@ router = APIRouter()
 
 @router.get("/usage", response_model=UserBillingInfo)
 async def get_billing_usage(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     user: User = Depends(get_current_user_from_cookie(get_user)),
 ) -> Any:
     """
@@ -51,7 +51,7 @@ async def get_billing_usage(
 @router.get("/info", response_model=ApiUserBillingInfo)
 async def get_billing_info(
     api_user: ApiUser = Depends(get_current_user_from_cookie(get_user)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> Any:
     """
     Get the current API user's billing information.
@@ -71,4 +71,3 @@ async def get_billing_info(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error during billing information retrieval",
         ) from e
-

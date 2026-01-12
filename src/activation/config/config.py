@@ -39,4 +39,33 @@ MAKES_WITH_SOH_BIB = [
     "renault",
     "ford",
 ]
-MAKES_WITH_SOH_BIB_WO_MODEL_API = ["mercedes-benz", "kia", "ford"]
+MAKES_WITH_SOH_BIB_WO_MODEL_API = [
+    "mercedes-benz",
+    "ford",
+    "volkswagen",
+    "volvo-cars",
+]
+
+
+MAKES_TO_OEM = {
+    "tesla": "tesla",
+    "peugeot": "stellantis",
+    "renault": "renault",
+    "kia": "kia",
+    "mercedes-benz": "mercedes-benz",
+    "citroën": "stellantis",
+    "bmw": "bmw",
+    "volvo": "volvo-cars",
+    "opel": "stellantis",
+    "ford": "ford",
+    "fiat": "stellantis",
+    "ds automobiles": "stellantis",
+    "audi": "volkswagen",
+    "cupra": "volkswagen",
+    "volkswagen": "volkswagen",
+    "mini": "bmw",
+    "seaseat": "volkswagen",
+    "skoda": "volkswagen",
+    "dacia": "renault",
+    "nissan": "renault",
+}

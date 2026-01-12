@@ -36,8 +36,11 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.add_column("make", sa.Column("image_id", sa.UUID(), nullable=True))
-    op.create_foreign_key(None, "make", "asset", ["image_id"], ["id"])
+    with op.batch_alter_table("make") as batch_op:
+        batch_op.add_column(sa.Column("image_id", sa.UUID(), nullable=True))
+        batch_op.create_foreign_key(
+            "fk_make_image_id_asset", "asset", ["image_id"], ["id"]
+        )
     op.add_column("vehicle_model", sa.Column("image_id", sa.UUID(), nullable=True))
     op.create_foreign_key(None, "vehicle_model", "asset", ["image_id"], ["id"])
     op.drop_column("vehicle_model", "url_image")

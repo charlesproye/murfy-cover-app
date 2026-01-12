@@ -9,10 +9,10 @@ export const FilterButton = ({
   return (
     <div
       onClick={onClick}
-      className={`cursor-pointer transition-colors duration-300 ${isSelected ? 'bg-primary' : 'bg-transparent'} rounded-xl p-2 px-3`}
+      className={`cursor-pointer transition-colors duration-300 ${isSelected ? 'bg-primary' : 'bg-transparent'} rounded-xl p-2 px-4`}
     >
       <p
-        className={`text-xs select-none transition-colors duration-300 ${isSelected ? 'text-white' : 'text-gray'}`}
+        className={`text-sm font-medium select-none transition-colors duration-300 ${isSelected ? 'text-white' : 'text-gray'}`}
       >
         {label}
       </p>

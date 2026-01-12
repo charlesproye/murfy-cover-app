@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Path, Query
 
+from core.sql_utils import get_async_db
 from external_api.core.cookie_auth import (
     get_current_user_from_cookie,
     get_user_with_fleets,
 )
-from external_api.db.session import get_db
 from external_api.schemas.user import GetCurrentUser
 from external_api.services.dashboard import (
     get_extremum_vehicles,
@@ -23,7 +23,7 @@ router = APIRouter()
 
 @router.get("/last_timestamp_with_data", include_in_schema=False)
 async def last_timestamp_with_data(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     fleet_id: str = Query(..., description="The fleet id"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
@@ -34,7 +34,7 @@ async def last_timestamp_with_data(
 
 @router.get("/kpis", include_in_schema=False)
 async def individual_kpis(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     fleet_id: str = Query(..., description="The fleet id"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
@@ -46,7 +46,7 @@ async def individual_kpis(
 
 @router.get("/range_soh", include_in_schema=False)
 async def range_soh(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     fleet_id: str = Query(..., description="The fleet id"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
     type: str = Query(None, description="The type"),
@@ -58,7 +58,7 @@ async def range_soh(
 
 @router.get("/new_vehicles", include_in_schema=False)
 async def new_vehicles(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     fleet_id: str = Query(..., description="The fleet id"),
     period: str = Query(None, description="The period"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
@@ -70,7 +70,7 @@ async def new_vehicles(
 
 @router.get("/table_brand", include_in_schema=False)
 async def table_brand(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     fleet_id: str = Query(..., description="The fleet id"),
     filter: str = Query(None, description="The filter"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
@@ -82,7 +82,7 @@ async def table_brand(
 
 @router.get("/search/{vin}", include_in_schema=False)
 async def search_vin(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     vin: str = Path(..., description="The vin"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
@@ -93,7 +93,7 @@ async def search_vin(
 
 @router.get("/trendline_brand", include_in_schema=False)
 async def trendline_brand(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     fleet_id: str = Query(..., description="The fleet id"),
     brand: str = Query(None, description="The brand"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
@@ -105,7 +105,7 @@ async def trendline_brand(
 
 @router.get("/soh_by_groups", include_in_schema=False)
 async def soh_by_groups(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     fleet_id: str = Query(..., description="The fleet id"),
     group: str = Query(..., description="The group"),
     page: int = Query(1, description="The page"),
@@ -118,7 +118,7 @@ async def soh_by_groups(
 
 @router.get("/extremum_vehicles", include_in_schema=False)
 async def extremum_vehicles(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     fleet_id: str = Query(..., description="The fleet id"),
     brand: str = Query(None, description="The brand"),
     page: int | None = Query(

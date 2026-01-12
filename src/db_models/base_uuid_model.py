@@ -1,19 +1,24 @@
 import uuid
 
-from sqlalchemy import DateTime, event
+from sqlalchemy import BigInteger, DateTime, event
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, declared_attr, mapped_column
 from sqlalchemy.sql import DDL, func, text
+
+# ------------------------------------------------------------------------------
+# Base SQLAlchemy
+# ------------------------------------------------------------------------------
 
 Base_ = declarative_base()
 ListTables = []
 
 
 class Base(Base_):
+    __abstract__ = True
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        # test if the class is abstract
-        if not cls.__abstract__ or "__abstract__" not in cls.__dict__:
+        if not cls.__dict__.get("__abstract__", False):
             ListTables.append(cls)
 
     @declared_attr
@@ -22,56 +27,37 @@ class Base(Base_):
 
     @declared_attr
     def __table_args__(cls):
-        doc = cls.__doc__
+        doc = cls.__doc__ or ""
         table_args = cls.__dict__.get("table_args", ())
-        if doc is None:
-            doc = ""
-        while doc.startswith(("\n", " ")) or doc.endswith(("\n", " ")):
-            doc = doc.strip(" ").strip("\n")
-            doc = doc.strip(" ").strip("\n")
-        if len(table_args) == 0:
-            table_args = ({"comment": doc},)
-        elif isinstance(table_args[-1], dict):
-            table_args[-1]["comment"] = doc
-        else:
-            table_args = (*table_args, {"comment": doc})
-        return table_args
 
-    __abstract__ = True
+        doc = doc.strip().strip("\n")
+
+        if not table_args:
+            return ({"comment": doc},)
+
+        if isinstance(table_args[-1], dict):
+            table_args[-1]["comment"] = doc
+            return table_args
+
+        return (*table_args, {"comment": doc})
 
 
 class BaseUUID(Base):
-    @declared_attr
-    def __tablename__(cls) -> str:
-        return cls.__name__
-
     __abstract__ = True
+
     id = mapped_column(
         UUID,
-        default=lambda: uuid.uuid4(),
+        default=uuid.uuid4,
         primary_key=True,
-        index=False,
         nullable=False,
-        comment="Unique identifier of the row",
         server_default=text("gen_random_uuid()"),
+        comment="Unique identifier of the row",
     )
 
 
-class BaseUUIDCreatedAt(Base):
-    @declared_attr
-    def __tablename__(cls) -> str:
-        return cls.__name__
-
+class BaseCreatedAt:
     __abstract__ = True
-    id = mapped_column(
-        UUID,
-        default=lambda: uuid.uuid4(),
-        primary_key=True,
-        index=False,
-        nullable=False,
-        comment="Unique identifier of the row",
-        server_default=text("gen_random_uuid()"),
-    )
+
     created_at = mapped_column(
         DateTime,
         nullable=True,
@@ -80,27 +66,9 @@ class BaseUUIDCreatedAt(Base):
     )
 
 
-class BaseUUIDModel(Base):
-    @declared_attr
-    def __tablename__(cls) -> str:
-        return cls.__name__
-
+class BaseUpdatedAt:
     __abstract__ = True
-    id = mapped_column(
-        UUID,
-        default=lambda: uuid.uuid4(),
-        primary_key=True,
-        index=False,
-        nullable=False,
-        comment="Unique identifier of the row",
-        server_default=text("gen_random_uuid()"),
-    )
-    created_at = mapped_column(
-        DateTime,
-        nullable=True,
-        server_default=func.now(),
-        comment="Date of creation of this row",
-    )
+
     updated_at = mapped_column(
         DateTime,
         nullable=True,
@@ -110,31 +78,48 @@ class BaseUUIDModel(Base):
 
     @classmethod
     def __declare_last__(cls):
-        """Create trigger for automatically updating updated_at on UPDATE."""
-        # Only create trigger for non-abstract classes
-        if not cls.__dict__.get("__abstract__", False):
-            # Get table name and schema from the table metadata
-            table_name = cls.__table__.name
-            table_schema = cls.__table__.schema or "public"
+        if cls.__dict__.get("__abstract__", False):
+            return
 
-            # Build the full table identifier with proper quoting
-            if table_schema != "public":
-                full_table_name = f'"{table_schema}"."{table_name}"'
-                trigger_name = f"update_{table_schema}_{table_name}_updated_at"
-            else:
-                full_table_name = f'"{table_name}"'
-                trigger_name = f"update_{table_name}_updated_at"
+        table = cls.__table__  # type: ignore[attr-defined]
+        table_name = table.name
+        table_schema = table.schema or "public"
 
-            # Sanitize trigger name (PostgreSQL limit is 63 chars)
-            trigger_name = trigger_name.replace("-", "_").replace(".", "_")
-            if len(trigger_name) > 63:
-                trigger_name = trigger_name[:63]
+        if table_schema != "public":
+            full_table_name = f'"{table_schema}"."{table_name}"'
+            trigger_name = f"update_{table_schema}_{table_name}_updated_at"
+        else:
+            full_table_name = f'"{table_name}"'
+            trigger_name = f"update_{table_name}_updated_at"
 
-            trigger_ddl = DDL(f"""
-                DROP TRIGGER IF EXISTS "{trigger_name}" ON {full_table_name};
-                CREATE TRIGGER "{trigger_name}"
-                BEFORE UPDATE ON {full_table_name}
-                FOR EACH ROW
-                EXECUTE FUNCTION update_updated_at_column();
-            """)
-            event.listen(cls.__table__, "after_create", trigger_ddl)
+        trigger_name = trigger_name.replace("-", "_").replace(".", "_")[:63]
+
+        trigger_ddl = DDL(f"""
+            DROP TRIGGER IF EXISTS "{trigger_name}" ON {full_table_name};
+            CREATE TRIGGER "{trigger_name}"
+            BEFORE UPDATE ON {full_table_name}
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+        """)
+
+        event.listen(table, "after_create", trigger_ddl)
+
+
+class BaseUUIDModel(BaseUUID, BaseCreatedAt, BaseUpdatedAt):
+    __abstract__ = True
+
+
+class BaseUUIDCreatedAt(BaseUUID, BaseCreatedAt):
+    __abstract__ = True
+
+
+class BaseAutoIncrementModel(Base, BaseCreatedAt, BaseUpdatedAt):
+    __abstract__ = True
+
+    id = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+        nullable=False,
+        comment="Auto-incrementing identifier of the row",
+    )

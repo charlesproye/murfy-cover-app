@@ -13,6 +13,7 @@ from external_api.api.v1.endpoints import (
     premium,
     static_data,
     tesla,
+    vehicle_command,
 )
 
 # Create main API router
@@ -28,6 +29,9 @@ api_router.include_router(flash.router, prefix="/flash", tags=["Flash"])
 api_router.include_router(premium.router, prefix="/premium", tags=["Premium"])
 api_router.include_router(individual.router, prefix="/individual", tags=["Individual"])
 
+api_router.include_router(
+    vehicle_command.router, prefix="/vehicle-command", tags=["Vehicle command"]
+)
 
 # Hidden routes for OpenAPI documentation
 hidden_router = APIRouter(include_in_schema=False)

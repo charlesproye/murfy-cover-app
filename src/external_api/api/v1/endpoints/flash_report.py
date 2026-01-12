@@ -2,8 +2,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select
 
+from core.sql_utils import get_async_db
 from db_models import FlashReportCombination, Make, User, VehicleModel
-from external_api.db.session import get_db
 from external_api.schemas.flash_report import FlashReportFormType, VehicleSpecs
 from external_api.schemas.static_data import (
     AllMakesModelsInfo,
@@ -29,7 +29,7 @@ async def decode_vin(
     request: Request,
     vin: str = Body(..., description="VIN to decode"),
     flash_report_user: User = Depends(get_flash_report_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> VehicleSpecs:
     await log_api_call(
         vin=vin,
@@ -49,7 +49,7 @@ async def decode_vin(
 async def send_report_email(
     request: Request,
     data: FlashReportFormType = Body(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     flash_report_user: User = Depends(get_flash_report_user),
 ) -> dict[str, str]:
     await log_api_call(
@@ -80,7 +80,7 @@ async def get_flash_report_data_for_generation(
     request: Request,
     flash_report_user: User = Depends(get_flash_report_user),
     token: str = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ):
     # Get vehicle info from flash report combination
     stmt = select(FlashReportCombination).where(FlashReportCombination.token == token)
@@ -107,7 +107,7 @@ async def get_flash_report_data_for_generation(
 
 @flash_report_router.get("/models-with-trendline", response_model=AllMakesModelsInfo)
 async def get_all_models_with_trendline(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> AllMakesModelsInfo:
     query = (
         select(

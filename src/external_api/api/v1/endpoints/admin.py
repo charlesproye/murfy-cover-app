@@ -10,8 +10,8 @@ from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from core.sql_utils import get_async_db
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
-from external_api.db.session import get_db
 from external_api.schemas.api import (
     ApiPricingPlanCreate,
     ApiPricingPlanUpdate,
@@ -32,7 +32,7 @@ router = APIRouter()
 # Vérification que l'utilisateur API est un admin
 async def get_admin_api_user(
     user: User = Depends(get_current_user_from_cookie(get_user)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> ApiUser:
     """Vérifie que l'utilisateur API a les droits d'administration"""
     # Récupérer l'utilisateur interne associé
@@ -57,7 +57,7 @@ async def get_api_users(
     skip: int = 0,
     limit: int = 100,
     is_active: bool | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -79,7 +79,7 @@ async def get_api_users(
 @router.get("/api-users/{api_user_id}", response_model=ApiUserRead)
 async def get_api_user(
     api_user_id: uuid.UUID = Path(..., description="ID de l'utilisateur API"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -103,7 +103,7 @@ async def get_api_user(
 async def update_api_user_active_status(
     api_user_id: uuid.UUID = Path(..., description="ID de l'utilisateur API"),
     is_active: bool = Query(..., description="Nouvel état d'activation"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -135,7 +135,7 @@ async def update_api_user_active_status(
 async def get_pricing_plans(
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -154,7 +154,7 @@ async def get_pricing_plans(
 )
 async def create_pricing_plan(
     plan: ApiPricingPlanCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -194,7 +194,7 @@ async def create_pricing_plan(
 async def update_pricing_plan(
     plan_id: uuid.UUID = Path(..., description="ID du plan tarifaire"),
     plan_update: ApiPricingPlanUpdate = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -254,7 +254,7 @@ async def update_pricing_plan(
 @router.get("/api-users/{api_user_id}/pricing", response_model=ApiUserPricing)
 async def get_user_pricing(
     api_user_id: uuid.UUID = Path(..., description="ID de l'utilisateur API"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -298,7 +298,7 @@ async def get_user_pricing(
 async def create_user_pricing(
     api_user_id: uuid.UUID = Path(..., description="ID de l'utilisateur API"),
     pricing: ApiUserPricingCreate = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -355,7 +355,7 @@ async def create_user_pricing(
 async def update_current_user_pricing(
     api_user_id: uuid.UUID = Path(..., description="ID de l'utilisateur API"),
     pricing_update: ApiUserPricingUpdate = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: ApiUser = Depends(get_admin_api_user),
 ) -> Any:
     """
@@ -427,4 +427,3 @@ async def update_current_user_pricing(
     )
 
     return user_pricing
-

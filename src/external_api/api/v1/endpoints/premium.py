@@ -8,19 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from core.s3.async_s3 import AsyncS3
+from core.sql_utils import get_async_db
 from db_models import Asset, Fleet, PremiumReport, UserFleet, Vehicle, VehicleData
 from db_models.company import Make, Oem
-from db_models.vehicle import (
-    Battery,
-    VehicleModel,
-)
+from db_models.vehicle import Battery, VehicleModel
 from external_api.core.config import settings
 from external_api.core.cookie_auth import (
     get_current_user_from_cookie,
     get_user_with_fleets,
 )
 from external_api.core.dependencies import get_s3_client_fast
-from external_api.db.session import get_db
 from external_api.schemas.premium import (
     PremiumReportData,
     PremiumReportGeneration,
@@ -28,9 +25,7 @@ from external_api.schemas.premium import (
     PremiumReportSync,
 )
 from external_api.schemas.user import GetCurrentUser
-from external_api.services.premium.report_generation import (
-    generate_premium_report_sync,
-)
+from external_api.services.premium.report_generation import generate_premium_report_sync
 from reports import reports_utils
 from reports.report_render.premium_report_generator import PremiumReportGenerator
 from reports.workers.tasks import generate_pdf_task
@@ -77,7 +72,7 @@ async def check_soh_available(vin: str, db: AsyncSession) -> bool:
     description="Returns the complete premium report data collected by Bib for an activated vehicle.",
 )
 async def get_premium_data(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     vin: str = Path(..., description="VIN requested"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ) -> PremiumReportData:
@@ -123,7 +118,7 @@ async def get_premium_data(
     description="Triggers the generation of a premium report for a vehicle by VIN. The report will only be generated if the vehicle is activated and has SoH data available, it can take up to 2 minutes to generate the report. Use the `Get premium report` endpoint to retrieve the status and URL of the report.",
 )
 async def generate_premium_report(
-    db=Depends(get_db),
+    db=Depends(get_async_db),
     vin: str = Path(..., description="VIN requested"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ) -> PremiumReportGeneration:
@@ -157,7 +152,7 @@ async def get_report_status(
     vin: str = Path(..., description="The VIN"),
     job_id: str = Path(..., description="The Celery job ID"),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     s3_client: AsyncS3 = Depends(get_s3_client_fast),
 ) -> PremiumReportPDFUrl:
     if not await check_user_allowed_to_vin(vin, user, db):
@@ -288,7 +283,7 @@ async def fetch_report_required_data(
 )
 async def get_premium_report_html_endpoint(
     vin: str = Path(..., description="VIN requested"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ) -> HTMLResponse:
     if not await check_user_allowed_to_vin(vin, user, db):
@@ -331,7 +326,7 @@ async def get_premium_report_html_endpoint(
 )
 async def generate_premium_report_sync_endpoint(
     vin: str = Path(..., description="VIN requested"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     s3_client: AsyncS3 = Depends(get_s3_client_fast),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ) -> PremiumReportSync:

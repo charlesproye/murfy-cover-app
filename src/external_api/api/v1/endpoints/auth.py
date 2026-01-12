@@ -4,13 +4,13 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.sql_utils import get_async_db
 from external_api.core.cookie_auth import (
     CookieAuth,
     get_authenticated_user,
     get_current_user_with_refresh_from_cookie,
 )
 from external_api.core.personal_tesla import CrudTesla
-from external_api.db.session import get_db
 from external_api.schemas.user import LoginResponse, TokenResponse, UserLogin
 from external_api.services.user import login_with_cookies
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 @router.post("/login", include_in_schema=False)
 async def login(
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     body: UserLogin = Body(...),
 ) -> Any:
     """Login endpoint that uses httpOnly cookies for security"""
@@ -46,7 +46,7 @@ async def login(
     description="Returns a bearer token for the user to access the API services.",
 )
 async def get_token(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     body: UserLogin = Body(...),
 ) -> TokenResponse:
     """Login endpoint that uses httpOnly cookies for security"""
@@ -75,7 +75,7 @@ async def logout(response: Response):
 async def refresh_token(
     response: Response,
     tokens_and_emails: dict = Depends(get_current_user_with_refresh_from_cookie()),
-    db=Depends(get_db),
+    db=Depends(get_async_db),
 ):
     data = await get_authenticated_user(tokens_and_emails["email"], db)
 
@@ -92,6 +92,6 @@ async def refresh_token(
 
 ##### For personnal telsa vehicle, we need to get the bearer token to get the activation
 @router.post("/bearer", include_in_schema=False)
-async def get_bearer(db=Depends(get_db), data: dict = Body(...)):
+async def get_bearer(db=Depends(get_async_db), data: dict = Body(...)):
     await CrudTesla().insert_code_tesla(body=data, db_session=db)
     return {"status": "done"}

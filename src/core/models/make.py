@@ -11,3 +11,4 @@ class MakeEnum(str, Enum):
     ford = "ford"
     tesla_fleet_telemetry = "tesla-fleet-telemetry"
     volkswagen = "volkswagen"
+    tesla = "tesla"

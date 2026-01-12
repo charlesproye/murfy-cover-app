@@ -1,21 +1,26 @@
 import logging
+
 import aiohttp
-from typing import List, Dict
-from activation.utils.eligibility_checker.utils import require_valid_vins
 
 
 class VolkswagenApi:
     """Volkswagen API client for vehicle management."""
-    
-    def __init__(self, auth_url: str, base_url: str, organization_id: str,
-                 client_username: str, client_password: str):
+
+    def __init__(
+        self,
+        auth_url: str,
+        base_url: str,
+        organization_id: str,
+        client_username: str,
+        client_password: str,
+    ):
         self.auth_url = auth_url
         self.base_url = base_url
         self.client_username = client_username
         self.organization_id = organization_id
         self.client_password = client_password
         self._access_token = None
-        self.logger = logging.getLogger(' VolkswagenAPI')
+        self.logger = logging.getLogger(" VolkswagenAPI")
         self.logger.setLevel(logging.INFO)
 
         if not self.logger.hasHandlers():
@@ -29,13 +34,11 @@ class VolkswagenApi:
         try:
             response = await session.post(
                 f"{self.auth_url}/v1/fdp/login/third-party-system",
-                headers={
-                    "Content-Type": "application/json"
-                },
+                headers={"Content-Type": "application/json"},
                 json={
                     "username": self.client_username,
-                    "password": self.client_password
-                }
+                    "password": self.client_password,
+                },
             )
 
             response.raise_for_status()
@@ -45,23 +48,26 @@ class VolkswagenApi:
             self._access_token = data.get("value")
 
             if not self._access_token:
-                raise ValueError(f"No access_token found in Volkswagen response: {data}")
+                raise ValueError(
+                    f"No access_token found in Volkswagen response: {data}"
+                )
 
             return self._access_token
 
         except Exception as e:
-            self.logger.error(f"Failed to get Volkswagen auth token: {str(e)}")
+            self.logger.error(f"Failed to get Volkswagen auth token: {e!s}")
             raise
 
-    @require_valid_vins
-    async def _get_vehicle_approval(self, session: aiohttp.ClientSession, vins: List[str]) -> Dict[str, str]:
+    async def _get_vehicle_approval(
+        self, session: aiohttp.ClientSession, vins: list[str]
+    ) -> dict[str, str]:
         """
         Request vehicle approval (activation) for a list of VINs.
 
         Returns a dict with VIN as key and verification-code as value for approved VINs.
         Logs VINs that were not approved.
         """
-        
+
         if not self._access_token:
             await self._get_auth_token(session)
 
@@ -69,7 +75,7 @@ class VolkswagenApi:
         headers = {
             "x-sub-organisation-id": self.organization_id,
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self._access_token}"
+            "Authorization": f"Bearer {self._access_token}",
         }
         payload = {"vins": vins}
 
@@ -92,9 +98,10 @@ class VolkswagenApi:
 
             already_confirmed = set(already_confirmed).intersection(set(vins))
 
-
             if already_confirmed:
-                self.logger.info(f"The following VINs were already confirmed: {already_confirmed}")
+                self.logger.info(
+                    f"The following VINs were already confirmed: {already_confirmed}"
+                )
 
             if missing:
                 self.logger.info(f"The following VINs were not approved: {missing}")
@@ -102,17 +109,17 @@ class VolkswagenApi:
             return approved
 
         except aiohttp.ClientResponseError as e:
-            self.logger.error(f"Vehicle approval request failed ({e.status}): {e.message}")
-            return {vin: "error" for vin in vins}
+            self.logger.error(
+                f"Vehicle approval request failed ({e.status}): {e.message}"
+            )
+            return dict.fromkeys(vins, "error")
         except Exception as e:
-            self.logger.error(f"Unexpected error during vehicle approval: {str(e)}")
-            return {vin: "error" for vin in vins}
-    
+            self.logger.error(f"Unexpected error during vehicle approval: {e!s}")
+            return dict.fromkeys(vins, "error")
+
     async def _get_vehicle_confirmation(
-        self, 
-        session: aiohttp.ClientSession, 
-        response_approval: Dict[str, str]
-    ) -> Dict[str, str]:
+        self, session: aiohttp.ClientSession, response_approval: dict[str, str]
+    ) -> dict[str, str]:
         """
         Confirm vehicle registrations using the verification codes obtained from _get_vehicle_approval.
 
@@ -127,13 +134,13 @@ class VolkswagenApi:
         headers = {
             "x-sub-organisation-id": self.organization_id,
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self._access_token}"
+            "Authorization": f"Bearer {self._access_token}",
         }
 
         # Préparer la liste des confirmations
         payload = {
             "vehicle-confirmations": [
-                {"vin": el['vin'], "verification-code": el['verification-code']} 
+                {"vin": el["vin"], "verification-code": el["verification-code"]}
                 for el in response_approval
             ]
         }
@@ -142,15 +149,17 @@ class VolkswagenApi:
             response = await session.post(url, headers=headers, json=payload)
             response.raise_for_status()
             for el in response_approval:
-                self.logger.info(f"Vehicle confirmation request successful for vin : {el['vin']}")
-
+                self.logger.info(
+                    f"Vehicle confirmation request successful for vin : {el['vin']}"
+                )
 
         except Exception as e:
-            self.logger.error(f"Vehicle confirmation request failed: {str(e)}")
-            return {vin: "error" for vin in response_approval.keys()}
+            self.logger.error(f"Vehicle confirmation request failed: {e!s}")
+            return dict.fromkeys(response_approval.keys(), "error")
 
-
-    async def get_confirmed_vehicles(self, session: aiohttp.ClientSession) -> dict[str, str]:
+    async def get_confirmed_vehicles(
+        self, session: aiohttp.ClientSession
+    ) -> dict[str, str]:
         """
         Fetch existing vehicle approvals (VINs and verification codes) from VW Fleet API.
 
@@ -163,7 +172,7 @@ class VolkswagenApi:
         url = f"{self.base_url}/v1/fdp/vehicle-approval"
         headers = {
             "x-sub-organisation-id": self.organization_id,
-            "Authorization": f"Bearer {self._access_token}"
+            "Authorization": f"Bearer {self._access_token}",
         }
 
         try:
@@ -175,7 +184,7 @@ class VolkswagenApi:
             confirmed_vehicles = [
                 item["vin"]
                 for item in data.get("vehicle-confirmations", [])
-                if  item['confirmation-status'] == 'confirmed'
+                if item["confirmation-status"] == "confirmed"
             ]
 
             return set(confirmed_vehicles)
@@ -184,14 +193,13 @@ class VolkswagenApi:
             self.logger.error(f"Get vehicle approvals failed ({e.status}): {e.message}")
             return {}
         except Exception as e:
-            self.logger.error(f"Unexpected error while getting vehicle approvals: {str(e)}")
+            self.logger.error(
+                f"Unexpected error while getting vehicle approvals: {e!s}"
+            )
             return {}
 
-    @require_valid_vins
     async def check_vehicle_status(
-        self, 
-        session: aiohttp.ClientSession, 
-        vins: list[str]
+        self, session: aiohttp.ClientSession, vins: list[str]
     ) -> dict[str, str]:
         """
         Check the registration/activation status of a list of vehicles.
@@ -205,7 +213,7 @@ class VolkswagenApi:
         url = f"{self.base_url}/v1/fdp/vehicle-status"
         headers = {
             "x-sub-organisation-id": self.organization_id,
-            "Authorization": f"Bearer {self._access_token}"
+            "Authorization": f"Bearer {self._access_token}",
         }
 
         try:
@@ -215,21 +223,31 @@ class VolkswagenApi:
 
             results = {}
 
-            results = {item["vin"]: {'status_bool':item["status"] == 'enrollment_completed', 'status':item["status"], 'reason':item["enrollment-rejection-reason"]} for item in data if item["vin"] in vins}
+            results = {
+                item["vin"]: {
+                    "status_bool": item["status"] == "enrollment_completed",
+                    "status": item["status"],
+                    "reason": item["enrollment-rejection-reason"],
+                }
+                for item in data
+                if item["vin"] in vins
+            }
             for vin in vins:
                 if vin not in results:
-                    results[vin] = {'status_bool':False, 'status':None, 'reason':None}
+                    results[vin] = {
+                        "status_bool": False,
+                        "status": None,
+                        "reason": None,
+                    }
 
             return results
 
         except Exception as e:
-            self.logger.error(f"Vehicle status check failed: {str(e)}")
-            return {vin: "error" for vin in vins}
+            self.logger.error(f"Vehicle status check failed: {e!s}")
+            return dict.fromkeys(vins, "error")
 
     async def activate_vehicles(
-        self,
-        session: aiohttp.ClientSession,
-        vins: list[str]
+        self, session: aiohttp.ClientSession, vins: list[str]
     ) -> dict[str, str]:
         """
         Activate vehicles by first requesting approval and then confirming them.
@@ -241,20 +259,18 @@ class VolkswagenApi:
             approval_result = await self._get_vehicle_approval(session, vins)
 
             # Step 2: Confirmation
-            confirmation_result = await self._get_vehicle_confirmation(session, approval_result)
+            confirmation_result = await self._get_vehicle_confirmation(
+                session, approval_result
+            )
 
             return confirmation_result
 
         except Exception as e:
-            self.logger.error(f"Vehicle activation failed: {str(e)}")
-            return {vin: "error" for vin in vins}
+            self.logger.error(f"Vehicle activation failed: {e!s}")
+            return dict.fromkeys(vins, "error")
 
-
-    @require_valid_vins
     async def deactivate_vehicles(
-        self, 
-        session: aiohttp.ClientSession, 
-        vins: list[str]
+        self, session: aiohttp.ClientSession, vins: list[str]
     ) -> dict:
         """
         Deactivate (de-enroll) vehicles from VW Fleet API.
@@ -271,7 +287,7 @@ class VolkswagenApi:
         headers = {
             "x-sub-organisation-id": self.organization_id,
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self._access_token}"
+            "Authorization": f"Bearer {self._access_token}",
         }
         payload = {"vins": vins}
 
@@ -279,17 +295,25 @@ class VolkswagenApi:
             response = await session.delete(url, headers=headers, json=payload)
             response.raise_for_status()
             data = await response.json()
-            
+
             # Log response categories
-            self.logger.info(f"VINs deactivated: {data.get('deenrollment-candidates', [])}")
-            self.logger.info(f"VINs deactivated once confirmed: {data.get('scheduled-deenrollment-candidates', [])}")
-            self.logger.info(f"VINs ignored because not activated or confirmed yet: {data.get('ignored-vins', [])}")
+            self.logger.info(
+                f"VINs deactivated: {data.get('deenrollment-candidates', [])}"
+            )
+            self.logger.info(
+                f"VINs deactivated once confirmed: {data.get('scheduled-deenrollment-candidates', [])}"
+            )
+            self.logger.info(
+                f"VINs ignored because not activated or confirmed yet: {data.get('ignored-vins', [])}"
+            )
 
             return data
 
         except aiohttp.ClientResponseError as e:
-            self.logger.error(f"Vehicle deactivation request failed ({e.status}): {e.message}")
+            self.logger.error(
+                f"Vehicle deactivation request failed ({e.status}): {e.message}"
+            )
             return {"error": f"Request failed with status {e.status}"}
         except Exception as e:
-            self.logger.error(f"Unexpected error during vehicle deactivation: {str(e)}")
+            self.logger.error(f"Unexpected error during vehicle deactivation: {e!s}")
             return {"error": str(e)}

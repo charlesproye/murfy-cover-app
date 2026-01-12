@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import insert, select, update
 
 from core.encrypt_utils import Encrypter
+from core.sql_utils import get_async_db
 from core.tesla.tesla_individual_api import TeslaIndividualApi
 from db_models.user_tokens import User, UserToken
 from db_models.vehicle import FleetTeslaAuthenticationCode
@@ -25,7 +26,6 @@ from external_api.core.cookie_auth import (
 )
 from external_api.core.http_client import HTTP_CLIENT
 from external_api.core.utils import replace_in_url, strip_params_from_url
-from external_api.db.session import get_db
 from external_api.schemas.tesla import TeslaCreateUserRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ async def tesla_auth_callback(
     state: str = Query(...),
     code: str = Query(...),
     session: aiohttp.ClientSession = Depends(HTTP_CLIENT),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ):
     """
     Callback endpoint for Tesla authentication.
@@ -116,7 +116,7 @@ async def tesla_auth_callback(
 async def create_user(
     create_user_request: TeslaCreateUserRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> str:
     """
     Creates a new Tesla user and returns the authentication URL.
@@ -162,7 +162,7 @@ async def create_user(
 async def refresh_token(
     user_id: uuid.UUID,
     session: aiohttp.ClientSession = Depends(HTTP_CLIENT),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, str]:
     encrypter = Encrypter()
 
@@ -227,7 +227,7 @@ async def refresh_token(
 async def authentication_code(
     authentication_code: str,
     fleet_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
 ) -> dict[str, str]:
     encrypter = Encrypter()

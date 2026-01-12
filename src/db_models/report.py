@@ -7,7 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
-from db_models.base_uuid_model import BaseUUID, BaseUUIDCreatedAt
+from db_models.base_uuid_model import BaseUUID, BaseUUIDCreatedAt, BaseUUIDModel
 from db_models.enums import LanguageEnum
 
 
@@ -29,7 +29,7 @@ class FlashReportCombination(BaseUUIDCreatedAt):
     )
 
 
-class PremiumReport(BaseUUID):
+class PremiumReport(BaseUUIDModel):
     __tablename__ = "premium_report"
     vehicle_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("vehicle.id"), nullable=False

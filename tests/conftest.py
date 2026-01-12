@@ -14,9 +14,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from core.sql_utils import get_async_db
 from db_models.core.config import db_settings
 from external_api.app import app
-from external_api.db.session import get_db
 
 # Test database configuration
 # Uses the same DB as the app but ensures we're using test environment
@@ -80,7 +80,7 @@ async def app_client(
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
-    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_async_db] = override_get_db
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"

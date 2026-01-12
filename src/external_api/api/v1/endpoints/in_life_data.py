@@ -7,14 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.sql_utils import get_async_db
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.core.utils import check_rate_limit
-from external_api.db.session import get_db
 from external_api.schemas.user import GetCurrentUser
-from external_api.schemas.vehicle import (
-    DynamicVehicleData,
-    VehicleEligibilityResponse,
-)
+from external_api.schemas.vehicle import DynamicVehicleData, VehicleEligibilityResponse
 from external_api.services.vehicle import (
     check_vehicle_eligibility,
     get_dynamic_vehicle_data,
@@ -31,7 +28,7 @@ async def check_vehicle_eligibility_endpoint(
         ..., description="VIN of the vehicle to check", min_length=10, max_length=25
     ),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> Any:
     """
     Check the eligibility of a vehicle for activation.
@@ -100,7 +97,7 @@ async def get_dynamic_vehicle(
     vin: str = Path(
         ..., description="VIN of the vehicle", min_length=10, max_length=25
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
 ) -> Any:
     """

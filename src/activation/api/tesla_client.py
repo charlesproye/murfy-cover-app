@@ -2,6 +2,7 @@ import logging
 import re
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import ClassVar
 
 import aiohttp
@@ -9,7 +10,13 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select
 
+from activation.config.credentials import (
+    FLEET_TELEMETRY_CERT_PATH,
+    TESLA_VEHICLE_COMMAND_KEY_PATH,
+)
+from activation.tesla_individual.config import TESLA_TELEMETRY_CONFIG
 from core.encrypt_utils import Encrypter
+from core.env_utils import get_env_var
 from db_models.vehicle import FleetTeslaAuthenticationCode
 
 
@@ -62,8 +69,12 @@ class TeslaApi:
     def __init__(self, client_id: str, client_secret: str):
         self.client_id = client_id
         self.client_secret = client_secret
-        self.tokens: dict[str, str] = {}
+        self.tokens: dict[uuid.UUID, str] = {}
         self.encrypter = Encrypter()
+        self.service_url = get_env_var("TESLA_VEHICLE_COMMAND_SERVICE_URL")
+        self.fleet_telemetry_hostname = get_env_var("FLEET_TELEMETRY_HOSTNAME")
+        self.fleet_cert = Path(FLEET_TELEMETRY_CERT_PATH).read_text()
+        self.fleet_key = Path(TESLA_VEHICLE_COMMAND_KEY_PATH).read_text()
 
     def _get_headers(self, token: str) -> dict[str, str]:
         """Build HTTP headers with authorization token."""
@@ -111,6 +122,32 @@ class TeslaApi:
             token_data = await self._fetch_access_token(session, auth_code)
             self.tokens[fleet_id] = token_data["access_token"]
             logging.info(f"Fetched token for fleet {fleet_id}")
+
+    async def check_vehicle_status(
+        self, vin: str, fleet_id: str, session: aiohttp.ClientSession
+    ) -> tuple[bool, str | None]:
+        access_token = self.tokens.get(uuid.UUID(fleet_id))
+
+        if not access_token:
+            logging.warning(f"No token found for fleet {fleet_id}")
+            return False, "No token found for fleet"
+
+        url = f"{self.BASE_URL}/api/1/vehicles/{vin}/fleet_telemetry_config"
+        headers = self._get_headers(access_token)
+
+        async with session.get(url, headers=headers) as response:
+            if response.status != 200:
+                logging.warning(
+                    f"Failed to fetch vehicle status for VIN {vin}: HTTP {response.status}"
+                )
+                return False, "Error checking status"
+            else:
+                data = await response.json()
+                config = data.get("response", {}).get("config")
+                if config:
+                    return True, None
+                else:
+                    return False, "Not configured"
 
     async def get_warranty_info(
         self, session: aiohttp.ClientSession, vin: str, fleet_id: uuid.UUID
@@ -215,3 +252,130 @@ class TeslaApi:
             )
 
             return version, vehicle_type
+
+    async def activate_vehicles(
+        self, vins: list[str], fleet_id: str, session: aiohttp.ClientSession
+    ):
+        fleet_uuid = uuid.UUID(fleet_id)
+        access_token = self.tokens.get(fleet_uuid)
+
+        if not access_token:
+            logging.warning(f"No token found for fleet {fleet_id}")
+            return {
+                "success": False,
+                "error": "No token found for fleet",
+                "vins": vins,
+            }
+
+        payload = {
+            "config": {
+                **TESLA_TELEMETRY_CONFIG,
+                "hostname": self.fleet_telemetry_hostname,
+                "ca": self.fleet_cert,
+            },
+            "vins": vins,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+
+        error_msg = None
+
+        try:
+            async with session.post(
+                f"{self.service_url}/api/1/vehicles/fleet_telemetry_config",
+                json=payload,
+                headers=headers,
+                ssl=False,  # aiohttp uses ssl parameter, not verify
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as response:
+                # Read response body first
+                response_text = await response.text()
+
+                try:
+                    response_json = await response.json() if response_text else {}
+                except Exception:
+                    response_json = {}
+
+                # Check for error in response
+                if "error" in response_json:
+                    error_msg = response_json["error"]
+                    logging.error(f"Tesla API error for VINs {vins}: {error_msg}")
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "vins": vins,
+                        "status_code": response.status,
+                    }
+
+                # Check HTTP status
+                if response.status >= 400:
+                    logging.error(
+                        f"Tesla API HTTP error {response.status} for VINs {vins}: {response_text}"
+                    )
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status}: {response_text}",
+                        "vins": vins,
+                        "status_code": response.status,
+                    }
+
+                # Success
+                logging.info(f"Successfully activated Tesla VINs: {vins}")
+                return {
+                    "success": True,
+                    "vins": vins,
+                    "response": response_json,
+                    "status_code": response.status,
+                }
+
+        except aiohttp.ClientSSLError as e:
+            logging.error(f"SSL error activating Tesla vehicles {vins}: {e}")
+            return {
+                "success": False,
+                "error": f"SSL error: {e}",
+                "vins": vins,
+            }
+        except aiohttp.ClientError as e:
+            logging.error(f"Client error activating Tesla vehicles {vins}: {e}")
+            error_detail = f"{e}"
+            if error_msg:
+                error_detail = f"{e} - {error_msg}"
+
+            return {
+                "success": False,
+                "error": f"Request error: {error_detail}",
+                "vins": vins,
+            }
+        except Exception as e:
+            logging.error(f"Unexpected error activating Tesla vehicles {vins}: {e}")
+            return {
+                "success": False,
+                "error": f"Unexpected error: {e}",
+                "vins": vins,
+            }
+
+    async def deactivate_vehicles(
+        self,
+        vin: str,
+        fleet_id: str,
+        session: aiohttp.ClientSession,
+    ):
+        access_token = self.tokens.get(uuid.UUID(fleet_id))
+        if not access_token:
+            logging.warning(f"No token found for fleet {fleet_id}")
+            return False, "No token found for fleet"
+
+        url = f"{self.BASE_URL}/api/1/vehicles/{vin}/fleet_telemetry_config"
+        headers = self._get_headers(access_token)
+
+        async with session.delete(url, headers=headers) as response:
+            if response.status != 200:
+                logging.warning(
+                    f"Failed to deactivate vehicle {vin}: HTTP {response.status}"
+                )
+                return False, "Error deactivating vehicle"
+            else:
+                return True, None

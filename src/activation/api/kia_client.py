@@ -2,8 +2,6 @@ import logging
 
 import aiohttp
 
-from activation.utils.eligibility_checker.utils import require_valid_vins
-
 
 class KiaApi:
     """Kia API client for vehicle management."""
@@ -56,7 +54,6 @@ class KiaApi:
             print("Error fetching token:", e)
             return None
 
-    @require_valid_vins
     async def _activate_vins(self, session: aiohttp.ClientSession, vins: list):
         """Send VIN consent request to the API."""
 

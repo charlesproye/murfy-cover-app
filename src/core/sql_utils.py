@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import contextmanager
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from logging import getLogger
 
 import pandas as pd
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 from core.pandas_utils import DF, left_merge
-from db_models.core.config import db_settings as db_settings
+from db_models.core.config import db_settings
 
 LOGGER = getLogger(__name__)
 
@@ -45,6 +51,12 @@ def get_sqlalchemy_engine(is_prod: bool = False, db_name: str = "rdb") -> Engine
         )
 
     return create_engine(db_uri)
+
+
+def get_session(is_prod: bool = False, db_name: str = "rdb"):
+    engine = get_sqlalchemy_engine(is_prod, db_name)
+    Session = sessionmaker(bind=engine)
+    return Session()
 
 
 @contextmanager
@@ -192,3 +204,51 @@ def insert_df_and_deduplicate(
         conn.execute(text(dedup_sql))
 
     return df
+
+
+# Async engine
+_engine: AsyncEngine | None = None
+_session_maker = None
+
+
+def get_async_engine() -> AsyncEngine:
+    """Get or create the database engine."""
+    global _engine
+    if _engine is None:
+        _engine = create_async_engine(
+            db_settings.ASYNC_DB_DATA_EV_URI,
+            echo=False,
+            future=True,
+            pool_size=db_settings.POOL_SIZE,
+            pool_timeout=30,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+            connect_args={"server_settings": {"search_path": "public"}},
+        )
+    return _engine
+
+
+def get_async_session_maker():
+    """Get or create the session maker."""
+    global _session_maker
+    if _session_maker is None:
+        engine = get_async_engine()
+        _session_maker = sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+    return _session_maker
+
+
+def get_async_db() -> AsyncGenerator[AsyncSession, None]:
+    session = get_async_session_maker()()
+    try:
+        yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()

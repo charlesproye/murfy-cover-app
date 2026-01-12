@@ -14,8 +14,8 @@ from jose import JWTError, jwt
 from sqlmodel import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from core.sql_utils import get_async_db
 from external_api.core.config import settings
-from external_api.db.session import get_db
 from external_api.schemas.user import GetCurrentUser
 
 # Configuration JWT
@@ -189,7 +189,7 @@ class CookieAuthBearer(HTTPBearer):
 cookie_auth_bearer = CookieAuthBearer(auto_error=False)
 
 # Module-level dependency to avoid function call in defaults
-_db_dependency = Depends(get_db)
+_db_dependency = Depends(get_async_db)
 
 
 def get_current_user_from_cookie(getUserFunction: Callable):

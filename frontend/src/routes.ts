@@ -47,6 +47,14 @@ export const ROUTES = {
 
   // TESLA ACTIVATION
   TESLA_CREATE_USER: `${BASE_URL}/tesla/create-user`,
+
+  // FLEET MANAGER / VEHICLE ACTIVATION
+  VEHICLE_FLEETS: `${BASE_URL}/vehicle-command/fleets`,
+  VEHICLE_MAKES: `${BASE_URL}/vehicle-command/makes`,
+  VEHICLE_MODELS: (makeId: string) => `${BASE_URL}/vehicle-command/${makeId}/models`,
+  VEHICLE_STATUS: `${BASE_URL}/vehicle-command/status`,
+  VEHICLE_ACTIVATE: `${BASE_URL}/vehicle-command/activate`,
+  VEHICLE_DEACTIVATE: `${BASE_URL}/vehicle-command/deactivate`,
 };
 
 export type RouteKey = keyof typeof ROUTES;

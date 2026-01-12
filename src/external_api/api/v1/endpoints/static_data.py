@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.sql_utils import get_async_db
 from db_models import Battery, Make, VehicleModel
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
-from external_api.db.session import get_db
 from external_api.schemas.static_data import (
     BatteryModelData,
     ModelData,
@@ -46,7 +46,7 @@ async def check_model_exists(model_id: uuid.UUID, db: AsyncSession) -> bool:
 async def get_models(
     has_soh_estimation: bool | None = Query(None),
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> list[ModelType]:
     query = (
         select(
@@ -94,7 +94,7 @@ async def get_models(
 async def get_model_data(
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
     model_id: uuid.UUID = Path(..., description="Model ID"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> ModelData:
     await check_model_exists(model_id, db)
 
@@ -136,7 +136,7 @@ async def get_model_data(
 async def get_model_trendline(
     model_id: uuid.UUID = Path(..., description="Model ID (UUID)"),
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> ModelTrendline:
     """
     Get trendline data for a specific model.

@@ -329,10 +329,10 @@ def mapping_vehicle_type(
             elif sale_year:
                 sale_year = pd.to_datetime(sale_year)
                 today = pd.to_datetime(date.today())
-                subset[["commissioning_date", "enf_of_life_date"]].fillna(today)
+                subset[["commissioning_date", "end_of_life_date"]].fillna(today)
                 subset = subset[
                     (subset["commissioning_date"] <= sale_year)
-                    & (subset["enf_of_life_date"] >= sale_year)
+                    & (subset["end_of_life_date"] >= sale_year)
                 ]
                 closest_rows = subset
             else:

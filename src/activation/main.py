@@ -4,6 +4,17 @@ import signal
 import sys
 from functools import partial
 
+import click
+
+from activation.activators import (
+    BMWActivator,
+    HighMobilityActivator,
+    KiaActivator,
+    RenaultActivator,
+    StellantisActivator,
+    TeslaActivator,
+    VolkswagenActivator,
+)
 from activation.api.bmw_client import BMWApi
 from activation.api.hm_client import HMApi
 from activation.api.kia_client import KiaApi
@@ -26,7 +37,6 @@ from activation.config.credentials import (
     KIA_API_USERNAME,
     KIA_AUTH_URL,
     KIA_BASE_URL,
-    METRIC_SLACK_CHANNEL_ID,
     RENAULT_AUD,
     RENAULT_CLIENT,
     RENAULT_KID,
@@ -45,28 +55,24 @@ from activation.config.credentials import (
     VW_ORGANIZATION_ID,
 )
 from activation.config.settings import LOGGING_CONFIG
-from activation.fleet_info import check_vehicles_without_type
-from activation.fleet_info import read_fleet_info as fleet_info
-from activation.services.activation_service import VehicleActivationService
-from activation.services.vehicle_processor import VehicleProcessor
 from activation.utils.check_utils import ensure_admins_linked_to_fleets
-from activation.utils.metric_utils import (
-    check_vehicles_without_type_postgre,
-    compare_active_vehicles,
-    write_metrics_to_db,
-)
-from core.slack_utils import send_slack_message
+from activation.utils.metric_utils import write_metrics_to_db
+from activation.vehicle_command import get_vehicle_command
 
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 
-async def process_vehicles(owner_filter: str | None = None):
-    """Main function to process vehicles in parallel."""
+async def activate_and_process_vehicles(oems=None):
+    """Main function to process vehicles using OEM-specific activators.
+
+    Args:
+        oems: List of OEM names to process. If None, processes all OEMs.
+              Valid values: tesla, bmw, renault, stellantis, volkswagen, kia, hm
+    """
 
     try:
-        # Initialize APIs
         bmw_api = BMWApi(
             auth_url=BMW_AUTH_URL,
             base_url=BMW_BASE_URL,
@@ -75,9 +81,11 @@ async def process_vehicles(owner_filter: str | None = None):
             client_username=BMW_CLIENT_USERNAME,
             client_password=BMW_CLIENT_PASSWORD,
         )
+
         hm_api = HMApi(
             base_url=HM_BASE_URL, client_id=HM_CLIENT_ID, client_secret=HM_CLIENT_SECRET
         )
+
         stellantis_api = StellantisApi(
             base_url=STELLANTIS_BASE_URL,
             email=STELLANTIS_EMAIL,
@@ -108,91 +116,89 @@ async def process_vehicles(owner_filter: str | None = None):
             client_username=VW_CLIENT_USERNAME,
             client_password=VW_CLIENT_PASSWORD,
         )
-
         tesla_api = TeslaApi(
             client_id=TESLA_CLIENT_ID,
             client_secret=TESLA_CLIENT_SECRET,
         )
 
-        # Get initial fleet info
-        df = await fleet_info(fleet_filter=owner_filter)
-        nbr_vehicles_without_type, vehicles_without_type_vin = (
-            check_vehicles_without_type(df)
-        )
-        send_slack_message(
-            METRIC_SLACK_CHANNEL_ID,
-            f"📊 Information - Véhicules sans type\nSource: Gsheet \nMotif: {nbr_vehicles_without_type} véhicules activés sans type renseignés sur lesquels BIB calcule un SoH. Le SoH sera probablement erroné.\n VIN: {vehicles_without_type_vin}\n",
+        df = await get_vehicle_command()
+
+        # Filter vehicles that need activation changes
+        vehicle_command_df = df[
+            df["activation_requested_status"] != df["activation_status"]
+        ]
+
+        # Get vehicles to process (activated but not yet processed)
+        vehicle_to_process = df[
+            (df.activation_status == True) & (df.is_processed == False)  # noqa: E712
+        ]
+
+        # Initialize all OEM activators
+        logger.info("Initializing OEM activators...")
+
+        all_activators = {
+            "tesla": TeslaActivator(tesla_api, vehicle_command_df, vehicle_to_process),
+            "bmw": BMWActivator(bmw_api, vehicle_command_df, vehicle_to_process),
+            "renault": RenaultActivator(
+                renault_api, vehicle_command_df, vehicle_to_process
+            ),
+            "stellantis": StellantisActivator(
+                stellantis_api, vehicle_command_df, vehicle_to_process
+            ),
+            "volkswagen": VolkswagenActivator(
+                volkswagen_api, vehicle_command_df, vehicle_to_process
+            ),
+            "kia": KiaActivator(kia_api, vehicle_command_df, vehicle_to_process),
+            "hm": HighMobilityActivator(hm_api, vehicle_command_df, vehicle_to_process),
+        }
+
+        # Filter activators based on OEM selection
+        if oems:
+            oems_lower = [oem.lower() for oem in oems]
+            activators_to_run = {
+                name: activator
+                for name, activator in all_activators.items()
+                if name in oems_lower
+            }
+            if not activators_to_run:
+                logger.error(f"No valid OEMs found in: {oems}")
+                logger.info(f"Valid OEMs: {', '.join(all_activators.keys())}")
+                return
+            logger.info(
+                f"Running activators for: {', '.join(activators_to_run.keys())}"
+            )
+        else:
+            activators_to_run = all_activators
+            logger.info("Running all OEM activators...")
+
+        logger.info(
+            f"Found {len(vehicle_to_process)} vehicles that need processing after activation"
         )
 
-        # Initialize activation service
-        activation_service = VehicleActivationService(
-            bmw_api=bmw_api,
-            hm_api=hm_api,
-            stellantis_api=stellantis_api,
-            renault_api=renault_api,
-            volkswagen_api=volkswagen_api,
-            kia_api=kia_api,
-            fleet_info_df=df,
-        )
-
-        # Process all brands in parallel
+        # Run all activators in parallel (each handles activation + processing)
+        logger.info("Starting parallel OEM activation and processing...")
         await asyncio.gather(
-            activation_service.activation_bmw(),
-            activation_service.activation_hm(),
-            activation_service.activation_stellantis(),
-            activation_service.activation_volkswagen(),
-            activation_service.activation_kia(),
+            *[activator.run() for activator in activators_to_run.values()]
         )
 
-        # Get updated fleet info after activation"""
-        logging.info(
-            "-------------------------------Activation completed-------------------------------"
+        logger.info(
+            "-------------------------------All OEM activators completed-------------------------------"
         )
 
-        #   Process vehicles with updated info
-        vehicle_processor = VehicleProcessor(
-            bmw_api=bmw_api,
-            hm_api=hm_api,
-            stellantis_api=stellantis_api,
-            renault_api=renault_api,
-            volkswagen_api=volkswagen_api,
-            kia_api=kia_api,
-            tesla_api=tesla_api,
-            df=df,
-        )
+        if len(activators_to_run) == len(all_activators):
+            logger.info("Writing activation metrics to database...")
+            await write_metrics_to_db(logger)
 
-        await asyncio.gather(
-            vehicle_processor.process_tesla(),
-            vehicle_processor.process_other_vehicles(),
-            vehicle_processor.process_renault(),
-            vehicle_processor.process_deactivated_vehicles(),
-            vehicle_processor.process_bmw(),
-        )
-
-        await write_metrics_to_db(logger)
+        logger.info("Ensuring admins are linked to fleets...")
         await asyncio.to_thread(ensure_admins_linked_to_fleets, logger)
-        db_not_in_gsheet, gsheet_not_in_db = await compare_active_vehicles(df)
 
-        send_slack_message(
-            METRIC_SLACK_CHANNEL_ID,
-            f"Les véhicules suivants sont présents dans la base de données mais pas dans le Gsheet: {db_not_in_gsheet}",
-        )
-        send_slack_message(
-            METRIC_SLACK_CHANNEL_ID,
-            f"Les véhicules suivants sont présents dans le Gsheet mais pas dans la base de données: {gsheet_not_in_db}",
-        )
-
-        (
-            nbr_vehicles_without_type_postgre,
-            vehicles_without_type_vin_postgre,
-        ) = await check_vehicles_without_type_postgre(vehicles_without_type_vin)
-        send_slack_message(
-            METRIC_SLACK_CHANNEL_ID,
-            f"🐘 Information - Véhicules sans type\nSource: Postgre \nMotif: {nbr_vehicles_without_type_postgre} véhicules activés sans type renseignés sur lesquels BIB calcule un SoH. Le SoH sera probablement erroné.\n VIN: {vehicles_without_type_vin_postgre}\n",
-        )
+        logger.info("✅ Vehicle processing completed successfully!")
 
     except Exception as e:
         logger.error(f"Error processing vehicles: {e!s}")
+        import traceback
+
+        logger.error(traceback.format_exc())
         raise
 
 
@@ -223,20 +229,51 @@ async def cleanup(task):
 
 
 if __name__ == "__main__":
-    try:
-        # Create the main task
-        loop = asyncio.get_event_loop()
-        main_task = loop.create_task(process_vehicles())
 
-        # Set up signal handler with the current task
-        signal.signal(signal.SIGINT, partial(handle_sigint, current_task=main_task))
+    @click.command()
+    @click.option(
+        "--oem",
+        "-o",
+        multiple=True,
+        type=click.Choice(
+            ["tesla", "bmw", "renault", "stellantis", "volkswagen", "kia", "hm"],
+            case_sensitive=False,
+        ),
+        help="OEM(s) to process. Can be specified multiple times. If not specified, all OEMs will be processed.",
+    )
+    def main(oem):
+        """Vehicle Activation and Processing System.
 
-        # Run the main task with cleanup
-        loop.run_until_complete(cleanup(main_task))
+        Process vehicle activations and enrichments for one or more OEMs.
 
-    except KeyboardInterrupt:
-        logger.info("\nProcess interrupted by user.")
-    finally:
-        # Close the event loop
-        loop.close()
-        sys.exit(0)
+        Examples:
+
+            # Process all OEMs
+            python main.py
+
+            # Process only Tesla
+            python main.py --oem tesla
+
+            # Process Tesla and BMW
+            python main.py --oem tesla --oem bmw
+
+            # Short form
+            python main.py -o tesla -o bmw
+        """
+        try:
+            oems = list(oem) if oem else None
+
+            loop = asyncio.get_event_loop()
+            main_task = loop.create_task(activate_and_process_vehicles(oems))
+
+            signal.signal(signal.SIGINT, partial(handle_sigint, current_task=main_task))
+
+            loop.run_until_complete(cleanup(main_task))
+
+        except KeyboardInterrupt:
+            logger.info("\nProcess interrupted by user.")
+        finally:
+            loop.close()
+            sys.exit(0)
+
+    main()

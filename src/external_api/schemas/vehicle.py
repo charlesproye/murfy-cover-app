@@ -117,52 +117,11 @@ class DynamicVehicleData(BaseModel):
         from_attributes = True
 
 
-class VehicleActivationRequest(BaseModel):
-    """Request model for vehicle activation"""
-
-    vins: list[str] = Field(
-        ...,
-        description="Liste des VINs à activer. Pour les véhicules Tesla, un seul VIN doit être soumis à la fois. Les VINs doivent tous être de la même marque.",
-        min_items=1,
-    )
-    make: str | None = Field(
-        None, description="Marque des véhicules (une seule marque par requête)"
-    )
-
-    class Config:
-        from_attributes = True
-
-
-class VehicleActivationResponse(BaseModel):
-    """Response model for vehicle activation"""
-
-    vins: list[str] = Field(..., description="List of processed VINs")
-    success: bool = Field(..., description="Global operation status")
-    message: str = Field(..., description="Message describing the operation result")
-    errors: dict[str, str] = Field(
-        default_factory=dict, description="Error details by VIN"
-    )
-
-    class Config:
-        from_attributes = True
-
-
 class VehicleEligibilityResponse(BaseModel):
-    """Response model for vehicle eligibility check"""
+    """Vehicle eligibility response"""
 
-    vin: str = Field(..., description="VIN of the checked vehicle")
-    exists: bool = Field(
-        ..., description="Indicates if the vehicle exists in the database"
-    )
-    is_eligible: bool = Field(
-        ..., description="Indicates if the vehicle is eligible for activation"
-    )
-    is_activated: bool = Field(
-        ..., description="Indicates if the vehicle is already activated"
-    )
-    message: str = Field(
-        ..., description="Explanatory message about vehicle eligibility"
-    )
+    eligibility: bool = Field(..., description="Eligibilité du véhicule")
+    reason: str | None = Field(None, description="Raison de l'éligibilité")
 
     class Config:
         from_attributes = True

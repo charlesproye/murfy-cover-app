@@ -18,7 +18,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from db_models.base_uuid_model import BaseUUIDCreatedAt, BaseUUIDModel
+from db_models.base_uuid_model import (
+    BaseAutoIncrementModel,
+    BaseUUIDCreatedAt,
+    BaseUUIDModel,
+)
 
 
 class Region(BaseUUIDCreatedAt):
@@ -97,17 +101,23 @@ class Vehicle(BaseUUIDModel):
     region_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("region.id"), nullable=False
     )
-    vehicle_model_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("vehicle_model.id"), nullable=False
+    vehicle_model_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("vehicle_model.id"), nullable=True
     )
     vin: Mapped[str | None] = mapped_column(String(50))
     bib_score: Mapped[str | None] = mapped_column(String(1))
     activation_status: Mapped[bool | None] = mapped_column(Boolean)
+    activation_requested_status: Mapped[bool | None] = mapped_column(Boolean)
+    activation_start_date: Mapped[date | None] = mapped_column(Date)
+    activation_end_date: Mapped[date | None] = mapped_column(Date)
+    activation_status_message: Mapped[str | None] = mapped_column(String(255))
+    activation_comment: Mapped[str | None] = mapped_column(String(255))
     is_eligible: Mapped[bool | None] = mapped_column(Boolean)
     is_pinned: Mapped[bool | None] = mapped_column(Boolean)
     start_date: Mapped[date | None] = mapped_column(Date)
     licence_plate: Mapped[str | None] = mapped_column(String(50))
     end_of_contract_date: Mapped[date | None] = mapped_column(Date)
+    is_processed: Mapped[bool] = mapped_column(Boolean, nullable=True)
     __table_args__ = (
         Index("ix_vehicle_fleet_id", "fleet_id"),  # Index sur l'ID de la flotte
         Index("ix_vehicle_region_id", "region_id"),  # Index sur l'ID de la région
@@ -168,3 +178,14 @@ class FleetTeslaAuthenticationCode(BaseUUIDModel):
     authentication_code: Mapped[str] = mapped_column(String(2000), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class VehicleActivationHistory(BaseAutoIncrementModel):
+    __tablename__ = "vehicle_activation_history"
+    vehicle_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("vehicle.id"), nullable=False
+    )
+    activation_requested_status: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    activation_status: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    activation_status_message: Mapped[str] = mapped_column(String(255), nullable=False)
+    oem_detail: Mapped[str] = mapped_column(String(555), nullable=True)
