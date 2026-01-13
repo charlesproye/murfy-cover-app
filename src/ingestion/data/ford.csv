@@ -1,0 +1,10 @@
+field_name,field_type
+charging.charging_current.data.value,double
+charging.battery_level.data,double
+charging.time_to_complete_charge.data.value,int
+charging.charger_voltage.data.value,int
+charging.battery_energy.data.value,double
+charging.status.data,string
+charging.battery_level.data,double
+charging.battery_performance_status.data,string
+diagnostics.odometer.data.value,int

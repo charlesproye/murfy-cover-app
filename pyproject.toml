@@ -101,7 +101,9 @@ ingestion = [
     "orjson>=3.11",
     "pyjwt",
     "pyyaml>=6.0",
-    "psycopg2-binary>=2.9.9"
+    "psycopg2-binary>=2.9.9",
+    "aiomqtt>=2.5.0",
+    "httpx"
 ]
 
 # Scraping module dependencies

@@ -1,5 +1,5 @@
 from core.s3.s3_utils import S3Service
-from external_api.services.flash_report.vin_decoder.config import WMI_TO_OEM
+from core.wmi_to_oem import WMI_TO_OEM
 
 
 def load_model(model_name: str):
@@ -23,7 +23,7 @@ class VinDecoder:
         """
         self.model = load_model("model_vin_decoder.pkl")
 
-    def decode(self, vin: str) -> str:
+    def decode(self, vin: str) -> tuple[str | None, str | None]:
         """
         Predict MODEL_VERSION for a single VIN.
 
@@ -48,7 +48,9 @@ class VinDecoder:
         if vin_first_three_characters not in WMI_TO_OEM:
             return None, None
 
-        if model.capitalize() == WMI_TO_OEM[vin_first_three_characters]:
+        if model.lower() == WMI_TO_OEM[vin_first_three_characters].lower().replace(
+            " ", "-"
+        ):
             return model, version
         else:
             return WMI_TO_OEM[vin_first_three_characters], None

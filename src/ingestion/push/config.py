@@ -1,3 +1,5 @@
+from pydantic_settings import BaseSettings
+
 KIA_KEYS_TO_IGNORE = [
     "*.Date",
     "meta",
@@ -18,3 +20,15 @@ KIA_KEYS_TO_IGNORE = [
     "state.Vehicle.Version",
 ]
 
+
+class KafkaSettings(BaseSettings):
+    KAFKA_BOOTSTRAP_SERVERS: str = "127.0.0.1:9092"
+    KAFKA_PUSH_TOPIC: str = "oem_push_data"
+
+
+class RedisSettings(BaseSettings):
+    REDIS_HOST: str = "127.0.0.1"
+    REDIS_PORT: int = 6379
+    REDIS_USER: str = "default"
+    REDIS_PASSWORD: str = "default"
+    REDIS_DB_KAFKA_CACHE: int = 2

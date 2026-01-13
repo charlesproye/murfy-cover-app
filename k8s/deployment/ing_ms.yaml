@@ -37,11 +37,20 @@ spec:
             - secretRef:
                 name: s3-secret
           env:
+            # Redis Configuration
             - name: REDIS_HOST
               value: valkey.data-engineering.svc
             - name: REDIS_PORT
               value: "6379"
             - name: REDIS_DB_INGESTION
               value: "1"
+            - name: REDIS_DB_KAFKA_CACHE
+              value: "2"
+            # S3 Configuration
             - name: S3_BUCKET
               value: "bib-platform-prod-data"
+            # Kafka Configuration
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "bib-kafka-bootstrap.kafka.svc:9092"
+            - name: KAFKA_PUSH_TOPIC
+              value: "oem_push_data"

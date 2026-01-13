@@ -1,9 +1,11 @@
 import argparse
+import asyncio
 import logging
 import os
 import textwrap
 
 import dotenv
+
 from ingestion.mobilisights.ingester import MobilisightsIngester
 
 
@@ -65,9 +67,8 @@ def main():
         max_workers=args.max_workers,
     )
 
-    ingester.run()
+    asyncio.run(ingester.run())
 
 
 if __name__ == "__main__":
     main()
-

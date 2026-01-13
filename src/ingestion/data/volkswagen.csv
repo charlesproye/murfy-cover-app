@@ -1,0 +1,16 @@
+field_name,field_type
+odometer,int
+energyLevelPrimaryEnginePercentage,double
+energyLevelSecondaryEnginePercentage,double
+odometer,int
+warningCategory,string
+warningDescription,string
+targetSoc,int
+batteryCareMode,string
+chargingState,string
+chargePower,double
+chargeRate,double
+chargingMode,string
+chargingReason,string
+externalPowerSupplyState,string
+energyFlow,string

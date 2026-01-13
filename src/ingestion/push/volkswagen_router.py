@@ -4,6 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
+from core.models import MakeEnum
+from ingestion.kafka_producer import KafkaProducerDep
+
 from .response_storage import ResponseStorageDep
 from .schemas import (
     ChargingRemainingTime,
@@ -44,7 +47,11 @@ volkswagen_router = APIRouter(
 
 # Test route
 @volkswagen_router.post("/")
-async def post_data(request: Request, storage_service: ResponseStorageDep):
+async def post_data(
+    request: Request,
+    storage_service: ResponseStorageDep,
+    kafka_producer: KafkaProducerDep,
+):
     EVENT_TO_MODEL = {
         "TRIP": Trip,
         "MAINTENANCE": Maintenance,
@@ -72,9 +79,21 @@ async def post_data(request: Request, storage_service: ResponseStorageDep):
 
         models = [model_class(**item) for item in json_data]
 
-        await storage_service.store_basemodels_with_vin("volkswagen", models)
+        await storage_service.store_basemodels_with_vin(
+            MakeEnum.volkswagen.value, models
+        )
+
+        # Send filtered data to Kafka for each item
+        for item in json_data:
+            vin = item["vin"]
+            await kafka_producer.send_filtered_data(
+                MakeEnum.volkswagen,
+                item,
+                vin,
+                message_datetime=item["vehicleTimeUtc"],
+            )
+
         return {}
     except Exception as e:
         logging.error(f"Error parsing data: {json_data}, error: {e}")
         return {}
-

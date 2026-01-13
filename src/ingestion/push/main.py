@@ -6,9 +6,11 @@ from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from ingestion.kafka_producer import stop_kafka_producer
+
 from .bmw_router import bmw_router
 from .kia_router import kia_router
-from .volksvagen_router import volkswagen_router
+from .volkswagen_router import volkswagen_router
 
 LOGGER = logging.getLogger(__name__)
 __VERSION__ = "1.0.0"
@@ -26,7 +28,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # Code exécuté à l'arrêt
     LOGGER.info("Arrêt de l'API")
+    # Stop Kafka producer if it was initialized
+    await stop_kafka_producer()
 
 
 app = FastAPI(

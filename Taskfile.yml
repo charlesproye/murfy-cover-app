@@ -87,6 +87,7 @@ tasks:
   docker:setup:
     cmds:
       - docker buildx create --name multiarch --driver docker-container --bootstrap --use
+
   # Alembic
   alembic:data-eng:generate:
     cmds:
@@ -101,3 +102,7 @@ tasks:
   alembic:data-ev:upgrade:
     cmds:
       - uv run alembic -c src/db_models/alembic.ini upgrade head
+
+  utils:generate-oem-field-files:
+    cmds:
+      - uv run -m src.utils.oem_field_filter_generator.generate_fields

@@ -1,11 +1,16 @@
+import asyncio
 import json
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime
 from urllib.parse import quote, urlencode
 
+import httpx
 import requests
 
 from ingestion.high_mobility.config import BRAND_TO_OEM
 from ingestion.high_mobility.vehicle import Vehicle
+
+LOGGER = logging.getLogger(__name__)
 
 
 class HMApi:
@@ -46,21 +51,20 @@ class HMApi:
 
             self.__token = response_data.get("access_token")
             timestamp = (
-                datetime.now(tz=timezone.utc)
-                - datetime(1970, 1, 1, tzinfo=timezone.utc)
+                datetime.now(tz=UTC) - datetime(1970, 1, 1, tzinfo=UTC)
             ).total_seconds()
             expires_in = int(
                 response_data.get("expires_in", 3600)
             )  # Default 1 hour if not specified
             self.__token_exp = timestamp + expires_in
         except requests.exceptions.RequestException as e:
-            raise Exception(f"Failed to fetch High Mobility API token: {str(e)}")
+            raise Exception(f"Failed to fetch High Mobility API token: {e!s}") from e
         except (KeyError, ValueError, json.JSONDecodeError) as e:
-            raise Exception(f"Invalid response from High Mobility API: {str(e)}")
+            raise Exception(f"Invalid response from High Mobility API: {e!s}") from e
 
     def __get_token(self):
         timestamp = (
-            datetime.now(tz=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
+            datetime.now(tz=UTC) - datetime(1970, 1, 1, tzinfo=UTC)
         ).total_seconds()
         if timestamp > self.__token_exp:
             self.__fetch_token()
@@ -92,9 +96,7 @@ class HMApi:
         )
         return result.status_code, result.json()
 
-    def list_clearances(
-        self, status=None, brand=None
-    ) -> tuple[int, list[Vehicle] | object]:
+    def list_clearances(self, status=None, brand=None) -> tuple[int, list[Vehicle]]:
         """Lists clearances of vehicles activated through the HM API
 
         Arguments
@@ -123,7 +125,7 @@ class HMApi:
                 f"{self.base_url}/v1/fleets/vehicles?{encoded_filter}",
                 headers={"Authorization": f"Bearer {token}"},
             )
-            if result.status_code == requests.codes.ok:
+            if result.status_code == 200:
                 return result.status_code, [
                     Vehicle(
                         vin=vehicle["vin"],
@@ -141,7 +143,7 @@ class HMApi:
             f"{self.base_url}/v1/fleets/vehicles",
             headers={"Authorization": f"Bearer {token}"},
         )
-        if result.status_code == requests.codes.ok:
+        if result.status_code == 200:
             return result.status_code, [
                 Vehicle(
                     vin=vehicle["vin"],
@@ -173,7 +175,7 @@ class HMApi:
             f"{self.base_url}/v1/fleets/vehicles/{vin}",
             headers={"Authorization": f"Bearer {token}"},
         )
-        if result.status_code == requests.codes.ok:
+        if result.status_code == 200:
             res = result.json()
             return result.status_code, Vehicle(
                 vin=res["vin"],
@@ -207,7 +209,7 @@ class HMApi:
             if result.text:
                 try:
                     return result.status_code, result.json()
-                except:
+                except Exception:
                     return result.status_code, result.text
             return result.status_code, None
 
@@ -231,6 +233,28 @@ class HMApi:
         )
         return result.status_code, result.content
 
+    async def get_vehicle_info_async(self, vin: str) -> tuple[int, bytes]:
+        """Get a vehicle's info asynchronously
+
+        Arguments
+        ---------
+        vin: str
+            The VIN of the vehicle
+
+        Returns
+        -------
+        tuple[int, bytes]
+            A tuple containing the response's status code and the returned bytes
+        """
+        token = await asyncio.to_thread(self.__get_token)
+        async with httpx.AsyncClient() as client:
+            result = await client.get(
+                f"{self.base_url}/v1/vehicle-data/autoapi-13/{vin}",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=30.0,
+            )
+            return result.status_code, result.content
+
     def get_status(self, vin: str) -> tuple[int, dict | object]:
         """Get the detailed status for a single vehicle
 
@@ -249,13 +273,12 @@ class HMApi:
             f"{self.base_url}/v1/fleets/vehicles/{vin}",
             headers={"Authorization": f"Bearer {token}"},
         )
-        if result.status_code == requests.codes.ok:
+        if result.status_code == 200:
             return result.status_code, result.json()
         else:
             if result.text:
                 try:
                     return result.status_code, result.json()
-                except:
+                except Exception:
                     return result.status_code, result.text
             return result.status_code, None
-

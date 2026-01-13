@@ -1,7 +1,6 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from hashlib import blake2s
-from urllib.parse import quote, urlencode
 
 import requests
 
@@ -80,4 +79,3 @@ class MSApi:
             stream=True,
         )
         return result.status_code, result.iter_lines()
-

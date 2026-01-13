@@ -50,8 +50,14 @@ spec:
               value: "6379"
             - name: REDIS_DB_INGESTION
               value: "1"
+            - name: REDIS_DB_KAFKA_CACHE
+              value: "2"
             - name: S3_BUCKET
               value: "bib-platform-prod-data"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "bib-kafka-bootstrap.kafka.svc:9092"
+            - name: KAFKA_PUSH_TOPIC
+              value: "oem_push_data"
       restartPolicy: Always
 ---
 apiVersion: v1

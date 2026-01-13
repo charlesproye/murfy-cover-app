@@ -1,0 +1,11 @@
+field_name,field_type
+hv_state_of_health,string
+charging_ac_voltage,int
+charging_status,string
+mileage,int
+avg_electric_range_consumption,double
+current_remaining_fuel_range,int
+kombi_remaining_electric_range,int
+remaining_fuel,double
+soc_hv_header,int
+charging_ac_ampere,double

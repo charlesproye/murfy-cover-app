@@ -12,7 +12,9 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
+from core.models import MakeEnum
 from ingestion.ingestion_cache import IngestionCache
+from ingestion.kafka_producer import KafkaProducerDep
 from ingestion.push.config import KIA_KEYS_TO_IGNORE
 
 from .response_storage import ResponseStorageDep
@@ -21,6 +23,74 @@ from .token_utils import create_access_token, verify_token
 security = HTTPBasic()
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _flatten_dict(data: dict, parent_key: str = "") -> dict:
+    """Flatten nested dictionary using dot notation."""
+    items = {}
+    for key, value in data.items():
+        new_key = f"{parent_key}.{key}" if parent_key else key
+        if isinstance(value, dict):
+            items.update(_flatten_dict(value, new_key))
+        else:
+            items[new_key] = value
+    return items
+
+
+def _remove_meta_fields(data: dict) -> dict:
+    """
+    Remove meta.* fields from Kia data.
+
+    Meta fields are only used for timestamps and should not be sent as metrics.
+    """
+    if not isinstance(data, dict):
+        return data
+
+    cleaned = {}
+    for key, value in data.items():
+        # Skip meta key at root level
+        if key == "meta":
+            continue
+        # Recursively clean nested dicts
+        if isinstance(value, dict):
+            cleaned[key] = _remove_meta_fields(value)
+        else:
+            cleaned[key] = value
+
+    return cleaned
+
+
+def _extract_kia_timestamps(record_data: dict) -> dict[str, str]:
+    """
+    Extract field-specific timestamps from Kia's meta.* fields.
+
+    For Kia data structure:
+    - meta.* fields contain Unix timestamps (milliseconds) for each metric
+    - state.* fields contain the actual data values
+
+    Returns:
+        dict mapping field_name -> ISO timestamp (naive UTC)
+    """
+    flattened = _flatten_dict(record_data)
+    field_timestamps = {}
+
+    for field_name, value in flattened.items():
+        # For each meta.* field, create timestamp for corresponding state.* field
+        if field_name.startswith("meta."):
+            # Get the corresponding state field name
+            state_field = field_name.replace("meta.", "state.", 1)
+
+            # Convert Unix timestamp (milliseconds) to ISO format (naive UTC)
+            if isinstance(value, (int, float)):
+                try:
+                    dt = datetime.fromtimestamp(value / 1000, tz=UTC).replace(
+                        tzinfo=None
+                    )
+                    field_timestamps[state_field] = dt.isoformat()
+                except (ValueError, OSError) as e:
+                    LOGGER.warning(f"Invalid timestamp in {field_name}={value}: {e}")
+
+    return field_timestamps
 
 
 class KiaSettings(BaseSettings):
@@ -52,6 +122,7 @@ kia_router = APIRouter(
 async def receive_kia_data(
     request: Request,
     storage_service: ResponseStorageDep,
+    kafka_producer: KafkaProducerDep,
     x_amz_firehose_access_key: str = Header(...),
 ):
     # Check token format
@@ -82,7 +153,21 @@ async def receive_kia_data(
                 continue
 
             kia_cache.set_json_in_db(vin, record_data)
-            await storage_service.store_raw_json("kia", record_data)
+            await storage_service.store_raw_json(MakeEnum.kia.value, record_data)
+
+            # Extract field-specific timestamps from meta.* fields for Kia
+            field_timestamps = _extract_kia_timestamps(record_data)
+
+            record_data.pop("meta", None)
+
+            # Send filtered data to Kafka with field-specific timestamps
+            await kafka_producer.send_filtered_data(
+                MakeEnum.kia,
+                record_data,
+                vin,
+                field_timestamps=field_timestamps,
+            )
+
             LOGGER.info(f"Stored new record for VIN: {vin}")
 
     except Exception as e:
@@ -90,7 +175,7 @@ async def receive_kia_data(
 
     return {
         "requestId": request_id,
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat(),
     }
 
 

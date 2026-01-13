@@ -3,7 +3,6 @@ import json
 import logging
 import os
 from logging import getLogger
-from typing import Any
 
 import gspread
 import numpy as np
@@ -12,7 +11,7 @@ from google.oauth2.service_account import Credentials
 logger = getLogger("ingestion.vehicle_info")
 
 
-def get_google_client() -> Any:
+def get_google_client() -> gspread.Client:
     """Get authenticated Google Sheets client.
 
     Returns:
