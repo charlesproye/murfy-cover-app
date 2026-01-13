@@ -19,7 +19,7 @@ spec:
             - name: res-generating-reports-1
               image: rg.fr-par.scw.cloud/data-engineering/premium_report:latest
               imagePullPolicy: Always
-              command: ["python", "src/reports/main.py"]
+              command: ["python", "src/reports/generate_gsheet_reports.py"]
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
@@ -42,6 +42,8 @@ spec:
                   value: "1DeFkOqD5a5j-gKsBe_PbCL73mpoI2B6x"
                 - name: S3_BUCKET
                   value: "bib-premium-reports"
+                - name: GOTENBERG_URL
+                  value: "http://gotenberg.data-engineering.svc:3000"
               resources:
                 limits:
                   memory: "2Gi"

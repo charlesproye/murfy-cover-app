@@ -24,7 +24,7 @@ from external_api.services.flash_report.vin_decoder.tesla_vin_decoder import (
     TeslaVinDecoder,
 )
 from external_api.services.flash_report.vin_decoder.vin_decoder import VinDecoder
-from external_api.services.s3 import get_make_image_url, get_model_image_url
+from reports import reports_utils
 
 
 async def log_vin_decoded(
@@ -394,10 +394,8 @@ async def get_flash_report_data(
         select(
             VehicleModel,
             Battery,
-            ModelImage.public_url.label("model_image_public_url"),
-            ModelImage.name.label("model_image_name"),
-            MakeImage.public_url.label("make_image_public_url"),
-            MakeImage.name.label("make_image_name"),
+            ModelImage,
+            MakeImage,
         )
         .outerjoin(Make, Make.id == VehicleModel.make_id)
         .outerjoin(Battery, Battery.id == VehicleModel.battery_id)
@@ -421,10 +419,8 @@ async def get_flash_report_data(
     (
         vehicle_model,
         battery,
-        model_image_public_url,
-        model_image_name,
-        make_image_public_url,
-        make_image_name,
+        model_asset,
+        make_asset,
     ) = row
 
     if not vehicle_model.trendline:
@@ -442,15 +438,7 @@ async def get_flash_report_data(
             expression=trendline, x=flash_report_combination.odometer
         )
 
-    image_url = None
-    if model_image_public_url:
-        image_url = model_image_public_url
-    elif model_image_name:
-        image_url = get_model_image_url(model_image_name)
-    elif make_image_public_url:
-        image_url = make_image_public_url
-    elif make_image_name:
-        image_url = get_make_image_url(make_image_name)
+    image_url = reports_utils.get_image_public_url(model_asset, make_asset)
 
     return GenerationData(
         has_trendline=status,

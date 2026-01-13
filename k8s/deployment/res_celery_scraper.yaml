@@ -43,6 +43,8 @@ spec:
             value: "1"
           - name: S3_BUCKET
             value: "bib-premium-reports"
+          - name: GOTENBERG_URL
+            value: "http://gotenberg.data-engineering.svc:3000"
         envFrom:
           - secretRef:
               name: s3-secret

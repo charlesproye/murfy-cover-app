@@ -7,9 +7,6 @@ using the centralized S3Service from core for security and consistency.
 
 from functools import lru_cache
 
-from botocore.exceptions import ClientError
-from fastapi import HTTPException
-
 from core.s3.s3_utils import S3Service
 from core.s3.settings import S3Settings
 from db_models.enums import AssetTypeEnum
@@ -76,60 +73,3 @@ def get_model_image_url(image_name: str):
 
 def get_make_image_url(image_name: str):
     return get_file_url(f"{AssetTypeEnum.make_images.value}/{image_name}")
-
-
-# UPLOAD FILES
-# --------------------------------
-def upload_file_to_s3(file_path: str, file_content: bytes):
-    """
-    Upload a file to S3.
-
-    Args:
-        file_path: S3 key (path) where the file should be stored
-        file_content: File content as bytes
-
-    Returns:
-        Response from S3
-
-    Raises:
-        HTTPException: If upload fails
-    """
-    try:
-        s3 = _get_s3_service()
-        s3.store_object(file_content, file_path)
-        # Return a success response for backward compatibility
-        return {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    except ClientError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error uploading file to s3: {e!s}"
-        ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error uploading file to s3: {e!s}"
-        ) from e
-
-
-# DELETE FILES
-# --------------------------------
-def delete_file_in_s3(full_path: str):
-    """
-    Delete a file from S3.
-
-    Args:
-        full_path: S3 key (path) to the file to delete
-
-    Raises:
-        HTTPException: If deletion fails
-    """
-    try:
-        s3 = _get_s3_service()
-        # Use the underlying boto3 client for deletion
-        s3._s3_client.delete_object(Bucket=s3.bucket_name, Key=full_path)
-    except ClientError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error deleting file in s3: {e!s}"
-        ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error deleting file in s3: {e!s}"
-        ) from e

@@ -1,27 +1,25 @@
-import asyncio
 import logging
 import uuid
-from datetime import datetime
-from pathlib import Path
+from datetime import UTC, datetime
 from typing import cast
 
 import pandas as pd
-from playwright.async_api import async_playwright
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import ColumnElement
+from sqlalchemy import func
+from sqlalchemy.sql import ColumnElement, select
 
-from core.env_utils import get_env_var
 from core.gdrive_utils import get_google_service
 from core.gsheet_utils import get_google_client
 from core.s3.async_s3 import S3ACL, AsyncS3
-from core.sql_utils import get_sqlalchemy_engine
+from core.sql_utils import get_async_session_maker
 from db_models import PremiumReport, Vehicle, VehicleData, VehicleModel
+from db_models.company import Oem
+from db_models.vehicle import Battery
+from external_api.core.exceptions import ExistingReportException
+from reports import reports_utils
+from reports.report_render.premium_report_generator import PremiumReportGenerator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-PREMIUM_REPORT_MAIL = get_env_var("PREMIUM_REPORT_MAIL")
-PREMIUM_REPORT_PWD = get_env_var("PREMIUM_REPORT_PWD")
 
 
 class ReportGenerator:
@@ -40,40 +38,32 @@ class ReportGenerator:
             spreadsheet_id: Google Sheets spreadsheet ID
             worksheet_name: Name of the worksheet to process
             s3_bucket: S3 bucket name for storing PDFs
-            login_email: Email for login (optional, can be set later)
-            login_password: Password for login (optional, can be set later)
         """
         self.spreadsheet_id = spreadsheet_id
         self.worksheet_name = worksheet_name
         self.s3_bucket = s3_bucket
-        self.login_email = PREMIUM_REPORT_MAIL
-        self.login_password = PREMIUM_REPORT_PWD
         self._gsheet_client = get_google_client()
         self._sheets_service = get_google_service(service_type="sheets", version="v4")
         self._worksheet = None
-        self._s3_client = None
+        self.s3_client = AsyncS3(bucket=self.s3_bucket)
         self._engine = None
         self._session_factory = None
+        self._async_session_factory = None
 
     @property
     def worksheet(self):
         if self._worksheet is None:
+            if self.spreadsheet_id is None:
+                raise ValueError("Spreadsheet ID is required")
             spreadsheet = self._gsheet_client.open_by_key(self.spreadsheet_id)
             self._worksheet = spreadsheet.worksheet(self.worksheet_name)
         return self._worksheet
 
     @property
-    def s3_client(self) -> AsyncS3:
-        if self._s3_client is None:
-            self._s3_client = AsyncS3(bucket=self.s3_bucket)
-        return self._s3_client
-
-    @property
-    def session_factory(self):
-        if self._session_factory is None:
-            self._engine = get_sqlalchemy_engine()
-            self._session_factory = sessionmaker(bind=self._engine)
-        return self._session_factory
+    def async_session_factory(self):
+        if self._async_session_factory is None:
+            self._async_session_factory = get_async_session_maker()
+        return self._async_session_factory
 
     def load_gsheet_data(self) -> pd.DataFrame:
         """
@@ -124,7 +114,7 @@ class ReportGenerator:
 
         return df
 
-    def enrich_with_vehicle_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    async def enrich_with_vehicle_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Enrich DataFrame with vehicle model data from database.
         """
@@ -132,10 +122,12 @@ class ReportGenerator:
         vin_list = df["VIN"].astype(str).dropna().tolist()
         vehicle_vin_column = cast(ColumnElement[str], Vehicle.vin)
 
-        with self.session_factory() as session:
+        async with self.async_session_factory() as session:
             # Vin and ability to compute SoH
-            results: list[tuple[str, bool | None, bool | None, bool]] = (
-                session.query(
+            results: list[
+                tuple[str, bool | None, bool | None, bool]
+            ] = await session.execute(
+                select(
                     Vehicle.vin,
                     VehicleModel.soh_data,
                     VehicleModel.soh_oem_data,
@@ -143,16 +135,14 @@ class ReportGenerator:
                 )
                 .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
                 .filter(vehicle_vin_column.in_(vin_list))
-                .all()
             )
 
             # Vin and actually available SOH
-            sohs = (
-                session.query(Vehicle.vin)
+            sohs = await session.execute(
+                select(Vehicle.vin)
                 .join(VehicleData, Vehicle.id == VehicleData.vehicle_id)
                 .filter(vehicle_vin_column.in_(vin_list))
                 .filter(VehicleData.soh.isnot(None))
-                .all()
             )
 
         query_rows = [
@@ -202,94 +192,215 @@ class ReportGenerator:
 
         return merged_df
 
-    async def download_pdfs_for_vins(self, vins: list[str]) -> list[tuple[str, str]]:
+    async def _fetch_report_data(
+        self, vin: str
+    ) -> tuple[Vehicle, VehicleModel, Battery, Oem, VehicleData, str | None]:
         """
-        Download PDF reports for given VINs and upload to S3.
+        Fetch all required data for report generation from the database.
+
+        Args:
+            vin: Vehicle VIN
+
+        Returns:
+            Tuple of (Vehicle, VehicleModel, Battery, Oem, VehicleData, image_url)
+
+        Raises:
+            ValueError: If required data is missing
+        """
+        async with self.async_session_factory() as session:
+            existing_report = await reports_utils.get_db_premium_report_by_date(
+                vin,
+                datetime.now(UTC).date(),
+                session,
+            )
+            if existing_report:
+                raise ExistingReportException(
+                    f"Report already exists for VIN: {vin} and date: {datetime.now(UTC).date()}"
+                )
+
+            stmt = reports_utils.build_report_data_query(vin)
+
+            result = await session.execute(stmt)
+            row = result.first()
+
+            if not row:
+                raise ValueError(f"Vehicle not found for VIN: {vin}")
+
+            # Validate required relationships exist
+            if row.Battery is None:
+                raise ValueError(f"Battery data not available for VIN: {vin}")
+
+            if row.Oem is None:
+                raise ValueError(f"OEM data not available for VIN: {vin}")
+
+            if row.VehicleData is None or row.VehicleData.soh is None:
+                raise ValueError(
+                    f"Vehicle activated but SoH is not available yet for VIN: {vin}"
+                )
+
+            image_url = reports_utils.get_image_public_url(
+                row.ModelImage, row.MakeImage
+            )
+
+            return (
+                row.Vehicle,
+                row.VehicleModel,
+                row.Battery,
+                row.Oem,
+                row.VehicleData,
+                image_url,
+            )
+
+    async def refresh_urls(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Refresh presigned URLs for existing PDF reports for given VINs and dates.
+
+        Args:
+            df: DataFrame containing VIN and DATE_REPORT columns
+
+        Returns:
+            DataFrame with updated LINK column containing new presigned URLs
+        """
+        valid_rows = df[["VIN", "DATE_REPORT"]].dropna()
+        vin_date_pairs = [
+            (row["VIN"], row["DATE_REPORT"]) for _, row in valid_rows.iterrows()
+        ]
+
+        logger.info(
+            f"Refreshing presigned URLs for {len(vin_date_pairs)} VIN/date combinations"
+        )
+
+        # Query database for reports matching VIN/date combinations
+        vin_to_report: dict[tuple[str, str], PremiumReport] = {}
+
+        async with self.async_session_factory() as session:
+            for vin, date_str in vin_date_pairs:
+                try:
+                    report_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                except Exception as e:
+                    logger.error(f"Error parsing date {date_str} for VIN {vin}: {e}")
+                    continue
+
+                report = await session.execute(
+                    select(PremiumReport)
+                    .join(Vehicle, PremiumReport.vehicle_id == Vehicle.id)
+                    .filter(Vehicle.vin == vin)
+                    .filter(func.date(PremiumReport.created_at) == report_date)
+                    .limit(1)
+                )
+                report = report.scalar_one_or_none()
+
+                if report:
+                    vin_to_report[(vin, date_str)] = report
+                else:
+                    logger.debug(f"No report found for VIN {vin} on date {date_str}")
+
+        for (vin, date_str), report in vin_to_report.items():
+            presigned_url = await self.s3_client.get_presigned_url(
+                s3_uri=report.report_url,
+                expires_in=7 * 24 * 60 * 60,  # 7 days
+            )
+            mask = (df["VIN"] == vin) & (df["DATE_REPORT"] == date_str)
+            df.loc[mask, "LINK"] = presigned_url
+
+        logger.info(f"Successfully refreshed {len(vin_to_report)} presigned URLs")
+        return df
+
+    async def download_pdfs_for_vins(
+        self, vins: list[str]
+    ) -> list[tuple[str, str, uuid.UUID]]:
+        """
+        Generate PDF reports for given VINs using PremiumReportGenerator and upload to S3.
         """
 
         if not vins:
-            logger.info("No VINs to download PDFs for")
+            logger.info("No VINs to generate PDFs for")
             return []
 
-        logger.info(f"Downloading PDFs for {len(vins)} VINs")
+        logger.info(f"Generating PDFs for {len(vins)} VINs")
 
-        list_files = []
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+        list_files: list[tuple[str, str, uuid.UUID]] = []
+        generator = PremiumReportGenerator()
 
-            # Login
-            await page.goto("https://get-evalue.com/auth/login")
-            await page.fill("#email", self.login_email)
-            await page.fill("#password", self.login_password)
-            await page.click("text=Login")
-            await page.wait_for_load_state("networkidle")
+        for vin in vins:
+            try:
+                # Fetch required data for report generation
+                (
+                    vehicle,
+                    vehicle_model,
+                    battery,
+                    oem,
+                    vehicle_data,
+                    image_url,
+                ) = await self._fetch_report_data(vin)
 
-            for vin in vins:
-                try:
-                    await page.goto(f"https://get-evalue.com/dashboard/passport/{vin}")
-                    await page.wait_for_selector(
-                        "text=Download Report", state="visible"
-                    )
-                    await asyncio.sleep(0.5)
+                report_uuid = uuid.uuid4()
+                html_content = await generator.generate_premium_report_html(
+                    vehicle=vehicle,
+                    vehicle_model=vehicle_model,
+                    battery=battery,
+                    oem=oem,
+                    vehicle_data=vehicle_data,
+                    image_url=image_url,
+                    report_uuid=str(report_uuid),
+                )
 
-                    async with page.expect_download() as dl_info:
-                        await page.click("text=Download Report")
-                    download = await dl_info.value
+                pdf_bytes = await generator.generate_pdf(html_content=html_content)
 
-                    temp_path = Path(await download.path())
-                    pdf_bytes = temp_path.read_bytes()
-
-                    if pdf_bytes[:4] != b"%PDF":
-                        logger.error(f"Downloaded file for {vin} is not a PDF")
-                        continue
-                except Exception as e:
-                    logger.error(f"Error downloading PDF for {vin}: {e}")
+                if pdf_bytes[:4] != b"%PDF":
+                    logger.error(f"Generated file for {vin} is not a PDF")
                     continue
 
-                # Upload to S3 as a private object (presigned URLs will be generated on-demand)
-                s3_path = f"{self.worksheet_name.upper()}/{datetime.now().strftime('%Y%m%d')}/{vin}_{uuid.uuid4()}.pdf"
-                await self.s3_client.upload_file(s3_path, pdf_bytes, acl=S3ACL.PRIVATE)
+                logger.info(
+                    f"PDF generated successfully for VIN {vin}, size: {len(pdf_bytes) / 1024:.2f} KB"
+                )
 
-                list_files.append((vin, s3_path))
+                s3_uri = f"s3://{self.s3_bucket}/{self.worksheet_name.upper()}/{datetime.now(UTC).strftime('%Y%m%d')}/{vin}/{vin}_{report_uuid}.pdf"
+                await self.s3_client.upload_file_fast(
+                    s3_uri=s3_uri, file=pdf_bytes, acl=S3ACL.PRIVATE
+                )
 
-            await browser.close()
+                list_files.append((vin, s3_uri, report_uuid))
+            except ExistingReportException as e:
+                logger.warning(e)
+                continue
+            except Exception as e:
+                logger.error(f"Error generating PDF for {vin}: {e}", exc_info=True)
+                continue
 
-        logger.info(f"Downloaded {len(list_files)} PDFs successfully")
+        logger.info(f"Generated {len(list_files)} PDFs successfully")
         return list_files
 
-    async def load_to_db(
-        self, list_files: list[tuple[str, str]], task_id: str | None = None
+    async def add_reports_to_db(
+        self, list_files: list[tuple[str, str, uuid.UUID]], task_id: str | None = None
     ) -> None:
         """
         Load report S3 URIs to database.
 
         Stores S3 URIs (s3://bucket/path format) so presigned URLs can be generated on-demand.
         """
-        for vin, s3_path in list_files:
-            with self.session_factory() as session:
-                vehicle_id = (
-                    session.query(Vehicle.id).where(Vehicle.vin == vin).scalar()
+        async with self.async_session_factory() as session:
+            for vin, s3_uri, report_uuid in list_files:
+                vehicle_id = await session.execute(
+                    select(Vehicle.id).where(Vehicle.vin == vin)
                 )
+                vehicle_id = vehicle_id.scalar_one_or_none()
 
                 if vehicle_id is None:
                     logger.error(f"Vehicle with VIN {vin} not found in database")
                     continue
 
-                # Store as S3 URI (s3://bucket/path)
-                s3_uri = f"s3://{self.s3_bucket}/{s3_path}"
-
                 premium_report = PremiumReport(
+                    id=report_uuid,
                     vehicle_id=vehicle_id,
                     report_url=s3_uri,
                     task_id=task_id,
                 )
                 session.add(premium_report)
-
-                session.commit()
+            await session.commit()
 
     async def add_urls(
-        self, df: pd.DataFrame, list_files: list[tuple[str, str]]
+        self, df: pd.DataFrame, list_files: list[tuple[str, str, uuid.UUID]]
     ) -> pd.DataFrame:
         """
         Add presigned S3 URLs to DataFrame.
@@ -297,8 +408,11 @@ class ReportGenerator:
 
         logger.info(f"Generating presigned URLs for {len(list_files)} files")
 
-        for vin, s3_path in list_files:
-            url = f"https://{self.s3_bucket}.s3.fr-par.scw.cloud/{s3_path}"
+        for vin, s3_uri, _ in list_files:
+            url = await self.s3_client.get_presigned_url(
+                s3_uri=s3_uri,
+                expires_in=7 * 24 * 60 * 60,  # 7 days
+            )
             df.loc[df["VIN"] == vin, "LINK"] = url
 
         logger.info("Presigned URLs generated")
@@ -354,19 +468,18 @@ class ReportGenerator:
         df = self.load_gsheet_data()
 
         # Enrich with database data
-        merged_df = self.enrich_with_vehicle_data(df)
+        merged_df = await self.enrich_with_vehicle_data(df)
 
         # Download PDFs if requested
         vins_to_download = merged_df[
             (merged_df["AVAILABLE_SOH"])
-            & (merged_df["DATE_REPORT"] == datetime.now().strftime("%Y-%m-%d"))
+            & (merged_df["DATE_REPORT"] == datetime.now(UTC).strftime("%Y-%m-%d"))
         ]["VIN"].tolist()
 
         list_files = await self.download_pdfs_for_vins(vins_to_download)
+        await self.add_reports_to_db(list_files)
 
-        merged_df = await self.add_urls(merged_df, list_files)
-
-        await self.load_to_db(list_files)
+        merged_df = await self.refresh_urls(merged_df)
 
         merged_df = merged_df.drop(columns=["AVAILABLE_SOH"])
 
@@ -374,3 +487,11 @@ class ReportGenerator:
 
         logger.info("Report enrichment process completed")
         return merged_df
+
+    async def close(self) -> None:
+        """
+        Close all resources, including the S3 client.
+
+        Call this method after using ReportGenerator to properly clean up resources.
+        """
+        await self.s3_client.close()

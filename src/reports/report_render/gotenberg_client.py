@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class GotenbergClient:
     """Client for generating PDFs using Gotenberg service."""
 
-    def __init__(self, base_url: str = "http://localhost:3000"):
+    def __init__(self, base_url: str):
         """
         Initialize Gotenberg client.
 
@@ -90,7 +90,10 @@ class GotenbergClient:
                 files=files,
                 data=data,
             )
-            response.raise_for_status()
+            if response.status_code != 200:
+                raise Exception(
+                    f"Failed to generate PDF on {self.chromium_endpoint}: {response.text}"
+                )
             return response.content
 
     @staticmethod

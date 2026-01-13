@@ -15,8 +15,14 @@ async def main():
         spreadsheet_id = spreadsheet["id"]
         spreadsheet_name = spreadsheet["name"]
 
+        # if spreadsheet_name != "TestClient":
+        #     continue
+
         report_generator = ReportGenerator(spreadsheet_id, spreadsheet_name)
-        await report_generator.run()
+        try:
+            await report_generator.run()
+        finally:
+            await report_generator.close()
 
 
 if __name__ == "__main__":

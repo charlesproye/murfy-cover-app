@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -8,12 +10,13 @@ class PremiumReportGeneration(BaseModel):
 
 
 class PremiumReportPDFUrl(BaseModel):
-    job_id: str
+    job_id: str | None = None
     vin: str
-    message: str
-    url: str | None
-    error: str | None
-    retry_info: str | None
+    message: str | None = None
+    url: str | None = None
+    expires_at: datetime | None = None
+    error: str | None = None
+    retry_info: str | None = None
 
 
 class PremiumReportSync(BaseModel):

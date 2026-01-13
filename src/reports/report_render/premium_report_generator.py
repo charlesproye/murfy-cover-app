@@ -2,6 +2,7 @@
 
 import logging
 import math
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,7 @@ class PremiumReportGenerator:
 
     def __init__(
         self,
-        gotenberg_url: str = "http://localhost:3000",
+        gotenberg_url: str = os.getenv("GOTENBERG_URL", "http://localhost:3000"),
     ):
         """
         Initialize the premium report generator.

@@ -1,16 +1,16 @@
 import logging
+from datetime import UTC, datetime, timedelta
 
 from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException, Path
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
 from core.s3.async_s3 import AsyncS3
 from core.sql_utils import get_async_db
-from db_models import Asset, Fleet, PremiumReport, UserFleet, Vehicle, VehicleData
-from db_models.company import Make, Oem
+from db_models import Fleet, PremiumReport, UserFleet, Vehicle, VehicleData
+from db_models.company import Oem
 from db_models.vehicle import Battery, VehicleModel
 from external_api.core.config import settings
 from external_api.core.cookie_auth import (
@@ -25,6 +25,7 @@ from external_api.schemas.premium import (
     PremiumReportSync,
 )
 from external_api.schemas.user import GetCurrentUser
+from external_api.services.premium import report_generation
 from external_api.services.premium.report_generation import generate_premium_report_sync
 from reports import reports_utils
 from reports.report_render.premium_report_generator import PremiumReportGenerator
@@ -112,7 +113,7 @@ async def get_premium_data(
 
 
 @router.post(
-    "/{vin}/generate_report",
+    "/{vin}/report_job",
     status_code=202,
     summary="Generate premium report",
     description="Triggers the generation of a premium report for a vehicle by VIN. The report will only be generated if the vehicle is activated and has SoH data available, it can take up to 2 minutes to generate the report. Use the `Get premium report` endpoint to retrieve the status and URL of the report.",
@@ -127,6 +128,19 @@ async def generate_premium_report(
             status_code=422, detail="User not allowed to access this VIN"
         )
 
+    today = datetime.now(UTC).date()
+    existing_report = await reports_utils.get_db_premium_report_by_date(vin, today, db)
+    if existing_report:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Report already exists for today",
+                "report_id": str(existing_report.id),
+                "vin": vin,
+                "date": today.isoformat(),
+            },
+        )
+
     if not await check_soh_available(vin, db):
         raise HTTPException(
             status_code=400, detail="Vehicle activated but SoH is not available yet."
@@ -134,17 +148,13 @@ async def generate_premium_report(
 
     task = generate_pdf_task.delay(vin)
 
-    response_data = {
-        "job_id": task.id,
-        "message": "PDF generation started",
-        "estimated_duration": "2 minutes",
-    }
-
-    return PremiumReportGeneration(**response_data)
+    return PremiumReportGeneration(
+        job_id=task.id, message="PDF generation started", estimated_duration="2 minutes"
+    )
 
 
 @router.get(
-    "/{vin}/report/{job_id}",
+    "/{vin}/report_job/{job_id}",
     summary="Get premium report",
     description="Returns the status and URL of a premium report for a vehicle using the job_id returned by the `Generate premium report` endpoint.",
 )
@@ -203,13 +213,71 @@ async def get_report_status(
         else:
             message = f"Unknown state: {task_result.state}"
 
+    expires_at = (
+        datetime.now(UTC)
+        + timedelta(seconds=settings.PREMIUM_REPORT_S3_SIGNED_URI_EXPIRES_IN)
+        if url
+        else None
+    )
+
     return PremiumReportPDFUrl(
         job_id=job_id,
         vin=vin,
         message=message,
         url=url,
+        expires_at=expires_at,
         error=error,
         retry_info=retry_info,
+    )
+
+
+@router.get(
+    "/{vin}/report",
+    summary="Get premium report for today",
+    description="Returns the premium report for a vehicle using the VIN, defaults to today's date.",
+)
+async def get_premium_report_today(
+    vin: str = Path(..., description="VIN requested"),
+    db: AsyncSession = Depends(get_async_db),
+    s3_client: AsyncS3 = Depends(get_s3_client_fast),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
+) -> PremiumReportPDFUrl:
+    if not await check_user_allowed_to_vin(vin, user, db):
+        raise HTTPException(
+            status_code=422, detail="User not allowed to access this VIN"
+        )
+
+    today = datetime.now(UTC).date()
+    return await report_generation.get_premium_report_by_date(vin, today, db, s3_client)
+
+
+@router.get(
+    "/{vin}/report/{iso_date}",
+    summary="Get premium report for a specific date",
+    description="Returns the premium report for a vehicle using the VIN and date (format: YYYY-MM-DD).",
+)
+async def get_premium_report_for_date(
+    vin: str = Path(..., description="VIN requested"),
+    iso_date: str = Path(..., description="Date requested in YYYY-MM-DD format"),
+    db: AsyncSession = Depends(get_async_db),
+    s3_client: AsyncS3 = Depends(get_s3_client_fast),
+    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
+) -> PremiumReportPDFUrl:
+    if not await check_user_allowed_to_vin(vin, user, db):
+        raise HTTPException(
+            status_code=422, detail="User not allowed to access this VIN"
+        )
+
+    try:
+        report_date = datetime.strptime(iso_date, "%Y-%m-%d").date()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid date format: {iso_date}. Expected format: YYYY-MM-DD",
+        ) from e
+
+    return await report_generation.get_premium_report_by_date(
+        vin, report_date, db, s3_client
     )
 
 
@@ -218,27 +286,7 @@ async def fetch_report_required_data(
 ) -> tuple[Vehicle, VehicleModel, Battery, Oem, VehicleData, str | None]:
     """Fetch all required data for report generation in a single query."""
 
-    ModelImage = aliased(Asset, name="ModelImage")
-    MakeImage = aliased(Asset, name="MakeImage")
-
-    stmt = (
-        select(Vehicle, VehicleModel, Battery, Oem, VehicleData, ModelImage, MakeImage)
-        .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
-        .join(Battery, VehicleModel.battery_id == Battery.id, isouter=True)
-        .join(Oem, VehicleModel.oem_id == Oem.id, isouter=True)
-        .join(Make, VehicleModel.make_id == Make.id, isouter=True)
-        .join(ModelImage, VehicleModel.image_id == ModelImage.id, isouter=True)
-        .join(MakeImage, Make.image_id == MakeImage.id, isouter=True)
-        .outerjoin(
-            VehicleData,
-            (VehicleData.vehicle_id == Vehicle.id) & (VehicleData.soh.isnot(None)),
-        )
-        .where(Vehicle.vin == vin)
-        .order_by(
-            VehicleData.odometer.desc()
-        )  # ID/created/updated at are not reliable for sorting
-        .limit(1)
-    )
+    stmt = reports_utils.build_report_data_query(vin)
 
     result = await db.execute(stmt)
     row = result.first()
@@ -263,7 +311,7 @@ async def fetch_report_required_data(
             status_code=400, detail="Vehicle activated but SoH is not available yet."
         )
 
-    image_url = reports_utils.get_image_url(row.ModelImage, row.MakeImage)
+    image_url = reports_utils.get_image_public_url(row.ModelImage, row.MakeImage)
 
     return (
         row.Vehicle,

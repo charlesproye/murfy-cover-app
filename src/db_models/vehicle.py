@@ -82,17 +82,17 @@ class Battery(BaseUUIDModel):
     battery_type: Mapped[str | None] = mapped_column(String(100))
     battery_chemistry: Mapped[str | None] = mapped_column(String(100))
     battery_oem: Mapped[str | None] = mapped_column(String(100))
-    capacity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
-    net_capacity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    capacity: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    net_capacity: Mapped[float | None] = mapped_column(Numeric(10, 2))
     estimated_capacity: Mapped[str | None] = mapped_column(String(100))
     battery_modules: Mapped[int | None] = mapped_column(Integer)
     battery_cells: Mapped[str | None] = mapped_column(String(255))
-    battery_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    battery_weight: Mapped[float | None] = mapped_column(Numeric(10, 2))
     battery_architecture: Mapped[str | None] = mapped_column(String(100))
     battery_tms: Mapped[str | None] = mapped_column(String(100))
-    battery_voltage_nominal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    battery_voltage_nominal: Mapped[float | None] = mapped_column(Numeric(10, 2))
     battery_warranty_period: Mapped[int | None] = mapped_column(Integer)
-    battery_warranty_mileage: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    battery_warranty_mileage: Mapped[float | None] = mapped_column(Numeric(10, 2))
 
 
 class Vehicle(BaseUUIDModel):
@@ -133,29 +133,29 @@ class VehicleData(BaseUUIDModel):
     vehicle_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("vehicle.id"), nullable=False
     )
-    odometer: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    odometer: Mapped[float | None] = mapped_column(Numeric(10, 2))
     region: Mapped[str | None] = mapped_column(String(100))
-    speed: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    speed: Mapped[float | None] = mapped_column(Numeric(5, 2))
     location: Mapped[str | None] = mapped_column(String(100))
-    soh: Mapped[Decimal | None] = mapped_column(Numeric(5, 3))
-    cycles: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
-    consumption: Mapped[Decimal | None] = mapped_column(Numeric(5, 3))
-    soh_comparison: Mapped[Decimal | None] = mapped_column(Numeric(6, 3))
+    soh: Mapped[float | None] = mapped_column(Numeric(5, 3))
+    cycles: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    consumption: Mapped[float | None] = mapped_column(Numeric(5, 3))
+    soh_comparison: Mapped[float | None] = mapped_column(Numeric(6, 3))
     timestamp: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    level_1: Mapped[Decimal | None] = mapped_column(
+    level_1: Mapped[float | None] = mapped_column(
         Numeric(6, 2),
         comment="Level 1 of charging. Corresponds to charging in the range 1.4-1.9 kW, 120V, AC, 12-16 Ah",
     )
-    level_2: Mapped[Decimal | None] = mapped_column(
+    level_2: Mapped[float | None] = mapped_column(
         Numeric(6, 2),
         comment="Level 2 of charging. Corresponds to charging in the range 1.9.3-19.2 kW, 208V, AC, 32-64 Ah",
     )
-    level_3: Mapped[Decimal | None] = mapped_column(
+    level_3: Mapped[float | None] = mapped_column(
         Numeric(6, 2),
         comment="Level 3 of charging. Corresponds to charging in the range > 50kW, DC",
     )
-    soh_oem: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
-    real_autonomy: Mapped[Decimal | None] = mapped_column(Numeric(10, 0))
+    soh_oem: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    real_autonomy: Mapped[float | None] = mapped_column(Numeric(10, 0))
     timestamp_last_data_collected: Mapped[datetime | None] = mapped_column(DateTime)
 
 
