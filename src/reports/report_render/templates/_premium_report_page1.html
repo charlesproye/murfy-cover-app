@@ -124,12 +124,12 @@
                     {{ soh_data.value|round(0)|int }}%
                 </div>
 
-                <div class="border border-white/50 bg-[linear-gradient(135deg,#80F8CA_0%,#FFFFFF_50%,#80F8CA_100%)] h-[42px] w-[160px] rounded-[20px] flex items-center justify-around px-1.5 relative z-10 top-[5px]">
-                    <div class="w-4 h-5 rounded bg-[#2C6D49] {% if soh_data.grade == 'A' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'A' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">A</div>
-                    <div class="w-4 h-5 rounded bg-[#49DE80] {% if soh_data.grade == 'B' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'B' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">B</div>
-                    <div class="w-4 h-5 rounded bg-[#FACC14] {% if soh_data.grade == 'C' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'C' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">C</div>
-                    <div class="w-4 h-5 rounded bg-[#FDBA74] {% if soh_data.grade == 'D' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'D' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">D</div>
-                    <div class="w-4 h-5 rounded bg-[#FB7815] {% if soh_data.grade == 'E' %}shadow-md scale-[1.4] border-2 border-white/10{% endif %} flex items-center justify-center text-white {% if soh_data.grade == 'E' %}text-[10px]{% else %}text-[8px]{% endif %} font-bold">E</div>
+                <div class="flex items-center relative z-10 border border-white/50 bg-[linear-gradient(135deg,#80F8CA_0%,#FFFFFF_50%,#80F8CA_100%)] h-[42px] w-[154px] rounded-xl flex items-center justify-around px-1.5 relative z-10 top-[3px] text-[14px]">
+                    <div class="flex items-center justify-center text-[rgba(255,255,255,0.8)] font-bold {% if soh_data.grade == 'A' %}w-[36px] h-[49px] text-[30px] rounded-2xl border-[3px] border-[rgba(255,255,255,0.95)] text-white z-20{% else %}w-[28px] h-[32px] rounded-l-xl{% endif %} bg-[#038141]">A</div>
+                    <div class="flex items-center justify-center text-[rgba(255,255,255,0.8)] font-bold -ml-[2px] {% if soh_data.grade == 'B' %}w-[36px] h-[49px] text-[30px] rounded-2xl border-[3px] border-[rgba(255,255,255,0.95)] text-white z-20{% else %}w-[28px] h-[32px]{% endif %} bg-[#49DE80]">B</div>
+                    <div class="flex items-center justify-center text-[rgba(255,255,255,0.8)] font-bold -ml-[2px] {% if soh_data.grade == 'C' %}w-[36px] h-[49px] text-[30px] rounded-2xl border-[3px] border-[rgba(255,255,255,0.95)] text-white z-20{% else %}w-[28px] h-[32px]{% endif %} bg-[#FECB02]">C</div>
+                    <div class="flex items-center justify-center text-[rgba(255,255,255,0.8)] font-bold -ml-[2px] {% if soh_data.grade == 'D' %}w-[36px] h-[49px] text-[30px] rounded-2xl border-[3px] border-[rgba(255,255,255,0.95)] text-white z-20{% else %}w-[28px] h-[32px]{% endif %} bg-[#EE8100]">D</div>
+                    <div class="flex items-center justify-center text-[rgba(255,255,255,0.8)] font-bold -ml-[2px] {% if soh_data.grade == 'E' %}w-[36px] h-[49px] text-[30px] rounded-2xl border-[3px] border-[rgba(255,255,255,0.95)] text-white z-20{% else %}w-[28px] h-[32px]  rounded-r-xl{% endif %} bg-[#E63E11]">E</div>
                 </div>
             </div>
         </div>

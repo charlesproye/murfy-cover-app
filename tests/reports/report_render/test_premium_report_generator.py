@@ -85,9 +85,7 @@ def _create_test_models() -> tuple[
         timestamp=datetime.now(),
     )
 
-    url_image = (
-        "https://bib-batteries-assets.s3.fr-par.scw.cloud/car_images/model_y_256px.png"
-    )
+    url_image = "https://bib-batteries-assets.s3.fr-par.scw.cloud/car_images/renault/renault_5_256px.webp"
 
     return vehicle, vehicle_model, battery, oem, vehicle_data, url_image
 
