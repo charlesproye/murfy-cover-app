@@ -69,7 +69,9 @@ def fit_lower_bound(x, y_lower):
     def f(x, a, b):
         return offset + a * np.log1p(x / b)
 
-    coef, _ = curve_fit(f, x, y_lower, maxfev=20000)
+    coef, _ = curve_fit(
+        f, x, y_lower, maxfev=20000, bounds=([-np.inf, 10000], [np.inf, 100000])
+    )
     return coef, offset
 
 
