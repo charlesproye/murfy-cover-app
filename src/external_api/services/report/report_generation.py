@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.s3.async_s3 import AsyncS3
 from db_models.company import Oem
-from db_models.report import PremiumReport
+from db_models.report import Report, ReportType
 from db_models.vehicle import (
     Battery,
     Vehicle,
@@ -19,31 +19,34 @@ from db_models.vehicle import (
     VehicleModel,
 )
 from external_api.core.config import settings
-from external_api.schemas.premium import PremiumReportPDFUrl
+from external_api.schemas.report import ReportPDFUrl
 from reports import reports_utils
-from reports.report_render.premium_report_generator import PremiumReportGenerator
+from reports.report_render.report_generator import ReportGenerator
 
 logger = logging.getLogger(__name__)
 
 
 async def get_existing_report_for_today(
-    vehicle: Vehicle, db: AsyncSession
-) -> PremiumReport | None:
+    vehicle: Vehicle,
+    db: AsyncSession,
+    report_type: ReportType,
+) -> Report | None:
     """
     Check if a premium report already exists for the given vehicle today.
 
     Args:
         vehicle: Vehicle DB model
         db: Database session
-
+        report_type: Report type
     Returns:
         PremiumReport if found, None otherwise
     """
     # Use UTC date to match database server timezone (PostgreSQL now() returns UTC)
     today = datetime.now(UTC).date()
-    stmt = select(PremiumReport).where(
-        PremiumReport.vehicle_id == vehicle.id,
-        func.date(PremiumReport.created_at) == today,
+    stmt = select(Report).where(
+        Report.vehicle_id == vehicle.id,
+        func.date(Report.created_at) == today,
+        Report.report_type == report_type,
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -55,6 +58,7 @@ async def _save_report_with_race_handling(
     db: AsyncSession,
     s3_client: AsyncS3,
     s3_uri: str,
+    report_type: ReportType,
 ) -> str:
     """
     Save premium report to database with race condition handling.
@@ -76,11 +80,12 @@ async def _save_report_with_race_handling(
     Raises:
         IntegrityError: If an unexpected integrity error occurs
     """
-    premium_report = PremiumReport(
+    premium_report = Report(
         vehicle_id=vehicle.id,
         report_url=s3_uri,
         id=uuid.UUID(report_uuid),
         task_id=None,  # No task ID for sync generation
+        report_type=report_type,
     )
     db.add(premium_report)
 
@@ -95,7 +100,7 @@ async def _save_report_with_race_handling(
             f"Race condition detected for VIN {vehicle.vin}, fetching existing report"
         )
 
-        existing_report = await get_existing_report_for_today(vehicle, db)
+        existing_report = await get_existing_report_for_today(vehicle, db, report_type)
         if existing_report:
             # Clean up the orphaned S3 file that was just uploaded
             try:
@@ -120,7 +125,7 @@ async def _save_report_with_race_handling(
             raise
 
 
-async def generate_premium_report_sync(
+async def generate_report_sync(
     vehicle: Vehicle,
     vehicle_model: VehicleModel,
     battery: Battery,
@@ -129,6 +134,7 @@ async def generate_premium_report_sync(
     image_url: str | None,
     db: AsyncSession,
     s3_client: AsyncS3,
+    report_type: ReportType,
     gotenberg_url: str = settings.GOTENBERG_URL,
     s3_bucket: str = settings.PREMIUM_REPORT_S3_BUCKET,
 ) -> str:
@@ -143,6 +149,7 @@ async def generate_premium_report_sync(
         vehicle_data: Latest VehicleData DB model
         db: Database session
         s3_client: AsyncS3 client instance (injected dependency)
+        report_type: Report type
         gotenberg_url: URL of the Gotenberg service
         s3_bucket: S3 bucket name for storing PDFs
 
@@ -156,17 +163,17 @@ async def generate_premium_report_sync(
     vin = vehicle.vin
     logger.info(f"Starting synchronous PDF generation for VIN: {vin}")
 
-    existing_report = await get_existing_report_for_today(vehicle, db)
+    existing_report = await get_existing_report_for_today(vehicle, db, report_type)
     if existing_report:
         logger.info(
             f"Report already exists for VIN {vin} today, returning existing S3 URI: {existing_report.report_url}"
         )
         return existing_report.report_url  # Return S3 URI
 
-    generator = PremiumReportGenerator(gotenberg_url=gotenberg_url)
+    generator = ReportGenerator(gotenberg_url=gotenberg_url)
 
     report_uuid = str(uuid.uuid4())
-    report_data = await generator.generate_premium_report_data(
+    report_data = await generator.generate_report_data(
         vehicle=vehicle,
         vehicle_model=vehicle_model,
         battery=battery,
@@ -174,6 +181,7 @@ async def generate_premium_report_sync(
         vehicle_data=vehicle_data,
         image_url=image_url,
         report_uuid=report_uuid,
+        report_type=report_type,
     )
 
     html_content = generator.render_template(
@@ -189,7 +197,7 @@ async def generate_premium_report_sync(
         f"PDF generated successfully for VIN {vin}, size: {len(pdf_bytes) / 1024:.2f} KB"
     )
 
-    s3_uri = f"s3://{s3_bucket}/sync/{vin}/{datetime.now(UTC).strftime('%Y%m%d')}_{uuid.uuid4()}.pdf"
+    s3_uri = f"s3://{s3_bucket}/{report_type.value}/API/{vin}/{datetime.now(UTC).strftime('%Y%m%d')}_{uuid.uuid4()}.pdf"
     await s3_client.upload_file_fast(
         s3_uri=s3_uri,
         file=pdf_bytes,
@@ -201,17 +209,19 @@ async def generate_premium_report_sync(
         db=db,
         s3_client=s3_client,
         s3_uri=s3_uri,
+        report_type=report_type,
     )
 
 
-async def get_premium_report_by_date(
+async def get_report_by_date(
     vin: str,
     report_date: date,
     db: AsyncSession,
     s3_client: AsyncS3,
-) -> PremiumReportPDFUrl:
-    existing_report = await reports_utils.get_db_premium_report_by_date(
-        vin, report_date, db
+    report_type: ReportType,
+) -> ReportPDFUrl:
+    existing_report = await reports_utils.get_db_report_by_date(
+        vin, report_date, db, report_type=report_type
     )
     if not existing_report:
         raise HTTPException(
@@ -228,7 +238,7 @@ async def get_premium_report_by_date(
         seconds=settings.PREMIUM_REPORT_S3_SIGNED_URI_EXPIRES_IN
     )
 
-    return PremiumReportPDFUrl(
+    return ReportPDFUrl(
         vin=vin,
         url=url,
         expires_at=expires_at,

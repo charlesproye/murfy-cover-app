@@ -13,12 +13,13 @@ from jinja2 import Environment, FileSystemLoader
 
 from core.numpy_utils import numpy_safe_eval
 from db_models.company import Oem
+from db_models.report import ReportType
 from db_models.vehicle import Battery, Vehicle, VehicleData, VehicleModel
-from external_api.schemas.premium import (
+from external_api.schemas.report import (
     AutonomyInfo,
     BatteryReportInfo,
     ChargingInfo,
-    PremiumReportData,
+    ReportData,
     ReportMetadata,
     SohChartData,
     VehicleReportInfo,
@@ -30,8 +31,8 @@ from reports.report_render.gotenberg_client import GotenbergClient
 logger = logging.getLogger(__name__)
 
 
-class PremiumReportGenerator:
-    """Generates premium PDF reports from Figma-based templates."""
+class ReportGenerator:
+    """Generates PDF reports from templates."""
 
     def __init__(
         self,
@@ -265,7 +266,7 @@ class PremiumReportGenerator:
 
         return results
 
-    async def generate_premium_report_data(
+    async def generate_report_data(
         self,
         vehicle: Vehicle,
         vehicle_model: VehicleModel,
@@ -273,8 +274,9 @@ class PremiumReportGenerator:
         oem: Oem,
         vehicle_data: VehicleData,
         image_url: str | None,
+        report_type: ReportType,
         report_uuid: str | None = None,
-    ) -> PremiumReportData:
+    ) -> ReportData:
         """
         Generate structured data for a premium report.
 
@@ -300,7 +302,7 @@ class PremiumReportGenerator:
 
         logger.info(f"Generating report data for VIN: {vin}")
 
-        if vehicle_data.soh is None:
+        if vehicle_data.soh is None and vehicle_data.soh_oem is None:
             raise ValueError(f"SoH data not available for VIN: {vin}")
 
         # Select trendline data (vehicle-specific or OEM fallback)
@@ -328,7 +330,13 @@ class PremiumReportGenerator:
             trendline_min_eq=trendline_min_eq,
             trendline_max_eq=trendline_max_eq,
             bib_score=vehicle.bib_score,
-            current_soh=float(vehicle_data.soh) * 100,
+            bib_soh=float(vehicle_data.soh) * 100
+            if vehicle_data.soh is not None
+            else None,
+            readout_soh_value=float(vehicle_data.soh_oem) * 100
+            if vehicle_data.soh_oem is not None
+            else None,
+            report_type=report_type,
         )
 
         charging_data = self._calculate_charging_data(battery.capacity)
@@ -349,14 +357,15 @@ class PremiumReportGenerator:
             mileage=str(int(current_km)),
             type=vehicle_model.type,
             charging_port=vehicle_model.charge_plug_type,
+            fast_charging_port=vehicle_model.fast_charge_plug_type,
             image_url=image_url,
         )
 
         battery_info = BatteryReportInfo(
             manufacturer=battery.battery_oem,
             chemistry=battery.battery_chemistry,
-            type=battery.battery_type,
-            capacity=float(battery.capacity) if battery.capacity else 0.0,
+            capacity=battery.capacity,
+            net_capacity=battery.net_capacity,
             wltp_range=str(vehicle_model.autonomy),
             consumption=int(vehicle_data.consumption)
             if vehicle_data.consumption
@@ -369,9 +378,10 @@ class PremiumReportGenerator:
             date=self._format_date_french(datetime.now()),
             delivered_by="BIB Batteries",
             uuid=report_uuid,
+            report_type=report_type,
         )
 
-        return PremiumReportData(
+        return ReportData(
             vehicle=vehicle_info,
             battery=battery_info,
             soh_data=soh_chart_data,
@@ -381,7 +391,7 @@ class PremiumReportGenerator:
             report=report_metadata,
         )
 
-    async def generate_premium_report_html(
+    async def generate_report_html(
         self,
         vehicle: Vehicle,
         vehicle_model: VehicleModel,
@@ -389,6 +399,7 @@ class PremiumReportGenerator:
         oem: Oem,
         vehicle_data: VehicleData,
         image_url: str | None,
+        report_type: ReportType,
         report_uuid: str | None = None,
     ) -> str:
         """
@@ -409,7 +420,7 @@ class PremiumReportGenerator:
         """
         logger.info(f"Generating HTML for premium report, VIN: {vehicle.vin}")
 
-        report_data = await self.generate_premium_report_data(
+        report_data = await self.generate_report_data(
             vehicle=vehicle,
             vehicle_model=vehicle_model,
             battery=battery,
@@ -417,6 +428,7 @@ class PremiumReportGenerator:
             vehicle_data=vehicle_data,
             report_uuid=report_uuid,
             image_url=image_url,
+            report_type=report_type,
         )
 
         # Use the main template which includes both pages with proper page breaks
@@ -484,7 +496,7 @@ class PremiumReportGenerator:
 
     def render_template(
         self,
-        data: PremiumReportData,
+        data: ReportData,
         embed_assets: bool = True,
     ) -> str:
         """
@@ -554,8 +566,10 @@ class PremiumReportGenerator:
         trendline_eq: str,
         trendline_min_eq: str,
         trendline_max_eq: str,
-        current_soh: float,
+        bib_soh: float | None,
         bib_score: str | None,
+        readout_soh_value: float | None,
+        report_type: ReportType,
     ) -> SohChartData:
         """
         Generate complete SoH data including current value, grade, and chart data.
@@ -570,7 +584,9 @@ class PremiumReportGenerator:
             trendline_min_eq: Equation string for lower bound
             trendline_max_eq: Equation string for upper bound
             bib_score: BIB battery health grade
-            current_soh: Current SoH percentage (0-100), used to offset the trendline
+            bib_soh: Current BIB SoH percentage (0-100), used to offset the trendline
+            readout_soh_value: Current Readout SoH percentage (0-100)
+            report_type: Report type
 
         Returns:
             SohChartData with offset-adjusted trendline values and current SoH
@@ -591,16 +607,20 @@ class PremiumReportGenerator:
         trendline_value_at_current = float(
             np.round(numpy_safe_eval(trendline_eq, x=current_km) * 100, 1)
         )
-        offset = round(current_soh - trendline_value_at_current, 1)
-
-        soh_trendline = soh_trendline + offset
+        if report_type == ReportType.readout and readout_soh_value is not None:
+            offset = round(readout_soh_value - trendline_value_at_current, 1)
+        elif report_type == ReportType.premium and bib_soh is not None:
+            offset = round(bib_soh - trendline_value_at_current, 1)
+        else:
+            raise ValueError(f"SoH value missing for report_type={report_type}")
 
         # TODO: Remove the correction once EVALUE-250 is fixed
-        soh_min = soh_min + offset
-        soh_max = soh_max + offset
+        soh_trendline = soh_trendline + offset
 
         return SohChartData(
-            value=current_soh,
+            independant_soh_value=bib_soh,
+            readout_soh_value=readout_soh_value,
+            readout_only=report_type == ReportType.readout,
             grade=bib_score,
             odometer_points=km_points.tolist(),
             current_km=int(current_km),

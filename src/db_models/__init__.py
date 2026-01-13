@@ -19,7 +19,7 @@ from db_models.fleet import (
 )
 from db_models.report import (
     FlashReportCombination,
-    PremiumReport,
+    Report,
 )
 from db_models.user import (
     Role,
@@ -49,8 +49,8 @@ __all__ = [
     "Fleet",
     "Make",
     "Oem",
-    "PremiumReport",
     "Region",
+    "Report",
     "Role",
     "User",
     "UserFleet",

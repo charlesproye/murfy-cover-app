@@ -5,12 +5,13 @@ import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from fastapi_pagination import add_pagination
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from external_api import __VERSION__
-from external_api.api.v1 import api_router  # as api_router_v1
+from external_api.api.v1 import api_router
 from external_api.core.config import settings
 from external_api.core.http_client import HTTP_CLIENT
 
@@ -102,7 +103,11 @@ async def lifespan(app: FastAPI):
     instrumentator.expose(app)
 
     for route in app.routes:
-        if hasattr(route, "path") and route.path == "/metrics":
+        if (
+            hasattr(route, "path")
+            and route.path == "/metrics"
+            and isinstance(route, APIRoute)
+        ):
             route.include_in_schema = False
             break
 

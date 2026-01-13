@@ -11,18 +11,19 @@ from core.gdrive_utils import get_google_service
 from core.gsheet_utils import get_google_client
 from core.s3.async_s3 import S3ACL, AsyncS3
 from core.sql_utils import get_async_session_maker
-from db_models import PremiumReport, Vehicle, VehicleData, VehicleModel
+from db_models import Report, Vehicle, VehicleData, VehicleModel
 from db_models.company import Oem
+from db_models.report import ReportType
 from db_models.vehicle import Battery
 from external_api.core.exceptions import ExistingReportException
 from reports import reports_utils
-from reports.report_render.premium_report_generator import PremiumReportGenerator
+from reports.report_render.report_generator import ReportGenerator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class ReportGenerator:
+class GSheetReportGenerator:
     """Enriches Google Sheet data with vehicle information and generates PDF reports."""
 
     def __init__(
@@ -208,10 +209,11 @@ class ReportGenerator:
             ValueError: If required data is missing
         """
         async with self.async_session_factory() as session:
-            existing_report = await reports_utils.get_db_premium_report_by_date(
+            existing_report = await reports_utils.get_db_report_by_date(
                 vin,
                 datetime.now(UTC).date(),
                 session,
+                report_type=ReportType.premium,
             )
             if existing_report:
                 raise ExistingReportException(
@@ -271,7 +273,7 @@ class ReportGenerator:
         )
 
         # Query database for reports matching VIN/date combinations
-        vin_to_report: dict[tuple[str, str], PremiumReport] = {}
+        vin_to_report: dict[tuple[str, str], Report] = {}
 
         async with self.async_session_factory() as session:
             for vin, date_str in vin_date_pairs:
@@ -282,10 +284,11 @@ class ReportGenerator:
                     continue
 
                 report = await session.execute(
-                    select(PremiumReport)
-                    .join(Vehicle, PremiumReport.vehicle_id == Vehicle.id)
+                    select(Report)
+                    .join(Vehicle, Report.vehicle_id == Vehicle.id)
                     .filter(Vehicle.vin == vin)
-                    .filter(func.date(PremiumReport.created_at) == report_date)
+                    .filter(func.date(Report.created_at) == report_date)
+                    .filter(Report.report_type == ReportType.premium)
                     .limit(1)
                 )
                 report = report.scalar_one_or_none()
@@ -320,7 +323,7 @@ class ReportGenerator:
         logger.info(f"Generating PDFs for {len(vins)} VINs")
 
         list_files: list[tuple[str, str, uuid.UUID]] = []
-        generator = PremiumReportGenerator()
+        generator = ReportGenerator()
 
         for vin in vins:
             try:
@@ -335,7 +338,7 @@ class ReportGenerator:
                 ) = await self._fetch_report_data(vin)
 
                 report_uuid = uuid.uuid4()
-                html_content = await generator.generate_premium_report_html(
+                html_content = await generator.generate_report_html(
                     vehicle=vehicle,
                     vehicle_model=vehicle_model,
                     battery=battery,
@@ -343,6 +346,7 @@ class ReportGenerator:
                     vehicle_data=vehicle_data,
                     image_url=image_url,
                     report_uuid=str(report_uuid),
+                    report_type=ReportType.premium,
                 )
 
                 pdf_bytes = await generator.generate_pdf(html_content=html_content)
@@ -355,7 +359,7 @@ class ReportGenerator:
                     f"PDF generated successfully for VIN {vin}, size: {len(pdf_bytes) / 1024:.2f} KB"
                 )
 
-                s3_uri = f"s3://{self.s3_bucket}/{self.worksheet_name.upper()}/{datetime.now(UTC).strftime('%Y%m%d')}/{vin}/{vin}_{report_uuid}.pdf"
+                s3_uri = f"s3://{self.s3_bucket}/{ReportType.premium.value}/{self.worksheet_name.upper()}/{datetime.now(UTC).strftime('%Y%m%d')}/{vin}/{vin}_{report_uuid}.pdf"
                 await self.s3_client.upload_file_fast(
                     s3_uri=s3_uri, file=pdf_bytes, acl=S3ACL.PRIVATE
                 )
@@ -390,11 +394,12 @@ class ReportGenerator:
                     logger.error(f"Vehicle with VIN {vin} not found in database")
                     continue
 
-                premium_report = PremiumReport(
+                premium_report = Report(
                     id=report_uuid,
                     vehicle_id=vehicle_id,
                     report_url=s3_uri,
                     task_id=task_id,
+                    report_type=ReportType.premium,
                 )
                 session.add(premium_report)
             await session.commit()
@@ -462,7 +467,7 @@ class ReportGenerator:
         logger.info("Google Sheet updated successfully")
 
     async def run(self) -> pd.DataFrame:
-        logger.info("Starting report enrichment process")
+        logger.info("Starting Premium report enrichment process")
 
         # Load data
         df = self.load_gsheet_data()

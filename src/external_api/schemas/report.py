@@ -2,14 +2,16 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from db_models.report import ReportType
 
-class PremiumReportGeneration(BaseModel):
+
+class ReportGeneration(BaseModel):
     job_id: str
     message: str
     estimated_duration: str
 
 
-class PremiumReportPDFUrl(BaseModel):
+class ReportPDFUrl(BaseModel):
     job_id: str | None = None
     vin: str
     message: str | None = None
@@ -19,7 +21,7 @@ class PremiumReportPDFUrl(BaseModel):
     retry_info: str | None = None
 
 
-class PremiumReportSync(BaseModel):
+class ReportSync(BaseModel):
     vin: str
     url: str
     message: str
@@ -45,6 +47,9 @@ class VehicleReportInfo(BaseModel):
     charging_port: str | None = Field(
         None, description="Type of charging port (e.g., CCS, Type 2)"
     )
+    fast_charging_port: str | None = Field(
+        None, description="Type of fast charging port"
+    )
     image_url: str | None = Field(None, description="URL to vehicle image")
 
 
@@ -57,8 +62,8 @@ class BatteryReportInfo(BaseModel):
     chemistry: str | None = Field(
         None, description="Battery chemistry type (e.g., NMC, LFP)"
     )
-    type: str | None = Field(None, description="Battery type (e.g., LITHIUM-ION)")
-    capacity: float = Field(description="Battery capacity in kWh")
+    capacity: float | None = Field(description="Battery capacity in kWh")
+    net_capacity: float | None = Field(description="Battery net capacity in kWh")
     wltp_range: str = Field(description="WLTP certified range in km")
     consumption: int | None = Field(
         None, description="Average consumption in kWh/100km"
@@ -72,7 +77,12 @@ class SohChartData(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    value: float = Field(description="Current SoH percentage (0-100)")
+    independant_soh_value: float | None = Field(
+        None, description="Current BIB SoH percentage (0-100)"
+    )
+    readout_soh_value: float | None = Field(
+        None, description="Readout SoH percentage (0-100)"
+    )
     grade: str | None = Field(None, description="BIB battery health grade (A-E)")
     odometer_points: list[int] = Field(
         description="Mileage points for chart x-axis in km"
@@ -87,6 +97,8 @@ class SohChartData(BaseModel):
     soh_max: list[float] = Field(
         description="Upper confidence bound for SoH prediction"
     )
+
+    readout_only: bool = Field(description="Whether the report is a readout report")
 
 
 class ChargingInfo(BaseModel):
@@ -145,9 +157,10 @@ class ReportMetadata(BaseModel):
     uuid: str | None = Field(None, description="Report UUID")
     date: str = Field(description="Report generation date (dd/mm/YYYY)")
     delivered_by: str = Field(description="Report issuer organization")
+    report_type: ReportType = Field(description="Report type")
 
 
-class PremiumReportData(BaseModel):
+class ReportData(BaseModel):
     """
     Complete premium battery report data.
 

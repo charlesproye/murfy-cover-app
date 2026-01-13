@@ -2,7 +2,7 @@ import asyncio
 
 from core.env_utils import get_env_var
 from core.gdrive_utils import get_google_service, list_spreadsheets_in_folder
-from reports.report_generator import ReportGenerator
+from reports.gsheet_report_generator import GSheetReportGenerator
 
 CLIENT_FOLDER_ID = get_env_var("CLIENT_FOLDER_ID")
 
@@ -18,7 +18,7 @@ async def main():
         # if spreadsheet_name != "TestClient":
         #     continue
 
-        report_generator = ReportGenerator(spreadsheet_id, spreadsheet_name)
+        report_generator = GSheetReportGenerator(spreadsheet_id, spreadsheet_name)
         try:
             await report_generator.run()
         finally:

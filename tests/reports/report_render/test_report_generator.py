@@ -7,9 +7,10 @@ from pathlib import Path
 import pytest
 
 from db_models.company import Oem
+from db_models.report import ReportType
 from db_models.vehicle import Battery, Vehicle, VehicleData, VehicleModel
 from external_api.core.config import settings
-from reports.report_render.premium_report_generator import PremiumReportGenerator
+from reports.report_render.report_generator import ReportGenerator
 
 
 def _create_test_models() -> tuple[
@@ -30,6 +31,7 @@ def _create_test_models() -> tuple[
         battery_chemistry="NMC",
         battery_oem="SAMSUNG SDI",
         capacity=42.2,
+        net_capacity=40.2,
         battery_warranty_period=8,
         battery_warranty_mileage=160_000,
     )
@@ -52,6 +54,7 @@ def _create_test_models() -> tuple[
         expected_consumption=16.1,
         maximum_speed=150,
         charge_plug_type="CCS COMBO",
+        fast_charge_plug_type="CCS",
         # Autonomy data for different driving cycles
         autonomy_city_summer=380,
         autonomy_city_winter=320,
@@ -81,6 +84,7 @@ def _create_test_models() -> tuple[
         vehicle_id=vehicle.id,
         odometer=20000.0,
         soh=0.95,
+        soh_oem=0.97,
         consumption=16.1,
         timestamp=datetime.now(),
     )
@@ -95,9 +99,9 @@ async def test_generate_premium_report_html(tmp_path: Path) -> None:
     vehicle, vehicle_model, battery, oem, vehicle_data, url_image = (
         _create_test_models()
     )
-    generator = PremiumReportGenerator()
+    generator = ReportGenerator()
 
-    html_content = await generator.generate_premium_report_html(
+    html_content = await generator.generate_report_html(
         vehicle=vehicle,
         vehicle_model=vehicle_model,
         battery=battery,
@@ -105,6 +109,7 @@ async def test_generate_premium_report_html(tmp_path: Path) -> None:
         vehicle_data=vehicle_data,
         report_uuid=str(uuid.uuid4()),
         image_url=url_image,
+        report_type=ReportType.premium,
     )
 
     output_path = tmp_path / "example_premium_report.html"
@@ -135,38 +140,43 @@ async def test_generate_premium_report_html(tmp_path: Path) -> None:
 
 @pytest.mark.gotenberg
 @pytest.mark.integration
-async def test_generate_premium_report_pdf_gotenberg() -> None:
+async def test_generate_report_pdf_gotenberg() -> None:
     """Test PDF generation with Gotenberg (without S3 upload)."""
-    generator = PremiumReportGenerator(gotenberg_url=settings.GOTENBERG_URL)
-    output_path = Path("/tmp") / "bib_reports" / "example_premium_report.pdf"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    generator = ReportGenerator(gotenberg_url=settings.GOTENBERG_URL)
 
-    vehicle, vehicle_model, battery, oem, vehicle_data, url_image = (
-        _create_test_models()
-    )
+    for report_type in [ReportType.premium, ReportType.readout]:
+        output_path = (
+            Path("/tmp") / "bib_reports" / f"example_{report_type.value}_report.pdf"
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    html_content = await generator.generate_premium_report_html(
-        vehicle=vehicle,
-        vehicle_model=vehicle_model,
-        battery=battery,
-        oem=oem,
-        vehicle_data=vehicle_data,
-        report_uuid=str(uuid.uuid4()),
-        image_url=url_image,
-    )
-    html_path = output_path.parent / "example_premium_report.html"
-    html_path.write_text(html_content, encoding="utf-8")
+        vehicle, vehicle_model, battery, oem, vehicle_data, url_image = (
+            _create_test_models()
+        )
 
-    pdf_bytes = await generator.generate_pdf(
-        html_content=html_content, output_path=output_path
-    )
+        html_content = await generator.generate_report_html(
+            vehicle=vehicle,
+            vehicle_model=vehicle_model,
+            battery=battery,
+            oem=oem,
+            vehicle_data=vehicle_data,
+            report_uuid=str(uuid.uuid4()),
+            image_url=url_image,
+            report_type=report_type,
+        )
+        html_path = output_path.parent / f"example_{report_type.value}_report.html"
+        html_path.write_text(html_content, encoding="utf-8")
 
-    assert output_path.exists()
-    assert output_path.stat().st_size == len(pdf_bytes)
-    assert pdf_bytes.startswith(b"%PDF")
+        pdf_bytes = await generator.generate_pdf(
+            html_content=html_content, output_path=output_path
+        )
 
-    print(f"Saved PDF to {output_path}")
-    print(f"Saved HTML to {html_path}")
+        assert output_path.exists()
+        assert output_path.stat().st_size == len(pdf_bytes)
+        assert pdf_bytes.startswith(b"%PDF")
+
+        print(f"Saved PDF to {output_path}")
+        print(f"Saved HTML to {html_path}")
 
 
 async def test_generate_premium_report_html_with_fallback_autonomy() -> None:
@@ -174,7 +184,7 @@ async def test_generate_premium_report_html_with_fallback_autonomy() -> None:
     vehicle, vehicle_model, battery, oem, vehicle_data, url_image = (
         _create_test_models()
     )
-    generator = PremiumReportGenerator()
+    generator = ReportGenerator()
 
     # Remove autonomy values from vehicle_model to test fallback
     vehicle_model.autonomy_city_summer = None
@@ -187,13 +197,14 @@ async def test_generate_premium_report_html_with_fallback_autonomy() -> None:
     # Set real_autonomy in vehicle_data (308 km WLTP)
     vehicle_data.real_autonomy = 308
 
-    html_content = await generator.generate_premium_report_html(
+    html_content = await generator.generate_report_html(
         vehicle=vehicle,
         vehicle_model=vehicle_model,
         battery=battery,
         oem=oem,
         vehicle_data=vehicle_data,
         image_url=url_image,
+        report_type=ReportType.premium,
     )
 
     assert html_content

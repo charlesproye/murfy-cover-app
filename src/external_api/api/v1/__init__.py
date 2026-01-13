@@ -10,7 +10,8 @@ from external_api.api.v1.endpoints import (
     in_life_data,
     individual,
     passport,
-    premium,
+    report_premium,
+    report_readout,
     static_data,
     tesla,
     vehicle_command,
@@ -26,7 +27,22 @@ api_router.include_router(
     static_data.router, prefix="/static_data", tags=["Static Data"]
 )
 api_router.include_router(flash.router, prefix="/flash", tags=["Flash"])
-api_router.include_router(premium.router, prefix="/premium", tags=["Premium"])
+
+api_router.include_router(
+    report_premium.premium_router, prefix="/premium", tags=["Premium"]
+)
+api_router.include_router(
+    report_premium.premium_router_hidden, prefix="/premium", tags=["Premium"]
+)
+
+api_router.include_router(
+    report_readout.readout_router, prefix="/readout", tags=["Readout"]
+)
+api_router.include_router(
+    report_readout.readout_router_hidden, prefix="/readout", tags=["Readout"]
+)
+
+
 api_router.include_router(individual.router, prefix="/individual", tags=["Individual"])
 
 api_router.include_router(

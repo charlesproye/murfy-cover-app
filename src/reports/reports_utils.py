@@ -3,10 +3,11 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, or_
 
-from db_models import Asset, PremiumReport, Vehicle, VehicleData, VehicleModel
+from db_models import Asset, Report, Vehicle, VehicleData, VehicleModel
 from db_models.company import Make, Oem
+from db_models.report import ReportType
 from db_models.vehicle import Battery
 
 
@@ -48,7 +49,8 @@ def build_report_data_query(vin: str):
         .join(MakeImage, Make.image_id == MakeImage.id, isouter=True)
         .outerjoin(
             VehicleData,
-            (VehicleData.vehicle_id == Vehicle.id) & (VehicleData.soh.isnot(None)),
+            (VehicleData.vehicle_id == Vehicle.id)
+            & (or_(VehicleData.soh.isnot(None), VehicleData.soh_oem.isnot(None))),
         )
         .where(Vehicle.vin == vin)
         .order_by(VehicleData.odometer.desc())
@@ -56,17 +58,19 @@ def build_report_data_query(vin: str):
     )
 
 
-async def get_db_premium_report_by_date(
+async def get_db_report_by_date(
     vin: str,
     report_date: date,
     db: AsyncSession,
-) -> PremiumReport | None:
+    report_type: ReportType,
+) -> Report | None:
     """Helper function to get premium report by VIN and date."""
     existing_report_result = await db.execute(
-        select(PremiumReport)
-        .join(Vehicle, PremiumReport.vehicle_id == Vehicle.id)
+        select(Report)
+        .join(Vehicle, Report.vehicle_id == Vehicle.id)
         .where(Vehicle.vin == vin)
-        .where(func.date(PremiumReport.created_at) == report_date)
+        .where(func.date(Report.created_at) == report_date)
+        .where(Report.report_type == report_type)
         .limit(1)
     )
     existing_report = existing_report_result.scalar_one_or_none()
