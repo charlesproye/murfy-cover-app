@@ -259,7 +259,10 @@ class HighMobilityActivator(BaseOEMActivator):
 
                 if not current_status_info["status"] and desired_status:
                     to_activate[vin] = entry
-                elif current_status_info["status"] and not desired_status:
+                elif (current_status_info["status"] and not desired_status) or (
+                    not desired_status
+                    and row["activation_status_message"] == "DEACTIVATION REQUESTED"
+                ):
                     to_deactivate[vin] = entry
                 elif current_status_info["status"] == desired_status:
                     status_equal[vin] = entry

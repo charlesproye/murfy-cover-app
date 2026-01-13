@@ -98,6 +98,7 @@ class TeslaActivator(BaseOEMActivator):
                     "message": status_results[idx][1],
                     "fleet_id": row["fleet_id"],
                     "desired_state": row["activation_requested_status"],
+                    "activation_status_message": row["activation_status_message"],
                 }
                 for idx, (_, row) in enumerate(df_tesla.iterrows())
             }
@@ -108,12 +109,15 @@ class TeslaActivator(BaseOEMActivator):
             vin_in_desired_state: list[tuple[str, bool, str]] = []
 
             for vin, info in status_dict.items():
-                if info["current_state"] == info["desired_state"]:
+                if (info["current_state"] and not info["desired_state"]) or (
+                    not info["desired_state"]
+                    and info["activation_status_message"] == "DEACTIVATION REQUESTED"
+                ):
+                    vin_to_deactivate.append((vin, info["fleet_id"]))
+                elif info["current_state"] == info["desired_state"]:
                     vin_in_desired_state.append(
                         (vin, info["current_state"], info["fleet_id"])
                     )
-                elif info["current_state"] and not info["desired_state"]:
-                    vin_to_deactivate.append((vin, info["fleet_id"]))
                 elif info["desired_state"] and not info["current_state"]:
                     vin_to_activate.append((vin, info["fleet_id"]))
 
@@ -126,7 +130,7 @@ class TeslaActivator(BaseOEMActivator):
 
             # Process vehicles already in desired state
             if vin_in_desired_state:
-                for vin, current_state, fleet_id in vin_in_desired_state:
+                for vin, current_state, _ in vin_in_desired_state:
                     vehicle = vehicles_dict.get(vin)
                     if not vehicle:
                         logging.warning(f"Tesla vehicle {vin} not found in database")
@@ -141,13 +145,16 @@ class TeslaActivator(BaseOEMActivator):
                 await self._activate_tesla_batch(vin_to_activate, session)
 
                 # Check activation results in parallel
-                activation_check_tasks = [
-                    self._handle_activation_result(
-                        vehicles_dict.get(vin), vin, fleet_id, session
+                activation_check_tasks = []
+                for vin, fleet_id in vin_to_activate:
+                    vehicle = vehicles_dict.get(vin)
+                    if not vehicle:
+                        logging.warning(f"Tesla vehicle {vin} not found in database")
+                        continue
+                    activation_check_tasks.append(
+                        self._handle_activation_result(vehicle, vin, fleet_id, session)
                     )
-                    for vin, fleet_id in vin_to_activate
-                    if vehicles_dict.get(vin)
-                ]
+
                 activation_results = await asyncio.gather(*activation_check_tasks)
                 history_inserts.extend([r for r in activation_results if r])
 

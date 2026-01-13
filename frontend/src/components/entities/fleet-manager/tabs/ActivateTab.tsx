@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { IconCheck, IconUpload } from '@tabler/icons-react';
+import { IconCheck, IconUpload, IconDownload } from '@tabler/icons-react';
 import { toast } from 'sonner';
 import fetchWithAuth from '@/services/fetchWithAuth';
 import { ROUTES } from '@/routes';
@@ -663,6 +663,24 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     setCsvValidation(updated);
   };
 
+  const downloadCSVTemplate = () => {
+    const headers = ['vin', 'make', 'model', 'type', 'start_date', 'end_date', 'comment'];
+    const csvContent = headers.join(',');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'vehicle_activation_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success('CSV template downloaded');
+  };
+
   const handleSingleActivation = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -790,6 +808,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
         headers.forEach((header, index) => {
           obj[header] = values[index] || '';
         });
+        // Convert make to lowercase
+        if (obj.make) {
+          obj.make = obj.make.toLowerCase();
+        }
         return obj;
       });
 
@@ -1083,7 +1105,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
           {/* CSV Import Form */}
           {inputMethod === 'csv' && (
             <div className="w-full rounded-lg border bg-white p-6 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3 flex-1">
                   <p className="text-sm text-blue-800 font-medium mb-2">
                     Expected CSV format:
@@ -1092,16 +1114,27 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                     vin,make,model,type,start_date,end_date,comment
                   </code>
                 </div>
-                {showValidation && csvValidation.length > 0 && (
+
+                <div className="flex gap-2 flex-shrink-0">
                   <Button
-                    onClick={clearCSVData}
+                    onClick={downloadCSVTemplate}
                     variant="outline"
                     size="sm"
-                    className="ml-4"
+                    type="button"
                   >
-                    Clear CSV
+                    <IconDownload size={16} className="mr-1" />
+                    Download CSV
                   </Button>
-                )}
+                  {showValidation && csvValidation.length > 0 && (
+                    <Button
+                      onClick={clearCSVData}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Clear CSV
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">

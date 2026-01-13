@@ -40,6 +40,8 @@ activation = [
     "uuid6>=2022.10.25",
     "sqlalchemy>=2.0.0",
     "rapidfuzz>=3.13.0",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.5.1",
 ]
 
 # Transform module dependencies - handles ETL pipeline with Spark
@@ -208,6 +210,7 @@ dev = [
     "py-spy>=0.4.1",
     "ipykernel",
     "polyfactory>=3.2.0",
+    "scikit-learn>=1.5.1",
 ]
 
 local = ["pyspark>=4.0.1", "jupyterlab"]

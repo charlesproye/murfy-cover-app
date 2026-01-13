@@ -123,9 +123,13 @@ async def activate_and_process_vehicles(oems=None):
 
         df = await get_vehicle_command()
 
-        # Filter vehicles that need activation changes
+        # Filter vehicles that need activation changes & deactivation requested for cancelling an ongoing activation
         vehicle_command_df = df[
-            df["activation_requested_status"] != df["activation_status"]
+            (df["activation_requested_status"] != df["activation_status"])
+            | (
+                (df["activation_requested_status"] == False)
+                & (df["activation_status_message"] == "DEACTIVATION REQUESTED")
+            )
         ]
 
         # Get vehicles to process (activated but not yet processed)

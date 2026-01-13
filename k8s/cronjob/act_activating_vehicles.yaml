@@ -28,6 +28,8 @@ spec:
                     - ALL
               envFrom:
                 - secretRef:
+                    name: s3-secret
+                - secretRef:
                     name: db-data-ev-secret
                 - secretRef:
                     name: google-secret
@@ -52,6 +54,8 @@ spec:
                 - secretRef:
                     name: db-encryption-secret
               env:
+                - name: S3_BUCKET
+                  value: "bib-platform-prod-data"
                 - name: METRIC_SLACK_CHANNEL_ID
                   value: "C09RUV9T2UR"
                 - name: TESLA_VEHICLE_COMMAND_CERT_PATH

@@ -75,7 +75,8 @@ def update_activation_status(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     mask_dates_present = (
-        df["activation_start_date"].notna() | df["activation_end_date"].notna()
+        (df["activation_start_date"].notna() | df["activation_end_date"].notna())
+        & (df["activation_requested_status"] == True)  # noqa: E712
     )
 
     active = (

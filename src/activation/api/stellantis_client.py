@@ -110,6 +110,7 @@ class StellantisApi:
                         "id": id,
                         "from": from_date if from_date else None,
                     }
+
         return result
 
     async def add_to_fleet(self, id: str, session: aiohttp.ClientSession):

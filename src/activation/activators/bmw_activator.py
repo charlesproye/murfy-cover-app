@@ -396,7 +396,9 @@ class BMWActivator(BaseOEMActivator):
                 in_fleet = status_info["in_fleet"]
 
                 # Route to appropriate handler
-                if desired_state == current_state:
+                if (desired_state == current_state) and (
+                    row["activation_status_message"] != "DEACTIVATION REQUESTED"
+                ):
                     entry = await self._handle_status_equal(
                         vehicle, vin, current_state, in_fleet, session
                     )

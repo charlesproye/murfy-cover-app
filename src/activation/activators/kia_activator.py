@@ -116,12 +116,16 @@ class KiaActivator(BaseOEMActivator):
             get_async_session_maker()() as db,
             aiohttp.ClientSession() as session,
         ):
-            # Prepare desired states
+            # Prepare desired states with activation_status_message
             desired_states = {
-                vin: {"desired_state": desired_state}
-                for vin, desired_state in zip(
+                vin: {
+                    "desired_state": desired_state,
+                    "activation_status_message": status_msg,
+                }
+                for vin, desired_state, status_msg in zip(
                     df_kia["vin"].tolist(),
                     df_kia["activation_requested_status"].tolist(),
+                    df_kia["activation_status_message"].tolist(),
                     strict=False,
                 )
             }
@@ -136,6 +140,9 @@ class KiaActivator(BaseOEMActivator):
                     "desired_state": desired_states[vin]["desired_state"],
                     "current_state": merged[vin]["status_bool"],
                     "current_state_status": merged[vin]["reason"],
+                    "activation_status_message": desired_states[vin][
+                        "activation_status_message"
+                    ],
                 }
                 for vin in merged
             }
@@ -144,7 +151,8 @@ class KiaActivator(BaseOEMActivator):
             vins_in_desired_state = {
                 vin: info
                 for vin, info in merged_states.items()
-                if info["desired_state"] == info["current_state"]
+                if (info["desired_state"] == info["current_state"])
+                and (info["activation_status_message"] != "DEACTIVATION REQUESTED")
             }
 
             vins_to_activate = [
@@ -156,7 +164,12 @@ class KiaActivator(BaseOEMActivator):
             vins_to_deactivate = [
                 vin
                 for vin, info in merged_states.items()
-                if info["desired_state"] is False and info["current_state"] is True
+                if (info["desired_state"] is False and info["current_state"] is True)
+                or (
+                    info["desired_state"] is False
+                    and info["current_state"] is False
+                    and info["activation_status_message"] == "DEACTIVATION REQUESTED"
+                )
             ]
 
             # Batch load ALL vehicles at once

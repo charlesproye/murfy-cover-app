@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { IconSearch, IconDownload, IconRefresh } from '@tabler/icons-react';
+import { IconSearch, IconDownload, IconRefresh, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { toast } from 'sonner';
 import fetchWithAuth from '@/services/fetchWithAuth';
 import { ROUTES } from '@/routes';
@@ -39,8 +39,10 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'activated', 'requested', 'inactive'
   const [makeFilter, setMakeFilter] = useState<string[]>([]);
   const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const CACHE_DURATION = 30000; // 30 seconds
+  const ITEMS_PER_PAGE = 50;
 
   const getCacheKey = (fleetId: string) => `vehicles_cache_${fleetId}`;
   const getTimestampKey = (fleetId: string) => `vehicles_timestamp_${fleetId}`;
@@ -129,14 +131,18 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
   }, [selectedFleetId, lastFetchTime, vehicles.length]);
 
   const downloadCSV = () => {
-    if (vehicles.length === 0) {
+    if (filteredVehicles.length === 0) {
       toast.error('No data to download');
       return;
     }
 
-    const headers = ['VIN', 'Requested Status', 'Status', 'Message', 'Comment'];
-    const rows = vehicles.map(v => [
+    const headers = ['VIN', 'Make', 'Model', 'Type', 'Version', 'Requested Status', 'Status', 'Message', 'Comment'];
+    const rows = filteredVehicles.map(v => [
       v.vin,
+      v.make || '',
+      v.model_name || '',
+      v.type || '',
+      v.version || '',
       v.requested_status ? 'Yes' : 'No',
       v.status ? 'Yes' : 'No',
       v.message,
@@ -191,6 +197,17 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
   const filteredRequestedCount = filteredVehicles.filter(v => v.requested_status).length;
   const filteredInactiveCount = filteredVehicles.length - filteredActivatedCount;
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredVehicles.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedVehicles = filteredVehicles.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [vinFilter, messageFilter, statusFilter, makeFilter]);
+
   return (
     <div className="flex flex-col gap-6 w-full">
       {fleets.length === 0 ? (
@@ -219,7 +236,7 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
 
           {vehicles.length > 0 && (
             <>
-              {/* Search Bar and Refresh */}
+              {/* Search Bar and Actions */}
               <div className="flex gap-4 items-end">
                 <div className="flex-1 space-y-2">
                   <div className="relative">
@@ -233,6 +250,10 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                     />
                   </div>
                 </div>
+                <Button onClick={downloadCSV} variant="outline" size="sm" disabled={filteredVehicles.length === 0}>
+                  <IconDownload size={16} />
+                  Export CSV
+                </Button>
                 <Button onClick={refreshVehicles} loading={isLoading} variant="outline" size="sm">
                   <IconRefresh size={16} />
                   Refresh
@@ -356,10 +377,10 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredVehicles.map((vehicle, index) => (
+                      {paginatedVehicles.map((vehicle, index) => (
                         <tr
                           key={vehicle.vin}
-                          className={`${index === filteredVehicles.length - 1 ? '' : 'border-b'} hover:bg-gray-50 transition-colors`}
+                          className={`${index === paginatedVehicles.length - 1 ? '' : 'border-b'} hover:bg-gray-50 transition-colors`}
                         >
                           <td className="py-3 px-4 font-mono text-xs">{vehicle.vin}</td>
                           <td className="py-3 px-4">{vehicle.make || '-'}</td>
@@ -396,6 +417,63 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                   </table>
                 </div>
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing {startIndex + 1} to {Math.min(endIndex, filteredVehicles.length)} of {filteredVehicles.length} vehicles
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <IconChevronLeft size={16} />
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        // Show first page, last page, current page, and pages around current
+                        if (
+                          page === 1 ||
+                          page === totalPages ||
+                          (page >= currentPage - 1 && page <= currentPage + 1)
+                        ) {
+                          return (
+                            <Button
+                              key={page}
+                              variant={currentPage === page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(page)}
+                              className="min-w-[40px]"
+                            >
+                              {page}
+                            </Button>
+                          );
+                        } else if (
+                          page === currentPage - 2 ||
+                          page === currentPage + 2
+                        ) {
+                          return <span key={page} className="px-2">...</span>;
+                        }
+                        return null;
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <IconChevronRight size={16} />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </>
