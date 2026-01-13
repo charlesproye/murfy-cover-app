@@ -243,12 +243,12 @@ def get_async_session_maker():
     return _session_maker
 
 
-def get_async_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     session = get_async_session_maker()()
     try:
         yield session
     except Exception:
-        session.rollback()
+        await session.rollback()
         raise
     finally:
-        session.close()
+        await session.close()
