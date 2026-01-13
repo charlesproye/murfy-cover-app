@@ -65,6 +65,7 @@ class VehicleModel(BaseUUIDModel):
     maximum_speed: Mapped[int | None] = mapped_column(Integer)
     charge_plug_location: Mapped[str | None] = mapped_column(String(100))
     charge_plug_type: Mapped[str | None] = mapped_column(String(100))
+    fast_charge_plug_type: Mapped[str | None] = mapped_column(String(100))
     fast_charge_max_power: Mapped[int | None] = mapped_column(Integer)
     fast_charge_duration: Mapped[int | None] = mapped_column(Integer)
     standard_charge_duration: Mapped[int | None] = mapped_column(Integer)

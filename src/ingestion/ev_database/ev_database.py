@@ -279,7 +279,8 @@ def get_or_create_vehicle_model(
             end_of_life_date=end_date,
             evdb_model_id=evdb_model_id,
             charge_plug_location=vehicle.get("Charge_Plug_Location"),
-            charge_plug_type=vehicle.get("Charge_Plug_Type"),
+            charge_plug_type=vehicle.get("Charge_Plug"),
+            fast_charge_plug_type=vehicle.get("Fastcharge_Plug"),
             fast_charge_max_power=vehicle.get("Fastcharge_Power_Max"),
             fast_charge_duration=vehicle.get("Fastcharge_ChargeTime"),
             standard_charge_duration=vehicle.get("Charge_Standard_ChargeTime"),
@@ -299,6 +300,7 @@ def get_or_create_vehicle_model(
         )
     else:
         # Update existing model with COALESCE-like behavior (only update if new value is not None)
+
         if vehicle.get("Range_WLTP") is not None:
             model.autonomy = vehicle.get("Range_WLTP")
         if vehicle.get("Efficiency_Consumption_Real") is not None:
@@ -317,8 +319,10 @@ def get_or_create_vehicle_model(
             model.evdb_model_id = evdb_model_id
         if vehicle.get("Charge_Plug_Location") is not None:
             model.charge_plug_location = vehicle.get("Charge_Plug_Location")
-        if vehicle.get("Charge_Plug_Type") is not None:
-            model.charge_plug_type = vehicle.get("Charge_Plug_Type")
+        if vehicle.get("Charge_Plug") is not None:
+            model.charge_plug_type = vehicle.get("Charge_Plug")
+        if vehicle.get("Fastcharge_Plug") is not None:
+            model.fast_charge_plug_type = vehicle.get("Fastcharge_Plug")
         if vehicle.get("Fastcharge_Power_Max") is not None:
             model.fast_charge_max_power = vehicle.get("Fastcharge_Power_Max")
         if vehicle.get("Fastcharge_ChargeTime") is not None:
