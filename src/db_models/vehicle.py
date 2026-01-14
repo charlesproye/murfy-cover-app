@@ -76,6 +76,9 @@ class VehicleModel(BaseUUIDModel):
     autonomy_highway_summer: Mapped[int | None] = mapped_column(Integer)
     autonomy_combined_winter: Mapped[int | None] = mapped_column(Integer)
     autonomy_combined_summer: Mapped[int | None] = mapped_column(Integer)
+    real_autonomy: Mapped[int | None] = mapped_column(
+        Integer, comment="Autonomy calculated by Bib"
+    )
 
 
 class Battery(BaseUUIDModel):
