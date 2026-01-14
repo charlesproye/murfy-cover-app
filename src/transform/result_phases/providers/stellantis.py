@@ -34,7 +34,7 @@ class StellantisProcessedPhaseToResultPhase(ProcessedPhaseToResultPhase):
                 & (F.col("ODOMETER_DIFF") > 5),
                 (-1 * F.col("SOC_DIFF"))
                 * F.col("BATTERY_NET_CAPACITY")
-                * (F.col("SOH_OEM") / 100)
+                * (F.col("SOH_OEM"))
                 / F.col("ODOMETER_DIFF"),
             ).otherwise(None),
         )
