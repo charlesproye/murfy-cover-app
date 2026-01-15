@@ -5,8 +5,6 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
-from core.env_utils import get_env_var
-from core.gsheet_utils import get_google_client
 from core.s3.s3_utils import S3Service
 from core.sql_utils import get_sqlalchemy_engine
 from db_models import Vehicle, VehicleData, VehicleStatus
@@ -16,9 +14,7 @@ class VehicleStatusTracker:
     def __init__(self, logger: logging.Logger):
         self.s3 = S3Service()
         self.engine = get_sqlalchemy_engine()
-        self.google_client = get_google_client()
         self.session = sessionmaker(bind=self.engine)
-        self.fleet_info_spreadsheet_id = get_env_var("SPREADSHEET_ID")
         self.makes = [
             "ford",
             "renault",
@@ -32,7 +28,7 @@ class VehicleStatusTracker:
         ]
         self.logger = logger
 
-    def _get_table(self, model):
+    def _get_table(self, model) -> pd.DataFrame:
         with self.session() as session:
             subquery = select(model)
             data = session.execute(subquery).scalars().all()
@@ -46,12 +42,6 @@ class VehicleStatusTracker:
 
     def _get_parquet_as_pd(self, make: str):
         return self.s3.read_parquet_df(f"result_phases/result_phases_{make}.parquet")
-
-    def _get_gsheet(self):
-        sheet = self.google_client.open_by_key(self.fleet_info_spreadsheet_id).sheet1
-        data = pd.DataFrame(sheet.get_all_records())
-
-        return data
 
     def _upsert_vehicle_status_batch(self, vehicle_statuses: list[VehicleStatus]):
         """Upsert a list of vehicle statuses efficiently."""
@@ -93,24 +83,18 @@ class VehicleStatusTracker:
                 VehicleStatus.status_name == "REQUIRED_ACTIVATION"
             ).delete()
             session.commit()
-        gsheet = self._get_gsheet()
-        data = gsheet[["vin", "Activation"]]
-        data = data[data.Activation == "TRUE"]
         vehicle = self._get_table(Vehicle)
-        data = data.merge(
-            vehicle[["vin", "id"]], left_on="vin", right_on="vin", how="left"
-        )
-        data = data[data.vin.str.len() == 17]
-        data = data.drop_duplicates(subset=["vin"])
 
         vehicle_statuses = []
-        for _, row in data.iterrows():
+        for _, row in vehicle.iterrows():
             vehicle_statuses.append(
                 VehicleStatus(
-                    vehicle_id=row["id"] if pd.notna(row["id"]) else None,
+                    vehicle_id=row["id"],
                     vin=row["vin"],
                     status_name="REQUIRED_ACTIVATION",
-                    status_value=row["Activation"] == "TRUE",
+                    status_value=row["activation_requested_status"]
+                    if row["activation_requested_status"]
+                    else False,
                     process_step="ACTIVATION",
                     created_at=datetime.now(),
                     updated_at=datetime.now(),

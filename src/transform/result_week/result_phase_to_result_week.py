@@ -14,7 +14,11 @@ from core.stats_utils import (
     weighted_mean,
 )
 from transform.result_phases.config import RESULT_PHASES_CACHE_KEY_TEMPLATE
-from transform.result_week.config import SOH_FILTER_EVAL_STRINGS, UPDATE_FREQUENCY
+from transform.result_week.config import (
+    MIN_SOH_REGARDING_ODOMETER_INTERCEPT,
+    MIN_SOH_REGARDING_ODOMETER_PENT,
+    UPDATE_FREQUENCY,
+)
 
 
 class ResultPhaseToResultWeek:
@@ -59,17 +63,20 @@ class ResultPhaseToResultWeek:
                 if self.has_levels
                 else (lambda rph: rph)
             )
-            .eval(SOH_FILTER_EVAL_STRINGS[self.make])
             .pipe(self._agg_results_by_update_frequency)
             .groupby("VIN", observed=True)
             .apply(self._make_soh_presentable_per_vehicle, include_groups=False)
-            .pipe(self._replace_soh_over_one_hundred)
             .reset_index(level=0)
             .sort_values(["VIN", "DATE"])
         )
 
+        # Fill ODOMETER before SOH filtering to ensure consistent filtering behavior
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].ffill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].bfill()
+
+        rweek = rweek.pipe(self._replace_soh_below_min_soh_regarding_odometer).pipe(
+            self._replace_soh_over_one_hundred
+        )
 
         rweek = self.compute_cycles(rweek)
 
@@ -187,9 +194,23 @@ class ResultPhaseToResultWeek:
             df["SOH"] = force_decay(df[["SOH", "ODOMETER"]])
         return df
 
+    def _replace_soh_below_min_soh_regarding_odometer(
+        self, df: pd.DataFrame
+    ) -> pd.DataFrame:
+        if "SOH" in df.columns:
+            df["SOH"] = df["SOH"].mask(
+                df["SOH"]
+                < MIN_SOH_REGARDING_ODOMETER_PENT * df["ODOMETER"]
+                + MIN_SOH_REGARDING_ODOMETER_INTERCEPT,
+                None,
+            )
+        return df
+
     def _replace_soh_over_one_hundred(self, df: pd.DataFrame) -> pd.DataFrame:
         if "SOH" in df.columns:
-            df["SOH"] = df["SOH"].mask(df["SOH"] > 1, 1)
+            # Filter out SoH > 1.1 and set to 1 those between 1 and 1.1
+            df["SOH"] = df["SOH"].mask(df["SOH"] > 1.1, None)
+            df["SOH"] = df["SOH"].mask(df["SOH"].between(1, 1.1), 1)
         return df
 
     def compute_cycles(self, df: pd.DataFrame) -> pd.DataFrame:

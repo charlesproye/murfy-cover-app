@@ -1,12 +1,14 @@
 import logging
 
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import or_, select, update
 
 from activation.config.mappings import mapping_vehicle_type
 from activation.config.settings import LOGGING_CONFIG
 from core.gsheet_utils import load_excel_data
 from core.sql_utils import get_sqlalchemy_engine
+from db_models.company import Make, Oem
+from db_models.vehicle import Battery, Vehicle, VehicleData, VehicleModel
 from results.trendline.trendline_utils import (
     clean_battery_data,
     compute_trendline_functions,
@@ -21,21 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 def generate_trendline_functions(df, odometer_column, soh_column):
-    """
-
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        Dataframe with SoH and Odometer column
-    soh_column: str
-        Column name with the SoH
-    odometer_column: str
-       Column name with the odometer
-    Returns:
-    --------
-    tupple
-        trendlines mean, upper and lower bound
-    """
     df_clean = clean_battery_data(df, odometer_column, soh_column)
     if df_clean.shape[0] < 20:
         return "Can't compute trendline"
@@ -80,31 +67,34 @@ def load_and_clean_scrapping_data():
 
 
 def load_vehicle_data_from_db():
-    query = """
-        SELECT
-            v.vin,
-            vm.model_name,
-            vm.id as vehicle_model_id,
-            vm.type,
-            vm.version,
-            m.make_name,
-            vd.soh,
-            vd.soh_oem,
-            vd.odometer,
-            o.oem_name,
-            o.id as oem_id,
-            m.id as make_id
-        FROM vehicle v
-        LEFT JOIN vehicle_model vm ON vm.id = v.vehicle_model_id
-        LEFT JOIN vehicle_data vd ON vd.vehicle_id = v.id
-        LEFT JOIN oem o ON o.id = vm.oem_id
-        LEFT JOIN battery b ON b.id = vm.battery_id
-        LEFT JOIN make m ON m.id = vm.make_id
-        WHERE (soh IS NOT NULL OR soh_oem IS NOT NULL)
-    """
     engine = get_sqlalchemy_engine()
+
+    stmt = (
+        select(
+            Vehicle.vin,
+            VehicleModel.model_name,
+            VehicleModel.id.label("vehicle_model_id"),
+            VehicleModel.type,
+            VehicleModel.version,
+            Make.make_name,
+            VehicleData.soh,
+            VehicleData.soh_oem,
+            VehicleData.odometer,
+            Oem.oem_name,
+            Oem.id.label("oem_id"),
+            Make.id.label("make_id"),
+        )
+        .select_from(Vehicle)
+        .outerjoin(VehicleModel, VehicleModel.id == Vehicle.vehicle_model_id)
+        .outerjoin(VehicleData, VehicleData.vehicle_id == Vehicle.id)
+        .outerjoin(Oem, Oem.id == VehicleModel.oem_id)
+        .outerjoin(Battery, Battery.id == VehicleModel.battery_id)
+        .outerjoin(Make, Make.id == VehicleModel.make_id)
+        .where(or_(VehicleData.soh.is_not(None), VehicleData.soh_oem.is_not(None)))
+    )
+
     with engine.connect() as connection:
-        df = pd.read_sql(text(query), connection)
+        df = pd.read_sql(stmt, connection)
 
     df["soh_oem"] = pd.to_numeric(df["soh_oem"], errors="coerce")
     df["soh"] = pd.to_numeric(df["soh"], errors="coerce")
@@ -122,23 +112,24 @@ def load_vehicle_data_from_db():
 
 
 def load_vehicle_models_from_db():
-    query = """
-        SELECT
-            vm.model_name,
-            vm.id as id,
-            vm.type,
-            m.make_name,
-            o.oem_name,
-            o.id as oem_id,
-            m.id as make_id
-        FROM vehicle_model vm
-        JOIN oem o ON o.id = vm.oem_id
-        JOIN make m ON m.id = vm.make_id
-    """
-
     engine = get_sqlalchemy_engine()
-    with engine.connect() as con:
-        return pd.read_sql(text(query), con)
+
+    stmt = (
+        select(
+            VehicleModel.model_name,
+            VehicleModel.id.label("id"),
+            VehicleModel.type,
+            Make.make_name,
+            Oem.oem_name,
+            Oem.id.label("oem_id"),
+            Make.id.label("make_id"),
+        )
+        .join(Oem, Oem.id == VehicleModel.oem_id)
+        .join(Make, Make.id == VehicleModel.make_id)
+    )
+
+    with engine.connect() as conn:
+        return pd.read_sql(stmt, conn)
 
 
 def load_all_data():
@@ -166,15 +157,19 @@ def load_all_data():
 
 def clean_db_trendlines():
     logger.info("Clean db trendlines...")
-    query = """
-        UPDATE vehicle_model
-        SET trendline = NULL,
-            trendline_min = NULL,
-            trendline_max = NULL
-        WHERE trendline is not null
-    """
+
+    stmt = (
+        update(VehicleModel)
+        .where(VehicleModel.trendline.is_not(None))
+        .values(
+            trendline=None,
+            trendline_min=None,
+            trendline_max=None,
+        )
+    )
+
     with get_sqlalchemy_engine().begin() as conn:
-        conn.execute(text(query))
+        conn.execute(stmt)
 
 
 def update_trendline_oem():
@@ -184,15 +179,20 @@ def update_trendline_oem():
     updated_oems = 0
     skipped_oems = 0
 
+    engine = get_sqlalchemy_engine()
+
     for oem in oem_ids:
         df_temp = df_all[df_all["oem_id"] == oem]
         if filter_data(df_temp, "odometer", "vin", 50_000, 50_000, 50, 10, 10):
             mean_trend, upper_bound, lower_bound = generate_trendline_functions(
                 df_temp, "odometer", "soh"
             )
-            update_database_trendlines(
-                None, mean_trend, upper_bound, lower_bound, oem_id=oem
-            )
+
+            engine = get_sqlalchemy_engine()
+            with engine.begin() as conn:
+                update_database_trendlines(
+                    [], mean_trend, upper_bound, lower_bound, oem_id=oem, conn=conn
+                )
             updated_oems += 1
         else:
             logger.info(f"Can't compute trendline for oem: {oem}")
@@ -221,11 +221,33 @@ def update_trendline_model():
                     df_temp, "odometer", "soh"
                 )
                 if filter_trendlines(mean_trend, upper_bound, lower_bound):
-                    update_database_trendlines(
-                        model_car, mean_trend, upper_bound, lower_bound, False
-                    )
-                    logger.info(f"Trendline update for car model {model_car}")
-                    updated_models += 1
+                    # Get all models with same model_name and battery_id
+                    engine = get_sqlalchemy_engine()
+                    with engine.begin() as conn:
+                        subquery = (
+                            select(VehicleModel.model_name, VehicleModel.battery_id)
+                            .where(VehicleModel.id == model_car)
+                            .subquery()
+                        )
+
+                        query = select(VehicleModel.id).where(
+                            (VehicleModel.model_name == subquery.c.model_name)
+                            & (VehicleModel.battery_id == subquery.c.battery_id)
+                        )
+
+                        result = conn.execute(query)
+                        vehicle_model_ids = [str(row[0]) for row in result]
+
+                        update_database_trendlines(
+                            vehicle_model_ids,
+                            mean_trend,
+                            upper_bound,
+                            lower_bound,
+                            False,
+                            conn=conn,
+                        )
+
+                        updated_models += len(vehicle_model_ids)
                 else:
                     logger.info(f"Trendline not updated for car model {model_car}")
                     skipped_models += 1

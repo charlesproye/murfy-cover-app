@@ -1,14 +1,14 @@
-import json
 import logging
 
 import numpy as np
 from scipy.optimize import curve_fit
-from sqlalchemy.sql import text
+from sqlalchemy import update
 
 from activation.config.settings import LOGGING_CONFIG
 from core.numpy_utils import numpy_safe_eval
-from core.sql_utils import get_sqlalchemy_engine
 from core.stats_utils import log_function
+from db_models.company import Oem
+from db_models.vehicle import VehicleModel
 
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -129,37 +129,50 @@ def compute_trendline_functions(
 
 
 def update_database_trendlines(
-    model_id, mean, upper, lower, trendline_bib=True, oem_id=None
+    model_ids: list[str],
+    mean,
+    upper,
+    lower,
+    trendline_bib=True,
+    oem_id=None,
+    conn=None,
 ):
-    if oem_id:
-        query = text("""
-            UPDATE oem
-            SET trendline = :mean, trendline_min = :low, trendline_max = :high
-            WHERE id = :id
-        """)
-        params = {
-            "mean": json.dumps(mean),
-            "low": json.dumps(lower),
-            "high": json.dumps(upper),
-            "id": oem_id,
-        }
-    else:
-        query = text("""
-            UPDATE vehicle_model
-            SET trendline = :mean, trendline_min = :low,
-                trendline_max = :high, trendline_bib = :bib
-            WHERE id = :id
-        """)
-        params = {
-            "mean": json.dumps(mean),
-            "low": json.dumps(lower),
-            "high": json.dumps(upper),
-            "id": model_id,
-            "bib": trendline_bib,
-        }
+    """Update trendlines in database using SQLAlchemy.
 
-    with get_sqlalchemy_engine().begin() as conn:
-        conn.execute(query, params)
+    Args:
+        model_ids: List of vehicle model IDs to update
+        mean: Mean trendline function
+        upper: Upper bound trendline function
+        lower: Lower bound trendline function
+        trendline_bib: Whether trendline is from BIB calculation
+        oem_id: OEM ID if updating OEM table instead of vehicle_model
+        engine: SQLAlchemy engine instance
+    """
+    if conn is None:
+        raise ValueError("Engine must be provided as parameter")
+
+    if oem_id:
+        stmt = (
+            update(Oem)
+            .where(Oem.id == oem_id)
+            .values(
+                trendline=mean,
+                trendline_min=lower,
+                trendline_max=upper,
+            )
+        )
+    else:
+        stmt = (
+            update(VehicleModel)
+            .where(VehicleModel.id.in_(model_ids))
+            .values(
+                trendline=mean if mean else None,
+                trendline_min=lower if lower else None,
+                trendline_max=upper if upper else None,
+                trendline_bib=trendline_bib,
+            )
+        )
+    conn.execute(stmt)
 
 
 def clean_battery_data(df, odometer_column, soh_colum):
@@ -197,13 +210,11 @@ def filter_data(
 
     if nb_total_vins >= vin_total and nb_lower >= nbr_under and nb_upper >= nbr_upper:
         return nb_total_vins
-    print("Not enough vehicles to compute trendlines")
 
 
 def filter_trendlines(trendline, trendline_max, trendline_min):
     value_at_160k = numpy_safe_eval(expression=trendline["trendline"], x=160_000)
     if value_at_160k >= 0.95:
-        print(f"The trendline value at 160,000 km is {value_at_160k}")
         return False
 
     kms = np.arange(0, 200_001, 50_000)
