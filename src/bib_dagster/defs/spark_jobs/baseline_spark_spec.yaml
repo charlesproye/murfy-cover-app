@@ -12,14 +12,24 @@ sparkConf:
   "spark.kubernetes.container.image.pullPolicy": "Always"
   "spark.eventLog.enabled": "true"
   "spark.eventLog.dir": "s3a://bib-prod-spark-history/spark-events"
+  # Point to custom log4j2 config for quieter logs
+  "spark.driver.extraJavaOptions": "-Dlog4j2.configurationFile=file:/opt/spark/conf/custom/log4j2.properties"
+  "spark.executor.extraJavaOptions": "-Dlog4j2.configurationFile=file:/opt/spark/conf/custom/log4j2.properties"
 timeToLiveSeconds: 300
 restartPolicy:
   type: Never
+volumes:
+  - name: spark-log4j-config
+    configMap:
+      name: spark-log4j-config
 driver:
   cores: 1
   memory: "512m"
   memoryOverhead: "512m"
   serviceAccount: spark-operator-spark
+  volumeMounts:
+    - name: spark-log4j-config
+      mountPath: /opt/spark/conf/custom
   envFrom:
     - secretRef:
         name: db-data-ev-secret
@@ -52,6 +62,9 @@ executor:
   cores: 1
   instances: 1
   memory: "512m"
+  volumeMounts:
+    - name: spark-log4j-config
+      mountPath: /opt/spark/conf/custom
   envFrom:
     - secretRef:
         name: db-data-ev-secret

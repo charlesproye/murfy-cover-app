@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-log4j-config
+  namespace: spark-operator
+data:
+  log4j2.properties: |
+    # Set root logger to WARN
+    rootLogger.level = warn
+    rootLogger.appenderRef.stdout.ref = console
+
+    # Console appender
+    appender.console.type = Console
+    appender.console.name = console
+    appender.console.target = SYSTEM_ERR
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = %d{yy/MM/dd HH:mm:ss} %p %c{1}: %m%n%ex
+
+    # Silence noisy Spark loggers
+    logger.spark.name = org.apache.spark
+    logger.spark.level = warn
+
+    logger.scheduler.name = org.apache.spark.scheduler
+    logger.scheduler.level = warn
+
+    logger.taskset.name = org.apache.spark.scheduler.TaskSetManager
+    logger.taskset.level = warn
+
+    logger.blockmanager.name = org.apache.spark.storage.BlockManager
+    logger.blockmanager.level = warn
+
+    logger.blockmanagermaster.name = org.apache.spark.storage.BlockManagerMasterEndpoint
+    logger.blockmanagermaster.level = warn
+
+    # Silence noisy Hadoop loggers
+    logger.hadoop.name = org.apache.hadoop
+    logger.hadoop.level = warn
+
+    logger.s3a.name = org.apache.hadoop.fs.s3a
+    logger.s3a.level = warn
+
+    # Keep Python/Dagster Pipes output visible
+    logger.py4j.name = py4j
+    logger.py4j.level = warn
+
+    # Keep Kubernetes-related loggers at warn
+    logger.k8s.name = org.apache.spark.deploy.k8s
+    logger.k8s.level = warn
+
+    logger.k8sscheduler.name = org.apache.spark.scheduler.cluster.k8s
+    logger.k8sscheduler.level = warn

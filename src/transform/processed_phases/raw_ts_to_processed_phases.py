@@ -94,14 +94,20 @@ class RawTsToProcessedPhases(CachedETLSpark):
         tss = self._normalize_units_to_metric(tss)
         tss = tss.orderBy(["vin", "date"])
         tss = self.fill_forward(tss)
+        tss.cache()
 
         all_vins = [row["vin"] for row in tss.select("vin").distinct().collect()]
-        BATCH_SIZE = 200
+        BATCH_SIZE = 50
+        num_batches = (len(all_vins) + BATCH_SIZE - 1) // BATCH_SIZE
 
-        batch_results = []
+        temp_path = (
+            f"s3a://{self.settings.S3_BUCKET}/tmp/processed_phases_{self.make.value}"
+        )
 
+        batch_paths = []
         for i in range(0, len(all_vins), BATCH_SIZE):
-            self.logger.info(f"Processing batch {i} of {len(all_vins)}")
+            batch_num = i // BATCH_SIZE
+            self.logger.info(f"Processing batch {batch_num + 1} of {num_batches}")
 
             batch_vins = all_vins[i : i + BATCH_SIZE]
             batch_df = tss.filter(F.col("vin").isin(batch_vins))
@@ -116,11 +122,16 @@ class RawTsToProcessedPhases(CachedETLSpark):
             phase_tss = phase_tss.orderBy("date", "vin")
 
             phases_enriched_batch = self.aggregate_stats(phase_tss)
-            batch_results.append(phases_enriched_batch)
 
-        phases_enriched = batch_results[0]
-        for r in batch_results[1:]:
-            phases_enriched = phases_enriched.union(r)
+            # Write to parquet to force materialization (breaks lineage, frees memory)
+            batch_path = f"{temp_path}/batch_{batch_num:04d}"
+            phases_enriched_batch.write.mode("overwrite").parquet(batch_path)
+            batch_paths.append(batch_path)
+            self.logger.info(f"Batch {batch_num + 1} written to {batch_path}")
+
+        tss.unpersist()
+        self.logger.info(f"Merging {len(batch_paths)} batches into a single DF")
+        phases_enriched = self.spark.read.parquet(*batch_paths)
 
         self.save(
             phases_enriched,
