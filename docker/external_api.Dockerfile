@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev --extra external_api --extra reports
 
 COPY src /app/src
+COPY __appsignal__.py /app/__appsignal__.py
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
@@ -22,6 +23,7 @@ RUN groupadd --gid 1001 app && \
     useradd --uid 1001 --gid app --shell /bin/bash --create-home app
 
 COPY --from=builder --chown=app:app /app /app
+COPY --from=builder --chown=app:app /app/__appsignal__.py /app/__appsignal__.py
 
 RUN mkdir -p /home/app/.postgresql
 COPY --chown=app:app ./certs/bib-prod-rdb-data-ev.pem /home/app/.postgresql/root.crt

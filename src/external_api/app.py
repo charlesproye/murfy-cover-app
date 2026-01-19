@@ -1,12 +1,14 @@
 import logging
 from contextlib import asynccontextmanager
 
+import appsignal
 import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from fastapi_pagination import add_pagination
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -76,6 +78,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
             return response
         except Exception as e:
+            appsignal.set_error(e)
             # If error, log and return an error response
             logger.error(
                 "Error processing request",
@@ -100,6 +103,7 @@ async def lifespan(app: FastAPI):
     logger.info("API startup", version=__VERSION__)
     logger.info("Environment", environment=settings.ENVIRONMENT)
     HTTP_CLIENT.start()
+    appsignal.start()
     instrumentator.expose(app)
 
     for route in app.routes:
@@ -163,6 +167,7 @@ instrumentator: Instrumentator = Instrumentator(
     app,
     metric_namespace="evalue_back",
 )
+FastAPIInstrumentor().instrument_app(app)
 
 
 @app.get("/", include_in_schema=False)

@@ -41,6 +41,8 @@ spec:
             name: db-data-ev-secret
         - secretRef:
             name: db-encryption-secret
+        - secretRef:
+            name: appsignal-secret
         env:
         - name: ALGORITHM
           value: HS256
