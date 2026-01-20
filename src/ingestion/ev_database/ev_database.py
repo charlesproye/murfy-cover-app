@@ -11,6 +11,25 @@ from sqlalchemy.orm import Session, sessionmaker
 from core.sql_utils import get_sqlalchemy_engine
 from db_models import Battery, Make, Oem, VehicleModel
 
+RENAULT_GROUP = ["dacia", "alpine", "mitsubishi"]
+STELLANTIS_GROUP = [
+    "peugeot",
+    "opel",
+    "fiat",
+    "citroen",
+    "ds",
+    "abarth",
+    "maserati",
+    "lancia",
+    "alfa romeo",
+]
+VOLKSWAGEN_GROUP = ["cupra", "skoda", "seat", "audi", "porsche", "man"]
+MERCEDES_GROUP = ["smart"]
+BMW_GROUP = ["mini", "rolls-royce"]
+VOLVO_GROUP = ["volvo"]
+TOYOTA_GROUP = ["lexus"]
+HYUNDAI_GROUP = ["genesis"]
+
 
 def fetch_api_data(url: str) -> list | None:
     """Fetch data from the EV database API."""
@@ -37,10 +56,34 @@ def get_oem(session: Session, vehicle_make: str) -> uuid.UUID | None:
             .filter(func.lower(Oem.oem_name) == vehicle_make.lower())
             .first()
         )
+    if oem and oem.id:
         return oem.id if oem else None
     else:
-        make = session.query(Make).filter(Make.id == vehicle_make).first()
-        return make.oem_id if make else None
+        oem_id = get_oem_id_for_group(session, vehicle_make)
+        return oem_id
+
+
+def get_oem_id_for_group(session: Session, vehicle_make: str) -> uuid.UUID | None:
+    """Get an OEM record and return its ID."""
+    vehicle_make = vehicle_make.lower()
+    if vehicle_make in RENAULT_GROUP:
+        return session.query(Oem).filter(Oem.oem_name == "renault").first().id
+    elif vehicle_make in STELLANTIS_GROUP:
+        return session.query(Oem).filter(Oem.oem_name == "stellantis").first().id
+    elif vehicle_make in VOLKSWAGEN_GROUP:
+        return session.query(Oem).filter(Oem.oem_name == "volkswagen").first().id
+    elif vehicle_make in MERCEDES_GROUP:
+        return session.query(Oem).filter(Oem.oem_name == "mercedes-benz").first().id
+    elif vehicle_make in BMW_GROUP:
+        return session.query(Oem).filter(Oem.oem_name == "bmw").first().id
+    elif vehicle_make in VOLVO_GROUP:
+        return session.query(Oem).filter(Oem.oem_name == "volvo-cars").first().id
+    elif vehicle_make in TOYOTA_GROUP:
+        return session.query(Oem).filter(Oem.oem_name == "toyota").first().id
+    elif vehicle_make in HYUNDAI_GROUP:
+        return session.query(Oem).filter(Oem.oem_name == "hyundai").first().id
+    else:
+        return None
 
 
 def get_commissioning_date(vehicle):
