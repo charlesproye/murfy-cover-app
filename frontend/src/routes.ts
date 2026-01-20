@@ -10,20 +10,15 @@ export const ROUTES = {
   LAST_TIMESTAMP_WITH_DATA: `${BASE_URL}/dashboard/last_timestamp_with_data`,
   SEARCHBAR: `${BASE_URL}/dashboard/search`,
   KPIHOME: `${BASE_URL}/dashboard/kpis`,
-  SOHRANGE: `${BASE_URL}/dashboard/range_soh`,
   NEW_VEHICLES: `${BASE_URL}/dashboard/new_vehicles`,
   SEARCH_VEHICLE: `${BASE_URL}/dashboard/search`,
   TABLE_BRANDS: `${BASE_URL}/dashboard/table_brand`,
   TABLE_EXTREMUM: `${BASE_URL}/dashboard/extremum_vehicles`,
-  TRENDLINE_BRANDS: `${BASE_URL}/dashboard/trendline_brand`,
   SOH_BY_GROUPS: `${BASE_URL}/dashboard/soh_by_groups`,
 
   // PASSPORT
   GRAPHS: `${BASE_URL}/passport/graph`,
-  CHARGING_CYCLES: `${BASE_URL}/passport/charging-cycles`,
   INFO_VEHICLE: `${BASE_URL}/passport/infos`,
-  ESTIMATED_RANGE: `${BASE_URL}/passport/estimated_range`,
-  KPIS_ADDITIONAL: `${BASE_URL}/passport/kpis_additional`,
   PIN_VEHICLE: `${BASE_URL}/passport/pin_vehicle`,
   GET_PINNED_VEHICLE: `${BASE_URL}/passport/pinned_vehicle`,
   PRICE_FORECAST: `${BASE_URL}/passport/price_forecast`,
@@ -32,6 +27,9 @@ export const ROUTES = {
   // PREMIUM
   PREMIUM_REPORT_HTML: `${BASE_URL}/premium`,
   PREMIUM_REPORT_PDF_SYNC: `${BASE_URL}/premium`,
+
+  // READOUT
+  READOUT_REPORT_HTML: `${BASE_URL}/readout`,
 
   // FAVORITES
   PINNED_VEHICLES: `${BASE_URL}/individual/favorite_table`,

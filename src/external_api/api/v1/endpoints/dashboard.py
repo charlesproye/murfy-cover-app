@@ -11,11 +11,9 @@ from external_api.services.dashboard import (
     get_individual_kpis,
     get_last_timestamp_with_data,
     get_new_vehicles,
-    get_range_soh,
     get_search_vin,
     get_soh_by_groups,
     get_table_brand,
-    get_trendline_brand,
 )
 
 router = APIRouter()
@@ -41,18 +39,6 @@ async def individual_kpis(
     response = await get_individual_kpis(
         [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets], db
     )
-    return response
-
-
-@router.get("/range_soh", include_in_schema=False)
-async def range_soh(
-    db=Depends(get_async_db),
-    fleet_id: str = Query(..., description="The fleet id"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
-    type: str = Query(None, description="The type"),
-):
-    fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
-    response = await get_range_soh(fleet_ids, type, db)
     return response
 
 
@@ -91,18 +77,6 @@ async def search_vin(
     return response
 
 
-@router.get("/trendline_brand", include_in_schema=False)
-async def trendline_brand(
-    db=Depends(get_async_db),
-    fleet_id: str = Query(..., description="The fleet id"),
-    brand: str = Query(None, description="The brand"),
-    user: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
-):
-    fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
-    response = await get_trendline_brand(fleet_ids, db, brand)
-    return response
-
-
 @router.get("/soh_by_groups", include_in_schema=False)
 async def soh_by_groups(
     db=Depends(get_async_db),
@@ -137,4 +111,5 @@ async def extremum_vehicles(
     response = await get_extremum_vehicles(
         fleet_ids, brand, page, page_size, extremum, sorting_column, sorting_order, db
     )
+
     return response

@@ -143,7 +143,7 @@ class GSheetReportGenerator:
                 select(Vehicle.vin)
                 .join(VehicleData, Vehicle.id == VehicleData.vehicle_id)
                 .filter(vehicle_vin_column.in_(vin_list))
-                .filter(VehicleData.soh.isnot(None))
+                .filter(VehicleData.soh_bib.isnot(None))
             )
 
         query_rows = [
@@ -235,7 +235,7 @@ class GSheetReportGenerator:
             if row.Oem is None:
                 raise ValueError(f"OEM data not available for VIN: {vin}")
 
-            if row.VehicleData is None or row.VehicleData.soh is None:
+            if row.VehicleData is None or row.VehicleData.soh_bib is None:
                 raise ValueError(
                     f"Vehicle activated but SoH is not available yet for VIN: {vin}"
                 )

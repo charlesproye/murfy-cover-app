@@ -18,7 +18,8 @@ export type TableExtremumResult = {
     vin: string;
     oem_name: string;
     odometer: number;
-    soh: number;
+    soh: number | null;
+    soh_oem: number | null;
     years_remaining?: number;
     score: string;
     consumption?: number;

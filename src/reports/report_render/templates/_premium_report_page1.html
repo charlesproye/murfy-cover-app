@@ -82,10 +82,10 @@
                                 <p class="text-[7px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85">Port de charge / Rapide</p>
                                 <p class="mt-[2px] text-[12px] leading-[12px]">{{ vehicle.charging_port|default_value }} / {{ vehicle.fast_charging_port|default_value }}</p>
                             </div>
-                            {% if not soh_data.readout_only and soh_data.readout_soh_value is not none %}
+                            {% if not soh_data.readout_only and soh_data.soh_readout is not none %}
                             <div>
                                     <p class="text-[7px] font-bold uppercase tracking-[0.04em] text-[#CCEDDC]/85">SoH OEM</p>
-                                    <p class="mt-[2px] {% if soh_data.readout_soh_value|round(0) != soh_data.independant_soh_value|round(0) %}font-bold{% endif %} text-[12px] leading-[12px]">{{ soh_data.readout_soh_value|round(0)|int }}%</p>
+                                    <p class="mt-[2px] {% if soh_data.soh_readout|round(0) != soh_data.soh_bib|round(0) %}font-bold{% endif %} text-[12px] leading-[12px]">{{ soh_data.soh_readout|round(0)|int }}%</p>
                                 </div>
                             {% endif %}
                         </div>
@@ -130,9 +130,9 @@
 
                 <div class="text-emerald-900 text-6xl font-normal font-['Space_Grotesk'] leading-[68px] relative z-10">
                     {% if report.report_type == 'readout' %}
-                    {{ soh_data.readout_soh_value|round(0)|int }}%
+                    {{ soh_data.soh_readout|round(0)|int }}%
                     {% else %}
-                    {{ soh_data.independant_soh_value|round(0)|int }}%
+                    {{ soh_data.soh_bib|round(0)|int }}%
                     {% endif %}
                 </div>
 
@@ -187,9 +187,9 @@
                         const splitIdx = d.odometer_points.findIndex(km => km >= d.current_km);
 
                         {% if report.report_type == 'readout' %}
-                        const currentSohValue = d.readout_soh_value;
+                        const currentSohValue = d.soh_readout;
                         {% else %}
-                        const currentSohValue = d.independant_soh_value;
+                        const currentSohValue = d.soh_bib;
                         {% endif %}
 
                         const currentPt = {x: d.current_km, y: currentSohValue};

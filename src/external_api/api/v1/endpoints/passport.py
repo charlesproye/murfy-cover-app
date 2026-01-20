@@ -113,4 +113,5 @@ async def price_forecast(
     _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user_with_fleets)),
 ):
     response = await get_price_forecast(vin, db)
+
     return response

@@ -13,8 +13,10 @@ st.title("📊 Données de la table vehicle_model")
 def get_vehicle_models():
     with get_connection() as con:
         cursor = con.cursor()
-        cursor.execute("""SELECT vm.model_name, vm.type, vm.version, o.oem_name, m.make_name, vm.trendline,
-                       vm.trendline_min, vm.trendline_max , vm.odometer_data ,vm.soh_data , vm.soh_oem_data ,vm.trendline_bib , vm.commissioning_date , vm.end_of_life_date
+        cursor.execute("""SELECT vm.model_name, vm.type, vm.version, o.oem_name, m.make_name,
+                       vm.trendline_bib, vm.trendline_bib_min, vm.trendline_bib_max,
+                       vm.trendline_oem, vm.trendline_oem_min, vm.trendline_oem_max,
+                       vm.odometer_data ,vm.soh_data , vm.soh_oem_data ,vm.has_trendline_bib , vm.has_trendline_oem , vm.commissioning_date , vm.end_of_life_date
                             FROM vehicle_model vm
                             join oem o  on o.id = vm.oem_id
                             join make m  on m.id = vm.make_id
@@ -31,13 +33,17 @@ vehicle_models = pd.DataFrame(
         "version",
         "oem_name",
         "make_name",
-        "trendline",
-        "trendline_min",
-        "trendline_max",
+        "trendline_bib",
+        "trendline_bib_min",
+        "trendline_bib_max",
+        "trendline_oem",
+        "trendline_oem_min",
+        "trendline_oem_max",
         "odometer_data",
         "soh_data",
         "soh_oem_data",
-        "trendline_bib",
+        "has_trendline_bib",
+        "has_trendline_oem",
         "commissioning_date",
         "end_of_life_date",
     ],
@@ -83,12 +89,12 @@ st.subheader("📋 Données filtrées")
 st.dataframe(filtered_df, use_container_width=True)
 
 
-if st.button("show graph from db"):
+if st.button("show graph bib"):
     with get_connection() as con:
         cursor = con.cursor()
         if selected_oem == "tesla":
             cursor.execute(
-                """SELECT vd.soh, vd.odometer FROM vehicle v
+                """SELECT vd.soh_bib, vd.odometer FROM vehicle v
                                 JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
                                 JOIN battery b ON vm.battery_id = b.id
                                 JOIN oem o ON vm.oem_id = o.id
@@ -99,7 +105,7 @@ if st.button("show graph from db"):
 
         else:
             cursor.execute(
-                """SELECT vd.soh, vd.odometer FROM vehicle v
+                """SELECT vd.soh_bib, vd.odometer FROM vehicle v
                                 JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
                                 JOIN battery b ON vm.battery_id = b.id
                                 JOIN oem o ON vm.oem_id = o.id
@@ -109,21 +115,21 @@ if st.button("show graph from db"):
                 (selected_model, selected_type),
             )
         df = pd.DataFrame(
-            cursor.fetchall(), columns=["soh", "odometer"], dtype=float
+            cursor.fetchall(), columns=["soh_bib", "odometer"], dtype=float
         ).dropna()
         fig = show_trendline(
             df,
-            filtered_df["trendline"].values[0],
-            filtered_df["trendline_max"].values[0],
-            filtered_df["trendline_min"].values[0],
+            filtered_df["trendline_bib"].values[0],
+            filtered_df["trendline_bib_max"].values[0],
+            filtered_df["trendline_bib_min"].values[0],
             selected_type,
             "odometer",
-            "soh",
+            "soh_bib",
         )
         st.plotly_chart(fig)
 
 
-if st.button("show graph scrapping"):
+if st.button("show graph oem"):
     df = load_excel_data("Courbes de tendance", "Courbes OS")
     df_sheet = pd.DataFrame(columns=df[0, :8], data=df[1:, :8])
     df_sheet["Modèle"] = df_sheet["Modèle"].apply(lambda x: x.lower())
@@ -138,12 +144,11 @@ if st.button("show graph scrapping"):
     )
     fig = show_trendline(
         df_model,
-        filtered_df["trendline"].values[0],
-        filtered_df["trendline_max"].values[0],
-        filtered_df["trendline_min"].values[0],
+        filtered_df["trendline_oem"].values[0],
+        filtered_df["trendline_oem_max"].values[0],
+        filtered_df["trendline_oem_min"].values[0],
         selected_type,
         "Odomètre (km)",
-        "SoH",
+        "SoH_OEM",
     )
     st.plotly_chart(fig)
-

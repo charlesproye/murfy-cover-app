@@ -56,7 +56,7 @@ async def get_price_forecast(vin: str, db: AsyncSession | None = None):
                         static_data.net_capacity,
                         dynamic_data.odometer,
                         year,
-                        dynamic_data.soh * 100,
+                        dynamic_data.soh * 100 if dynamic_data.soh else 100,
                     ]
                 ],
                 columns=[
@@ -70,6 +70,7 @@ async def get_price_forecast(vin: str, db: AsyncSession | None = None):
                 ],
             )
         )
+
         if model_response is not None and len(model_response) > 0:
             price = model_response[0]
         else:
@@ -101,4 +102,3 @@ async def get_price_forecast(vin: str, db: AsyncSession | None = None):
     except Exception as e:
         logger.error(f"Error predicting a price: {e}")
         return {"price": None, "price_discount": None}
-

@@ -50,7 +50,7 @@ def build_report_data_query(vin: str):
         .outerjoin(
             VehicleData,
             (VehicleData.vehicle_id == Vehicle.id)
-            & (or_(VehicleData.soh.isnot(None), VehicleData.soh_oem.isnot(None))),
+            & (or_(VehicleData.soh_bib.isnot(None), VehicleData.soh_oem.isnot(None))),
         )
         .where(Vehicle.vin == vin)
         .order_by(VehicleData.odometer.desc())

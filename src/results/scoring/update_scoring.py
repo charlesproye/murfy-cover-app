@@ -32,11 +32,11 @@ def update_scoring(logger: Logger = LOGGER):
                 SELECT
                     vm.oem_id,
                     vd.odometer,
-                    vd.soh,
+                    vd.soh_bib,
                     COUNT(*) OVER (PARTITION BY vm.oem_id) as n,
                     AVG(vd.odometer) OVER (PARTITION BY vm.oem_id) as avg_odometer,
-                    AVG(vd.soh) OVER (PARTITION BY vm.oem_id) as avg_soh,
-                    STDDEV(vd.soh) OVER (PARTITION BY vm.oem_id) as stddev_soh
+                    AVG(vd.soh_bib) OVER (PARTITION BY vm.oem_id) as avg_soh,
+                    STDDEV(vd.soh_bib) OVER (PARTITION BY vm.oem_id) as stddev_soh
                 FROM vehicle_data vd
                 JOIN vehicle v ON v.id = vd.vehicle_id
                 JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
@@ -46,7 +46,7 @@ def update_scoring(logger: Logger = LOGGER):
                 oem_id,
                 -- Calcul du taux de dégradation moyen (perte de SOH par km)
                 COALESCE(
-                    NULLIF((1 - AVG(soh)) / NULLIF(AVG(odometer), 0), 0),
+                    NULLIF((1 - AVG(soh_bib)) / NULLIF(AVG(odometer), 0), 0),
                     0.00001
                 ) as degradation_rate,
                 AVG(stddev_soh) as stddev_soh
@@ -103,14 +103,14 @@ def update_scoring(logger: Logger = LOGGER):
                             WITH to_update AS (
                                 SELECT
                                     vd.id,
-                                    vd.soh,
+                                    vd.soh_bib,
                                     vd.odometer,
                                     ot.degradation_rate,
                                     ot.stddev_soh,
                                     -- Calcul du taux de dégradation réel du véhicule
                                     CASE
                                         WHEN vd.odometer = 0 THEN 0
-                                        ELSE (1 - vd.soh) / NULLIF(vd.odometer, 0)
+                                        ELSE (1 - vd.soh_bib) / NULLIF(vd.odometer, 0)
                                     END as vehicle_degradation
                                 FROM vehicle_data vd
                                 JOIN vehicle v ON vd.vehicle_id = v.id
@@ -206,15 +206,15 @@ def compute_bib_score(logger: Logger = LOGGER):
         select(
             Vehicle.vin,
             VehicleModel.id.label("model_id"),
-            VehicleData.soh.cast(sa.Float).label("soh"),
+            VehicleData.soh_bib.cast(sa.Float).label("soh"),
             VehicleData.odometer.cast(sa.Float).label("odometer"),
-            VehicleModel.trendline,
-            VehicleModel.trendline_min,
-            VehicleModel.trendline_max,
+            VehicleModel.trendline_bib,
+            VehicleModel.trendline_bib_min,
+            VehicleModel.trendline_bib_max,
         )
         .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
         .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
-        .where(VehicleData.soh.isnot(None))
+        .where(VehicleData.soh_bib.isnot(None))
         .where(VehicleData.odometer.isnot(None))
     )
 
@@ -231,18 +231,18 @@ def compute_bib_score(logger: Logger = LOGGER):
         categories = np.full(len(df_model), "C", dtype=object)
 
         trendline_mean = (
-            df_model["trendline"].dropna().iloc[0]["trendline"]
-            if df_model["trendline"].notna().any()
+            df_model["trendline_bib"].dropna().iloc[0]
+            if df_model["trendline_bib"].notna().any()
             else None
         )
         trendline_max = (
-            df_model["trendline_max"].dropna().iloc[0]["trendline"]
-            if df_model["trendline_max"].notna().any()
+            df_model["trendline_bib_max"].dropna().iloc[0]
+            if df_model["trendline_bib_max"].notna().any()
             else None
         )
         trendline_min = (
-            df_model["trendline_min"].dropna().iloc[0]["trendline"]
-            if df_model["trendline_min"].notna().any()
+            df_model["trendline_bib_min"].dropna().iloc[0]
+            if df_model["trendline_bib_min"].notna().any()
             else None
         )
 
@@ -276,8 +276,8 @@ def compute_bib_score(logger: Logger = LOGGER):
                 km, soh, distribution=1, interval=(5, 75)
             )
 
-            t25 = eval_trendline_vectorized(lower["trendline"], km)
-            t75 = eval_trendline_vectorized(upper["trendline"], km)
+            t25 = eval_trendline_vectorized(lower, km)
+            t75 = eval_trendline_vectorized(upper, km)
 
             categories[soh >= t95] = "A"
             categories[soh < t5] = "E"
@@ -314,3 +314,7 @@ def compute_bib_score(logger: Logger = LOGGER):
         cur.execute("DROP TABLE IF EXISTS tmp_soh;")
         con.commit()
     logger.info("Bib score updated successfully")
+
+
+if __name__ == "__main__":
+    update_scoring()

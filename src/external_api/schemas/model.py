@@ -10,9 +10,15 @@ class ModelTrendlineData(BaseModel):
 
     # id: UUID4 = Field(..., description="ID unique of the model")
     model_name: str = Field(..., description="Name of the model of the vehicle")
-    trendline_mean: dict[str, Any] | None = Field(None, description="Trendline mean")
-    trendline_min: dict[str, Any] | None = Field(None, description="Trendline min")
-    trendline_max: dict[str, Any] | None = Field(None, description="Trendline max")
+    trendline_mean: dict[str, Any] | None = Field(
+        None, description="Trendline mean", nullable=True
+    )
+    trendline_min: dict[str, Any] | None = Field(
+        None, description="Trendline min", nullable=True
+    )
+    trendline_max: dict[str, Any] | None = Field(
+        None, description="Trendline max", nullable=True
+    )
     comment: str | None = Field(None, description="Comment")
 
     model_config = {"from_attributes": True, "protected_namespaces": ()}
@@ -28,4 +34,3 @@ class ModelWarrantyData(BaseModel):
 
     class Config:
         from_attributes = True
-

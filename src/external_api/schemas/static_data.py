@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class TypeInfo(BaseModel):
     model_type: str = Field(..., description="Model type")
     versions: list[str] | None = Field(None, description="Versions")
+    has_trendline_bib: bool = Field(..., description="Has trendline BIB")
+    has_trendline_oem: bool = Field(..., description="Has trendline OEM")
 
 
 class ModelInfo(BaseModel):
@@ -30,7 +32,8 @@ class ModelType(BaseModel):
     model_type: str | None = Field(None, description="Model type")
     commissioning_date: datetime | None = Field(..., description="Commissioning date")
     end_of_life_date: datetime | None = Field(..., description="End of life date")
-    has_soh_estimation: bool = Field(..., description="Has SoH estimation")
+    has_soh_estimation_bib: bool = Field(..., description="Has SoH estimation BIB")
+    has_soh_estimation_oem: bool = Field(..., description="Has SoH estimation OEM")
 
 
 class VehicleModelData(BaseModel):
@@ -107,7 +110,20 @@ class ModelTrendline(BaseModel):
     model_name: str = Field(..., description="Model name")
     model_type: str | None = Field(None, description="Model type")
     version: str | None = Field(None, description="Version")
-    trendline_mean: str = Field(..., description="Trendline equation")
-    trendline_min: str = Field(..., description="Trendline min")
-    trendline_max: str = Field(..., description="Trendline max")
+    trendline_bib_mean: str | None = Field(
+        None, description="Trendline BIB equation", nullable=True
+    )
+    trendline_bib_min: str | None = Field(
+        None, description="Trendline BIB min", nullable=True
+    )
+    trendline_bib_max: str | None = Field(
+        None, description="Trendline BIB max", nullable=True
+    )
+    trendline_oem: str | None = Field(None, description="Trendline OEM", nullable=True)
+    trendline_oem_min: str | None = Field(
+        None, description="Trendline OEM min", nullable=True
+    )
+    trendline_oem_max: str | None = Field(
+        None, description="Trendline OEM max", nullable=True
+    )
     comment: str | None = Field(..., description="Comment")

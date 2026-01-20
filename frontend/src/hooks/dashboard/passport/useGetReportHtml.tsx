@@ -8,9 +8,14 @@ interface ReportHtmlResult {
   error: unknown;
 }
 
-const useGetReportHtml = (vin: string | undefined): ReportHtmlResult => {
+const useGetReportHtml = (
+  vin: string | undefined,
+  reportType: 'premium' | 'readout' = 'premium',
+): ReportHtmlResult => {
+  const baseRoute = reportType === 'readout' ? ROUTES.READOUT_REPORT_HTML : ROUTES.PREMIUM_REPORT_HTML;
+
   const { data, isLoading, error } = useSWR(
-    vin ? `${ROUTES.PREMIUM_REPORT_HTML}/${vin}/report_html` : null,
+    vin ? `${baseRoute}/${vin}/report_html` : null,
     fetchWithAuth<string>,
     {
       revalidateOnFocus: false,

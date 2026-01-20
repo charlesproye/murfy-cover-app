@@ -143,7 +143,7 @@ async def get_dynamic_vehicle_data(db: AsyncSession, vin: str) -> DynamicVehicle
             region,
             speed,
             location,
-            soh,
+            soh_bib,
             cycles,
             consumption,
             soh_comparison,
@@ -179,7 +179,9 @@ async def get_dynamic_vehicle_data(db: AsyncSession, vin: str) -> DynamicVehicle
             if vehicle_data.speed is not None
             else None,
             "location": vehicle_data.location,
-            "soh": float(vehicle_data.soh) if vehicle_data.soh is not None else None,
+            "soh": float(vehicle_data.soh_bib)
+            if vehicle_data.soh_bib is not None
+            else None,
             "cycles": float(vehicle_data.cycles)
             if vehicle_data.cycles is not None
             else None,

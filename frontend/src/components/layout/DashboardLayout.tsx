@@ -116,66 +116,6 @@ export default function DashboardLayout({
           <div className="mt-0 sm:mt-6 ml-0 sm:ml-2">
             <p className="hidden sm:block uppercase text-gray dark:text-dark-gray-light text-xs tracking-widest">
               {' '}
-              Financial{' '}
-            </p>
-            {/* <Link href="/dashboard/finance/individual">
-              <div
-                className={`${
-                  isActive('finance/individual')
-                    ? 'bg-white-clair dark:bg-dark-white-clair text-bleu-vif dark:text-dark-bleu-vif rounded-lg ml-0 px-2'
-                    : 'ml-2'
-                } cursor-pointer flex h-10 mt-2 gap-2 items-center`}
-              >
-                <IconReportMoney
-                  className={`w-[22px] h-[22px] sm:w-[18px] sm:h-[18px] ${
-                    isActive('finance/individual')
-                      ? 'text-bleu-vif dark:text-dark-bleu-vif'
-                      : 'text-gray dark:text-dark-gray'
-                  }`}
-                />
-                <p
-                  className={`hidden sm:block text-sm ${
-                    isActive('finance/individual')
-                      ? 'text-bleu-vif dark:text-dark-bleu-vif font-semibold'
-                      : 'text-gray dark:text-dark-gray font-thin'
-                  }`}
-                >
-                  {' '}
-                  Individual{' '}
-                </p>
-              </div>
-            </Link> */}
-            <Link href={`/dashboard/finance/global`}>
-              <div
-                className={`${
-                  isActive('finance/global')
-                    ? 'bg-white-clair dark:bg-dark-white-clair text-bleu-vif dark:text-dark-bleu-vif rounded-lg ml-0 px-2'
-                    : 'ml-2'
-                } cursor-pointer flex h-10 gap-2 items-center relative`}
-              >
-                <IconWallet
-                  className={`w-[22px] h-[22px] sm:w-[18px] sm:h-[18px] ${
-                    isActive('finance/global')
-                      ? 'text-bleu-vif dark:text-dark-bleu-vif'
-                      : 'text-gray dark:text-dark-gray'
-                  }`}
-                />
-                <p
-                  className={`hidden sm:block text-sm my-auto ${
-                    isActive('finance/global')
-                      ? 'text-bleu-vif dark:text-dark-bleu-vif font-semibold'
-                      : 'text-gray dark:text-dark-gray font-thin'
-                  }`}
-                >
-                  Global
-                </p>
-              </div>
-            </Link>
-          </div>
-          <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-4 border-cool-gray-200" />
-          <div className="mt-0 sm:mt-6 ml-0 sm:ml-2">
-            <p className="hidden sm:block uppercase text-gray dark:text-dark-gray-light text-xs tracking-widest">
-              {' '}
               Management{' '}
             </p>
             <Link href="/fleet-manager">

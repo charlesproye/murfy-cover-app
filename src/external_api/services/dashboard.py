@@ -14,7 +14,7 @@ async def get_last_timestamp_with_data(fleet_ids: list[str], db: AsyncSession):
         .where(
             and_(
                 Vehicle.fleet_id.in_(fleet_ids),
-                VehicleData.soh.isnot(None),
+                VehicleData.soh_bib.isnot(None),
                 VehicleData.odometer.isnot(None),
             )
         )
@@ -56,7 +56,7 @@ async def get_individual_kpis(fleet_ids: list[str], db: AsyncSession):
             Vehicle.id,
             VehicleData.timestamp,
             VehicleData.odometer,
-            func.round(VehicleData.soh * 100, 1).label("soh"),
+            func.round(VehicleData.soh_bib * 100, 1).label("soh"),
             Vehicle.is_pinned,
         )
         .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
@@ -95,7 +95,7 @@ async def get_individual_kpis(fleet_ids: list[str], db: AsyncSession):
             Vehicle.id,
             VehicleData.timestamp,
             VehicleData.odometer,
-            func.round(VehicleData.soh * 100, 1).label("soh"),
+            func.round(VehicleData.soh_bib * 100, 1).label("soh"),
             Vehicle.is_pinned,
         )
         .join(Vehicle, VehicleData.vehicle_id == Vehicle.id)
@@ -158,87 +158,6 @@ async def get_individual_kpis(fleet_ids: list[str], db: AsyncSession):
     ]
 
 
-async def get_range_soh(fleet_ids: list[str], type: str, db: AsyncSession):
-    if type == "soh":
-        query = text("""
-            WITH latest_vehicle_data AS (
-                SELECT DISTINCT ON (vd.vehicle_id)
-                    vd.vehicle_id,
-                    vd.soh * 100 as value
-                FROM vehicle_data vd
-                JOIN vehicle v ON vd.vehicle_id = v.id
-                WHERE v.fleet_id = ANY(:fleet_ids)
-                ORDER BY vd.vehicle_id, vd.timestamp DESC
-            ),
-            ranges AS (
-                SELECT unnest(ARRAY[70, 80, 85, 90, 95, 100]) as upper_bound,
-                       unnest(ARRAY[0, 70, 80, 85, 90, 95]) as lower_bound
-            )
-            SELECT
-                r.lower_bound,
-                r.upper_bound,
-                COUNT(lvd.vehicle_id) as vehicle_count
-            FROM ranges r
-            LEFT JOIN latest_vehicle_data lvd
-            ON lvd.value > r.lower_bound AND lvd.value <= r.upper_bound
-            GROUP BY r.lower_bound, r.upper_bound
-            ORDER BY r.lower_bound DESC
-        """)
-    else:
-        query = text("""
-            WITH latest_vehicle_data AS (
-                SELECT DISTINCT ON (vd.vehicle_id)
-                    vd.vehicle_id,
-                    vd.odometer as value
-                FROM vehicle_data vd
-                JOIN vehicle v ON vd.vehicle_id = v.id
-                WHERE v.fleet_id = ANY(:fleet_ids)
-                ORDER BY vd.vehicle_id, vd.timestamp DESC
-            ),
-            value_bounds AS (
-                SELECT
-                    MIN(value) as min_value,
-                    MAX(value) as max_value
-                FROM latest_vehicle_data
-            ),
-            value_intervals AS (
-                SELECT
-                    ROUND(min_value + (i * (max_value - min_value) / 5)) as lower_bound,
-                    ROUND(min_value + ((i + 1) * (max_value - min_value) / 5)) as upper_bound
-                FROM value_bounds, generate_series(0, 4) as i
-                WHERE max_value IS NOT NULL
-            )
-            SELECT
-                vi.lower_bound,
-                vi.upper_bound,
-                COUNT(lvd.vehicle_id) as vehicle_count
-            FROM value_intervals vi
-            LEFT JOIN latest_vehicle_data lvd
-            ON lvd.value >= vi.lower_bound
-            AND (
-                CASE
-                    WHEN vi.upper_bound = (SELECT ROUND(max_value) FROM value_bounds)
-                    THEN lvd.value <= vi.upper_bound
-                    ELSE lvd.value < vi.upper_bound
-                END
-            )
-            GROUP BY vi.lower_bound, vi.upper_bound
-            ORDER BY vi.lower_bound
-        """)
-
-    result = await db.execute(query, {"fleet_ids": fleet_ids})
-    rows = result.mappings().all()
-
-    return [
-        {
-            "lower_bound": int(row["lower_bound"]),
-            "upper_bound": int(row["upper_bound"]),
-            "vehicle_count": row["vehicle_count"],
-        }
-        for row in rows
-    ]
-
-
 async def get_new_vehicles(fleet_ids: list[str], period: str, db: AsyncSession):
     if period not in ["monthly", "annually"]:
         period = "monthly"
@@ -297,7 +216,8 @@ def query_region_table():
             SELECT DISTINCT ON (vd.vehicle_id)
                 v.id as vehicle_id,
                 vd.odometer,
-                ROUND((vd.soh * 100), 1) as soh,
+                ROUND((vd.soh_bib * 100), 1) as soh,
+                ROUND((vd.soh_oem * 100), 1) as soh_oem,
                 v.region_id,
                 r.region_name
             FROM vehicle v
@@ -325,7 +245,8 @@ def query_brand_table():
             SELECT DISTINCT ON (vd.vehicle_id)
                 v.id as vehicle_id,
                 vd.odometer,
-                ROUND((vd.soh * 100), 1) as soh,
+                ROUND((vd.soh_bib * 100), 1) as soh,
+                ROUND((vd.soh_oem * 100), 1) as soh_oem,
                 vm.oem_id,
                 o.oem_name
             FROM vehicle v
@@ -354,7 +275,8 @@ def query_all_table():
             SELECT DISTINCT ON (vd.vehicle_id)
                 v.id as vehicle_id,
                 vd.odometer,
-                ROUND((vd.soh * 100), 1) as soh,
+                ROUND((vd.soh_bib * 100), 1) as soh,
+                ROUND((vd.soh_oem * 100), 1) as soh_oem,
                 vm.oem_id,
                 o.oem_name,
                 v.region_id,
@@ -395,121 +317,6 @@ async def get_table_brand(fleet_ids: list[str], filter: str, db: AsyncSession):
     return result.mappings().all()
 
 
-async def get_trendline_brand(
-    fleet_ids: list[str], db: AsyncSession, brand: str | None = None
-):
-    query = text("""
-        WITH first_brand AS (
-            SELECT DISTINCT ON (vm.oem_id)
-                vm.oem_id,
-                o.oem_name,
-                o.trendline::text as trendline,
-                o.trendline_max::text as trendline_max,
-                o.trendline_min::text as trendline_min
-            FROM vehicle v
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN oem o ON vm.oem_id = o.id
-            WHERE v.fleet_id = ANY(:fleet_ids)
-            ORDER BY vm.oem_id
-            LIMIT 1
-        ),
-        brands_with_data AS (
-            SELECT DISTINCT
-                vm.oem_id,
-                o.oem_name,
-                o.trendline::text as trendline,
-                o.trendline_max::text as trendline_max,
-                o.trendline_min::text as trendline_min,
-                MIN(vd.timestamp) as first_data
-            FROM vehicle v
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN oem o ON vm.oem_id = o.id
-            LEFT JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            WHERE v.fleet_id = ANY(:fleet_ids)
-            GROUP BY vm.oem_id, o.oem_name, o.trendline::text, o.trendline_max::text, o.trendline_min::text
-        ),
-        latest_vehicle_data AS (
-            SELECT DISTINCT ON (v.id)
-                v.id,
-                v.vin,
-                ROUND((vd.soh * 100), 1) as soh,
-                vd.odometer,
-                vd.soh_comparison,
-                v.fleet_id = ANY(:fleet_ids) as in_fleet,
-                v.bib_score as score
-            FROM vehicle v
-            JOIN vehicle_model vm ON v.vehicle_model_id = vm.id
-            JOIN vehicle_data vd ON v.id = vd.vehicle_id
-            WHERE vm.oem_id = COALESCE(:brand, (SELECT oem_id FROM first_brand))
-            ORDER BY v.id, vd.timestamp DESC
-        )
-        SELECT DISTINCT
-            b.oem_id,
-            b.oem_name,
-            b.trendline,
-            b.trendline_max,
-            b.trendline_min,
-            b.first_data,
-            lvd.soh,
-            lvd.odometer,
-            lvd.vin,
-            lvd.in_fleet,
-            lvd.score,
-            CASE WHEN b.oem_id = COALESCE(:brand, (SELECT oem_id FROM first_brand)) THEN 0 ELSE 1 END as sort_order
-        FROM brands_with_data b
-        LEFT JOIN latest_vehicle_data lvd ON b.oem_id = COALESCE(:brand, (SELECT oem_id FROM first_brand))
-        ORDER BY
-            sort_order,
-            b.first_data ASC NULLS LAST,
-            b.oem_name
-    """)
-
-    result = await db.execute(
-        query,
-        {
-            "fleet_ids": fleet_ids,
-            "brand": brand
-            if brand and brand != "undefined" and brand != "null" and brand != "All"
-            else None,
-        },
-    )
-    rows = result.mappings().all()
-
-    # Creating a list of unique brands with their trendlines
-    seen_brands = set()
-    brands_list = []
-    for row in rows:
-        brand_key = (row["oem_id"], row["oem_name"])
-        if brand_key not in seen_brands:
-            seen_brands.add(brand_key)
-            brands_list.append(
-                {
-                    "oem_id": row["oem_id"],
-                    "oem_name": row["oem_name"],
-                    "trendline": row["trendline"],
-                    "trendline_max": row["trendline_max"],
-                    "trendline_min": row["trendline_min"],
-                }
-            )
-
-    # Creating the trendline list
-    trendline = []
-    for row in rows:
-        if row["soh"] is not None:
-            trendline.append(
-                {
-                    "soh": row["soh"],
-                    "odometer": row["odometer"],
-                    "vin": row["vin"],
-                    "in_fleet": row["in_fleet"],
-                    "score": row["score"],
-                }
-            )
-
-    brands_list_sorted = sorted(brands_list, key=lambda x: x["oem_name"].lower())
-    return {"brands": brands_list_sorted, "trendline": trendline}
-
-
 async def get_soh_by_groups(
     fleet_ids: list[str], group: str, page: int, db: AsyncSession
 ):
@@ -539,7 +346,8 @@ async def get_soh_by_groups(
         WITH latest_vehicle_data AS (
             SELECT DISTINCT ON (v.id)
                 v.vin,
-                vd.soh * 100 as soh,
+                vd.soh_bib * 100 as soh,
+                vd.soh_oem * 100 as soh_oem,
                 vd.odometer,
                 o.oem_name
             FROM vehicle v
@@ -665,7 +473,8 @@ async def get_extremum_vehicles(
                 v.id,
                 v.vin,
                 v.bib_score as score,
-                ROUND((vd.soh * 100), 1) as soh,
+                ROUND((vd.soh_bib * 100), 1) as soh,
+                ROUND((vd.soh_oem * 100), 1) as soh_oem,
                 vd.odometer,
                 vm.oem_id,
                 o.oem_name,
@@ -688,8 +497,8 @@ async def get_extremum_vehicles(
             JOIN vehicle_data vd ON v.id = vd.vehicle_id
             WHERE v.fleet_id = ANY(:fleet_ids)
             AND (:brand='' OR vm.oem_id = CAST(:brand AS uuid))
-            AND vd.soh IS NOT NULL
             AND vd.soh_comparison IS NOT NULL
+            AND (vd.soh_bib IS NOT NULL OR vd.soh_oem IS NOT NULL)
             ORDER BY v.id, vd.timestamp DESC
         ),
         total_count AS (
@@ -700,6 +509,7 @@ async def get_extremum_vehicles(
             SELECT
                 vin,
                 ROUND(soh::numeric, 1) as soh,
+                ROUND(soh_oem::numeric, 1) as soh_oem,
                 odometer,
                 oem_name,
                 years_remaining,

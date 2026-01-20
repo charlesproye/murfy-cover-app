@@ -43,15 +43,21 @@ async def get_model_soh_trendline(
     # Get trendline data
     query = (
         select(
-            VehicleModel.trendline["trendline"].as_string().label("trendline"),
-            VehicleModel.trendline_min["trendline"].as_string().label("trendline_min"),
-            VehicleModel.trendline_max["trendline"].as_string().label("trendline_max"),
+            VehicleModel.trendline_bib,
+            VehicleModel.trendline_bib_min,
+            VehicleModel.trendline_bib_max,
+            VehicleModel.trendline_oem,
+            VehicleModel.trendline_oem_min,
+            VehicleModel.trendline_oem_max,
             VehicleModel.commissioning_date,
             VehicleModel.end_of_life_date,
             VehicleModel.id,
         )
         .where(VehicleModel.id == model_id)
-        .where(VehicleModel.trendline.is_not(None))
+        .where(
+            (VehicleModel.trendline_bib.is_not(None))
+            | (VehicleModel.trendline_oem.is_not(None))
+        )
     )
 
     trendline_result = await db.execute(query)
@@ -64,15 +70,53 @@ async def get_model_soh_trendline(
         )
 
     odometers = list(range(0, 150000, 30000))
-    trendline_min = await generate_trendline_points(trendline.trendline_min, odometers)
-    trendline_max = await generate_trendline_points(trendline.trendline_max, odometers)
 
-    soh = round(numpy_utils.numpy_safe_eval(trendline.trendline, x=odometer), 2)
+    trendline_bib_min = None
+    trendline_bib_max = None
+
+    if trendline.trendline_bib_min and trendline.trendline_bib_max:
+        trendline_bib_min = await generate_trendline_points(
+            trendline.trendline_bib_min, odometers
+        )
+        trendline_bib_max = await generate_trendline_points(
+            trendline.trendline_bib_max, odometers
+        )
+
+    # Generate OEM trendlines if available
+    trendline_oem_min = None
+    trendline_oem_max = None
+    if trendline.trendline_oem_min and trendline.trendline_oem_max:
+        trendline_oem_min = await generate_trendline_points(
+            trendline.trendline_oem_min, odometers
+        )
+        trendline_oem_max = await generate_trendline_points(
+            trendline.trendline_oem_max, odometers
+        )
+
+    # Calculate SoH values
+    soh_bib = (
+        round(
+            float(numpy_utils.numpy_safe_eval(trendline.trendline_bib, x=odometer)), 2
+        )
+        if trendline.trendline_bib
+        else None
+    )
+
+    soh_oem = (
+        round(
+            float(numpy_utils.numpy_safe_eval(trendline.trendline_oem, x=odometer)), 2
+        )
+        if trendline.trendline_oem
+        else None
+    )
 
     return SOHWithTrendline(
         model_id=model_id,
-        soh=soh,
+        soh_bib=soh_bib,
+        soh_oem=soh_oem,
         odometer=odometer,
-        trendline_min=trendline_min,
-        trendline_max=trendline_max,
+        trendline_bib_min=trendline_bib_min,
+        trendline_bib_max=trendline_bib_max,
+        trendline_oem_min=trendline_oem_min,
+        trendline_oem_max=trendline_oem_max,
     )

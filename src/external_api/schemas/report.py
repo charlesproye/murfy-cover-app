@@ -77,10 +77,10 @@ class SohChartData(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    independant_soh_value: float | None = Field(
+    soh_bib: float | None = Field(
         None, description="Current BIB SoH percentage (0-100)"
     )
-    readout_soh_value: float | None = Field(
+    soh_readout: float | None = Field(
         None, description="Readout SoH percentage (0-100)"
     )
     grade: str | None = Field(None, description="BIB battery health grade (A-E)")

@@ -71,6 +71,7 @@ const TableExtremum: React.FC<{ fleet: string | null }> = ({ fleet }): ReactNode
     { label: 'Vin', filter: 'vin', show: true },
     { label: 'Mileage', filter: 'odometer', show: true },
     { label: 'SoH', filter: 'soh', show: true },
+    { label: 'SoH OEM', filter: 'soh_oem', show: true },
     { label: 'Score', filter: 'score', show: true },
     { label: 'Consumption (Wh/km)', filter: 'consumption', show: true },
     { label: 'Ratio Fast-charge', filter: 'fast_charge_ratio', show: true },
@@ -153,6 +154,7 @@ const TableExtremum: React.FC<{ fleet: string | null }> = ({ fleet }): ReactNode
                     {formatNumber(row.odometer?.toFixed(0))}
                   </td>
                   <td className="font-medium">{formatNumber(row.soh)}</td>
+                  <td className="font-medium">{formatNumber(row.soh_oem)}</td>
                   <td className="font-medium">{row.score}</td>
                   <td className="font-medium">{formatNumber(row.consumption)}</td>
                   <td className="font-medium">

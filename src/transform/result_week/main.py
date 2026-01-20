@@ -19,7 +19,7 @@ ORCHESTRATED_MAKES = {
 }
 
 VEHICLE_DATA_RDB_TABLE_SRC_DEST_COLS = {
-    "SOH": "soh",
+    "SOH": "soh_bib",
     "SOH_OEM": "soh_oem",
     "ODOMETER": "odometer",
     "LEVEL_1": "level_1",

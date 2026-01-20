@@ -302,13 +302,20 @@ class ReportGenerator:
 
         logger.info(f"Generating report data for VIN: {vin}")
 
-        if vehicle_data.soh is None and vehicle_data.soh_oem is None:
+        if vehicle_data.soh_bib is None and vehicle_data.soh_oem is None:
             raise ValueError(f"SoH data not available for VIN: {vin}")
 
         # Select trendline data (vehicle-specific or OEM fallback)
-        trendline = vehicle_model.trendline or oem.trendline
-        trendline_min = vehicle_model.trendline_min or oem.trendline_min
-        trendline_max = vehicle_model.trendline_max or oem.trendline_max
+        if report_type == ReportType.readout:
+            # For readout, use OEM trendlines from vehicle_model or oem table
+            trendline = vehicle_model.trendline_oem or oem.trendline
+            trendline_min = vehicle_model.trendline_oem_min or oem.trendline_min
+            trendline_max = vehicle_model.trendline_oem_max or oem.trendline_max
+        else:
+            # For premium, use BIB trendlines from vehicle_model
+            trendline = vehicle_model.trendline_bib or oem.trendline
+            trendline_min = vehicle_model.trendline_bib_min or oem.trendline_min
+            trendline_max = vehicle_model.trendline_bib_max or oem.trendline_max
 
         if not trendline or not trendline_min or not trendline_max:
             raise ValueError(f"No trendline data available for VIN: {vin}")
@@ -316,9 +323,9 @@ class ReportGenerator:
         current_km = int(vehicle_data.odometer or 0)
         max_km = int(vehicle_model.warranty_km or 160000)
 
-        trendline_eq = trendline.get("trendline")
-        trendline_min_eq = trendline_min.get("trendline")
-        trendline_max_eq = trendline_max.get("trendline")
+        trendline_eq = trendline
+        trendline_min_eq = trendline_min
+        trendline_max_eq = trendline_max
 
         if not trendline_eq or not trendline_min_eq or not trendline_max_eq:
             raise ValueError(f"Invalid trendline equations for VIN: {vin}")
@@ -330,8 +337,8 @@ class ReportGenerator:
             trendline_min_eq=trendline_min_eq,
             trendline_max_eq=trendline_max_eq,
             bib_score=vehicle.bib_score,
-            bib_soh=float(vehicle_data.soh) * 100
-            if vehicle_data.soh is not None
+            bib_soh=float(vehicle_data.soh_bib) * 100
+            if vehicle_data.soh_bib is not None
             else None,
             readout_soh_value=float(vehicle_data.soh_oem) * 100
             if vehicle_data.soh_oem is not None
@@ -598,7 +605,6 @@ class ReportGenerator:
         # Generate exactly 10 points to keep the chart clean
         km_points = np.linspace(0, max_km, 15, dtype=int)
 
-        # Generate raw trendline values
         soh_trendline = np.round(numpy_safe_eval(trendline_eq, x=km_points) * 100, 1)
         soh_min = np.round(numpy_safe_eval(trendline_min_eq, x=km_points) * 100, 1)
         soh_max = np.round(numpy_safe_eval(trendline_max_eq, x=km_points) * 100, 1)
@@ -618,8 +624,8 @@ class ReportGenerator:
         soh_trendline = soh_trendline + offset
 
         return SohChartData(
-            independant_soh_value=bib_soh,
-            readout_soh_value=readout_soh_value,
+            soh_bib=bib_soh,
+            soh_readout=readout_soh_value,
             readout_only=report_type == ReportType.readout,
             grade=bib_score,
             odometer_points=km_points.tolist(),

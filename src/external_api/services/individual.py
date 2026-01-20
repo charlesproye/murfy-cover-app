@@ -11,8 +11,9 @@ async def get_all_pinned_vehicles(
             v.vin,
             ma.make_name,
             vd.odometer,
-            ROUND((vd.soh * 100)::numeric, 1) as soh,
-            ROUND(((1 - vd.soh) * 100) / NULLIF(vd.odometer / 10000, 0)::numeric, 2) as soh_per_10000km,
+            ROUND((vd.soh_bib * 100)::numeric, 1) as soh,
+            ROUND((vd.soh_oem * 100)::numeric, 1) as soh_oem,
+            ROUND(((1 - vd.soh_bib) * 100) / NULLIF(vd.odometer / 10000, 0)::numeric, 2) as soh_per_10000km,
             v.start_date
         FROM vehicle v
         LEFT JOIN vehicle_data vd ON v.id = vd.vehicle_id
@@ -38,6 +39,7 @@ async def get_all_pinned_vehicles(
             "startDate": row["start_date"],
             "makeName": row["make_name"],
             "soh": row["soh"],
+            "sohOem": row["soh_oem"],
             "odometer": row["odometer"],
             "sohPer10000km": row["soh_per_10000km"],
         }

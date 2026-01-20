@@ -5,10 +5,15 @@ import useGetReportHtml from '@/hooks/dashboard/passport/useGetReportHtml';
 interface HtmlReportModalProps {
   onClose: () => void;
   vin: string;
+  reportType?: 'premium' | 'readout';
 }
 
-const HtmlReportModal: React.FC<HtmlReportModalProps> = ({ onClose, vin }) => {
-  const { htmlContent, isLoading, error } = useGetReportHtml(vin);
+const HtmlReportModal: React.FC<HtmlReportModalProps> = ({
+  onClose,
+  vin,
+  reportType = 'premium'
+}) => {
+  const { htmlContent, isLoading, error } = useGetReportHtml(vin, reportType);
 
   const scaledHtmlContent = React.useMemo(() => {
     if (!htmlContent) return null;

@@ -51,9 +51,12 @@ class VehicleModelFactory(BaseAsyncFactory[VehicleModel]):
     warranty_km = None
 
     # Default trendline: y = 100 - 0.0001 * x (simulates degradation)
-    trendline = Use(lambda: {"trendline": "100 - 0.0001 * x"})
-    trendline_min = Use(lambda: {"trendline": "95 - 0.0001 * x"})
-    trendline_max = Use(lambda: {"trendline": "105 - 0.0001 * x"})
+    trendline_bib = Use(lambda: "100 - 0.0001 * x")
+    trendline_bib_min = Use(lambda: "95 - 0.0001 * x")
+    trendline_bib_max = Use(lambda: "105 - 0.0001 * x")
+    trendline_oem = Use(lambda: "100 - 0.0001 * x")
+    trendline_oem_min = Use(lambda: "95 - 0.0001 * x")
+    trendline_oem_max = Use(lambda: "105 - 0.0001 * x")
 
 
 class VehicleFactory(BaseAsyncFactory[Vehicle]):
@@ -82,7 +85,6 @@ class VehicleDataFactory(BaseAsyncFactory[VehicleData]):
     region = "France"
     speed = None
     location = None
-    soh = 95.5
     cycles = None
     consumption = None
     soh_comparison = None
@@ -90,6 +92,7 @@ class VehicleDataFactory(BaseAsyncFactory[VehicleData]):
     level_2 = None
     level_3 = None
     soh_oem = None
+    soh_bib = 95.5
     real_autonomy = None
     timestamp_last_data_collected = None
 

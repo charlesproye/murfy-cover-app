@@ -62,7 +62,7 @@ export const FlashReportPdf: React.FC<{ data: GetGenerationInfo }> = ({ data }) 
             mileage={data.vehicle_info.mileage}
             range={data.battery_info.range}
             language={data.language}
-            trendline={data.battery_info.trendline ?? null}
+            trendline={data.battery_info.trendline_bib ?? null}
           />
         </View>
         <View style={styles.footerContent}>

@@ -55,13 +55,40 @@ async def log_vin_decoded(
 
 
 async def get_make_has_trendline(make_name: str, db: AsyncSession) -> bool:
+    """Check if make has any trendline (BIB or readout)."""
     query_has_trendline = """
         SELECT count(*)
         FROM vehicle_model vm
         left join make m on m.id = vm.make_id
-        WHERE vm.trendline->>'trendline' is not null AND m.make_name = :make_name
+        WHERE (vm.has_trendline_bib = true OR vm.has_trendline_oem = true)
+        AND m.make_name = :make_name
+        AND (vm.trendline_bib IS NOT NULL OR vm.trendline_oem IS NOT NULL)
     """
     result = await db.execute(text(query_has_trendline), {"make_name": make_name})
+    return result.fetchone()[0] > 0
+
+
+async def get_make_has_trendline_bib(make_name: str, db: AsyncSession) -> bool:
+    """Check if make has BIB trendline."""
+    query_has_trendline_bib = """
+        SELECT count(*)
+        FROM vehicle_model vm
+        left join make m on m.id = vm.make_id
+        WHERE vm.has_trendline_bib = true AND m.make_name = :make_name
+    """
+    result = await db.execute(text(query_has_trendline_bib), {"make_name": make_name})
+    return result.fetchone()[0] > 0
+
+
+async def get_make_has_trendline_oem(make_name: str, db: AsyncSession) -> bool:
+    """Check if make has readout trendline."""
+    query_has_trendline_oem = """
+        SELECT count(*)
+        FROM vehicle_model vm
+        left join make m on m.id = vm.make_id
+        WHERE vm.has_trendline_oem = true AND m.make_name = :make_name
+    """
+    result = await db.execute(text(query_has_trendline_oem), {"make_name": make_name})
     return result.fetchone()[0] > 0
 
 
@@ -134,7 +161,19 @@ async def send_vehicle_specs(vin: str, db: AsyncSession) -> VehicleSpecs:
             db=db,
         )
 
+        if not make_db_name:
+            return VehicleSpecs(
+                has_trendline=False,
+                has_trendline_bib=False,
+                has_trendline_oem=False,
+                make="tesla",
+                model=None,
+                type_version_list=None,
+            )
+
         has_trendline = await get_make_has_trendline(make_db_name, db)
+        has_trendline_bib = await get_make_has_trendline_bib(make_db_name, db)
+        has_trendline_oem = await get_make_has_trendline_oem(make_db_name, db)
 
         type_version = {}
 
@@ -152,6 +191,8 @@ async def send_vehicle_specs(vin: str, db: AsyncSession) -> VehicleSpecs:
 
         return VehicleSpecs(
             has_trendline=has_trendline,
+            has_trendline_bib=has_trendline_bib,
+            has_trendline_oem=has_trendline_oem,
             make="tesla",
             model=model_db_name,
             type_version_list=[
@@ -169,10 +210,24 @@ async def send_vehicle_specs(vin: str, db: AsyncSession) -> VehicleSpecs:
                     make, model, type=None, db=db
                 )
 
+                if not make_db_name:
+                    return VehicleSpecs(
+                        has_trendline=False,
+                        has_trendline_bib=False,
+                        has_trendline_oem=False,
+                        make=make.lower().replace("ë", "e"),
+                        model=None,
+                        type_version_list=None,
+                    )
+
                 has_trendline = await get_make_has_trendline(make_db_name, db)
+                has_trendline_bib = await get_make_has_trendline_bib(make_db_name, db)
+                has_trendline_oem = await get_make_has_trendline_oem(make_db_name, db)
 
                 return VehicleSpecs(
                     has_trendline=has_trendline,
+                    has_trendline_bib=has_trendline_bib,
+                    has_trendline_oem=has_trendline_oem,
                     make=make_db_name,
                     model=model_db_name,
                     type_version_list=None,
@@ -181,6 +236,8 @@ async def send_vehicle_specs(vin: str, db: AsyncSession) -> VehicleSpecs:
             else:  # Model not found, just make
                 return VehicleSpecs(
                     has_trendline=False,
+                    has_trendline_bib=False,
+                    has_trendline_oem=False,
                     make=make.lower().replace("ë", "e"),
                     model=None,
                     type_version_list=None,
@@ -188,6 +245,8 @@ async def send_vehicle_specs(vin: str, db: AsyncSession) -> VehicleSpecs:
         else:  # Make not found
             return VehicleSpecs(
                 has_trendline=False,
+                has_trendline_bib=False,
+                has_trendline_oem=False,
                 make=None,
                 model=None,
                 type_version_list=None,
@@ -379,7 +438,10 @@ async def get_flash_report_data(
                 (Make.make_name == flash_report_combination.make)
                 & (VehicleModel.model_name == flash_report_combination.model)
                 & (VehicleModel.type == flash_report_combination.type)
-                & VehicleModel.trendline.is_not(None)
+                & (
+                    VehicleModel.trendline_bib.is_not(None)
+                    | VehicleModel.trendline_oem.is_not(None)
+                )
             )
         )
         result = await db.execute(stmt)
@@ -406,7 +468,10 @@ async def get_flash_report_data(
             & (VehicleModel.model_name == flash_report_combination.model)
             & (VehicleModel.type == flash_report_combination.type)
             & (VehicleModel.version == version)
-            & (VehicleModel.trendline.isnot(None))
+            & (
+                (VehicleModel.trendline_bib.isnot(None))
+                | (VehicleModel.trendline_oem.isnot(None))
+            )
         )
     )
     result = await db.execute(stmt)
@@ -423,20 +488,41 @@ async def get_flash_report_data(
         make_asset,
     ) = row
 
-    if not vehicle_model.trendline:
-        trendline = None
-        trendline_min = None
-        trendline_max = None
+    if not vehicle_model.trendline_bib and not vehicle_model.trendline_oem:
+        trendline_bib = None
+        trendline_bib_min = None
+        trendline_bib_max = None
+        trendline_oem = None
+        trendline_oem_min = None
+        trendline_oem_max = None
         status = False
-        soh = None
+        soh_bib = None
+        soh_oem = None
     else:
-        trendline = vehicle_model.trendline["trendline"]
-        trendline_min = vehicle_model.trendline_min["trendline"]
-        trendline_max = vehicle_model.trendline_max["trendline"]
+        # Set BIB trendlines
+        trendline_bib = vehicle_model.trendline_bib
+        trendline_bib_min = vehicle_model.trendline_bib_min
+        trendline_bib_max = vehicle_model.trendline_bib_max
+
+        # Set OEM trendlines
+        trendline_oem = vehicle_model.trendline_oem
+        trendline_oem_min = vehicle_model.trendline_oem_min
+        trendline_oem_max = vehicle_model.trendline_oem_max
+
         status = True
-        soh = numpy_utils.numpy_safe_eval(
-            expression=trendline, x=flash_report_combination.odometer
-        )
+
+        # Calculate SoH values
+        soh_bib = None
+        if trendline_bib:
+            soh_bib = numpy_utils.numpy_safe_eval(
+                expression=trendline_bib, x=flash_report_combination.odometer
+            )
+
+        soh_oem = None
+        if trendline_oem:
+            soh_oem = numpy_utils.numpy_safe_eval(
+                expression=trendline_oem, x=flash_report_combination.odometer
+            )
 
     image_url = reports_utils.get_image_public_url(model_asset, make_asset)
 
@@ -463,9 +549,13 @@ async def get_flash_report_data(
             "capacity": battery.capacity if battery else None,
             "consumption": vehicle_model.expected_consumption,
             "range": vehicle_model.autonomy,
-            "trendline": trendline,
-            "trendline_min": trendline_min,
-            "trendline_max": trendline_max,
-            "soh": soh,
+            "trendline_bib": trendline_bib,
+            "trendline_bib_min": trendline_bib_min,
+            "trendline_bib_max": trendline_bib_max,
+            "trendline_oem": trendline_oem,
+            "trendline_oem_min": trendline_oem_min,
+            "trendline_oem_max": trendline_oem_max,
+            "soh_bib": soh_bib,
+            "soh_oem": soh_oem,
         },
     )

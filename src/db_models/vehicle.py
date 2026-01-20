@@ -5,7 +5,6 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    JSON,
     Boolean,
     Date,
     DateTime,
@@ -43,13 +42,21 @@ class VehicleModel(BaseUUIDModel):
     warranty_date: Mapped[int | None] = mapped_column(Integer)
     warranty_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     source: Mapped[str | None] = mapped_column(String(100))
-    trendline: Mapped[dict | None] = mapped_column(JSON)
-    trendline_min: Mapped[dict | None] = mapped_column(JSON)
-    trendline_max: Mapped[dict | None] = mapped_column(JSON)
-    trendline_bib: Mapped[bool] = mapped_column(
+    trendline_bib: Mapped[str | None] = mapped_column(String(2000))
+    trendline_bib_min: Mapped[str | None] = mapped_column(String(2000))
+    trendline_bib_max: Mapped[str | None] = mapped_column(String(2000))
+    trendline_oem: Mapped[str | None] = mapped_column(String(2000))
+    trendline_oem_min: Mapped[str | None] = mapped_column(String(2000))
+    trendline_oem_max: Mapped[str | None] = mapped_column(String(2000))
+    has_trendline_bib: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         comment="If the trendline is based on SoH calculated by BIB",
+    )
+    has_trendline_oem: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        comment="If the trendline is based on SoH calculated by Readout",
     )
     odometer_data: Mapped[bool] = mapped_column(Boolean, default=False)
     soh_data: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -141,7 +148,7 @@ class VehicleData(BaseUUIDModel):
     region: Mapped[str | None] = mapped_column(String(100))
     speed: Mapped[float | None] = mapped_column(Numeric(5, 2))
     location: Mapped[str | None] = mapped_column(String(100))
-    soh: Mapped[float | None] = mapped_column(Numeric(5, 3))
+    soh_bib: Mapped[float | None] = mapped_column(Numeric(5, 3))
     cycles: Mapped[float | None] = mapped_column(Numeric(10, 2))
     consumption: Mapped[float | None] = mapped_column(Numeric(5, 3))
     soh_comparison: Mapped[float | None] = mapped_column(Numeric(6, 3))

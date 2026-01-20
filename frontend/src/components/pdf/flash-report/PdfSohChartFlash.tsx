@@ -9,7 +9,7 @@ const PdfSohChartFlash: React.FC<{ data: GetGenerationInfo }> = ({ data }) => {
   const texts = pdfTexts[data?.language || LanguageEnum.EN];
   // Récupérer les vraies valeurs du véhicule
   const mileage = data.vehicle_info.mileage;
-  const sohCurrent = data.battery_info.soh ? data.battery_info.soh * 100 : 100;
+  const sohCurrent = data.battery_info.soh_bib ? data.battery_info.soh_bib * 100 : 100;
 
   // Valeurs de départ et de prédiction
   const odoCurrent = mileage;
@@ -33,19 +33,19 @@ const PdfSohChartFlash: React.FC<{ data: GetGenerationInfo }> = ({ data }) => {
   const getY = (soh: number): number =>
     marginY + ((maxY - soh) / (maxY - minY)) * (height - 2 * marginY);
 
-  // Parser les équations de trendline et générer les points
+  // Parser les équations de trendline et générer les points (use BIB trendlines)
   const getTrendlinePointsFromEquation = (equation: string | undefined): Point[] => {
     if (!equation) return [];
     const coefficients = parseTrendlineEquation(equation);
     return getTrendlinePoints(minX, maxX, coefficients);
   };
 
-  const trendlinePoints = getTrendlinePointsFromEquation(data.battery_info.trendline);
+  const trendlinePoints = getTrendlinePointsFromEquation(data.battery_info.trendline_bib);
   const trendlineMinPoints = getTrendlinePointsFromEquation(
-    data.battery_info.trendline_min,
+    data.battery_info.trendline_bib_min,
   );
   const trendlineMaxPoints = getTrendlinePointsFromEquation(
-    data.battery_info.trendline_max,
+    data.battery_info.trendline_bib_max,
   );
 
   // Séparer les points de la trendline principale : avant et après le point actuel

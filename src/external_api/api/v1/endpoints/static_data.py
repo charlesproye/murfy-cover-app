@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def check_model_exists(model_id: uuid.UUID, db: AsyncSession) -> bool:
+async def check_model_exists(model_id: uuid.UUID, db: AsyncSession) -> None:
     query = select(VehicleModel).where(VehicleModel.id == model_id)
     result = await db.execute(query)
 
@@ -33,8 +33,6 @@ async def check_model_exists(model_id: uuid.UUID, db: AsyncSession) -> bool:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Vehicle model with id {model_id} does not exist",
         )
-
-    return model_id
 
 
 @router.get(
@@ -56,7 +54,8 @@ async def get_models(
             VehicleModel.type,
             VehicleModel.commissioning_date,
             VehicleModel.end_of_life_date,
-            VehicleModel.trendline,
+            VehicleModel.trendline_bib,
+            VehicleModel.trendline_oem,
         )
         .select_from(VehicleModel)
         .join(Make, VehicleModel.make_id == Make.id)
@@ -64,9 +63,15 @@ async def get_models(
     )
 
     if has_soh_estimation is True:
-        query = query.where(VehicleModel.trendline.is_not(None))
+        query = query.where(
+            (VehicleModel.trendline_bib.is_not(None))
+            | (VehicleModel.trendline_oem.is_not(None))
+        )
     elif has_soh_estimation is False:
-        query = query.where(VehicleModel.trendline.is_(None))
+        query = query.where(
+            VehicleModel.trendline_bib.is_(None),
+            VehicleModel.trendline_oem.is_(None),
+        )
 
     vehicules_query = await db.execute(query)
     vehicules = vehicules_query.fetchall()
@@ -79,7 +84,8 @@ async def get_models(
             model_type=vehicule.type,
             commissioning_date=vehicule.commissioning_date,
             end_of_life_date=vehicule.end_of_life_date,
-            has_soh_estimation=vehicule.trendline is not None,
+            has_soh_estimation_bib=vehicule.trendline_bib is not None,
+            has_soh_estimation_oem=vehicule.trendline_oem is not None,
         )
         for vehicule in vehicules
     ]
@@ -158,15 +164,23 @@ async def get_model_trendline(
             VehicleModel.model_name,
             VehicleModel.type,
             VehicleModel.version,
-            VehicleModel.trendline["trendline"].as_string().label("trendline_mean"),
-            VehicleModel.trendline_min["trendline"].as_string().label("trendline_min"),
-            VehicleModel.trendline_max["trendline"].as_string().label("trendline_max"),
+            VehicleModel.trendline_bib,
+            VehicleModel.trendline_bib_min,
+            VehicleModel.trendline_bib_max,
+            VehicleModel.trendline_oem,
+            VehicleModel.trendline_oem_min,
+            VehicleModel.trendline_oem_max,
+            VehicleModel.has_trendline_bib,
+            VehicleModel.has_trendline_oem,
             VehicleModel.commissioning_date,
             VehicleModel.end_of_life_date,
             VehicleModel.version,
         )
         .where(VehicleModel.id == model_id)
-        .where(VehicleModel.trendline.is_not(None))
+        .where(
+            (VehicleModel.trendline_bib.is_not(None))
+            | (VehicleModel.trendline_oem.is_not(None))
+        )
     )
 
     result = await db.execute(stmt)
@@ -188,8 +202,11 @@ async def get_model_trendline(
         model_name=record.model_name,
         model_type=record.type,
         version=record.version,
-        trendline_mean=record.trendline_mean,
-        trendline_min=record.trendline_min,
-        trendline_max=record.trendline_max,
+        trendline_bib_mean=record.trendline_bib,
+        trendline_bib_min=record.trendline_bib_min,
+        trendline_bib_max=record.trendline_bib_max,
+        trendline_oem=record.trendline_oem,
+        trendline_oem_min=record.trendline_oem_min,
+        trendline_oem_max=record.trendline_oem_max,
         comment=comment,
     )

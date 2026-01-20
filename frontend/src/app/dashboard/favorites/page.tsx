@@ -18,7 +18,8 @@ const headers = [
   { label: 'Vin', filter: 'vin' },
   { label: 'Make', filter: 'makeName' },
   { label: 'Odometer (km)', filter: 'odometer' },
-  { label: 'SoH (%)', filter: 'soh' },
+  { label: 'SoH BIB(%)', filter: 'soh' },
+  { label: 'SoH OEM (%)', filter: 'sohOem' },
   {
     label: (
       <div>
@@ -69,6 +70,7 @@ const FavoritesPage: React.FC = () => {
     const numericColumns: (keyof PinnedVehicleDataResponse)[] = [
       'odometer',
       'soh',
+      'sohOem',
       'sohPer10000km',
     ];
 
@@ -185,6 +187,9 @@ const FavoritesPage: React.FC = () => {
                       {formatNumber(v.odometer?.toFixed(0))}
                     </td>
                     <td className="py-4 text-black text-left">{formatNumber(v.soh)}</td>
+                    <td className="py-4 text-black text-left">
+                      {formatNumber(v.sohOem)}
+                    </td>
                     <td className="py-4 text-black text-left">
                       {formatNumber(v.sohPer10000km)}
                     </td>

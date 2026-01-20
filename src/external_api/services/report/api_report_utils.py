@@ -30,7 +30,7 @@ async def check_soh_available(
     vin: str, db: AsyncSession, report_type: ReportType
 ) -> bool:
     if report_type == ReportType.premium:
-        condition = VehicleData.soh.isnot(None)
+        condition = VehicleData.soh_bib.isnot(None)
     elif report_type == ReportType.readout:
         condition = VehicleData.soh_oem.isnot(None)
     else:
@@ -75,7 +75,7 @@ async def fetch_report_required_data(
 
     vehichle_data: VehicleData = row.VehicleData
     if vehichle_data is None or (
-        vehichle_data.soh is None and vehichle_data.soh_oem is None
+        vehichle_data.soh_bib is None and vehichle_data.soh_oem is None
     ):
         raise HTTPException(
             status_code=400, detail="Vehicle activated but SoH is not available yet."

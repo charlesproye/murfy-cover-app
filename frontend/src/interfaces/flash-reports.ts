@@ -21,9 +21,13 @@ export interface GetGenerationInfo {
     capacity: number;
     consumption?: number;
     range: number;
-    trendline?: string;
-    trendline_min?: string;
-    trendline_max?: string;
-    soh?: number;
+    trendline_bib?: string;
+    trendline_bib_min?: string;
+    trendline_bib_max?: string;
+    trendline_oem?: string;
+    trendline_oem_min?: string;
+    trendline_oem_max?: string;
+    soh_bib?: number;
+    soh_oem?: number;
   };
 }

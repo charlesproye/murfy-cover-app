@@ -51,7 +51,7 @@ async def test_get_premium_data(
     await VehicleDataFactory.create_async(
         session=db_session,
         vehicle_id=vehicle.id,
-        soh=95.5,
+        soh_bib=95.5,
         odometer=50000.0,
     )
 
@@ -103,7 +103,7 @@ async def test_generate_premium_report_sync_endpoint(
     await VehicleDataFactory.create_async(
         session=db_session,
         vehicle_id=vehicle.id,
-        soh=95.5,
+        soh_bib=95.5,
         odometer=50000.0,
     )
 

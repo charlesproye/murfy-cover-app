@@ -21,4 +21,5 @@ async def pinned_vehicles(
 ):
     fleet_ids = [fleet_id] if fleet_id != "all" else [fleet.id for fleet in user.fleets]
     response = await get_all_pinned_vehicles(fleet_ids, page, limit, db)
+
     return response

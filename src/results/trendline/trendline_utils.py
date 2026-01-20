@@ -75,13 +75,15 @@ def fit_lower_bound(x, y_lower):
     return coef, offset
 
 
-def build_trendline_expressions(coef_mean, x_sorted, y_lower, y_upper):
+def build_trendline_expressions(
+    coef_mean, x_sorted, y_lower, y_upper
+) -> tuple[str, str, str]:
     """
     Builds trendline expressions.
     Upper bound starts at 1 and remains above mean/lower bound.
     """
     # Mean trendline
-    mean_expr = {"trendline": f"1 - {abs(coef_mean[0])} * np.log1p(x/{coef_mean[1]})"}
+    mean_expr = f"1 - {abs(coef_mean[0])} * np.log1p(x/{coef_mean[1]})"
     y_fit_mean = log_function(x_sorted, *coef_mean)
 
     # Upper bound
@@ -93,19 +95,17 @@ def build_trendline_expressions(coef_mean, x_sorted, y_lower, y_upper):
         )
         coef_upper_a = abs(coef_mean[0]) / 2
     coef_upper_b = coef_mean[1]
-    upper_expr = {"trendline": f"1 - {abs(coef_upper_a)} * np.log1p(x/{coef_upper_b})"}
+    upper_expr = f"1 - {abs(coef_upper_a)} * np.log1p(x/{coef_upper_b})"
 
     # Lower bound
     coef_lower, offset = fit_lower_bound(x_sorted, y_lower)
-    lower_expr = {
-        "trendline": f"{offset} - {abs(coef_lower[0])} * np.log1p(x/{coef_lower[1]})"
-    }
+    lower_expr = f"{offset} - {abs(coef_lower[0])} * np.log1p(x/{coef_lower[1]})"
     return mean_expr, upper_expr, lower_expr
 
 
 def compute_trendline_functions(
     x_sorted, y_sorted, distribution=1.96, interval=(5, 95)
-):
+) -> tuple[str, str, str]:
     coef_mean, _ = curve_fit(
         log_function,
         x_sorted,
@@ -166,21 +166,47 @@ def update_database_trendlines(
             update(VehicleModel)
             .where(VehicleModel.id.in_(model_ids))
             .values(
-                trendline=mean if mean else None,
-                trendline_min=lower if lower else None,
-                trendline_max=upper if upper else None,
-                trendline_bib=trendline_bib,
+                trendline_bib=mean,
+                trendline_bib_min=lower,
+                trendline_bib_max=upper,
+                has_trendline_bib=trendline_bib,
             )
         )
     conn.execute(stmt)
 
 
-def clean_battery_data(df, odometer_column, soh_colum):
-    df_clean = df.rename(columns={odometer_column: "odometer", soh_colum: "soh"}).copy()
+def update_database_trendlines_oem(
+    model_ids: list[str],
+    mean,
+    upper,
+    lower,
+    conn=None,
+):
+    if conn is None:
+        raise ValueError("Engine must be provided as parameter")
+
+    stmt = (
+        update(VehicleModel)
+        .where(VehicleModel.id.in_(model_ids))
+        .values(
+            trendline_oem=mean,
+            trendline_oem_min=lower,
+            trendline_oem_max=upper,
+            has_trendline_oem=True,
+        )
+    )
+    conn.execute(stmt)
+
+
+def clean_battery_data(df, odometer_column, soh_column: str):
+    df_clean = df.rename(columns={odometer_column: "odometer"}).copy()
+
+    df_clean = df_clean.rename(columns={soh_column: "soh"})
     df_clean = df_clean[
         ~((df_clean["odometer"] < 20000) & (df_clean["soh"] < 0.95))
         & (df_clean["soh"] >= 0.8)
     ]
+
     df_clean = df_clean.dropna(subset=["soh", "odometer"])
     df_clean["soh"] = np.minimum(df_clean["soh"], 1)
     return df_clean
@@ -213,13 +239,13 @@ def filter_data(
 
 
 def filter_trendlines(trendline, trendline_max, trendline_min):
-    value_at_160k = numpy_safe_eval(expression=trendline["trendline"], x=160_000)
+    value_at_160k = numpy_safe_eval(expression=trendline, x=160_000)
     if value_at_160k >= 0.95:
         return False
 
     kms = np.arange(0, 200_001, 50_000)
-    max_values = numpy_safe_eval(trendline_max["trendline"], x=kms)
-    min_values = numpy_safe_eval(trendline_min["trendline"], x=kms)
+    max_values = numpy_safe_eval(trendline_max, x=kms)
+    min_values = numpy_safe_eval(trendline_min, x=kms)
 
     idx_150k = 150_000 // 50_000
     diff_start = max_values[0] - min_values[0]

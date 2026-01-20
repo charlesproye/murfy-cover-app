@@ -51,7 +51,7 @@ const FlashReportStep1Page = () => {
     <div className="flex flex-col gap-8 w-5/6 mx-auto mt-6">
       <FlashReportForm
         vin={flashReportData.vin}
-        has_trendline={flashReportData.has_trendline}
+        has_trendline={flashReportData.has_trendline_oem || flashReportData.has_trendline_bib}
         make={flashReportData.make ?? undefined}
         model={flashReportData.model ?? undefined}
         type_version_list={flashReportData.type_version_list}

@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import HTTPException
-from sqlalchemy import Numeric, cast, func, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_models import Oem, Vehicle, VehicleData, VehicleModel
@@ -25,16 +25,19 @@ async def get_fleet_id_of_vin(vin: str, db: AsyncSession):
     return vehicle.fleet_id
 
 
-async def get_graph_data(vin: str, db: AsyncSession = None):
-    # Get trendlines
+async def get_graph_data(vin: str, db: AsyncSession):
+    # Get trendlines from both vehicle_model and OEM
     trendlines_list_query = (
         select(
-            Oem.trendline.label("oem_trendline"),
-            Oem.trendline_min.label("oem_trendline_min"),
-            Oem.trendline_max.label("oem_trendline_max"),
-            VehicleModel.trendline.label("vehicle_model_trendline"),
-            VehicleModel.trendline_min.label("vehicle_model_trendline_min"),
-            VehicleModel.trendline_max.label("vehicle_model_trendline_max"),
+            Oem.trendline,
+            Oem.trendline_min,
+            Oem.trendline_max,
+            VehicleModel.trendline_bib,
+            VehicleModel.trendline_bib_min,
+            VehicleModel.trendline_bib_max,
+            VehicleModel.trendline_oem,
+            VehicleModel.trendline_oem_min,
+            VehicleModel.trendline_oem_max,
         )
         .select_from(Vehicle)
         .join(VehicleModel, Vehicle.vehicle_model_id == VehicleModel.id)
@@ -42,66 +45,55 @@ async def get_graph_data(vin: str, db: AsyncSession = None):
         .where(Vehicle.vin == vin)
     )
     trendlines_list_result = await db.execute(trendlines_list_query)
-    trendlines_list = trendlines_list_result.mappings().first()
+    trendlines_list = trendlines_list_result.first()
 
     if not trendlines_list:
         raise HTTPException(
             status_code=404, detail="Vehicle not found or no data available"
         )
 
+    # Prioritize OEM trendlines over BIB trendlines
     trendlines_final = {
-        "trendline": trendlines_list["vehicle_model_trendline"]
-        if trendlines_list["vehicle_model_trendline"]
-        else trendlines_list["oem_trendline"]
-        if trendlines_list["oem_trendline"]
-        else None,
-        "trendline_min": trendlines_list["vehicle_model_trendline_min"]
-        if trendlines_list["vehicle_model_trendline_min"]
-        else trendlines_list["oem_trendline_min"]
-        if trendlines_list["oem_trendline_min"]
-        else None,
-        "trendline_max": trendlines_list["vehicle_model_trendline_max"]
-        if trendlines_list["vehicle_model_trendline_max"]
-        else trendlines_list["oem_trendline_max"]
-        if trendlines_list["oem_trendline_max"]
-        else None,
+        "trendline_bib": trendlines_list[3] or None,
+        "trendline_bib_min": trendlines_list[4] or None,
+        "trendline_bib_max": trendlines_list[5] or None,
+        "trendline_oem": trendlines_list[6] or trendlines_list[0] or None,
+        "trendline_oem_min": trendlines_list[7] or trendlines_list[1] or None,
+        "trendline_oem_max": trendlines_list[8] or trendlines_list[2] or None,
     }
 
     # Get data points
-    soh_expr = (func.round(cast(VehicleData.soh, Numeric), 3) * 100).label("soh")
-    odometer_expr = func.round(cast(VehicleData.odometer, Numeric), 0).label("odometer")
-
     query = (
-        select(soh_expr, odometer_expr)
+        select(
+            (func.round(VehicleData.soh_bib, 3) * 100),
+            (func.round(VehicleData.soh_oem, 3) * 100),
+            func.round(VehicleData.odometer, 0),
+        )
         .select_from(Vehicle)
         .join(VehicleData, Vehicle.id == VehicleData.vehicle_id)
         .where(
             Vehicle.vin == vin,
-            VehicleData.soh.isnot(None),
             VehicleData.odometer.isnot(None),
         )
         .distinct()
-        .order_by(odometer_expr.asc())
+        .order_by(VehicleData.odometer.asc())
     )
     result = await db.execute(query)
-    data = result.mappings().all()
+    data = result.all()
 
     return DataGraphResponse(
-        initial_point=DataPoint(soh=100, odometer=0),
+        initial_point=DataPoint(soh_bib=100, soh_oem=100, odometer=0),
         data_points=[
-            DataPoint(soh=row["soh"], odometer=row["odometer"]) for row in data
+            DataPoint(soh_bib=row[0], soh_oem=row[1], odometer=row[2]) for row in data
         ]
         if data
         else [],
-        trendline=trendlines_final["trendline"].get("trendline")
-        if trendlines_final["trendline"]
-        else None,
-        trendline_min=trendlines_final["trendline_min"].get("trendline")
-        if trendlines_final["trendline_min"]
-        else None,
-        trendline_max=trendlines_final["trendline_max"].get("trendline")
-        if trendlines_final["trendline_max"]
-        else None,
+        trendline_bib=trendlines_final["trendline_bib"],
+        trendline_bib_min=trendlines_final["trendline_bib_min"],
+        trendline_bib_max=trendlines_final["trendline_bib_max"],
+        trendline_oem=trendlines_final["trendline_oem"],
+        trendline_oem_min=trendlines_final["trendline_oem_min"],
+        trendline_oem_max=trendlines_final["trendline_oem_max"],
     )
 
 
@@ -117,7 +109,7 @@ async def get_infos(vin: str, db: AsyncSession):
                 vehicle_id,
                 timestamp as last_data_date,
                 odometer,
-                soh,
+                soh_bib as soh,
                 soh_comparison,
                 consumption,
                 COALESCE(cycles, 0) as cycles
@@ -132,12 +124,12 @@ async def get_infos(vin: str, db: AsyncSession):
                 vehicle_id,
                 timestamp as last_data_date,
                 odometer,
-                soh,
+                soh_bib as soh,
                 soh_comparison,
                 consumption,
                 COALESCE(cycles, 0) as cycles
             FROM vehicle_data
-            WHERE soh IS NOT NULL
+            WHERE soh_bib IS NOT NULL
             AND vehicle_id = (SELECT id FROM vehicle WHERE vin = :vin)
             ORDER BY timestamp DESC
             LIMIT 1
@@ -147,12 +139,12 @@ async def get_infos(vin: str, db: AsyncSession):
                 vehicle_id,
                 timestamp as last_data_date,
                 odometer,
-                soh,
+                soh_bib as soh,
                 soh_comparison,
                 consumption,
                 COALESCE(cycles, 0) as cycles
             FROM vehicle_data
-            WHERE (soh IS NOT NULL OR odometer IS NOT NULL)
+            WHERE (soh_bib IS NOT NULL OR odometer IS NOT NULL)
             AND vehicle_id = (SELECT id FROM vehicle WHERE vin = :vin)
             AND timestamp BETWEEN (SELECT start_date FROM last_week) AND (SELECT end_date FROM last_week)
             ORDER BY timestamp DESC
@@ -197,7 +189,7 @@ async def get_infos(vin: str, db: AsyncSession):
             INITCAP(oem.oem_name) as oem_name,
             vm.warranty_date,
             vm.warranty_km,
-            vm.trendline->>'trendline' as trendline,
+            COALESCE(vm.trendline_oem, vm.trendline_bib) as trendline,
             bi.chemistry,
             bi.capacity,
             bi.range,
@@ -329,12 +321,12 @@ async def get_estimated_range(vin: str, db: AsyncSession):
         ),
         current_data AS (
             SELECT
-                ROUND(soh::numeric, 2)*100 as current_soh,
+                ROUND(soh_bib::numeric, 2)*100 as current_soh,
                 ROUND(odometer::numeric, 0) as current_odometer,
                 timestamp as current_timestamp
             FROM vehicle_data vd
             JOIN vehicle_info vi ON vd.vehicle_id = vi.id
-            WHERE soh IS NOT NULL AND odometer IS NOT NULL
+            WHERE soh_bib IS NOT NULL AND odometer IS NOT NULL
             ORDER BY timestamp DESC
             LIMIT 1
         ),
@@ -452,7 +444,7 @@ async def get_estimated_range(vin: str, db: AsyncSession):
                     "odometer": max(
                         round(data["contract_end_odometer"])
                         if data.get("contract_end_odometer") is not None
-                        else None,
+                        else data["current_odometer"],
                         data["current_odometer"],
                     ),
                 }

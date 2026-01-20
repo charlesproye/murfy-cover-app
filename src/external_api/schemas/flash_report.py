@@ -33,10 +33,14 @@ class BatteryInfo(BaseModel):
     capacity: float
     consumption: float | None
     range: float
-    trendline: str | None
-    trendline_min: str | None
-    trendline_max: str | None
-    soh: float | None
+    trendline_bib: str | None
+    trendline_bib_min: str | None
+    trendline_bib_max: str | None
+    trendline_oem: str | None
+    trendline_oem_min: str | None
+    trendline_oem_max: str | None
+    soh_bib: float | None
+    soh_oem: float | None
 
 
 class GenerationData(BaseModel):
@@ -53,6 +57,8 @@ class VehicleSpecsType(BaseModel):
 
 class VehicleSpecs(BaseModel):
     has_trendline: bool
+    has_trendline_bib: bool
+    has_trendline_oem: bool
     make: str | None
     model: str | None
     type_version_list: list[VehicleSpecsType] | None

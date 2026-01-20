@@ -24,6 +24,8 @@ export interface VinDecoderTypeVersion {
 
 export interface VinDecoderResponse {
   has_trendline: boolean;
+  has_trendline_bib: boolean;
+  has_trendline_oem: boolean;
   make: string | null;
   model: string | null;
   type_version_list: VinDecoderTypeVersion[] | null;

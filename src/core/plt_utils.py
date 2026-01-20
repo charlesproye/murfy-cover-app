@@ -154,9 +154,7 @@ def show_trendline(
     fig.add_trace(
         go.Scatter(
             x=x_sorted,
-            y=numpy_utils.numpy_safe_eval(
-                expression=trendline["trendline"], x=x_sorted
-            ),
+            y=numpy_utils.numpy_safe_eval(expression=trendline, x=x_sorted),
             mode="lines",
             line={"color": "red"},
             name="Fit",
@@ -166,9 +164,7 @@ def show_trendline(
     fig.add_trace(
         go.Scatter(
             x=x_sorted,
-            y=numpy_utils.numpy_safe_eval(
-                expression=trendline_max["trendline"], x=x_sorted
-            ),
+            y=numpy_utils.numpy_safe_eval(expression=trendline_max, x=x_sorted),
             mode="lines",
             line={"color": "green"},
             name="Upper",
@@ -178,9 +174,7 @@ def show_trendline(
     fig.add_trace(
         go.Scatter(
             x=x_sorted,
-            y=numpy_utils.numpy_safe_eval(
-                expression=trendline_min["trendline"], x=x_sorted
-            ),
+            y=numpy_utils.numpy_safe_eval(expression=trendline_min, x=x_sorted),
             mode="lines",
             line={"color": "green"},
             name="Lower",

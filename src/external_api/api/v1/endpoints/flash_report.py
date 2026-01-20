@@ -40,7 +40,12 @@ async def decode_vin(
 
     result = await send_vehicle_specs(vin, db)
 
-    if result.make and not result.has_trendline:
+    if (
+        result.make
+        and not result.has_trendline_oem
+        and not result.has_trendline_bib
+        and result.model
+    ):
         await log_vin_decoded(db, vin, result.make, result.model)
     return result
 
@@ -115,10 +120,15 @@ async def get_all_models_with_trendline(
             VehicleModel.model_name,
             VehicleModel.type,
             VehicleModel.version,
+            VehicleModel.has_trendline_bib,
+            VehicleModel.has_trendline_oem,
         )
         .select_from(VehicleModel)
         .join(Make, VehicleModel.make_id == Make.id)
-        .where(VehicleModel.trendline["trendline"].isnot(None))
+        .where(
+            (VehicleModel.trendline_bib.isnot(None))
+            | (VehicleModel.trendline_oem.isnot(None))
+        )
         .order_by(
             Make.make_name,
             VehicleModel.model_name,
@@ -137,6 +147,8 @@ async def get_all_models_with_trendline(
         model_name = vehicule.model_name
         model_type = vehicule.type
         version = vehicule.version
+        has_trendline_bib = vehicule.has_trendline_bib
+        has_trendline_oem = vehicule.has_trendline_oem
 
         # Initialize make if not exists
         if make_name not in makes_dict:
@@ -148,11 +160,16 @@ async def get_all_models_with_trendline(
 
         # Initialize type if not exists
         if model_type not in makes_dict[make_name][model_name]:
-            makes_dict[make_name][model_name][model_type] = []
+            makes_dict[make_name][model_name][model_type] = {
+                "versions": [],
+                "has_trendline_bib": has_trendline_bib,
+                "has_trendline_oem": has_trendline_oem,
+            }
 
         # Add version if not already present
         # Check if the value is None (meaning no versions) before using 'in' operator
-        versions_list = makes_dict[make_name][model_name][model_type]
+        type_info = makes_dict[make_name][model_name][model_type]
+        versions_list = type_info["versions"]
         if versions_list is None:
             # Already set to None (no versions), skip
             continue
@@ -162,7 +179,7 @@ async def get_all_models_with_trendline(
                 versions_list.append(version)
             else:
                 # Set to None to indicate no versions for this type
-                makes_dict[make_name][model_name][model_type] = None
+                type_info["versions"] = None
 
     # Convert to Pydantic models
     makes = []
@@ -170,9 +187,16 @@ async def get_all_models_with_trendline(
         models = []
         for model_name, types_dict in models_dict.items():
             types = []
-            for model_type, versions in types_dict.items():
+            for model_type, type_info in types_dict.items():
                 if model_type:
-                    types.append(TypeInfo(model_type=model_type, versions=versions))
+                    types.append(
+                        TypeInfo(
+                            model_type=model_type,
+                            versions=type_info["versions"],
+                            has_trendline_bib=type_info["has_trendline_bib"],
+                            has_trendline_oem=type_info["has_trendline_oem"],
+                        )
+                    )
             models.append(ModelInfo(model_name=model_name, types=types))
         makes.append(MakeInfo(make_name=make_name, models=models))
 

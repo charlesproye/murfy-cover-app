@@ -235,7 +235,7 @@ const PdfHeaderFlash: React.FC<{ data: GetGenerationInfo }> = ({ data }) => {
               lineHeight: 1,
             }}
           >
-            {batteryInfo?.soh ? `${(batteryInfo?.soh * 100).toFixed(0)}%` : '--'}
+            {batteryInfo?.soh_bib ? `${(batteryInfo?.soh_bib * 100).toFixed(0)}%` : '--'}
           </Text>
         </View>
         {/* Texte explicatif */}

@@ -39,17 +39,17 @@ const TrendlineChart: React.FC<TrendlineChartProps> = ({
 
     if (
       !brandEquations ||
-      !brandEquations.trendline ||
-      !brandEquations.trendline_max ||
-      !brandEquations.trendline_min
+      !brandEquations.trendline_bib ||
+      !brandEquations.trendline_bib_max ||
+      !brandEquations.trendline_bib_min
     ) {
       return null;
     }
 
     try {
-      const avgEquation = JSON.parse(brandEquations.trendline).trendline;
-      const maxEquation = JSON.parse(brandEquations.trendline_max).trendline;
-      const minEquation = JSON.parse(brandEquations.trendline_min).trendline;
+      const avgEquation = brandEquations.trendline_bib;
+      const maxEquation = brandEquations.trendline_bib_max;
+      const minEquation = brandEquations.trendline_bib_min;
 
       const parsedCoefficients = {
         avg: parseTrendlineEquation(avgEquation),

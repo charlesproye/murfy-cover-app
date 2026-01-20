@@ -7,6 +7,7 @@ export interface PinnedVehicleDataResponse {
   makeName: string;
   odometer: number;
   soh: number;
+  sohOem: number;
   sohPer10000km: number;
   startDate?: string;
 }
@@ -15,6 +16,7 @@ export const PinnedVehicleColumns = [
   'makeName',
   'odometer',
   'soh',
+  'sohOem',
   'sohPer10000km',
   'startDate',
 ];
