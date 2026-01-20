@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -32,6 +33,7 @@ _DEF_UA = (
 
 def make_driver():
     options = webdriver.ChromeOptions()
+    options.binary_location = "/usr/bin/chromium"
     options.add_argument(f"--user-agent={_DEF_UA}")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--disable-infobars")
@@ -47,7 +49,8 @@ def make_driver():
     options.add_argument("--user-data-dir=/tmp/chrome-data")
     options.add_argument("--data-path=/tmp/chrome-data")
     options.add_argument("--disk-cache-dir=/tmp/chrome-data")
-    return webdriver.Chrome(options=options)
+    service = Service("/usr/bin/chromedriver")
+    return webdriver.Chrome(service=service, options=options)
 
 
 def get_car_links(url):
@@ -240,7 +243,7 @@ def get_battery_capacity(version):
     return None
 
 
-def get_spoticar_data(url: str, timeout: int = 20) -> dict[str, str | None]:
+def get_spoticar_data(url: str, timeout: int = 20) -> dict[str, str | None] | None:
     driver = make_driver()
     try:
         driver.get(url)
@@ -307,15 +310,17 @@ def main():
                                                     join battery b on b.id=vm.battery_id;""")
         model_existing = pd.DataFrame(
             cursor.fetchall(),
-            columns=[
-                "model_name",
-                "id",
-                "type",
-                "commissioning_date",
-                "vm.end_of_life_date",
-                "make_name",
-                "capacity",
-            ],
+            columns=pd.Index(
+                [
+                    "model_name",
+                    "id",
+                    "type",
+                    "commissioning_date",
+                    "vm.end_of_life_date",
+                    "make_name",
+                    "capacity",
+                ]
+            ),
         )
     infos_clean["id"] = infos_clean.apply(
         lambda row: mapping_vehicle_type(

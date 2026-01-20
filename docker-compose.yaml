@@ -5,7 +5,6 @@ services:
       context: .
       dockerfile: docker/data_ev.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     container_name: data_ev
     env_file:
@@ -17,7 +16,6 @@ services:
       context: .
       dockerfile: docker/activation.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     container_name: activation
     env_file:
@@ -29,7 +27,6 @@ services:
       context: .
       dockerfile: docker/ev_database.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     container_name: ev_database
     env_file:
@@ -40,7 +37,6 @@ services:
       context: .
       dockerfile: docker/tesla.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     container_name: tesla-ingestion
     image: rg.fr-par.scw.cloud/data-engineering/tesla-ingestion:latest
@@ -52,7 +48,6 @@ services:
       context: .
       dockerfile: docker/scraping_soh.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/data-engineering/scraping_soh:latest
     container_name: scraping_soh
@@ -64,7 +59,6 @@ services:
       context: .
       dockerfile: docker/premium_report.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/data-engineering/premium_report:latest
     container_name: premium_report
@@ -76,7 +70,6 @@ services:
       context: .
       dockerfile: docker/results.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/data-engineering/results:latest
     container_name: results
@@ -88,7 +81,6 @@ services:
       context: .
       dockerfile: docker/results.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/bib-images-dev/results:latest
     container_name: results
@@ -100,7 +92,6 @@ services:
       context: .
       dockerfile: docker/hm.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/data-engineering/hm-ingestion:latest
     container_name: hm-ingestion
@@ -111,15 +102,12 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_USER=bib
-      - REDIS_PASSWORD=bibpwd
 
   ms_ingestion_service:
     build:
       context: .
       dockerfile: docker/mobilisights.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/data-engineering/ms-ingestion:latest
     container_name: ms-ingestion
@@ -128,8 +116,6 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_USER=bib
-      - REDIS_PASSWORD=bibpwd
     depends_on:
       - redis
 
@@ -138,7 +124,6 @@ services:
       context: .
       dockerfile: docker/data_catalog.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     container_name: data-catalog
     image: rg.fr-par.scw.cloud/data-engineering/data-catalog:latest
@@ -150,16 +135,8 @@ services:
 
   redis:
     image: redis:alpine
-    volumes:
-      - ./redis.conf:/usr/local/etc/redis/redis.conf
-      - ./redis-acl.conf:/usr/local/etc/redis/users.acl
     ports:
       - "6379:6379"
-    command: >
-      redis-server /usr/local/etc/redis/redis.conf
-        --port 6379
-        --protected-mode no
-        --aclfile /usr/local/etc/redis/users.acl
     deploy:
       restart_policy:
         condition: on-failure
@@ -170,7 +147,6 @@ services:
       dockerfile: docker/push_ingestion.Dockerfile
       context: .
       platforms:
-        - linux/amd64
         - linux/arm64
     ports:
       - "8080:8080"
@@ -179,8 +155,6 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_USER=bib
-      - REDIS_PASSWORD=bibpwd
     depends_on:
       - redis
 
@@ -189,7 +163,6 @@ services:
       context: .
       dockerfile: docker/spark.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/data-engineering/spark:latest
     container_name: spark-transform
@@ -201,7 +174,6 @@ services:
       context: .
       dockerfile: docker/external_api.Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/evalue/external-api:latest
     container_name: external_api
@@ -253,7 +225,7 @@ services:
   gotenberg:
     image: gotenberg/gotenberg
     ports:
-      - "3000:3000"
+      - "3030:3000"
     restart: unless-stopped
 
 volumes:

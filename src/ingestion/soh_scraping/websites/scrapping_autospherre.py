@@ -10,6 +10,7 @@ import pandas as pd
 import requests
 from PyPDF2 import PdfReader
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -182,6 +183,7 @@ def extract_aviloo_data_from_pdf(pdf_path):
 
 def get_driver():
     options = webdriver.ChromeOptions()
+    options.binary_location = "/usr/bin/chromium"
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")  # indispensable en non-root
     options.add_argument("--disable-dev-shm-usage")  # éviter les crashes /dev/shm
@@ -193,7 +195,8 @@ def get_driver():
     options.add_argument("--user-data-dir=/tmp/chrome-data")
     options.add_argument("--data-path=/tmp/chrome-data")
     options.add_argument("--disk-cache-dir=/tmp/chrome-data")
-    return webdriver.Chrome(options=options)
+    service = Service("/usr/bin/chromedriver")
+    return webdriver.Chrome(service=service, options=options)
 
 
 def extract_year_and_battery(all_li):
@@ -206,7 +209,7 @@ def extract_year_and_battery(all_li):
             match = re.search(r"\b(20(?:0[0-79]|0[9]|[1-9]\d))\b", text)
             if match:
                 year = int(match.group(1))
-            if year > date.today().year:
+            if not year or year > date.today().year:
                 year = date.today().year
 
         # battery capacity
@@ -345,15 +348,17 @@ def main():
                                                     join battery b on b.id=vm.battery_id;""")
         model_existing = pd.DataFrame(
             cursor.fetchall(),
-            columns=[
-                "model_name",
-                "id",
-                "type",
-                "commissioning_date",
-                "vm.end_of_life_date",
-                "make_name",
-                "capacity",
-            ],
+            columns=pd.Index(
+                [
+                    "model_name",
+                    "id",
+                    "type",
+                    "commissioning_date",
+                    "vm.end_of_life_date",
+                    "make_name",
+                    "capacity",
+                ]
+            ),
         )
     infos_clean["id"] = infos_clean.apply(
         lambda row: mapping_vehicle_type(

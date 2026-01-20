@@ -29,6 +29,6 @@ class KafkaSettings(BaseSettings):
 class RedisSettings(BaseSettings):
     REDIS_HOST: str = "127.0.0.1"
     REDIS_PORT: int = 6379
-    REDIS_USER: str = "default"
-    REDIS_PASSWORD: str = "default"
+    REDIS_USER: str | None = None
+    REDIS_PASSWORD: str | None = None
     REDIS_DB_KAFKA_CACHE: int = 2
