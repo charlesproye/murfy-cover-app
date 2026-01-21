@@ -3,8 +3,8 @@
  * Provides automatic token refresh and secure request handling
  */
 
-import { ROUTES } from '@/routes';
 import { logoutRequest } from '@/services/auth/authService';
+import { attemptRefresh, getIsLoggingOut } from '@/services/auth/authState';
 import { toast } from 'sonner';
 
 export interface FetchOptions extends RequestInit {
@@ -18,29 +18,30 @@ export interface FetchOptions extends RequestInit {
  * Uses httpOnly cookies instead of Authorization headers
  */
 async function fetchWithAuth<T>(url: string, options: FetchOptions = {}): Promise<T> {
+  const { body, ...restOptions } = options;
   const defaultOptions: RequestInit = {
     credentials: 'include', // Include httpOnly cookies
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...restOptions.headers,
     },
   };
 
   // Handle body serialization
-  if (options.body && !(options.body instanceof FormData)) {
-    if (typeof options.body === 'object') {
-      defaultOptions.body = JSON.stringify(options.body);
+  if (body && !(body instanceof FormData)) {
+    if (typeof body === 'object') {
+      defaultOptions.body = JSON.stringify(body);
     } else {
-      defaultOptions.body = options.body;
+      defaultOptions.body = body;
     }
-  } else if (options.body instanceof FormData) {
+  } else if (body instanceof FormData) {
     // Remove Content-Type header for FormData
     delete (defaultOptions.headers as Record<string, string>)['Content-Type'];
-    defaultOptions.body = options.body;
+    defaultOptions.body = body;
   }
 
   const makeRequest = async (): Promise<Response> => {
-    return fetch(url, { ...defaultOptions, ...options });
+    return fetch(url, { ...defaultOptions, ...restOptions });
   };
 
   try {
@@ -48,20 +49,21 @@ async function fetchWithAuth<T>(url: string, options: FetchOptions = {}): Promis
 
     // Handle token refresh on 401/403
     if (response.status === 401 || response.status === 403) {
-      // Try to refresh token
-      const refreshResponse = await fetch(ROUTES.REFRESH, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      // Use shared refresh coordination to prevent multiple simultaneous attempts
+      const refreshResponse = await attemptRefresh();
 
       if (refreshResponse.ok) {
         // Retry the original request
         response = await makeRequest();
       } else {
-        // Refresh failed, logout and redirect
-        await logoutRequest();
-        console.error('Authentication failed - please login again');
-        toast.error('Authentication failed - please login again');
+        // Only logout once, even if multiple requests fail
+        if (!getIsLoggingOut()) {
+          await logoutRequest();
+          console.error('Authentication failed - please login again');
+          toast.error('Authentication failed - please login again');
+        }
+        // Throw error to prevent further processing
+        throw new Error('Authentication failed - please login again');
       }
     }
 

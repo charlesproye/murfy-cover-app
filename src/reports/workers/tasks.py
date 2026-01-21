@@ -5,6 +5,7 @@ from sqlalchemy.sql import select
 
 from db_models import Report
 from db_models.report import ReportType
+from reports.report_config import VERIFY_REPORT_BASE_URL
 from reports.workers.celery_config import celery_app
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,9 @@ async def async_generate_pdf_task(
     report_generator = GSheetReportGenerator()
 
     try:
-        urls = await report_generator.download_pdfs_for_vins([vin])
+        urls = await report_generator.download_pdfs_for_vins(
+            [vin], VERIFY_REPORT_BASE_URL
+        )
 
         if not urls or len(urls) == 0:
             logger.error(f"No PDF generated for VIN: {vin}")

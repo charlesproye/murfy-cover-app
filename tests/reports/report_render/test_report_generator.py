@@ -10,6 +10,7 @@ from db_models.company import Oem
 from db_models.report import ReportType
 from db_models.vehicle import Battery, Vehicle, VehicleData, VehicleModel
 from external_api.core.config import settings
+from reports.report_config import VERIFY_REPORT_BASE_URL
 from reports.report_render.report_generator import ReportGenerator
 
 
@@ -56,7 +57,7 @@ def _create_test_models() -> tuple[
         trendline_oem_max="1.01 - 0.02 * np.log1p(x/10000)",
         expected_consumption=16.1,
         maximum_speed=150,
-        charge_plug_type="CCS COMBO",
+        charge_plug_type="Type 2",
         fast_charge_plug_type="CCS",
         # Autonomy data for different driving cycles
         autonomy_city_summer=380,
@@ -110,7 +111,6 @@ async def test_generate_premium_report_html(tmp_path: Path) -> None:
         battery=battery,
         oem=oem,
         vehicle_data=vehicle_data,
-        report_uuid=str(uuid.uuid4()),
         image_url=url_image,
         report_type=ReportType.premium,
     )
@@ -166,6 +166,7 @@ async def test_generate_report_pdf_gotenberg() -> None:
             report_uuid=str(uuid.uuid4()),
             image_url=url_image,
             report_type=report_type,
+            verify_report_base_url=VERIFY_REPORT_BASE_URL,
         )
         html_path = output_path.parent / f"example_{report_type.value}_report.html"
         html_path.write_text(html_content, encoding="utf-8")

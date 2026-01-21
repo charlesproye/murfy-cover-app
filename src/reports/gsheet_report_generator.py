@@ -17,6 +17,7 @@ from db_models.report import ReportType
 from db_models.vehicle import Battery
 from external_api.core.exceptions import ExistingReportException
 from reports import reports_utils
+from reports.report_config import VERIFY_REPORT_BASE_URL
 from reports.report_render.report_generator import ReportGenerator
 
 logging.basicConfig(level=logging.INFO)
@@ -310,7 +311,7 @@ class GSheetReportGenerator:
         return df
 
     async def download_pdfs_for_vins(
-        self, vins: list[str]
+        self, vins: list[str], report_base_url: str
     ) -> list[tuple[str, str, uuid.UUID]]:
         """
         Generate PDF reports for given VINs using PremiumReportGenerator and upload to S3.
@@ -347,6 +348,7 @@ class GSheetReportGenerator:
                     image_url=image_url,
                     report_uuid=str(report_uuid),
                     report_type=ReportType.premium,
+                    verify_report_base_url=report_base_url,
                 )
 
                 pdf_bytes = await generator.generate_pdf(html_content=html_content)
@@ -481,7 +483,9 @@ class GSheetReportGenerator:
             & (merged_df["DATE_REPORT"] == datetime.now(UTC).strftime("%Y-%m-%d"))
         ]["VIN"].tolist()
 
-        list_files = await self.download_pdfs_for_vins(vins_to_download)
+        list_files = await self.download_pdfs_for_vins(
+            vins_to_download, VERIFY_REPORT_BASE_URL
+        )
         await self.add_reports_to_db(list_files)
 
         merged_df = await self.refresh_urls(merged_df)

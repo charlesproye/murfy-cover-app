@@ -1,24 +1,13 @@
 'use client';
 
-import DataCardsHome from '@/components/entities/dashboard/home/DataCardHome';
-
-import React, { memo, useState } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import TableExtremum from '@/components/entities/dashboard/home/table/TableExtremum';
 import ChangeFleet from '@/components/common/ChangeFleet';
 import { IconTransfer } from '@tabler/icons-react';
 
-const MemoizedDataCardsHome = memo(DataCardsHome);
-
 const DashboardPage = (): React.ReactElement => {
   const { fleet } = useAuth();
-  const [isDisplay, setIsDisplay] = useState<boolean>(false);
-  const [clickedData, setClickedData] = useState<string | null>(null);
-
-  const handleDisplayChange = (newDisplay: boolean, newValue: string | null): void => {
-    setClickedData(newValue);
-    setIsDisplay(newDisplay);
-  };
 
   return (
     <div className="flex flex-col h-full w-full space-y-8 py-4">

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { IconLayoutDashboard, IconWallet, IconHeart, IconCar } from '@tabler/icons-react';
+import { IconLayoutDashboard, IconHeart, IconCar } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
@@ -47,7 +47,7 @@ export default function DashboardLayout({
                 priority
                 width={34}
                 height={34}
-                src="/logo/logo-battery-green.webp"
+                src="/logo/icon.svg"
               />
               <p className="font-bold text-xl hidden sm:contents">EValue</p>
             </div>
@@ -176,7 +176,7 @@ export default function DashboardLayout({
                   className="object-cover w-auto h-auto"
                   width={30}
                   height={30}
-                  src="/logo/logo-battery-green.webp"
+                  src="/logo/icon.svg"
                 />
                 <div className="flex flex-col justify-center">
                   <p className="text-sm font-semibold">{user?.first_name}</p>

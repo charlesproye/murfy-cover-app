@@ -11,14 +11,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { IconSearch, IconDownload, IconRefresh, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import {
+  IconSearch,
+  IconDownload,
+  IconRefresh,
+  IconChevronLeft,
+  IconChevronRight,
+} from '@tabler/icons-react';
 import { toast } from 'sonner';
 import fetchWithAuth from '@/services/fetchWithAuth';
 import { ROUTES } from '@/routes';
 import {
   FleetInfo,
   VehicleStatus,
-  VehicleStatusParams
+  VehicleStatusParams,
 } from '@/interfaces/fleet-manager/fleet-manager';
 
 interface VehiclesTabProps {
@@ -30,7 +36,7 @@ interface VehiclesTabProps {
 const VehiclesTab: React.FC<VehiclesTabProps> = ({
   fleets,
   selectedFleetId,
-  setSelectedFleetId
+  setSelectedFleetId,
 }) => {
   const [vehicles, setVehicles] = useState<VehicleStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,14 +85,14 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
       };
 
       const queryString = new URLSearchParams(
-        Object.entries(params).filter(([_, v]) => v !== undefined) as [string, string][]
+        Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][],
       ).toString();
 
       const response = await fetchWithAuth<VehicleStatus[]>(
         `${ROUTES.VEHICLE_STATUS}?${queryString}`,
         {
           method: 'GET',
-        }
+        },
       );
 
       if (response) {
@@ -113,7 +119,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
     if (selectedFleetId) {
       loadVehicles();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFleetId]);
 
   // Auto-refresh every 30 seconds if data is visible
@@ -127,7 +132,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
     }, CACHE_DURATION);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFleetId, lastFetchTime, vehicles.length]);
 
   const downloadCSV = () => {
@@ -136,8 +140,18 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
       return;
     }
 
-    const headers = ['VIN', 'Make', 'Model', 'Type', 'Version', 'Requested Status', 'Status', 'Message', 'Comment'];
-    const rows = filteredVehicles.map(v => [
+    const headers = [
+      'VIN',
+      'Make',
+      'Model',
+      'Type',
+      'Version',
+      'Requested Status',
+      'Status',
+      'Message',
+      'Comment',
+    ];
+    const rows = filteredVehicles.map((v) => [
       v.vin,
       v.make || '',
       v.model_name || '',
@@ -146,12 +160,12 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
       v.requested_status ? 'Yes' : 'No',
       v.status ? 'Yes' : 'No',
       v.message,
-      v.comment || ''
+      v.comment || '',
     ]);
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -163,38 +177,41 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
     window.URL.revokeObjectURL(url);
   };
 
-  const activatedCount = vehicles.filter(v => v.status).length;
-  const requestedCount = vehicles.filter(v => v.requested_status).length;
-  const inactiveCount = vehicles.length - activatedCount;
-
   // Get unique messages and makes for filtering
-  const uniqueMessages = Array.from(new Set(vehicles.map(v => v.message)));
-  const uniqueMakes = Array.from(new Set(vehicles.map(v => v.make).filter(Boolean))) as string[];
+  const uniqueMessages = Array.from(new Set(vehicles.map((v) => v.message)));
+  const uniqueMakes = Array.from(
+    new Set(vehicles.map((v) => v.make).filter(Boolean)),
+  ) as string[];
 
   // Filter vehicles by VIN search, message, status, and make
   const filteredByVin = vinFilter
-    ? vehicles.filter(v => v.vin.toLowerCase().includes(vinFilter.toLowerCase()))
+    ? vehicles.filter((v) => v.vin.toLowerCase().includes(vinFilter.toLowerCase()))
     : vehicles;
 
-  const filteredByMessage = messageFilter.length > 0
-    ? filteredByVin.filter(v => messageFilter.includes(v.message))
-    : filteredByVin;
+  const filteredByMessage =
+    messageFilter.length > 0
+      ? filteredByVin.filter((v) => messageFilter.includes(v.message))
+      : filteredByVin;
 
-  const filteredByStatus = statusFilter === 'all'
-    ? filteredByMessage
-    : statusFilter === 'activated'
-    ? filteredByMessage.filter(v => v.status === true)
-    : statusFilter === 'requested'
-    ? filteredByMessage.filter(v => v.requested_status && !v.status)
-    : filteredByMessage.filter(v => !v.status && !v.requested_status);
+  const filteredByStatus =
+    statusFilter === 'all'
+      ? filteredByMessage
+      : statusFilter === 'activated'
+        ? filteredByMessage.filter((v) => v.status === true)
+        : statusFilter === 'requested'
+          ? filteredByMessage.filter((v) => v.requested_status && !v.status)
+          : filteredByMessage.filter((v) => !v.status && !v.requested_status);
 
-  const filteredVehicles = makeFilter.length > 0
-    ? filteredByStatus.filter(v => v.make && makeFilter.includes(v.make))
-    : filteredByStatus;
+  const filteredVehicles =
+    makeFilter.length > 0
+      ? filteredByStatus.filter((v) => v.make && makeFilter.includes(v.make))
+      : filteredByStatus;
 
   // Recalculate counts based on filtered results
-  const filteredActivatedCount = filteredVehicles.filter(v => v.status).length;
-  const filteredRequestedCount = filteredVehicles.filter(v => v.requested_status).length;
+  const filteredActivatedCount = filteredVehicles.filter((v) => v.status).length;
+  const filteredRequestedCount = filteredVehicles.filter(
+    (v) => v.requested_status,
+  ).length;
   const filteredInactiveCount = filteredVehicles.length - filteredActivatedCount;
 
   // Pagination logic
@@ -240,7 +257,10 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
               <div className="flex gap-4 items-end">
                 <div className="flex-1 space-y-2">
                   <div className="relative">
-                    <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <IconSearch
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                      size={18}
+                    />
                     <Input
                       id="search-vin"
                       placeholder="Search by VIN..."
@@ -250,11 +270,21 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                     />
                   </div>
                 </div>
-                <Button onClick={downloadCSV} variant="outline" size="sm" disabled={filteredVehicles.length === 0}>
+                <Button
+                  onClick={downloadCSV}
+                  variant="outline"
+                  size="sm"
+                  disabled={filteredVehicles.length === 0}
+                >
                   <IconDownload size={16} />
                   Export CSV
                 </Button>
-                <Button onClick={refreshVehicles} loading={isLoading} variant="outline" size="sm">
+                <Button
+                  onClick={refreshVehicles}
+                  loading={isLoading}
+                  variant="outline"
+                  size="sm"
+                >
                   <IconRefresh size={16} />
                   Refresh
                 </Button>
@@ -264,7 +294,12 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                 <div className="text-xs text-gray-500 text-right">
                   Last updated: {new Date(lastFetchTime).toLocaleTimeString()}
                   {' • '}
-                  Cache expires in {Math.max(0, Math.ceil((CACHE_DURATION - (Date.now() - lastFetchTime)) / 1000))}s
+                  Cache expires in{' '}
+                  {Math.max(
+                    0,
+                    Math.ceil((CACHE_DURATION - (Date.now() - lastFetchTime)) / 1000),
+                  )}
+                  s
                 </div>
               )}
 
@@ -275,15 +310,21 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                 </div>
                 <div className="rounded-lg border bg-green-50 p-4">
                   <p className="text-sm text-gray-600">Activated</p>
-                  <p className="text-2xl font-bold text-green-600">{filteredActivatedCount}</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {filteredActivatedCount}
+                  </p>
                 </div>
                 <div className="rounded-lg border bg-blue-50 p-4">
                   <p className="text-sm text-gray-600">Requested</p>
-                  <p className="text-2xl font-bold text-blue-600">{filteredRequestedCount}</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {filteredRequestedCount}
+                  </p>
                 </div>
                 <div className="rounded-lg border bg-gray-50 p-4">
                   <p className="text-sm text-gray-600">Inactive</p>
-                  <p className="text-2xl font-bold text-gray-600">{filteredInactiveCount}</p>
+                  <p className="text-2xl font-bold text-gray-600">
+                    {filteredInactiveCount}
+                  </p>
                 </div>
               </div>
 
@@ -303,7 +344,13 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
 
                 {uniqueMakes.length > 0 && (
                   <Select
-                    value={makeFilter.length === 1 ? makeFilter[0] : makeFilter.length > 1 ? 'multiple' : 'all'}
+                    value={
+                      makeFilter.length === 1
+                        ? makeFilter[0]
+                        : makeFilter.length > 1
+                          ? 'multiple'
+                          : 'all'
+                    }
                     onValueChange={(value) => {
                       if (value === 'all') {
                         setMakeFilter([]);
@@ -314,9 +361,11 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="All makes">
-                        {makeFilter.length === 0 ? 'All makes' :
-                         makeFilter.length === 1 ? makeFilter[0] :
-                         `${makeFilter.length} makes selected`}
+                        {makeFilter.length === 0
+                          ? 'All makes'
+                          : makeFilter.length === 1
+                            ? makeFilter[0]
+                            : `${makeFilter.length} makes selected`}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -332,7 +381,13 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
 
                 {uniqueMessages.length > 1 && (
                   <Select
-                    value={messageFilter.length === 1 ? messageFilter[0] : messageFilter.length > 1 ? 'multiple' : 'all'}
+                    value={
+                      messageFilter.length === 1
+                        ? messageFilter[0]
+                        : messageFilter.length > 1
+                          ? 'multiple'
+                          : 'all'
+                    }
                     onValueChange={(value) => {
                       if (value === 'all') {
                         setMessageFilter([]);
@@ -343,9 +398,11 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="All messages">
-                        {messageFilter.length === 0 ? 'All messages' :
-                         messageFilter.length === 1 ? messageFilter[0] :
-                         `${messageFilter.length} messages selected`}
+                        {messageFilter.length === 0
+                          ? 'All messages'
+                          : messageFilter.length === 1
+                            ? messageFilter[0]
+                            : `${messageFilter.length} messages selected`}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -365,15 +422,33 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
                       <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">VIN</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Make</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Model</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Type</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Version</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-600">Requested</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-600">Activated</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Comment</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          VIN
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Make
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Model
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Type
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Version
+                        </th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-600">
+                          Requested
+                        </th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-600">
+                          Activated
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Status
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Comment
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -386,7 +461,9 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                           <td className="py-3 px-4">{vehicle.make || '-'}</td>
                           <td className="py-3 px-4">{vehicle.model_name || '-'}</td>
                           <td className="py-3 px-4">{vehicle.type || '-'}</td>
-                          <td className="py-3 px-4 text-xs text-gray-600">{vehicle.version || '-'}</td>
+                          <td className="py-3 px-4 text-xs text-gray-600">
+                            {vehicle.version || '-'}
+                          </td>
                           <td className="py-3 px-4 text-center">
                             {vehicle.requested_status ? (
                               <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs">
@@ -410,7 +487,9 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                             )}
                           </td>
                           <td className="py-3 px-4">{vehicle.message}</td>
-                          <td className="py-3 px-4 text-gray-600">{vehicle.comment || '-'}</td>
+                          <td className="py-3 px-4 text-gray-600">
+                            {vehicle.comment || '-'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -422,13 +501,15 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
               {totalPages > 1 && (
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">
-                    Showing {startIndex + 1} to {Math.min(endIndex, filteredVehicles.length)} of {filteredVehicles.length} vehicles
+                    Showing {startIndex + 1} to{' '}
+                    {Math.min(endIndex, filteredVehicles.length)} of{' '}
+                    {filteredVehicles.length} vehicles
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
                     >
                       <IconChevronLeft size={16} />
@@ -445,7 +526,7 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                           return (
                             <Button
                               key={page}
-                              variant={currentPage === page ? "default" : "outline"}
+                              variant={currentPage === page ? 'default' : 'outline'}
                               size="sm"
                               onClick={() => setCurrentPage(page)}
                               className="min-w-[40px]"
@@ -453,11 +534,12 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                               {page}
                             </Button>
                           );
-                        } else if (
-                          page === currentPage - 2 ||
-                          page === currentPage + 2
-                        ) {
-                          return <span key={page} className="px-2">...</span>;
+                        } else if (page === currentPage - 2 || page === currentPage + 2) {
+                          return (
+                            <span key={page} className="px-2">
+                              ...
+                            </span>
+                          );
                         }
                         return null;
                       })}
@@ -465,7 +547,9 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                      }
                       disabled={currentPage === totalPages}
                     >
                       Next

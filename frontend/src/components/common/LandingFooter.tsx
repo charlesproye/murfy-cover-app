@@ -12,12 +12,7 @@ const LandingFooter = ({ className }: { className?: string }): React.ReactElemen
           className="flex items-center"
           href="https://www.linkedin.com/company/bib-batteries/posts/?feedView=all"
         >
-          <Image
-            src="/logo/logo-battery-green.webp"
-            width={30}
-            height={30}
-            alt="logo bib"
-          />
+          <Image src="/logo/icon.svg" width={20} height={20} alt="logo bib" />
           <p className="text-sm text-primary ml-1"> Bib Batteries </p>
         </a>
       </div>

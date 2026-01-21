@@ -88,6 +88,7 @@ jobs:
           S3_BUCKET: foo
           S3_KEY: bar
           S3_SECRET: bar
+          FRONTEND_URL: http://localhost:3000
         run: |
           uv run pytest --cov=src --cov-report=xml --cov-report=json --cov-report=term-missing
 

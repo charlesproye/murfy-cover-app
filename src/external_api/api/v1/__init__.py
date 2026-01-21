@@ -12,6 +12,7 @@ from external_api.api.v1.endpoints import (
     passport,
     report_premium,
     report_readout,
+    report_verify,
     static_data,
     tesla,
     vehicle_command,
@@ -42,6 +43,9 @@ api_router.include_router(
     report_readout.readout_router_hidden, prefix="/readout", tags=["Readout"]
 )
 
+api_router.include_router(
+    report_verify.verify_router, prefix="/verify-report", tags=["Report Verification"]
+)
 
 api_router.include_router(individual.router, prefix="/individual", tags=["Individual"])
 

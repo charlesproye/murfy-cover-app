@@ -19,6 +19,7 @@ from external_api.schemas.report import (
 from external_api.schemas.user import GetCurrentUser
 from external_api.services.report import api_report_utils, report_generation
 from reports import reports_utils
+from reports.exceptions import MissingBIBSoH, MissingOEMSoH
 from reports.report_render.report_generator import ReportGenerator
 from reports.workers.tasks import generate_pdf_task
 
@@ -236,6 +237,8 @@ async def generate_html_report(
             report_type=report_type,
         )
         return HTMLResponse(content=html_content)
+    except (MissingOEMSoH, MissingBIBSoH) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         LOGGER.error(f"Error generating HTML for VIN {vin}: {e}", exc_info=True)
         raise HTTPException(

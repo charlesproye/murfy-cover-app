@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from db_models.report import ReportType
 
@@ -45,10 +45,10 @@ class VehicleReportInfo(BaseModel):
         description="Vehicle variant/trim (e.g., '73 kwh awd', 'long range', 'performance')",
     )
     charging_port: str | None = Field(
-        None, description="Type of charging port (e.g., CCS, Type 2)"
+        None, description="Type of charging port (e.g. Type 2)"
     )
     fast_charging_port: str | None = Field(
-        None, description="Type of fast charging port"
+        None, description="Type of fast charging port (e.g. CCS)"
     )
     image_url: str | None = Field(None, description="URL to vehicle image")
 
@@ -154,10 +154,29 @@ class ReportMetadata(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    uuid: str | None = Field(None, description="Report UUID")
+    uuid: str | None = Field(
+        None,
+        description="Report UUID. Only used if the report is generated for a PDF and inserted in the database.",
+    )
     date: str = Field(description="Report generation date (dd/mm/YYYY)")
     delivered_by: str = Field(description="Report issuer organization")
     report_type: ReportType = Field(description="Report type")
+    qr_code_url: str | None = Field(None, description="QR code as base64 PNG data URL")
+    report_verification_url: str | None = Field(
+        None, description="Report verification URL"
+    )
+
+    @model_validator(mode="after")
+    def if_uuid_check(self) -> "ReportMetadata":
+        if self.uuid is not None and not self.report_verification_url:
+            raise ValueError(
+                "report_verification_url must not be None if uuid is provided"
+            )
+
+        if self.uuid is not None and not self.qr_code_url:
+            raise ValueError("qr_code_url must not be None if uuid is provided")
+
+        return self
 
 
 class ReportData(BaseModel):
@@ -187,3 +206,27 @@ class ReportData(BaseModel):
     )
     warranty_data: WarrantyInfo = Field(description="Battery warranty coverage status")
     report: ReportMetadata = Field(description="Report generation information")
+
+
+# === Report Verification Models ===
+
+
+class ReportVerificationRequest(BaseModel):
+    """Request model for report verification."""
+
+    vin_last_4: str = Field(
+        ...,
+        min_length=4,
+        max_length=4,
+        pattern=r"^\d{4}$",
+        description="Last 4 digits of the VIN (always numeric)",
+    )
+
+
+class ReportVerificationResponse(BaseModel):
+    """Response model for report verification."""
+
+    verified: bool = Field(description="Whether the VIN matches the report")
+    pdf_url: str | None = Field(None, description="Presigned URL to the PDF report")
+    report_date: str | None = Field(None, description="Date the report was generated")
+    report_type: ReportType | None = Field(None, description="Type of the report")

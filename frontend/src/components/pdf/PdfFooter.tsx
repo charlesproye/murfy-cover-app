@@ -25,7 +25,7 @@ const PdfFooter: React.FC<PdfFooterProps> = ({ language }) => {
       }}
     >
       <Image
-        src="/logo/bib-pine-green.png"
+        src="/logo/icon.svg"
         style={{
           height: 36,
           marginLeft: 16,

@@ -46,6 +46,9 @@ export const ROUTES = {
   // TESLA ACTIVATION
   TESLA_CREATE_USER: `${BASE_URL}/tesla/create-user`,
 
+  // REPORT VERIFICATION
+  VERIFY_REPORT: `${BASE_URL}/verify-report`,
+
   // FLEET MANAGER / VEHICLE ACTIVATION
   VEHICLE_FLEETS: `${BASE_URL}/vehicle-command/fleets`,
   VEHICLE_MAKES: `${BASE_URL}/vehicle-command/makes`,

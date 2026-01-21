@@ -51,8 +51,7 @@ const FleetsTab: React.FC<FleetsTabProps> = ({
     if (fleets.length === 0) {
       loadFleets();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fleets.length]);
 
   const handleFleetClick = (fleetId: string) => {
     setSelectedFleetId(fleetId);

@@ -6,6 +6,7 @@
 import { ROUTES } from '@/routes';
 import { secureStorage, secureSessionStorage } from '@/services/auth/secureStorage';
 import { AuthResponse } from '@/interfaces/auth/auth';
+import { getIsLoggingOut, setIsLoggingOut } from '@/services/auth/authState';
 
 /**
  * Login request that uses httpOnly cookies
@@ -40,8 +41,15 @@ export const loginRequest = async (
 
 /**
  * Logout request that clears httpOnly cookies
+ * Includes guard to prevent multiple simultaneous logout calls
  */
 export const logoutRequest = async (): Promise<void> => {
+  // Prevent multiple simultaneous logout calls
+  if (getIsLoggingOut()) {
+    return;
+  }
+
+  setIsLoggingOut(true);
   try {
     await fetch(ROUTES.LOGOUT, {
       method: 'POST',

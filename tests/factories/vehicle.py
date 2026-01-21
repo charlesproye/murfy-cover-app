@@ -1,5 +1,7 @@
 """Factories for vehicle-related models."""
 
+import random
+import string
 from uuid import uuid4
 
 from polyfactory import Use
@@ -65,7 +67,9 @@ class VehicleFactory(BaseAsyncFactory[Vehicle]):
     __model__ = Vehicle
 
     # fleet_id, region_id, vehicle_model_id must be provided
-    vin = Use(lambda: f"5YJ3E1EA1KF{uuid4().hex[:6].upper()}")
+    vin = Use(
+        lambda: f"5YJ3E1EA1KF{''.join(random.choices(string.digits, k=6)).upper()}"
+    )
     bib_score = None
     activation_status = True
     is_eligible = True

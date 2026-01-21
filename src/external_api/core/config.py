@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     # Server
     BACKEND_CORS_ORIGINS: list[str] = ["*"]
     WEB_CONCURRENCY: int = int(os.getenv("WEB_CONCURRENCY", "4"))
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    FRONTEND_URL: str = os.environ["FRONTEND_URL"].rstrip("/")
 
     # Redis
     REDIS_HOST: str = os.getenv("REDIS_HOST", "")
@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str | None = None
 
     # Gotenberg
-    GOTENBERG_URL: str = os.getenv("GOTENBERG_URL", "http://localhost:3000")
+    GOTENBERG_URL: str = os.getenv("GOTENBERG_URL", "http://localhost:3030")
     PREMIUM_REPORT_S3_BUCKET: str = os.getenv(
         "PREMIUM_REPORT_S3_BUCKET", "bib-premium-reports"
     )

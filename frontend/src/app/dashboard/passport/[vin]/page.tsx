@@ -23,12 +23,20 @@ const PassPort = () => {
   const [reportType, setReportType] = useState<'premium' | 'readout'>('premium');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
 
-  const { data: vinCheck, isLoading: isCheckingVin, error: vinError } = useSWR(
+  const {
+    data: vinCheck,
+    isLoading: isCheckingVin,
+    error: vinError,
+  } = useSWR(
     `${ROUTES.IS_VIN_IN_FLEETS}/${vin}`,
     fetchWithAuth<{ is_in_fleets: boolean }>,
   );
 
-  const { htmlContent, isLoading: isLoadingReport, error: reportError } = useGetReportHtml(vin, reportType);
+  const {
+    htmlContent,
+    isLoading: isLoadingReport,
+    error: reportError,
+  } = useGetReportHtml(vin, reportType);
   const { data: infoVehicle, isLoading: isLoadingInfo } = useGetInfoVehicle(vin);
   const { data: priceForecast } = useGetPriceForecast(vin);
 
@@ -36,7 +44,8 @@ const PassPort = () => {
   React.useEffect(() => {
     if (!isCheckingVin && !vinError && vinCheck?.is_in_fleets === false) {
       toast.error('This vehicle is not in your fleets', {
-        description: 'Please contact your administrator to add this vehicle to your fleets',
+        description:
+          'Please contact your administrator to add this vehicle to your fleets',
       });
       return router.push('/dashboard');
     }
@@ -47,13 +56,20 @@ const PassPort = () => {
 
     setIsPdfLoading(true);
     try {
-      const baseRoute = reportType === 'readout' ? ROUTES.READOUT_REPORT_HTML : ROUTES.PREMIUM_REPORT_PDF_SYNC;
+      const baseRoute =
+        reportType === 'readout'
+          ? ROUTES.READOUT_REPORT_HTML
+          : ROUTES.PREMIUM_REPORT_PDF_SYNC;
       const response = await fetchWithAuth<{ vin: string; url: string; message: string }>(
         `${baseRoute}/${vin}/generate_report_sync`,
         { method: 'POST' },
       );
 
-      if (!response?.url || typeof response.url !== 'string' || response.url.trim() === '') {
+      if (
+        !response?.url ||
+        typeof response.url !== 'string' ||
+        response.url.trim() === ''
+      ) {
         throw new Error('Invalid PDF URL received from server');
       }
 
@@ -72,12 +88,15 @@ const PassPort = () => {
     const script = `
       <script>
         function fitToWidth() {
-          const REPORT_WIDTH = 595;
+          const REPORT_WIDTH = 794;
+          const REPORT_HEIGHT = 1123;
           const scale = window.innerWidth / REPORT_WIDTH;
           document.body.style.transform = 'scale(' + scale + ')';
           document.body.style.transformOrigin = 'top left';
           document.body.style.width = REPORT_WIDTH + 'px';
+          document.body.style.height = REPORT_HEIGHT + 'px';
           document.body.style.overflowX = 'hidden';
+          document.body.style.overflowY = 'hidden';
         }
         window.addEventListener('resize', fitToWidth);
         document.addEventListener('DOMContentLoaded', fitToWidth);
@@ -140,8 +159,8 @@ const PassPort = () => {
       </div>
 
       {/* Report Preview */}
-        <div
-          className="
+      <div
+        className="
             flex justify-center items-start
             bg-white
             rounded-[20px]
@@ -150,31 +169,31 @@ const PassPort = () => {
             overflow-hidden
             w-auto
           "
-          style={{ aspectRatio: '595 / 842' }}
-        >
-          <div className="w-full h-full relative">
-            {isLoadingReport && (
-              <div className="flex items-center justify-center h-full">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
+        style={{ aspectRatio: '794 / 1123' }}
+      >
+        <div className="w-full h-full relative">
+          {isLoadingReport && (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
 
-            {!!reportError && !isLoadingReport && !htmlContent && (
-              <div className="flex items-center justify-center h-full text-red-500">
-                <p>Failed to load report. Please try again.</p>
-              </div>
-            )}
+          {!!reportError && !isLoadingReport && !htmlContent && (
+            <div className="flex items-center justify-center h-full text-red-500">
+              <p>{reportError.detail || 'Failed to load report. Please try again.'}</p>
+            </div>
+          )}
 
-            {scaledHtmlContent && (
-              <iframe
-                srcDoc={scaledHtmlContent}
-                className="w-full h-full border-0 overflow-hidden"
-                title={`${reportType === 'premium' ? 'Premium' : 'Readout'} Report`}
-                sandbox="allow-scripts allow-same-origin"
-              />
-            )}
-          </div>
+          {scaledHtmlContent && (
+            <iframe
+              srcDoc={scaledHtmlContent}
+              className="w-full h-full border-0 overflow-hidden"
+              title={`${reportType === 'premium' ? 'Premium' : 'Readout'} Report`}
+              sandbox="allow-scripts allow-same-origin"
+            />
+          )}
         </div>
+      </div>
 
       {/* Channelling Recommendation Section */}
       {infoVehicle && (
@@ -195,7 +214,9 @@ const PassPort = () => {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900">Channelling Recommendation</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Channelling Recommendation
+            </h2>
           </div>
 
           <div className="space-y-4">
@@ -220,11 +241,16 @@ const PassPort = () => {
                       <span className="text-sm text-gray-600">SoH Adjustment</span>
                       <span
                         className={`text-lg font-semibold ${
-                          priceForecast.price_discount > 0 ? 'text-green-600' : 'text-red-600'
+                          priceForecast.price_discount > 0
+                            ? 'text-green-600'
+                            : 'text-red-600'
                         }`}
                       >
                         {priceForecast.price_discount > 0 ? '+ ' : '- '}
-                        {formatNumber(Math.abs(priceForecast.price_discount).toFixed(0))} €
+                        {formatNumber(
+                          Math.abs(priceForecast.price_discount).toFixed(0),
+                        )}{' '}
+                        €
                       </span>
                     </div>
                   </div>

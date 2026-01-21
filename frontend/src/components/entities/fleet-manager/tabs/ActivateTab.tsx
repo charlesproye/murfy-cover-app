@@ -34,8 +34,18 @@ interface ActivateTabProps {
 
 type InputMethod = 'single' | 'csv';
 
+interface CSVRow {
+  vin: string;
+  make: string;
+  model: string;
+  type?: string;
+  start_date?: string;
+  end_date?: string;
+  comment?: string;
+}
+
 interface CSVValidationRow {
-  originalRow: any;
+  originalRow: CSVRow;
   index: number;
   vin: string;
   make: string;
@@ -59,7 +69,7 @@ interface CSVValidationRow {
 const ActivateTab: React.FC<ActivateTabProps> = ({
   fleets,
   selectedFleetId,
-  setSelectedFleetId
+  setSelectedFleetId,
 }) => {
   const [inputMethod, setInputMethod] = useState<InputMethod>('single');
   const [isLoading, setIsLoading] = useState(false);
@@ -80,9 +90,11 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
   const [endDate, setEndDate] = useState('');
   const [comment, setComment] = useState('');
 
-  // CSV import
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  // CSV import (values stored for potential future use, only setters are currently used)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_csvFile, setCsvFile] = useState<File | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_csvPreview, setCsvPreview] = useState<CSVRow[]>([]);
   const [csvValidation, setCsvValidation] = useState<CSVValidationRow[]>([]);
   const [isValidatingCSV, setIsValidatingCSV] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
@@ -92,9 +104,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     const loadMakes = async () => {
       setIsLoadingMakes(true);
       try {
-        const response = await fetchWithAuth<MakeInfoResponse>(
-          ROUTES.VEHICLE_MAKES
-        );
+        const response = await fetchWithAuth<MakeInfoResponse>(ROUTES.VEHICLE_MAKES);
         if (response && response.makes) {
           setAvailableMakes(response.makes);
         }
@@ -144,7 +154,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
       setIsLoadingModels(true);
       try {
         const response = await fetchWithAuth<ModelInfoResponse>(
-          ROUTES.VEHICLE_MODELS(selectedMakeId)
+          ROUTES.VEHICLE_MODELS(selectedMakeId),
         );
         if (response && response.models) {
           setAvailableModels(response.models);
@@ -163,12 +173,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
   // Update type when model is selected
   useEffect(() => {
     if (selectedModelId) {
-      // Get the selected model to check available types
-      const selectedModel = availableModels.find(m => m.model_id === selectedModelId);
       // Reset type when changing model
       setVehicleType('');
     }
-  }, [selectedModelId, availableModels]);
+  }, [selectedModelId]);
 
   const resetForm = () => {
     setVin('');
@@ -225,7 +233,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
           matrix[i][j] = Math.min(
             matrix[i - 1][j - 1] + 1,
             matrix[i][j - 1] + 1,
-            matrix[i - 1][j] + 1
+            matrix[i - 1][j] + 1,
           );
         }
       }
@@ -236,7 +244,9 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     return 1 - distance / maxLength;
   };
 
-  const validateAndConvertDate = (dateStr: string): { isValid: boolean; isoDate: string } => {
+  const validateAndConvertDate = (
+    dateStr: string,
+  ): { isValid: boolean; isoDate: string } => {
     if (!dateStr || !dateStr.trim()) {
       return { isValid: true, isoDate: '' };
     }
@@ -277,7 +287,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
   };
 
   // Validate and suggest corrections for CSV data
-  const validateCSVData = async (data: any[]) => {
+  const validateCSVData = async (data: CSVRow[]) => {
     setIsValidatingCSV(true);
     const validatedRows: CSVValidationRow[] = [];
 
@@ -300,7 +310,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
 
       // Check if make exists
       const makeMatch = availableMakes.find(
-        m => m.make_name.toLowerCase() === row.make.toLowerCase().trim()
+        (m) => m.make_name.toLowerCase() === row.make.toLowerCase().trim(),
       );
 
       if (makeMatch) {
@@ -320,7 +330,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
             // Model provided, try to find it
             try {
               const response = await fetchWithAuth<ModelInfoResponse>(
-                ROUTES.VEHICLE_MODELS(makeMatch.make_id)
+                ROUTES.VEHICLE_MODELS(makeMatch.make_id),
               );
 
               if (response && response.models) {
@@ -330,7 +340,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                 let bestMatch: ModelInfo | null = null;
                 let bestScore = 0;
 
-                response.models.forEach(model => {
+                response.models.forEach((model) => {
                   const score = calculateSimilarity(row.model, model.model_name);
                   if (score > bestScore) {
                     bestScore = score;
@@ -347,9 +357,9 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                   const typesForThisModel = Array.from(
                     new Set(
                       response.models
-                        .filter(m => m.model_name === matchedModel.model_name && m.type)
-                        .map(m => m.type as string)
-                    )
+                        .filter((m) => m.model_name === matchedModel.model_name && m.type)
+                        .map((m) => m.type as string),
+                    ),
                   );
                   validationRow.availableTypes = typesForThisModel;
 
@@ -357,10 +367,22 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                     validationRow.suggestedType = matchedModel.type;
                   }
 
-                  if (row.type && typesForThisModel.some(t => t.toLowerCase() === row.type.toLowerCase())) {
-                    const matchedType = typesForThisModel.find(t => t.toLowerCase() === row.type.toLowerCase());
-                    validationRow.type = matchedType || row.type;
-                    validationRow.status = bestScore === 1 ? 'valid' : 'suggestion';
+                  if (row.type) {
+                    const rowType = row.type;
+                    if (
+                      typesForThisModel.some(
+                        (t) => t.toLowerCase() === rowType.toLowerCase(),
+                      )
+                    ) {
+                      const matchedType = typesForThisModel.find(
+                        (t) => t.toLowerCase() === rowType.toLowerCase(),
+                      );
+                      validationRow.type = matchedType || rowType;
+                      validationRow.status = bestScore === 1 ? 'valid' : 'suggestion';
+                    } else {
+                      validationRow.type = '';
+                      validationRow.status = 'suggestion';
+                    }
                   } else {
                     validationRow.type = '';
                     validationRow.status = 'suggestion';
@@ -391,7 +413,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
             // Load models for this make
             try {
               const response = await fetchWithAuth<ModelInfoResponse>(
-                ROUTES.VEHICLE_MODELS(makeMatch.make_id)
+                ROUTES.VEHICLE_MODELS(makeMatch.make_id),
               );
 
               if (response && response.models) {
@@ -402,7 +424,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                 let bestMatch: ModelInfo | null = null;
                 let bestScore = 0;
 
-                response.models.forEach(model => {
+                response.models.forEach((model) => {
                   const score = calculateSimilarity(row.model, model.model_name);
                   if (score > bestScore) {
                     bestScore = score;
@@ -420,9 +442,9 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                   const typesForThisModel = Array.from(
                     new Set(
                       response.models
-                        .filter(m => m.model_name === matchedModel.model_name && m.type)
-                        .map(m => m.type as string)
-                    )
+                        .filter((m) => m.model_name === matchedModel.model_name && m.type)
+                        .map((m) => m.type as string),
+                    ),
                   );
                   validationRow.availableTypes = typesForThisModel;
 
@@ -432,24 +454,38 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                   }
 
                   // Check if the original type from CSV matches one of the available types
-                  if (row.type && typesForThisModel.some(t => t.toLowerCase() === row.type.toLowerCase())) {
-                    const matchedType = typesForThisModel.find(t => t.toLowerCase() === row.type.toLowerCase());
-                    validationRow.type = matchedType || row.type;
-                    if (bestScore === 1) {
-                      validationRow.status = 'valid';
+                  if (row.type) {
+                    const rowType = row.type;
+                    if (
+                      typesForThisModel.some(
+                        (t) => t.toLowerCase() === rowType.toLowerCase(),
+                      )
+                    ) {
+                      const matchedType = typesForThisModel.find(
+                        (t) => t.toLowerCase() === rowType.toLowerCase(),
+                      );
+                      validationRow.type = matchedType || rowType;
+                      if (bestScore === 1) {
+                        validationRow.status = 'valid';
+                      } else {
+                        validationRow.status = 'suggestion';
+                      }
                     } else {
-                      validationRow.status = 'suggestion';
+                      // Type doesn't match, user needs to select
+                      // For makes with conditions, type is REQUIRED
+                      validationRow.type = '';
+                      if (!rowType.trim()) {
+                        validationRow.status = 'suggestion';
+                        validationRow.errorMessage = `Type is required for ${row.make}`;
+                      } else {
+                        validationRow.status = 'suggestion';
+                      }
                     }
                   } else {
-                    // Type doesn't match or is empty, user needs to select
-                    // For makes with conditions, type is REQUIRED
+                    // Type is empty, user needs to select
                     validationRow.type = '';
-                    if (!row.type || !row.type.trim()) {
-                      validationRow.status = 'suggestion';
-                      validationRow.errorMessage = `Type is required for ${row.make}`;
-                    } else {
-                      validationRow.status = 'suggestion';
-                    }
+                    validationRow.status = 'suggestion';
+                    validationRow.errorMessage = `Type is required for ${row.make}`;
                   }
                 } else {
                   validationRow.status = 'error';
@@ -535,7 +571,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     const row = updated[index];
 
     // Find the selected model
-    const selectedModel = row.availableModels?.find(m => m.model_id === modelId);
+    const selectedModel = row.availableModels?.find((m) => m.model_id === modelId);
 
     if (selectedModel) {
       row.model = selectedModel.model_name;
@@ -545,9 +581,9 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
       const typesForThisModel = Array.from(
         new Set(
           row.availableModels
-            ?.filter(m => m.model_name === selectedModel.model_name && m.type)
-            .map(m => m.type as string) || []
-        )
+            ?.filter((m) => m.model_name === selectedModel.model_name && m.type)
+            .map((m) => m.type as string) || [],
+        ),
       );
       row.availableTypes = typesForThisModel;
 
@@ -571,7 +607,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     const row = updated[index];
 
     // Find the selected make
-    const selectedMake = availableMakes.find(m => m.make_id === makeId);
+    const selectedMake = availableMakes.find((m) => m.make_id === makeId);
 
     if (selectedMake) {
       row.make = selectedMake.make_name;
@@ -581,7 +617,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
       // Load models for this new make
       try {
         const response = await fetchWithAuth<ModelInfoResponse>(
-          ROUTES.VEHICLE_MODELS(makeId)
+          ROUTES.VEHICLE_MODELS(makeId),
         );
 
         if (response && response.models) {
@@ -591,7 +627,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
           let bestMatch: ModelInfo | null = null;
           let bestScore = 0;
 
-          response.models.forEach(model => {
+          response.models.forEach((model) => {
             const score = calculateSimilarity(row.originalRow.model, model.model_name);
             if (score > bestScore) {
               bestScore = score;
@@ -609,9 +645,9 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
             const typesForThisModel = Array.from(
               new Set(
                 response.models
-                  .filter(m => m.model_name === matchedModel.model_name && m.type)
-                  .map(m => m.type as string)
-              )
+                  .filter((m) => m.model_name === matchedModel.model_name && m.type)
+                  .map((m) => m.type as string),
+              ),
             );
             row.availableTypes = typesForThisModel;
 
@@ -654,7 +690,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     if (!updated[index].startDateValid || !updated[index].endDateValid) {
       updated[index].status = 'error';
       updated[index].errorMessage = `Invalid ${field} date format`;
-    } else if (updated[index].status === 'error' && updated[index].errorMessage?.includes('date')) {
+    } else if (
+      updated[index].status === 'error' &&
+      updated[index].errorMessage?.includes('date')
+    ) {
       // Si l'erreur était liée à la date, la retirer
       updated[index].status = 'suggestion';
       updated[index].errorMessage = undefined;
@@ -699,7 +738,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
       return;
     }
 
-    const selectedMake = availableMakes.find(m => m.make_id === selectedMakeId);
+    const selectedMake = availableMakes.find((m) => m.make_id === selectedMakeId);
 
     if (!selectedMake) {
       toast.error('Invalid make selection');
@@ -720,7 +759,9 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
 
     // For makes WITHOUT conditions (OEMS_W_SOH_W_MODEL_API - Tesla, BMW, Renault),
     // model and type are optional
-    const selectedModel = selectedModelId ? availableModels.find(m => m.model_id === selectedModelId) : null;
+    const selectedModel = selectedModelId
+      ? availableModels.find((m) => m.model_id === selectedModelId)
+      : null;
 
     setIsLoading(true);
     try {
@@ -743,14 +784,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
         ],
       };
 
-      const response = await fetchWithAuth<ActivationResponse>(
-        ROUTES.VEHICLE_ACTIVATE,
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        }
-      );
-
+      const response = await fetchWithAuth<ActivationResponse>(ROUTES.VEHICLE_ACTIVATE, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
 
       if (response && response.vehicles) {
         setResults(response.vehicles);
@@ -772,7 +809,6 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     }
   };
 
-
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -782,7 +818,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     const reader = new FileReader();
     reader.onload = async (event) => {
       const text = event.target?.result as string;
-      const lines = text.split('\n').filter(l => l.trim());
+      const lines = text.split('\n').filter((l) => l.trim());
 
       if (lines.length < 2) {
         toast.error('CSV file must have at least a header and one data row');
@@ -793,18 +829,18 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
       const firstLine = lines[0];
       const separator = firstLine.includes('\t') ? '\t' : ',';
 
-      const headers = firstLine.split(separator).map(h => h.trim().toLowerCase());
+      const headers = firstLine.split(separator).map((h) => h.trim().toLowerCase());
       const requiredHeaders = ['vin', 'make', 'model'];
 
-      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
       if (missingHeaders.length > 0) {
         toast.error(`Missing required columns: ${missingHeaders.join(', ')}`);
         return;
       }
 
-      const data = lines.slice(1).map(line => {
-        const values = line.split(separator).map(v => v.trim().replace(/^"|"$/g, ''));
-        const obj: any = {};
+      const data = lines.slice(1).map((line) => {
+        const values = line.split(separator).map((v) => v.trim().replace(/^"|"$/g, ''));
+        const obj: Record<string, string> = {};
         headers.forEach((header, index) => {
           obj[header] = values[index] || '';
         });
@@ -812,7 +848,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
         if (obj.make) {
           obj.make = obj.make.toLowerCase();
         }
-        return obj;
+        return obj as unknown as CSVRow;
       });
 
       setCsvPreview(data);
@@ -826,8 +862,6 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
   };
 
   const handleCSVActivation = async () => {
-    const selectedFleet = fleets.find(f => f.fleet_id === selectedFleetId);
-
     if (!selectedFleetId) {
       toast.error('Please select a fleet');
       return;
@@ -839,24 +873,28 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
     }
 
     // Filter only valid rows
-    const validRows = csvValidation.filter(row => row.status === 'valid');
+    const validRows = csvValidation.filter((row) => row.status === 'valid');
 
     if (validRows.length === 0) {
-      toast.error('No valid vehicles to activate. Please fix errors and accept suggestions.');
+      toast.error(
+        'No valid vehicles to activate. Please fix errors and accept suggestions.',
+      );
       return;
     }
 
     // Warn user about skipped rows
     const skippedCount = csvValidation.length - validRows.length;
     if (skippedCount > 0) {
-      toast.warning(`${skippedCount} vehicle(s) will be skipped due to errors or pending suggestions.`);
+      toast.warning(
+        `${skippedCount} vehicle(s) will be skipped due to errors or pending suggestions.`,
+      );
     }
 
     setIsLoading(true);
     try {
       const payload: ActivationRequest = {
         fleet_id: selectedFleetId,
-        activation_orders: validRows.map(row => ({
+        activation_orders: validRows.map((row) => ({
           vehicle: {
             vin: row.vin,
             make: row.make,
@@ -871,13 +909,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
         })),
       };
 
-      const response = await fetchWithAuth<ActivationResponse>(
-        ROUTES.VEHICLE_ACTIVATE,
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        }
-      );
+      const response = await fetchWithAuth<ActivationResponse>(ROUTES.VEHICLE_ACTIVATE, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
 
       if (response && response.vehicles) {
         setResults(response.vehicles);
@@ -926,7 +961,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
           <div className="space-y-2">
             <div className="flex gap-2">
               <button
-                onClick={() => { setInputMethod('single'); resetForm(); }}
+                onClick={() => {
+                  setInputMethod('single');
+                  resetForm();
+                }}
                 className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
                   inputMethod === 'single'
                     ? 'bg-primary text-white'
@@ -936,7 +974,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                 Single Vehicle
               </button>
               <button
-                onClick={() => { setInputMethod('csv'); resetForm(); }}
+                onClick={() => {
+                  setInputMethod('csv');
+                  resetForm();
+                }}
                 className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
                   inputMethod === 'csv'
                     ? 'bg-primary text-white'
@@ -950,7 +991,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
 
           {/* Single Vehicle Form */}
           {inputMethod === 'single' && (
-            <form onSubmit={handleSingleActivation} className="w-full rounded-lg border bg-white p-6 space-y-4">
+            <form
+              onSubmit={handleSingleActivation}
+              className="w-full rounded-lg border bg-white p-6 space-y-4"
+            >
               <h3 className="font-semibold text-lg">Vehicle Information</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -978,7 +1022,11 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                     disabled={isLoadingMakes}
                   >
                     <SelectTrigger id="make">
-                      <SelectValue placeholder={isLoadingMakes ? "Loading makes..." : "Select a make"} />
+                      <SelectValue
+                        placeholder={
+                          isLoadingMakes ? 'Loading makes...' : 'Select a make'
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {availableMakes.map((make) => (
@@ -997,7 +1045,11 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="model">
-                    Model {availableMakes.find(m => m.make_id === selectedMakeId)?.make_conditions ? '*' : '(optional)'}
+                    Model{' '}
+                    {availableMakes.find((m) => m.make_id === selectedMakeId)
+                      ?.make_conditions
+                      ? '*'
+                      : '(optional)'}
                   </Label>
                   <Select
                     value={selectedModelId}
@@ -1008,10 +1060,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                       <SelectValue
                         placeholder={
                           !selectedMakeId
-                            ? "Select a make first"
+                            ? 'Select a make first'
                             : isLoadingModels
-                            ? "Loading models..."
-                            : "Select a model"
+                              ? 'Loading models...'
+                              : 'Select a model'
                         }
                       />
                     </SelectTrigger>
@@ -1019,8 +1071,8 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                       {/* Show distinct model names */}
                       {Array.from(
                         new Map(
-                          availableModels.map(model => [model.model_name, model])
-                        ).values()
+                          availableModels.map((model) => [model.model_name, model]),
+                        ).values(),
                       ).map((model) => (
                         <SelectItem key={model.model_id} value={model.model_id}>
                           {model.model_name}
@@ -1032,7 +1084,11 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="type">
-                    Type {availableMakes.find(m => m.make_id === selectedMakeId)?.make_conditions ? '*' : '(optional)'}
+                    Type{' '}
+                    {availableMakes.find((m) => m.make_id === selectedMakeId)
+                      ?.make_conditions
+                      ? '*'
+                      : '(optional)'}
                   </Label>
                   <Select
                     value={vehicleType}
@@ -1040,24 +1096,31 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                     disabled={!selectedModelId}
                   >
                     <SelectTrigger id="type">
-                      <SelectValue placeholder={!selectedModelId ? "Select a model first" : "Select type"} />
+                      <SelectValue
+                        placeholder={
+                          !selectedModelId ? 'Select a model first' : 'Select type'
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {/* Show types available for the selected model name */}
-                      {selectedModelId && (() => {
-                        const selectedModel = availableModels.find(m => m.model_id === selectedModelId);
-                        const modelName = selectedModel?.model_name;
-                        const typesForModel = availableModels
-                          .filter(m => m.model_name === modelName && m.type)
-                          .map(m => m.type as string);
-                        const uniqueTypes = Array.from(new Set(typesForModel));
+                      {selectedModelId &&
+                        (() => {
+                          const selectedModel = availableModels.find(
+                            (m) => m.model_id === selectedModelId,
+                          );
+                          const modelName = selectedModel?.model_name;
+                          const typesForModel = availableModels
+                            .filter((m) => m.model_name === modelName && m.type)
+                            .map((m) => m.type as string);
+                          const uniqueTypes = Array.from(new Set(typesForModel));
 
-                        return uniqueTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ));
-                      })()}
+                          return uniqueTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ));
+                        })()}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1101,7 +1164,6 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
             </form>
           )}
 
-
           {/* CSV Import Form */}
           {inputMethod === 'csv' && (
             <div className="w-full rounded-lg border bg-white p-6 space-y-4">
@@ -1126,11 +1188,7 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                     Download CSV
                   </Button>
                   {showValidation && csvValidation.length > 0 && (
-                    <Button
-                      onClick={clearCSVData}
-                      variant="outline"
-                      size="sm"
-                    >
+                    <Button onClick={clearCSVData} variant="outline" size="sm">
                       Clear CSV
                     </Button>
                   )}
@@ -1168,13 +1226,17 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                       </p>
                       <div className="flex gap-2 text-xs">
                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                          ✓ {csvValidation.filter(r => r.status === 'valid').length} Valid
+                          ✓ {csvValidation.filter((r) => r.status === 'valid').length}{' '}
+                          Valid
                         </span>
                         <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
-                          ⚠ {csvValidation.filter(r => r.status === 'suggestion').length} Suggestions
+                          ⚠{' '}
+                          {csvValidation.filter((r) => r.status === 'suggestion').length}{' '}
+                          Suggestions
                         </span>
                         <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
-                          ✗ {csvValidation.filter(r => r.status === 'error').length} Errors
+                          ✗ {csvValidation.filter((r) => r.status === 'error').length}{' '}
+                          Errors
                         </span>
                       </div>
                     </div>
@@ -1188,18 +1250,25 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                             <th className="text-left py-2 px-3 font-medium">Make</th>
                             <th className="text-left py-2 px-3 font-medium">Model</th>
                             <th className="text-left py-2 px-3 font-medium">Type</th>
-                            <th className="text-left py-2 px-3 font-medium">Start Date</th>
+                            <th className="text-left py-2 px-3 font-medium">
+                              Start Date
+                            </th>
                             <th className="text-left py-2 px-3 font-medium">End Date</th>
                             <th className="text-left py-2 px-3 font-medium">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {csvValidation.map((row, idx) => (
-                            <tr key={idx} className={`border-b ${
-                              row.status === 'error' ? 'bg-red-50' :
-                              row.status === 'suggestion' ? 'bg-yellow-50' :
-                              'bg-green-50'
-                            }`}>
+                            <tr
+                              key={idx}
+                              className={`border-b ${
+                                row.status === 'error'
+                                  ? 'bg-red-50'
+                                  : row.status === 'suggestion'
+                                    ? 'bg-yellow-50'
+                                    : 'bg-green-50'
+                              }`}
+                            >
                               <td className="py-2 px-3">
                                 {row.status === 'valid' && (
                                   <span className="text-green-600 font-bold">✓</span>
@@ -1234,7 +1303,10 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                                       </SelectTrigger>
                                       <SelectContent>
                                         {availableMakes.map((make) => (
-                                          <SelectItem key={make.make_id} value={make.make_id}>
+                                          <SelectItem
+                                            key={make.make_id}
+                                            value={make.make_id}
+                                          >
                                             {make.make_name}
                                           </SelectItem>
                                         ))}
@@ -1256,24 +1328,31 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                                   )}
 
                                   {/* Show dropdown if there are available models */}
-                                  {row.availableModels && row.availableModels.length > 0 && (row.status === 'suggestion' || row.status === 'valid') ? (
+                                  {row.availableModels &&
+                                  row.availableModels.length > 0 &&
+                                  (row.status === 'suggestion' ||
+                                    row.status === 'valid') ? (
                                     <Select
                                       value={row.suggestedModel?.model_id}
                                       onValueChange={(value) => updateModel(idx, value)}
                                     >
                                       <SelectTrigger className="h-8 text-xs">
-                                        <SelectValue>
-                                          {row.model}
-                                        </SelectValue>
+                                        <SelectValue>{row.model}</SelectValue>
                                       </SelectTrigger>
                                       <SelectContent>
                                         {/* Get unique model names */}
                                         {Array.from(
                                           new Map(
-                                            row.availableModels.map(model => [model.model_name, model])
-                                          ).values()
+                                            row.availableModels.map((model) => [
+                                              model.model_name,
+                                              model,
+                                            ]),
+                                          ).values(),
                                         ).map((model) => (
-                                          <SelectItem key={model.model_id} value={model.model_id}>
+                                          <SelectItem
+                                            key={model.model_id}
+                                            value={model.model_id}
+                                          >
                                             {model.model_name}
                                           </SelectItem>
                                         ))}
@@ -1286,23 +1365,24 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                                           {row.model}
                                         </div>
                                       )}
-                                      {!row.suggestedModel && (
-                                        <div>{row.model}</div>
-                                      )}
+                                      {!row.suggestedModel && <div>{row.model}</div>}
                                     </>
                                   )}
                                 </div>
                               </td>
                               <td className="py-2 px-3">
                                 <div>
-                                  {row.originalRow.type && row.originalRow.type !== row.type && (
-                                    <div className="text-gray-500 line-through text-xs">
-                                      {row.originalRow.type}
-                                    </div>
-                                  )}
+                                  {row.originalRow.type &&
+                                    row.originalRow.type !== row.type && (
+                                      <div className="text-gray-500 line-through text-xs">
+                                        {row.originalRow.type}
+                                      </div>
+                                    )}
 
                                   {/* Show dropdown if there are available types */}
-                                  {row.availableTypes && row.availableTypes.length > 0 && row.status === 'suggestion' ? (
+                                  {row.availableTypes &&
+                                  row.availableTypes.length > 0 &&
+                                  row.status === 'suggestion' ? (
                                     <Select
                                       value={row.type}
                                       onValueChange={(value) => updateType(idx, value)}
@@ -1329,7 +1409,9 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                                         <div>{row.type}</div>
                                       )}
                                       {!row.type && !row.suggestedType && (
-                                        <div className="text-gray-400 text-xs">No type</div>
+                                        <div className="text-gray-400 text-xs">
+                                          No type
+                                        </div>
                                       )}
                                     </>
                                   )}
@@ -1339,11 +1421,15 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                                 <Input
                                   type="date"
                                   value={row.startDate}
-                                  onChange={(e) => updateDate(idx, 'start', e.target.value)}
+                                  onChange={(e) =>
+                                    updateDate(idx, 'start', e.target.value)
+                                  }
                                   className={`h-8 text-xs ${!row.startDateValid ? 'border-red-500' : ''}`}
                                 />
                                 {!row.startDateValid && (
-                                  <div className="text-xs text-red-600 mt-1">Invalid format</div>
+                                  <div className="text-xs text-red-600 mt-1">
+                                    Invalid format
+                                  </div>
                                 )}
                               </td>
                               <td className="py-2 px-3">
@@ -1354,7 +1440,9 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                                   className={`h-8 text-xs ${!row.endDateValid ? 'border-red-500' : ''}`}
                                 />
                                 {!row.endDateValid && (
-                                  <div className="text-xs text-red-600 mt-1">Invalid format</div>
+                                  <div className="text-xs text-red-600 mt-1">
+                                    Invalid format
+                                  </div>
                                 )}
                               </td>
                               <td className="py-2 px-3">
@@ -1393,13 +1481,22 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                     onClick={handleCSVActivation}
                     loading={isLoading}
                     className="w-full"
-                    disabled={csvValidation.filter(r => r.status === 'valid').length === 0}
+                    disabled={
+                      csvValidation.filter((r) => r.status === 'valid').length === 0
+                    }
                   >
                     <IconCheck size={18} />
-                    Activate {csvValidation.filter(r => r.status === 'valid').length} Valid Vehicle{csvValidation.filter(r => r.status === 'valid').length !== 1 ? 's' : ''}
-                    {csvValidation.filter(r => r.status !== 'valid').length > 0 && (
+                    Activate {
+                      csvValidation.filter((r) => r.status === 'valid').length
+                    }{' '}
+                    Valid Vehicle
+                    {csvValidation.filter((r) => r.status === 'valid').length !== 1
+                      ? 's'
+                      : ''}
+                    {csvValidation.filter((r) => r.status !== 'valid').length > 0 && (
                       <span className="ml-2 text-xs opacity-75">
-                        ({csvValidation.filter(r => r.status !== 'valid').length} skipped)
+                        ({csvValidation.filter((r) => r.status !== 'valid').length}{' '}
+                        skipped)
                       </span>
                     )}
                   </Button>
@@ -1417,16 +1514,36 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                 </h3>
                 <div className="flex gap-2 text-xs">
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                    ✓ {results.filter(r => r.requested_status && r.status === true).length} Success
+                    ✓{' '}
+                    {
+                      results.filter((r) => r.requested_status && r.status === true)
+                        .length
+                    }{' '}
+                    Success
                   </span>
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                    ✓ {results.filter(r => r.requested_status && r.status === false).length} Success
+                    ✓{' '}
+                    {
+                      results.filter((r) => r.requested_status && r.status === false)
+                        .length
+                    }{' '}
+                    Success
                   </span>
                   <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
-                    ⏳ {results.filter(r => r.requested_status && r.status === null).length} Pending
+                    ⏳{' '}
+                    {
+                      results.filter((r) => r.requested_status && r.status === null)
+                        .length
+                    }{' '}
+                    Pending
                   </span>
                   <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
-                    ✗ {results.filter(r => !r.requested_status || r.status === false).length} Failed
+                    ✗{' '}
+                    {
+                      results.filter((r) => !r.requested_status || r.status === false)
+                        .length
+                    }{' '}
+                    Failed
                   </span>
                 </div>
               </div>
@@ -1443,11 +1560,16 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                   </thead>
                   <tbody>
                     {results.map((result, idx) => (
-                      <tr key={idx} className={`border-b last:border-0 ${
-                        !result.requested_status || result.status === false ? 'bg-red-50' :
-                        result.status === null ? 'bg-yellow-50' :
-                        'bg-green-50'
-                      }`}>
+                      <tr
+                        key={idx}
+                        className={`border-b last:border-0 ${
+                          !result.requested_status || result.status === false
+                            ? 'bg-red-50'
+                            : result.status === null
+                              ? 'bg-yellow-50'
+                              : 'bg-green-50'
+                        }`}
+                      >
                         <td className="py-3 px-4 font-mono text-xs">{result.vin}</td>
                         <td className="py-3 px-4 text-center">
                           {result.requested_status ? (
@@ -1476,11 +1598,15 @@ const ActivateTab: React.FC<ActivateTabProps> = ({
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`text-sm ${
-                            !result.requested_status || result.status === false ? 'text-red-700 font-medium' :
-                            result.status === null ? 'text-yellow-700' :
-                            'text-green-700'
-                          }`}>
+                          <span
+                            className={`text-sm ${
+                              !result.requested_status || result.status === false
+                                ? 'text-red-700 font-medium'
+                                : result.status === null
+                                  ? 'text-yellow-700'
+                                  : 'text-green-700'
+                            }`}
+                          >
                             {result.message}
                           </span>
                           {result.comment && (

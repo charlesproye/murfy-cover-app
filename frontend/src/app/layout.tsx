@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   title: 'EValue - Bib',
   description:
     'An amazing tool to monitor your fleet, manage your contracts and your finances. The future of your fleet is here.',
+  icons: {
+    icon: '/logo/icon.svg',
+  },
 };
 
 export default function RootLayout({
@@ -17,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>): React.ReactElement {
   return (
-    <html lang="en">
-      <body className="bg-[#F7F6F9]">
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-[#F7F6F9]" suppressHydrationWarning>
         <Suspense fallback={<Loading />}>
           <AuthProvider>{children}</AuthProvider>
         </Suspense>

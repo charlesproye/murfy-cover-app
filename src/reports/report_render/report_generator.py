@@ -2,7 +2,6 @@
 
 import logging
 import math
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -25,8 +24,11 @@ from external_api.schemas.report import (
     VehicleReportInfo,
     WarrantyInfo,
 )
+from reports.exceptions import MissingBIBSoH, MissingOEMSoH
+from reports.report_config import GOTENBERG_URL
 from reports.report_render.asset_utils import AssetEmbedder
 from reports.report_render.gotenberg_client import GotenbergClient
+from reports.reports_utils import generate_report_qr_code_data_url
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ class ReportGenerator:
 
     def __init__(
         self,
-        gotenberg_url: str = os.getenv("GOTENBERG_URL", "http://localhost:3000"),
+        gotenberg_url: str = GOTENBERG_URL,
     ):
         """
         Initialize the premium report generator.
@@ -276,6 +278,7 @@ class ReportGenerator:
         image_url: str | None,
         report_type: ReportType,
         report_uuid: str | None = None,
+        verify_report_base_url: str | None = None,
     ) -> ReportData:
         """
         Generate structured data for a premium report.
@@ -289,6 +292,10 @@ class ReportGenerator:
             battery: Battery DB model
             oem: Oem DB model
             vehicle_data: Latest VehicleData DB model
+            image_url: URL of the vehicle image
+            report_type: Report type
+            report_uuid: UUID of the report. Needed if data will be used to generate a PDF.
+            verify_report_base_url: Base URL of the frontend, used to generate the report verification URL (optional)
 
         Returns:
             PremiumReportData: Structured data for the premium report
@@ -321,7 +328,6 @@ class ReportGenerator:
             raise ValueError(f"No trendline data available for VIN: {vin}")
 
         current_km = int(vehicle_data.odometer or 0)
-        max_km = int(vehicle_model.warranty_km or 160000)
 
         trendline_eq = trendline
         trendline_min_eq = trendline_min
@@ -332,7 +338,7 @@ class ReportGenerator:
 
         soh_chart_data = self.generate_soh_data(
             current_km=current_km,
-            max_km=max_km,
+            max_km=100_000,
             trendline_eq=trendline_eq,
             trendline_min_eq=trendline_min_eq,
             trendline_max_eq=trendline_max_eq,
@@ -381,11 +387,21 @@ class ReportGenerator:
             warranty_km=warranty_info.warranty_km,
         )
 
+        report_url = (
+            f"{verify_report_base_url.rstrip('/')}/{report_uuid}"
+            if report_uuid and verify_report_base_url
+            else None
+        )
+        report_date = self._format_date_french(datetime.now())
         report_metadata = ReportMetadata(
-            date=self._format_date_french(datetime.now()),
+            date=report_date,
             delivered_by="BIB Batteries",
             uuid=report_uuid,
             report_type=report_type,
+            qr_code_url=generate_report_qr_code_data_url(report_url)
+            if report_url
+            else None,
+            report_verification_url=report_url,
         )
 
         return ReportData(
@@ -408,6 +424,7 @@ class ReportGenerator:
         image_url: str | None,
         report_type: ReportType,
         report_uuid: str | None = None,
+        verify_report_base_url: str | None = None,
     ) -> str:
         """
         Generate the HTML content for a premium report.
@@ -418,6 +435,10 @@ class ReportGenerator:
             battery: Battery DB model
             oem: Oem DB model
             vehicle_data: Latest VehicleData DB model
+            image_url: URL of the vehicle image
+            report_type: Report type
+            report_uuid: UUID of the report. Needed if data will be used to generate a PDF.
+            verify_report_base_url: Base URL of the frontend, used to generate the report verification URL (optional)
 
         Returns:
             Rendered HTML content as string
@@ -436,6 +457,7 @@ class ReportGenerator:
             report_uuid=report_uuid,
             image_url=image_url,
             report_type=report_type,
+            verify_report_base_url=verify_report_base_url,
         )
 
         # Use the main template which includes both pages with proper page breaks
@@ -517,7 +539,7 @@ class ReportGenerator:
         Returns:
             Rendered HTML as string
         """
-        template = self.jinja_env.get_template(name="premium_report_main.html")
+        template = self.jinja_env.get_template(name="premium_report.html")
 
         context = data.model_dump(mode="python")
 
@@ -546,8 +568,8 @@ class ReportGenerator:
         pdf_bytes = await self.gotenberg_client.generate_pdf_from_html(
             html_content,
             wait_delay="0s",
-            paper_width=8.264,  # 595px at 72 DPI
-            paper_height=11.694,  # 842px at 72 DPI
+            paper_width=8.27,  # standard A4
+            paper_height=11.69,  # standard A4
             margin_top=0,
             margin_bottom=0,
             margin_left=0,
@@ -613,12 +635,16 @@ class ReportGenerator:
         trendline_value_at_current = float(
             np.round(numpy_safe_eval(trendline_eq, x=current_km) * 100, 1)
         )
-        if report_type == ReportType.readout and readout_soh_value is not None:
-            offset = round(readout_soh_value - trendline_value_at_current, 1)
-        elif report_type == ReportType.premium and bib_soh is not None:
-            offset = round(bib_soh - trendline_value_at_current, 1)
-        else:
-            raise ValueError(f"SoH value missing for report_type={report_type}")
+        if report_type == ReportType.readout:
+            if readout_soh_value is not None:
+                offset = round(readout_soh_value - trendline_value_at_current, 1)
+            else:
+                raise MissingOEMSoH(f"SoH value missing for report_type={report_type}")
+        elif report_type == ReportType.premium:
+            if bib_soh is not None:
+                offset = round(bib_soh - trendline_value_at_current, 1)
+            else:
+                raise MissingBIBSoH(f"SoH value missing for report_type={report_type}")
 
         # TODO: Remove the correction once EVALUE-250 is fixed
         soh_trendline = soh_trendline + offset

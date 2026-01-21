@@ -14,7 +14,11 @@ import {
   getSessionData,
   logoutRequest,
 } from '@/services/auth/authService';
-import { ROUTES } from '@/routes';
+import {
+  attemptRefresh,
+  coordinateCheckAuth,
+  getIsLoggingOut,
+} from '@/services/auth/authState';
 import { toast } from 'sonner';
 import { OEM } from '@/interfaces/dashboard/home/table/TablebrandResult';
 
@@ -30,7 +34,12 @@ interface AuthContextProps {
   refetchSessionData: () => Promise<void>;
 }
 
-const AUTHORIZED_ROUTES = ['/auth/login', '/flash-report', '/tesla-activation'];
+const AUTHORIZED_ROUTES = [
+  '/auth/login',
+  '/flash-report',
+  '/tesla-activation',
+  '/verify-report',
+];
 export const FLEET_ALL: Fleet = {
   id: 'all',
   name: 'All Fleets',
@@ -79,10 +88,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         if (!AUTHORIZED_ROUTES.find((route) => pathname.includes(route))) {
           // if Login page, no refresh
-          const refreshResponse = await fetch(ROUTES.REFRESH, {
-            method: 'POST',
-            credentials: 'include', // Include httpOnly cookies
-          });
+          // Use shared refresh coordination to prevent multiple simultaneous attempts
+          const refreshResponse = await attemptRefresh();
 
           if (refreshResponse.ok) {
             const sessionData = getSessionData();
@@ -128,11 +135,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const refetchSessionData = async (): Promise<void> => {
-    // if Login page, no refresh
-    const refreshResponse = await fetch(ROUTES.REFRESH, {
-      method: 'POST',
-      credentials: 'include', // Include httpOnly cookies
-    });
+    // Use shared refresh coordination to prevent multiple simultaneous attempts
+    const refreshResponse = await attemptRefresh();
 
     if (refreshResponse.ok) {
       const sessionData = getSessionData();
@@ -150,6 +154,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const handleLogout = async (): Promise<void> => {
+    // Only logout once, even if called multiple times
+    if (getIsLoggingOut()) {
+      return;
+    }
+
     try {
       await logoutRequest();
     } catch (error) {
@@ -164,11 +173,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    checkAuth();
+    // Coordinate checkAuth to prevent multiple simultaneous calls
+    coordinateCheckAuth(checkAuth);
 
     // Listen for storage changes (for multi-tab support)
     const handleStorageChange = () => {
-      checkAuth();
+      coordinateCheckAuth(checkAuth);
     };
 
     window.addEventListener('storage', handleStorageChange);

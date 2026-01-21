@@ -21,6 +21,7 @@ from db_models.vehicle import (
 from external_api.core.config import settings
 from external_api.schemas.report import ReportPDFUrl
 from reports import reports_utils
+from reports.report_config import VERIFY_REPORT_BASE_URL
 from reports.report_render.report_generator import ReportGenerator
 
 logger = logging.getLogger(__name__)
@@ -135,7 +136,6 @@ async def generate_report_sync(
     db: AsyncSession,
     s3_client: AsyncS3,
     report_type: ReportType,
-    gotenberg_url: str = settings.GOTENBERG_URL,
     s3_bucket: str = settings.PREMIUM_REPORT_S3_BUCKET,
 ) -> str:
     """
@@ -170,7 +170,7 @@ async def generate_report_sync(
         )
         return existing_report.report_url  # Return S3 URI
 
-    generator = ReportGenerator(gotenberg_url=gotenberg_url)
+    generator = ReportGenerator(gotenberg_url=settings.GOTENBERG_URL)
 
     report_uuid = str(uuid.uuid4())
     report_data = await generator.generate_report_data(
@@ -182,6 +182,7 @@ async def generate_report_sync(
         image_url=image_url,
         report_uuid=report_uuid,
         report_type=report_type,
+        verify_report_base_url=VERIFY_REPORT_BASE_URL,
     )
 
     html_content = generator.render_template(
