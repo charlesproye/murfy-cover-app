@@ -20,4 +20,3 @@ spec:
     - secretKey: tls.key
       remoteRef:
         key: id:53dffcd4-ad43-4b31-9fb0-550faa763bd5
-

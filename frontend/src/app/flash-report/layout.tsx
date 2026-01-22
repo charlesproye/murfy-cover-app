@@ -15,7 +15,7 @@ const FlashReportLayout = ({
       <div className="w-full md:w-3/5 h-full flex flex-col relative">
         <div className="flex-1 overflow-y-auto flex items-center justify-center">
           <div className="flex flex-col justify-center p-8 w-full gap-4">
-            <Logo title="EValue Flash Report" />
+            <Logo title="Bib batteries Flash Report" />
             {children}
           </div>
         </div>

@@ -49,9 +49,11 @@ spec:
         - name: ALGORITHM
           value: HS256
         - name: COOKIE_DOMAIN
-          value: "get-evalue.com"
+          value: ".bib-batteries.com"
         - name: FRONTEND_URL
-          value: "https://get-evalue.com"
+          value: "https://app.bib-batteries.com"
+        - name: BACKEND_CORS_ORIGINS
+          value: "https://app.bib-batteries.com,https://get-evalue.com"
         - name: REDIS_HOST
           value: valkey.data-engineering.svc
         - name: REDIS_PORT
@@ -86,12 +88,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: external-api-ingress
+  name: external-api-ingress-evalue
   namespace: evalue
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /api/v1/
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
     nginx.ingress.kubernetes.io/real-ip-header: "CF-Connecting-IP"
+    nginx.ingress.kubernetes.io/rewrite-target: /api/v1/
 spec:
   ingressClassName: nginx
   tls:
@@ -103,6 +105,33 @@ spec:
     http:
       paths:
       - path: /api/v1/
+        pathType: Prefix
+        backend:
+          service:
+            name: external-api
+            port:
+              number: 4000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-api-ingress-bib
+  namespace: evalue
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/real-ip-header: "CF-Connecting-IP"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.bib-batteries.com
+    secretName: api-bib-batteries-tls
+  rules:
+  - host: api.bib-batteries.com
+    http:
+      paths:
+      - path: /
         pathType: Prefix
         backend:
           service:

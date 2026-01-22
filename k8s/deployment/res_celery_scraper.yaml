@@ -50,7 +50,7 @@ spec:
           - name: SMTP_EMAIL
             value: "report@bib-batteries.fr"
           - name: FRONTEND_URL
-            value: "https://get-evalue.com"
+            value: "https://app.bib-batteries.com"
         envFrom:
           - secretRef:
               name: s3-secret

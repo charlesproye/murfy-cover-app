@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
       platforms:
-        - linux/amd64
         - linux/arm64
     image: rg.fr-par.scw.cloud/evalue/evalue-front:latest
     container_name: evalue-front

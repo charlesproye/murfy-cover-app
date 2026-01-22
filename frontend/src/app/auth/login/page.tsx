@@ -12,7 +12,7 @@ const Login = (): React.ReactElement => {
       <div className="w-full md:w-1/2 h-full flex items-center justify-center">
         <div className="relative  flex justify-center">
           <div className="p-8 md:p-24">
-            <Logo title="Welcome back to EValue" />
+            <Logo title="Welcome back" />
             <p className="sm:mt-1 text-center">Nice to see you again</p>
             <LoginForm />
           </div>

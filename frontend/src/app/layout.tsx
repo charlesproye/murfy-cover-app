@@ -6,7 +6,7 @@ import { Loading } from '@/components/common/loading/loading';
 import { AuthProvider } from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'EValue - Bib',
+  title: 'Bib batteries',
   description:
     'An amazing tool to monitor your fleet, manage your contracts and your finances. The future of your fleet is here.',
   icons: {

@@ -2,7 +2,7 @@ import logging
 import os
 
 import dotenv
-from pydantic import EmailStr, field_validator
+from pydantic import EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LOGGER = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "localhost")
 
     # Server
-    BACKEND_CORS_ORIGINS: list[str] = ["*"]
+    BACKEND_CORS_ORIGINS: str = os.getenv("BACKEND_CORS_ORIGINS", "*")
     WEB_CONCURRENCY: int = int(os.getenv("WEB_CONCURRENCY", "4"))
     FRONTEND_URL: str = os.environ["FRONTEND_URL"].rstrip("/")
 
@@ -80,15 +80,6 @@ class Settings(BaseSettings):
     GOTENBERG_URL: str = os.getenv("GOTENBERG_URL", "http://localhost:3030")
     REPORT_S3_BUCKET: str = os.getenv("REPORT_S3_BUCKET", "bib-premium-reports")
     PREMIUM_REPORT_S3_SIGNED_URI_EXPIRES_IN: int = 24 * 60 * 60  # 24 hours
-
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
-    @classmethod
-    def assemble_cors_origins(cls, v: str | list[str]) -> list[str] | str:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
 
 
 # Singleton for settings

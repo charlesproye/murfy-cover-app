@@ -13,13 +13,13 @@ const LandingFooter = ({ className }: { className?: string }): React.ReactElemen
           href="https://www.linkedin.com/company/bib-batteries/posts/?feedView=all"
         >
           <Image src="/logo/icon.svg" width={20} height={20} alt="logo bib" />
-          <p className="text-sm text-primary ml-1"> Bib Batteries </p>
+          <p className="text-sm text-primary ml-1"> Bib batteries </p>
         </a>
       </div>
       <div className="flex items-center">
         <p className="text-sm">
           {' '}
-          © <a href="https://bib-batteries.fr">Bib Batteries</a>{' '}
+          © <a href="https://bib-batteries.fr">Bib batteries</a>{' '}
           {new Date().getFullYear()}{' '}
         </p>
       </div>

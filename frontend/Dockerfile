@@ -37,7 +37,7 @@ COPY . .
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_API_URL=https://get-evalue.com/api/v1
+ENV NEXT_PUBLIC_API_URL=https://api.bib-batteries.com/v1
 
 RUN pnpm build
 
@@ -64,15 +64,14 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # Copy Next.js standalone output (self-contained server)
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copy only sharp (compiled in deps)
-COPY --from=deps /app/node_modules/sharp ./node_modules/sharp
+# Copy sharp with all node_modules for proper resolution
+# In pnpm, Sharp needs access to the full node_modules structure
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
-# Adjust ownership
-RUN chown -R nextjs:nodejs /app
 USER 1001
 
 EXPOSE 3000

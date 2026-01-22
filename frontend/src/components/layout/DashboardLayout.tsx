@@ -41,15 +41,14 @@ export default function DashboardLayout({
       <div className="flex bg-white dark:bg-dark-white h-[calc(100dvh)] flex-col w-14 sm:w-40 md:w-56 shrink-0">
         <div className="flex flex-col text-black dark:text-dark-dark px-2 overflow-auto z-20 h-full">
           <Link href="/dashboard">
-            <div className="flex items-center mt-3 mb-3">
+            <div className="flex justify-center mt-3 mb-3">
               <Image
-                alt="logo-battery-green"
+                alt="logo bib batteries"
                 priority
-                width={34}
-                height={34}
-                src="/logo/icon.svg"
+                width={120}
+                height={50}
+                src="/logo/bib-pine-green.svg"
               />
-              <p className="font-bold text-xl hidden sm:contents">EValue</p>
             </div>
           </Link>
           <hr className="w-7 sm:w-28 md:w-40 mx-auto mt-2 border-cool-gray-200" />

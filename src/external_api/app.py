@@ -39,6 +39,23 @@ class MetricsProtectionMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class RootPathMiddleware(BaseHTTPMiddleware):
+    """
+    Override root_path to prevent incorrect prefix for api.bib-batteries.com
+    FastAPI automatically uses X-Forwarded-Prefix, but we need to ensure
+    api.bib-batteries.com doesn't get a prefix while get-evalue.com does.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        # Only override for api.bib-batteries.com - force no prefix
+        host = request.headers.get("host", "").lower()
+        if "get-evalue.com" in host:
+            request.scope["root_path"] = "/api"
+
+        response = await call_next(request)
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -66,9 +83,6 @@ async def lifespan(app: FastAPI):
     logger.info("API shutdown")
 
 
-# Prefix to use for OpenAPI URLs
-root_path = "/api" if settings.ENVIRONMENT == "proxy" else ""
-
 app = FastAPI(
     title="BIB Batteries API",
     description="BIB Batteries API enables to access SoH, SoH estimated, dynamic and static data on your vehicles.",
@@ -79,24 +93,21 @@ app = FastAPI(
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
     lifespan=lifespan,
-    root_path=root_path,  # "/api" if not is_local else "",
-    openapi_tags=[
-        # {"name": "Authentication", "description": "Authentication operations"},
-        # # {"name": "Vehicle Model", "description": "Statistical data on vehicle models"},
-        # {"name": "Individual Vehicles", "description": "Data on individual vehicles"},
-        # {"name": "Billing", "description": "Billing operations and usage tracking"},
-    ],
+    root_path="",  # Will be overridden by X-Forwarded-Prefix header from Ingress
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
 )
 
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,  # type: ignore[arg-type]
-    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Handle root_path for multi-domain support
+app.add_middleware(RootPathMiddleware)  # type: ignore[arg-type]
 
 
 @app.exception_handler(StarletteHTTPException)
