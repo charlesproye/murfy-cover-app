@@ -54,7 +54,6 @@ class ResultPhaseToResultWeek:
 
         rweek = (
             rph
-            # Some raw estimations may have inf values, this will make mask_out_outliers_by_interquartile_range and force_monotonic_decrease fail
             # So we replace them by NaNs.
             .pipe(self._replace_inf_soh)
             .sort_values(["VIN", "DATETIME_BEGIN"])
@@ -65,7 +64,7 @@ class ResultPhaseToResultWeek:
             )
             .pipe(self._agg_results_by_update_frequency)
             .groupby("VIN", observed=True)
-            .apply(self._make_soh_presentable_per_vehicle, include_groups=False)
+            .apply(self._force_decay_soh, include_groups=False)
             .reset_index(level=0)
             .sort_values(["VIN", "DATE"])
         )
@@ -74,6 +73,7 @@ class ResultPhaseToResultWeek:
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].ffill()
         rweek["ODOMETER"] = rweek.groupby("VIN", observed=True)["ODOMETER"].bfill()
 
+        # Filters to avoid unrealistic SoH values
         rweek = rweek.pipe(self._replace_soh_below_min_soh_regarding_odometer).pipe(
             self._replace_soh_over_one_hundred
         )
@@ -85,6 +85,7 @@ class ResultPhaseToResultWeek:
     def _replace_inf_soh(self, df):
         if "SOH" in df.columns:
             df["SOH"] = df["SOH"].replace([np.inf, -np.inf], np.nan)
+            df["SOH"] = df["SOH"].replace(0, np.nan)
         else:
             df["SOH"] = None
         return df
@@ -181,15 +182,13 @@ class ResultPhaseToResultWeek:
             .agg(**agg_dict)
         )
 
-    def _make_soh_presentable_per_vehicle(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _force_decay_soh(self, df: pd.DataFrame) -> pd.DataFrame:
         if df["SOH"].isna().all():
             return df
         if df["SOH"].count() > 3:
-            outliser_mask = mask_out_outliers_by_interquartile_range(df["SOH"])
-            assert outliser_mask.any(), (
-                f"There seems to be only outliers???:\n{df['SOH']}."
-            )
-            df = df[outliser_mask].copy()
+            # Filter to avoid non sense values in force decay
+            outliers_mask = mask_out_outliers_by_interquartile_range(df["SOH"])
+            df = df[outliers_mask].copy()
         if df["SOH"].count() >= 2:
             df["SOH"] = force_decay(df[["SOH", "ODOMETER"]])
         return df
