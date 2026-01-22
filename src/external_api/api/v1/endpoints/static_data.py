@@ -3,7 +3,7 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +14,6 @@ from external_api.schemas.static_data import (
     BatteryModelData,
     ModelData,
     ModelTrendline,
-    ModelType,
     VehicleModelData,
 )
 from external_api.schemas.user import GetCurrentUser
@@ -33,62 +32,6 @@ async def check_model_exists(model_id: uuid.UUID, db: AsyncSession) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Vehicle model with id {model_id} does not exist",
         )
-
-
-@router.get(
-    "/models",
-    response_model=list[ModelType],
-    summary="Get all models",
-    description="Returns all electric vehicles models with their commissioning and end of life dates and whether Bib provides a trendline. If you want to get only the models with a trendline, you can set the `has_trendline` query parameter to `true`.",
-)
-async def get_models(
-    has_soh_estimation: bool | None = Query(None),
-    _: GetCurrentUser = Depends(get_current_user_from_cookie(get_user)),
-    db: AsyncSession = Depends(get_async_db),
-) -> list[ModelType]:
-    query = (
-        select(
-            VehicleModel.id,
-            Make.make_name,
-            VehicleModel.model_name,
-            VehicleModel.type,
-            VehicleModel.commissioning_date,
-            VehicleModel.end_of_life_date,
-            VehicleModel.trendline_bib,
-            VehicleModel.trendline_oem,
-        )
-        .select_from(VehicleModel)
-        .join(Make, VehicleModel.make_id == Make.id)
-        .join(Battery, VehicleModel.battery_id == Battery.id)
-    )
-
-    if has_soh_estimation is True:
-        query = query.where(
-            (VehicleModel.trendline_bib.is_not(None))
-            | (VehicleModel.trendline_oem.is_not(None))
-        )
-    elif has_soh_estimation is False:
-        query = query.where(
-            VehicleModel.trendline_bib.is_(None),
-            VehicleModel.trendline_oem.is_(None),
-        )
-
-    vehicules_query = await db.execute(query)
-    vehicules = vehicules_query.fetchall()
-
-    return [
-        ModelType(
-            model_id=vehicule.id,
-            make=vehicule.make_name,
-            model_name=vehicule.model_name,
-            model_type=vehicule.type,
-            commissioning_date=vehicule.commissioning_date,
-            end_of_life_date=vehicule.end_of_life_date,
-            has_soh_estimation_bib=vehicule.trendline_bib is not None,
-            has_soh_estimation_oem=vehicule.trendline_oem is not None,
-        )
-        for vehicule in vehicules
-    ]
 
 
 @router.get(

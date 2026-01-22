@@ -29,14 +29,12 @@ export type ModelInfoResponse = {
 
 export type VehicleStatus = {
   vin: string;
-  requested_status: boolean;
+  requested_soh_bib: boolean;
+  requested_soh_readout: boolean;
+  requested_activation: boolean;
   status: boolean | null;
   message: string;
   comment: string | null;
-  make?: string | null;
-  model_name?: string | null;
-  type?: string | null;
-  version?: string | null;
 };
 
 export type VehicleInfo = {
@@ -47,6 +45,8 @@ export type VehicleInfo = {
 };
 
 export type ActivationInfo = {
+  request_soh_bib: boolean;
+  request_soh_oem: boolean;
   start_date?: string | null;
   end_date?: string | null;
 };

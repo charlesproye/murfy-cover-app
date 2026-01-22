@@ -52,7 +52,7 @@ const DeactivateTab: React.FC<DeactivateTabProps> = ({
       );
 
       if (response) {
-        const activeVehicles = response.filter((v) => v.status || v.requested_status);
+        const activeVehicles = response.filter((v) => v.status || v.requested_activation);
         setVehicles(activeVehicles);
         setSelectedVehicles([]);
         setSearchQuery('');
@@ -287,7 +287,7 @@ const DeactivateTab: React.FC<DeactivateTabProps> = ({
                                 <span className="inline-block px-2 py-1 rounded bg-green-100 text-green-700 text-xs">
                                   Active
                                 </span>
-                              ) : vehicle.requested_status ? (
+                              ) : vehicle.requested_activation ? (
                                 <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs">
                                   Requested
                                 </span>
@@ -366,7 +366,7 @@ const DeactivateTab: React.FC<DeactivateTabProps> = ({
                       <tr key={idx} className="border-b last:border-0">
                         <td className="py-2 px-3 font-mono text-xs">{result.vin}</td>
                         <td className="py-2 px-3 text-center">
-                          {!result.status && !result.requested_status ? (
+                          {!result.status && !result.requested_activation ? (
                             <span className="inline-block px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs">
                               Deactivated
                             </span>

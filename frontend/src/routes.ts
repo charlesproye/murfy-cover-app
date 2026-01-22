@@ -50,10 +50,10 @@ export const ROUTES = {
   VERIFY_REPORT: `${BASE_URL}/verify-report`,
 
   // FLEET MANAGER / VEHICLE ACTIVATION
-  VEHICLE_FLEETS: `${BASE_URL}/vehicle-command/fleets`,
+  VEHICLE_FLEETS: `${BASE_URL}/account/fleets`,
   VEHICLE_MAKES: `${BASE_URL}/vehicle-command/makes`,
   VEHICLE_MODELS: (makeId: string) => `${BASE_URL}/vehicle-command/${makeId}/models`,
-  VEHICLE_STATUS: `${BASE_URL}/vehicle-command/status`,
+  VEHICLE_STATUS: `${BASE_URL}/account/vehicles`,
   VEHICLE_ACTIVATE: `${BASE_URL}/vehicle-command/activate`,
   VEHICLE_DEACTIVATE: `${BASE_URL}/vehicle-command/deactivate`,
 };

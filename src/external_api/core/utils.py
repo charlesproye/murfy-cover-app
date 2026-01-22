@@ -2,12 +2,15 @@
 
 import logging
 import time
+import uuid
 
 from fastapi import Depends, HTTPException, status
 from fastapi.datastructures import URL
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.sql_utils import get_async_db
+from db_models import UserFleet
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.schemas.user import GetCurrentUser
 from external_api.services.api_pricing import get_api_user_pricing, log_api_call
@@ -108,3 +111,25 @@ async def check_rate_limit(
             f"API Call logged (without limits): API user {user.id}, endpoint {endpoint}, "
             f"VIN {vin}"
         )
+
+
+async def verify_user_fleet_access(
+    db: AsyncSession, user_id: uuid.UUID, fleet_id: uuid.UUID
+) -> bool:
+    """
+    Verify that a user has access to a specific fleet.
+
+    Args:
+        db: Database session
+        user_id: User ID to check
+        fleet_id: Fleet ID to verify access to
+
+    Returns:
+        True if user has access to the fleet, False otherwise
+    """
+    result = await db.execute(
+        select(UserFleet).where(
+            UserFleet.user_id == user_id, UserFleet.fleet_id == fleet_id
+        )
+    )
+    return result.scalar_one_or_none() is not None

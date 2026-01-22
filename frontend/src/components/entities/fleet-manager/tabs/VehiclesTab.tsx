@@ -42,12 +42,11 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [vinFilter, setVinFilter] = useState('');
   const [messageFilter, setMessageFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'activated', 'requested', 'inactive'
-  const [makeFilter, setMakeFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const CACHE_DURATION = 30000; // 30 seconds
+  const CACHE_DURATION = 30000;
   const ITEMS_PER_PAGE = 50;
 
   const getCacheKey = (fleetId: string) => `vehicles_cache_${fleetId}`;
@@ -63,7 +62,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
     const timestampKey = getTimestampKey(selectedFleetId);
     const now = Date.now();
 
-    // Check cache if not forcing refresh
     if (!forceRefresh) {
       const cachedData = localStorage.getItem(cacheKey);
       const cachedTimestamp = localStorage.getItem(timestampKey);
@@ -98,7 +96,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
       if (response) {
         setVehicles(response);
         setLastFetchTime(now);
-        // Store in cache
         localStorage.setItem(cacheKey, JSON.stringify(response));
         localStorage.setItem(timestampKey, now.toString());
         toast.success(`${response.length} vehicles loaded`);
@@ -114,14 +111,12 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
     loadVehicles(true);
   };
 
-  // Auto-load vehicles when fleet is selected
   useEffect(() => {
     if (selectedFleetId) {
       loadVehicles();
     }
   }, [selectedFleetId]);
 
-  // Auto-refresh every 30 seconds if data is visible
   useEffect(() => {
     if (!selectedFleetId || vehicles.length === 0) return;
 
@@ -142,22 +137,17 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
 
     const headers = [
       'VIN',
-      'Make',
-      'Model',
-      'Type',
-      'Version',
-      'Requested Status',
-      'Status',
+      'BIB report requested',
+      'Readout report requested',
+      'Activated',
       'Message',
       'Comment',
     ];
     const rows = filteredVehicles.map((v) => [
       v.vin,
-      v.make || '',
-      v.model_name || '',
-      v.type || '',
-      v.version || '',
-      v.requested_status ? 'Yes' : 'No',
+      v.requested_soh_bib ? 'Yes' : 'No',
+      v.requested_soh_readout ? 'Yes' : 'No',
+      v.requested_activation ? 'Yes' : 'No',
       v.status ? 'Yes' : 'No',
       v.message,
       v.comment || '',
@@ -177,13 +167,8 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
     window.URL.revokeObjectURL(url);
   };
 
-  // Get unique messages and makes for filtering
   const uniqueMessages = Array.from(new Set(vehicles.map((v) => v.message)));
-  const uniqueMakes = Array.from(
-    new Set(vehicles.map((v) => v.make).filter(Boolean)),
-  ) as string[];
 
-  // Filter vehicles by VIN search, message, status, and make
   const filteredByVin = vinFilter
     ? vehicles.filter((v) => v.vin.toLowerCase().includes(vinFilter.toLowerCase()))
     : vehicles;
@@ -199,31 +184,25 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
       : statusFilter === 'activated'
         ? filteredByMessage.filter((v) => v.status === true)
         : statusFilter === 'requested'
-          ? filteredByMessage.filter((v) => v.requested_status && !v.status)
-          : filteredByMessage.filter((v) => !v.status && !v.requested_status);
+          ? filteredByMessage.filter((v) => v.requested_soh_bib && !v.status)
+          : filteredByMessage.filter((v) => !v.status && !v.requested_activation);
 
-  const filteredVehicles =
-    makeFilter.length > 0
-      ? filteredByStatus.filter((v) => v.make && makeFilter.includes(v.make))
-      : filteredByStatus;
+  const filteredVehicles = filteredByStatus;
 
-  // Recalculate counts based on filtered results
   const filteredActivatedCount = filteredVehicles.filter((v) => v.status).length;
   const filteredRequestedCount = filteredVehicles.filter(
-    (v) => v.requested_status,
+    (v) => v.requested_activation,
   ).length;
   const filteredInactiveCount = filteredVehicles.length - filteredActivatedCount;
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredVehicles.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedVehicles = filteredVehicles.slice(startIndex, endIndex);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [vinFilter, messageFilter, statusFilter, makeFilter]);
+  }, [vinFilter, messageFilter, statusFilter]);
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -253,7 +232,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
 
           {vehicles.length > 0 && (
             <>
-              {/* Search Bar and Actions */}
               <div className="flex gap-4 items-end">
                 <div className="flex-1 space-y-2">
                   <div className="relative">
@@ -328,7 +306,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                 </div>
               </div>
 
-              {/* Filters Row */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
@@ -341,43 +318,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                     <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
-
-                {uniqueMakes.length > 0 && (
-                  <Select
-                    value={
-                      makeFilter.length === 1
-                        ? makeFilter[0]
-                        : makeFilter.length > 1
-                          ? 'multiple'
-                          : 'all'
-                    }
-                    onValueChange={(value) => {
-                      if (value === 'all') {
-                        setMakeFilter([]);
-                      } else {
-                        setMakeFilter([value]);
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All makes">
-                        {makeFilter.length === 0
-                          ? 'All makes'
-                          : makeFilter.length === 1
-                            ? makeFilter[0]
-                            : `${makeFilter.length} makes selected`}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All makes</SelectItem>
-                      {uniqueMakes.map((make) => (
-                        <SelectItem key={make} value={make}>
-                          {make}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
 
                 {uniqueMessages.length > 1 && (
                   <Select
@@ -425,26 +365,17 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                         <th className="text-left py-3 px-4 font-medium text-gray-600">
                           VIN
                         </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">
-                          Make
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">
-                          Model
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">
-                          Type
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">
-                          Version
+                        <th className="text-center py-3 px-4 font-medium text-gray-600">
+                          BIB report requested
                         </th>
                         <th className="text-center py-3 px-4 font-medium text-gray-600">
-                          Requested
+                          Readout report requested
                         </th>
                         <th className="text-center py-3 px-4 font-medium text-gray-600">
                           Activated
                         </th>
                         <th className="text-left py-3 px-4 font-medium text-gray-600">
-                          Status
+                          Message
                         </th>
                         <th className="text-left py-3 px-4 font-medium text-gray-600">
                           Comment
@@ -458,15 +389,20 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                           className={`${index === paginatedVehicles.length - 1 ? '' : 'border-b'} hover:bg-gray-50 transition-colors`}
                         >
                           <td className="py-3 px-4 font-mono text-xs">{vehicle.vin}</td>
-                          <td className="py-3 px-4">{vehicle.make || '-'}</td>
-                          <td className="py-3 px-4">{vehicle.model_name || '-'}</td>
-                          <td className="py-3 px-4">{vehicle.type || '-'}</td>
-                          <td className="py-3 px-4 text-xs text-gray-600">
-                            {vehicle.version || '-'}
+                          <td className="py-3 px-4 text-center">
+                            {vehicle.requested_soh_bib ? (
+                              <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs">
+                                Yes
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs">
+                                No
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            {vehicle.requested_status ? (
-                              <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs">
+                            {vehicle.requested_soh_readout ? (
+                              <span className="inline-block px-2 py-1 rounded bg-purple-100 text-purple-700 text-xs">
                                 Yes
                               </span>
                             ) : (
@@ -497,7 +433,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                 </div>
               </div>
 
-              {/* Pagination Controls */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">
@@ -517,7 +452,6 @@ const VehiclesTab: React.FC<VehiclesTabProps> = ({
                     </Button>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                        // Show first page, last page, current page, and pages around current
                         if (
                           page === 1 ||
                           page === totalPages ||

@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -6,11 +7,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 class ActivationRequestVehicle(BaseModel):
     vin: str = Field(..., min_length=17, max_length=17)
     make: str
-    model: str
+    model: str | None = None
     type: str | None = None  # EV, PHEV, ICE, etc.
 
 
 class Activation(BaseModel):
+    request_soh_bib: bool
+    request_soh_oem: bool
     start_date: date | None = None
     end_date: date | None = None
 
@@ -76,14 +79,13 @@ class ActivationRequest(BaseModel):
 
 class VehicleStatus(BaseModel):
     vin: str = Field(..., min_length=17, max_length=17)
-    requested_status: bool
+    requested_soh_readout: bool
+    requested_soh_bib: bool
+    requested_activation: bool
     status: bool | None = None
     message: str | None = None
+    consent_information: str | None = None
     comment: str | None = None
-    make: str | None = None
-    model_name: str | None = None
-    type: str | None = None
-    version: str | None = None
 
 
 class ActivationResponse(BaseModel):
@@ -130,3 +132,21 @@ class ModelInfo(BaseModel):
 
 class ModelInfoResponse(BaseModel):
     models: list[ModelInfo]
+
+
+class ModelType(BaseModel):
+    model_id: uuid.UUID = Field(..., description="Model ID")
+    make: str = Field(..., description="Make (company that made the car)")
+    model_name: str = Field(..., description="Model name")
+    model_type: str | None = Field(None, description="Model type")
+    commissioning_date: datetime | None = Field(..., description="Commissioning date")
+    end_of_life_date: datetime | None = Field(..., description="End of life date")
+    has_flash_soh: bool = Field(
+        ..., description="SoH can be statistically estimated on this model type"
+    )
+    has_oem_soh: bool = Field(
+        ..., description="SoH readout is available for this model type"
+    )
+    has_bib_soh: bool = Field(
+        ..., description="SoH can be calculated by BIB for this model type"
+    )

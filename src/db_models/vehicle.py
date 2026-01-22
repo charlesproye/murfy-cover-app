@@ -118,6 +118,8 @@ class Vehicle(BaseUUIDModel):
     vin: Mapped[str | None] = mapped_column(String(50))
     bib_score: Mapped[str | None] = mapped_column(String(1))
     activation_status: Mapped[bool | None] = mapped_column(Boolean)
+    bib_report_requested_status: Mapped[bool | None] = mapped_column(Boolean)
+    readout_report_requested_status: Mapped[bool | None] = mapped_column(Boolean)
     activation_requested_status: Mapped[bool | None] = mapped_column(Boolean)
     activation_start_date: Mapped[date | None] = mapped_column(Date)
     activation_end_date: Mapped[date | None] = mapped_column(Date)

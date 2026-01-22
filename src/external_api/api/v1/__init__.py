@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from external_api.api.v1.endpoints import (
+    account,
     admin,
     auth,
     billing,
@@ -23,6 +24,9 @@ api_router = APIRouter()
 
 # Route for the API
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+
+api_router.include_router(account.router, prefix="/account", tags=["Account"])
+
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(
     static_data.router, prefix="/static_data", tags=["Static Data"]
@@ -52,6 +56,7 @@ api_router.include_router(individual.router, prefix="/individual", tags=["Indivi
 api_router.include_router(
     vehicle_command.router, prefix="/vehicle-command", tags=["Vehicle command"]
 )
+
 
 # Hidden routes for OpenAPI documentation
 hidden_router = APIRouter(include_in_schema=False)
