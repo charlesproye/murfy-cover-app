@@ -5,11 +5,13 @@ import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import numpy as np
 from dateutil.relativedelta import relativedelta
 from jinja2 import Environment, FileSystemLoader
 
+from core import trendlines_utils
 from core.numpy_utils import numpy_safe_eval
 from db_models.company import Oem
 from db_models.report import ReportType
@@ -28,7 +30,7 @@ from reports.exceptions import MissingBIBSoH, MissingOEMSoH
 from reports.report_config import GOTENBERG_URL
 from reports.report_render.asset_utils import AssetEmbedder
 from reports.report_render.gotenberg_client import GotenbergClient
-from reports.reports_utils import generate_report_qr_code_data_url
+from reports.report_render.qr_code_utils import generate_report_qr_code_data_url
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +279,7 @@ class ReportGenerator:
         vehicle_data: VehicleData,
         image_url: str | None,
         report_type: ReportType,
-        report_uuid: str | None = None,
+        report_uuid: UUID | None = None,
         verify_report_base_url: str | None = None,
     ) -> ReportData:
         """
@@ -309,39 +311,35 @@ class ReportGenerator:
 
         logger.info(f"Generating report data for VIN: {vin}")
 
+        match report_type:
+            case ReportType.readout:
+                trendlines = trendlines_utils.get_readout_trendlines(
+                    vehicle_model=vehicle_model
+                )
+            case ReportType.premium:
+                trendlines = trendlines_utils.get_premium_trendlines(
+                    vehicle_model=vehicle_model
+                )
+            case ReportType.flash:
+                trendlines = trendlines_utils.get_flash_trendlines(
+                    vehicle_model=vehicle_model
+                )
+                vehicle_data.soh_bib = float(
+                    numpy_safe_eval(expression=trendlines.main, x=vehicle_data.odometer)
+                )
+
+        # Validate SoH data after flash report type calculates it from trendline
         if vehicle_data.soh_bib is None and vehicle_data.soh_oem is None:
             raise ValueError(f"SoH data not available for VIN: {vin}")
 
-        # Select trendline data (vehicle-specific or OEM fallback)
-        if report_type == ReportType.readout:
-            # For readout, use OEM trendlines from vehicle_model or oem table
-            trendline = vehicle_model.trendline_oem or oem.trendline
-            trendline_min = vehicle_model.trendline_oem_min or oem.trendline_min
-            trendline_max = vehicle_model.trendline_oem_max or oem.trendline_max
-        else:
-            # For premium, use BIB trendlines from vehicle_model
-            trendline = vehicle_model.trendline_bib or oem.trendline
-            trendline_min = vehicle_model.trendline_bib_min or oem.trendline_min
-            trendline_max = vehicle_model.trendline_bib_max or oem.trendline_max
-
-        if not trendline or not trendline_min or not trendline_max:
-            raise ValueError(f"No trendline data available for VIN: {vin}")
-
         current_km = int(vehicle_data.odometer or 0)
-
-        trendline_eq = trendline
-        trendline_min_eq = trendline_min
-        trendline_max_eq = trendline_max
-
-        if not trendline_eq or not trendline_min_eq or not trendline_max_eq:
-            raise ValueError(f"Invalid trendline equations for VIN: {vin}")
 
         soh_chart_data = self.generate_soh_data(
             current_km=current_km,
             max_km=100_000,
-            trendline_eq=trendline_eq,
-            trendline_min_eq=trendline_min_eq,
-            trendline_max_eq=trendline_max_eq,
+            trendline_eq=trendlines.main,
+            trendline_min_eq=trendlines.minimum,
+            trendline_max_eq=trendlines.maximum,
             bib_score=vehicle.bib_score,
             bib_soh=float(vehicle_data.soh_bib) * 100
             if vehicle_data.soh_bib is not None
@@ -423,7 +421,7 @@ class ReportGenerator:
         vehicle_data: VehicleData,
         image_url: str | None,
         report_type: ReportType,
-        report_uuid: str | None = None,
+        report_uuid: UUID | None = None,
         verify_report_base_url: str | None = None,
     ) -> str:
         """
@@ -539,7 +537,7 @@ class ReportGenerator:
         Returns:
             Rendered HTML as string
         """
-        template = self.jinja_env.get_template(name="premium_report.html")
+        template = self.jinja_env.get_template(name="report_template.html")
 
         context = data.model_dump(mode="python")
 
@@ -635,6 +633,7 @@ class ReportGenerator:
         trendline_value_at_current = float(
             np.round(numpy_safe_eval(trendline_eq, x=current_km) * 100, 1)
         )
+        offset = 0
         if report_type == ReportType.readout:
             if readout_soh_value is not None:
                 offset = round(readout_soh_value - trendline_value_at_current, 1)

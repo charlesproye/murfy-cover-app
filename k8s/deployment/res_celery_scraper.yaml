@@ -43,8 +43,14 @@ spec:
             value: "1"
           - name: S3_BUCKET
             value: "bib-premium-reports"
+          - name: REPORT_S3_BUCKET
+            value: "bib-premium-reports"
           - name: GOTENBERG_URL
             value: "http://gotenberg.data-engineering.svc:3000"
+          - name: SMTP_EMAIL
+            value: "report@bib-batteries.fr"
+          - name: FRONTEND_URL
+            value: "https://get-evalue.com"
         envFrom:
           - secretRef:
               name: s3-secret
@@ -54,6 +60,8 @@ spec:
               name: google-secret
           - secretRef:
               name: db-data-ev-secret
+          - secretRef:
+              name: smtp-secret
         resources:
           requests:
             memory: "512Mi"

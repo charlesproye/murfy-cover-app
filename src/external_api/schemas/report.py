@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -154,7 +155,7 @@ class ReportMetadata(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    uuid: str | None = Field(
+    uuid: UUID | None = Field(
         None,
         description="Report UUID. Only used if the report is generated for a PDF and inserted in the database.",
     )

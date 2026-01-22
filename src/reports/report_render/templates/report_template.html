@@ -186,9 +186,9 @@
 
                 <div class="text-emerald-900 text-7xl font-normal font-['Space_Grotesk'] leading-[80px] z-10">
                     {% if report.report_type == 'readout' %}
-                    {{ soh_data.soh_readout|round(0)|int }}%
+                        {{ soh_data.soh_readout|round(0)|int }}%
                     {% else %}
-                    {{ soh_data.soh_bib|round(0)|int }}%
+                        {{ soh_data.soh_bib|round(0)|int }}%
                     {% endif %}
                 </div>
                 {% if report.report_type in ['readout', 'premium'] and soh_data.grade is not none %}
@@ -436,6 +436,7 @@
                         </div>
                     </div>
 
+                    {% if warranty_data.remaining_time is not none %}
                     <div class="mb-3">
                         <div class="text-[12px] text-gray-800 flex justify-between mb-1">
                             <span class="font-medium">Durée de garantie restante</span>
@@ -445,6 +446,7 @@
                             <div class="bg-[linear-gradient(to_right,#00EF95_0%,#00462D_100%)] h-full rounded-full" style="width: {{ warranty_data.time_percentage|default(0) }}%;"></div>
                         </div>
                     </div>
+                    {% endif %}
 
                     <div class="px-3 py-1 bg-emerald-400/10 rounded mb-1">
                         <div class="flex-1 text-[#05442B] text-[11px] ">

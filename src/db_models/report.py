@@ -15,6 +15,7 @@ from db_models.enums import LanguageEnum
 class ReportType(str, enum.Enum):
     premium = "premium"
     readout = "readout"
+    flash = "flash"
 
 
 class FlashReportCombination(BaseUUIDCreatedAt):
@@ -37,9 +38,13 @@ class FlashReportCombination(BaseUUIDCreatedAt):
 
 class Report(BaseUUIDModel):
     __tablename__ = "report"
-    vehicle_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("vehicle.id"), nullable=False
+    vehicle_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("vehicle.id"), nullable=True
     )
+    flash_report_combination_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("flash_report_combination.id"), nullable=True
+    )
+
     report_url: Mapped[str] = mapped_column(String(2000), nullable=False)
     report_type: Mapped[ReportType] = mapped_column(SqlEnum(ReportType), nullable=False)
     task_id: Mapped[str | None] = mapped_column(String(255))
@@ -51,6 +56,7 @@ class Report(BaseUUIDModel):
         Index(
             "ix_premium_report_vehicle_date_type_unique",
             vehicle_id,
+            flash_report_combination_id,
             func.date(created_at),
             report_type,
             unique=True,

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from core.sql_utils import get_connection
+from core.sql_utils import get_sqlalchemy_engine
 from external_api.services.flash_report.vin_decoder.config import (
     QUERY,
     QUERY_PARTIAL,
@@ -91,8 +91,8 @@ class TeslaVinDecoder:
                 return [v.strip() for v in value.split(char)]
             return value
 
-        with get_connection() as con:
-            df = pd.read_sql(self.query_full, con)
+        engine = get_sqlalchemy_engine()
+        df = pd.read_sql(self.query_full, engine)
 
         disc_vin = self._split_vin(vin, 0, 11)
         match = df.loc[df["discriminative_vin"] == disc_vin]
@@ -119,8 +119,8 @@ class TeslaVinDecoder:
             )
 
         # Fallback with partial VIN discriminator
-        with get_connection() as con:
-            df = pd.read_sql(self.query_partial, con)
+        engine = get_sqlalchemy_engine()
+        df = pd.read_sql(self.query_partial, engine)
 
         reduced_vin = self._split_vin(vin, 3, 5) + self._split_vin(vin, 6, 10)
         match = df.loc[df["discriminative_vin"] == reduced_vin]

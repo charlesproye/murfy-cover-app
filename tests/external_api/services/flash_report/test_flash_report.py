@@ -5,14 +5,11 @@ from db_models.enums import LanguageEnum
 from external_api.schemas.flash_report import VehicleSpecs, VehicleSpecsType
 from external_api.services.flash_report.flash_report import (
     get_db_names,
-    get_flash_report_data,
     insert_combination,
-    send_email,
     send_vehicle_specs,
 )
 from tests.factories import (
     BatteryFactory,
-    FlashReportCombinationFactory,
     MakeFactory,
     OemFactory,
     VehicleModelFactory,
@@ -61,41 +58,6 @@ async def test_insert_combination(db_session: AsyncSession):
     assert len(token) == 36  # UUID format
 
 
-@pytest.mark.asyncio
-async def test_get_flash_report_data(db_session: AsyncSession):
-    """Test getting flash report data with test fixture."""
-    # Create vehicle model that matches the flash report data
-    oem = await OemFactory.create_async(session=db_session, oem_name="tesla")
-    make = await MakeFactory.create_async(
-        session=db_session, oem_id=oem.id, make_name="tesla"
-    )
-    battery = await BatteryFactory.create_async(session=db_session)
-    vehicle_model = await VehicleModelFactory.create_async(
-        session=db_session,
-        oem_id=oem.id,
-        make_id=make.id,
-        battery_id=battery.id,
-        model_name="model 3",
-        type="long range awd",
-        version="MT352",
-    )
-
-    # Create flash report combination using factory
-    flash_report = await FlashReportCombinationFactory.create_async(
-        session=db_session,
-        vin="5YJ3E1EA1KF654321",
-        make=make.make_name,
-        model=vehicle_model.model_name,
-        type=vehicle_model.type,
-        version=vehicle_model.version,
-        odometer=50000,
-        language=LanguageEnum.EN,
-    )
-
-    result = await get_flash_report_data(flash_report, db=db_session)
-    assert result is not None
-
-
 # ============================================================================
 # Integration Tests (require external APIs)
 # ============================================================================
@@ -131,6 +93,8 @@ async def test_send_vehicle_specs_tesla_vin_decoder(db_session: AsyncSession):
             VehicleSpecsType(type="long range", version="MT303"),
             VehicleSpecsType(type="long range performance", version="MT304"),
         ],
+        has_trendline_bib=True,
+        has_trendline_oem=True,
     )
 
 
@@ -146,12 +110,7 @@ async def test_send_vehicle_specs_vin_decoder(db_session: AsyncSession):
         has_trendline=True,
         make="renault",
         model="zoe",
+        has_trendline_bib=True,
+        has_trendline_oem=True,
         type_version_list=None,
     )
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_send_email():
-    """Test email sending (requires SMTP server configuration)."""
-    await send_email(is_french=True, email="test@example.com", token="test-token-12345")

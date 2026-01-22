@@ -346,7 +346,7 @@ class GSheetReportGenerator:
                     oem=oem,
                     vehicle_data=vehicle_data,
                     image_url=image_url,
-                    report_uuid=str(report_uuid),
+                    report_uuid=report_uuid,
                     report_type=ReportType.premium,
                     verify_report_base_url=report_base_url,
                 )

@@ -9,6 +9,7 @@ from sqlalchemy.sql import select
 
 from core.s3.async_s3 import AsyncS3, get_async_s3
 from core.sql_utils import get_async_db
+from db_models import FlashReportCombination
 from db_models.report import Report
 from db_models.vehicle import Vehicle
 from external_api.schemas.report import (
@@ -54,8 +55,13 @@ async def verify_report(
 
     # Find the report and vehicle in a single query
     stmt = (
-        select(Report, Vehicle)
-        .join(Vehicle, Report.vehicle_id == Vehicle.id)
+        select(Report, Vehicle, FlashReportCombination)
+        .join(Vehicle, Report.vehicle_id == Vehicle.id, isouter=True)
+        .join(
+            FlashReportCombination,
+            Report.flash_report_combination_id == FlashReportCombination.id,
+            isouter=True,
+        )
         .where(Report.id == uuid_casted)
     )
     result = await db.execute(stmt)
@@ -64,12 +70,18 @@ async def verify_report(
     if not row:
         return invalid_reponse
 
-    report, vehicle = row
+    report, vehicle, flash_report_combination = row
 
-    if not vehicle or not vehicle.vin:
-        return invalid_reponse
+    if flash_report_combination and flash_report_combination.vin:
+        vin = flash_report_combination.vin
+    elif vehicle and vehicle.vin:
+        vin = vehicle.vin
+    else:
+        raise HTTPException(
+            status_code=404, detail=f"Vehicle not found for report {report_uuid}"
+        )
 
-    if vehicle.vin[-4:] != request.vin_last_4:
+    if vin[-4:] != request.vin_last_4:
         return invalid_reponse
 
     if not report.report_url:

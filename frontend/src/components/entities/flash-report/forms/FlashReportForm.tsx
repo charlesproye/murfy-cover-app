@@ -136,14 +136,17 @@ export const FlashReportForm = ({
           ? type_version_list.find((t) => t.type === type)?.version
           : undefined;
 
-      const response = await fetchWithoutAuth<{ message: string }>(ROUTES.SEND_EMAIL, {
-        method: 'POST',
-        body: JSON.stringify({
-          ...data,
-          type,
-          ...(version ? { version } : {}),
-        }),
-      });
+      const response = await fetchWithoutAuth<{ message: string }>(
+        ROUTES.SEND_REPORT_GENERATION,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            ...data,
+            type,
+            ...(version ? { version } : {}),
+          }),
+        },
+      );
       if (!response) {
         toast.error('Error sending report email');
       } else {
@@ -161,7 +164,10 @@ export const FlashReportForm = ({
   if (isFinalMessage) {
     return (
       <div className="flex flex-col gap-8">
-        <p className="text-xl font-medium">Your report was successfully sent by email.</p>
+        <p className="text-xl font-medium">
+          Report is being generated. You will receive an email with the link to the report
+          when it is ready.
+        </p>
         <Button
           type="button"
           className="px-6 max-w-48"

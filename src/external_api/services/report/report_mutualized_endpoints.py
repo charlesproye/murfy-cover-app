@@ -268,7 +268,7 @@ async def genereate_pdf_report_sync(
     ) = await api_report_utils.fetch_report_required_data(vin, db)
 
     try:
-        s3_uri = await report_generation.generate_report_sync(
+        _, s3_uri = await reports_utils.generate_report_sync(
             vehicle=vehicle,
             vehicle_model=vehicle_model,
             battery=battery,
@@ -278,6 +278,7 @@ async def genereate_pdf_report_sync(
             s3_client=s3_client,
             image_url=image_url,
             report_type=report_type,
+            s3_bucket=settings.REPORT_S3_BUCKET,
         )
 
         presigned_url = await s3_client.get_presigned_url(

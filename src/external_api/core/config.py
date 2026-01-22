@@ -78,9 +78,7 @@ class Settings(BaseSettings):
 
     # Gotenberg
     GOTENBERG_URL: str = os.getenv("GOTENBERG_URL", "http://localhost:3030")
-    PREMIUM_REPORT_S3_BUCKET: str = os.getenv(
-        "PREMIUM_REPORT_S3_BUCKET", "bib-premium-reports"
-    )
+    REPORT_S3_BUCKET: str = os.getenv("REPORT_S3_BUCKET", "bib-premium-reports")
     PREMIUM_REPORT_S3_SIGNED_URI_EXPIRES_IN: int = 24 * 60 * 60  # 24 hours
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core import numpy_utils
+from core.numpy_utils import numpy_safe_eval
 from core.sql_utils import get_async_db
+from core.trendlines_utils import get_flash_trendlines
 from db_models import VehicleModel
 from external_api.core.cookie_auth import get_current_user_from_cookie, get_user
 from external_api.schemas.flash import SOHWithTrendline
@@ -19,10 +20,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def generate_trendline_points(
+def generate_trendline_points(
     trendline: str, odometers: list[int]
 ) -> list[tuple[int, float]]:
-    soh_values = numpy_utils.numpy_safe_eval(trendline, x=np.array(odometers))
+    soh_values = numpy_safe_eval(trendline, x=np.array(odometers))
 
     return list(zip(odometers, soh_values, strict=True))
 
@@ -42,17 +43,7 @@ async def get_model_soh_trendline(
 ) -> SOHWithTrendline:
     # Get trendline data
     query = (
-        select(
-            VehicleModel.trendline_bib,
-            VehicleModel.trendline_bib_min,
-            VehicleModel.trendline_bib_max,
-            VehicleModel.trendline_oem,
-            VehicleModel.trendline_oem_min,
-            VehicleModel.trendline_oem_max,
-            VehicleModel.commissioning_date,
-            VehicleModel.end_of_life_date,
-            VehicleModel.id,
-        )
+        select(VehicleModel)
         .where(VehicleModel.id == model_id)
         .where(
             (VehicleModel.trendline_bib.is_not(None))
@@ -60,10 +51,10 @@ async def get_model_soh_trendline(
         )
     )
 
-    trendline_result = await db.execute(query)
-    trendline = trendline_result.fetchone()
+    result = await db.execute(query)
+    vehicle_model = result.scalar_one_or_none()
 
-    if not trendline:
+    if not vehicle_model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Model not found or model has no trendline",
@@ -71,52 +62,17 @@ async def get_model_soh_trendline(
 
     odometers = list(range(0, 150000, 30000))
 
-    trendline_bib_min = None
-    trendline_bib_max = None
+    trendlines = get_flash_trendlines(vehicle_model=vehicle_model)
 
-    if trendline.trendline_bib_min and trendline.trendline_bib_max:
-        trendline_bib_min = await generate_trendline_points(
-            trendline.trendline_bib_min, odometers
-        )
-        trendline_bib_max = await generate_trendline_points(
-            trendline.trendline_bib_max, odometers
-        )
-
-    # Generate OEM trendlines if available
-    trendline_oem_min = None
-    trendline_oem_max = None
-    if trendline.trendline_oem_min and trendline.trendline_oem_max:
-        trendline_oem_min = await generate_trendline_points(
-            trendline.trendline_oem_min, odometers
-        )
-        trendline_oem_max = await generate_trendline_points(
-            trendline.trendline_oem_max, odometers
-        )
-
-    # Calculate SoH values
-    soh_bib = (
-        round(
-            float(numpy_utils.numpy_safe_eval(trendline.trendline_bib, x=odometer)), 2
-        )
-        if trendline.trendline_bib
-        else None
-    )
-
-    soh_oem = (
-        round(
-            float(numpy_utils.numpy_safe_eval(trendline.trendline_oem, x=odometer)), 2
-        )
-        if trendline.trendline_oem
-        else None
-    )
+    trendline_min_points = generate_trendline_points(trendlines.minimum, odometers)
+    trendline_max_points = generate_trendline_points(trendlines.maximum, odometers)
+    soh = float(numpy_safe_eval(expression=trendlines.main, x=odometer))
 
     return SOHWithTrendline(
         model_id=model_id,
-        soh_bib=soh_bib,
-        soh_oem=soh_oem,
+        soh=soh,
+        source=trendlines.source,
         odometer=odometer,
-        trendline_bib_min=trendline_bib_min,
-        trendline_bib_max=trendline_bib_max,
-        trendline_oem_min=trendline_oem_min,
-        trendline_oem_max=trendline_oem_max,
+        trendline_min=trendline_min_points,
+        trendline_max=trendline_max_points,
     )

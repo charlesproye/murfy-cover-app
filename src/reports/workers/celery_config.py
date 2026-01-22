@@ -1,10 +1,23 @@
 import logging
 import os
+import sys
 from urllib.parse import quote_plus
 
 from celery import Celery
+from celery.signals import setup_logging, worker_init
 
 logger = logging.getLogger(__name__)
+
+
+@setup_logging.connect
+def config_loggers(*args, **kwargs):
+    """Configure logging for Celery workers to show application logs."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s: %(levelname)s/%(processName)s] %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
 
 redis_host = os.environ.get("REDIS_HOST", "redis")
 redis_port = os.environ.get("REDIS_PORT", "6379")
@@ -16,9 +29,41 @@ if redis_password:
 else:
     REDIS_URL = f"redis://{redis_host}:{redis_port}/0"
 
-logger.info(
-    f"Using Redis URL: {REDIS_URL.replace(safe_password, '***') if redis_password else REDIS_URL}"
+# SMTP Settings - optional at import time, validated at worker startup
+SMTP_EMAIL: str | None = os.environ.get("SMTP_EMAIL")
+SMTP_USER: str | None = os.environ.get("SMTP_USER")
+SMTP_PASSWORD: str | None = os.environ.get("SMTP_PASSWORD")
+SMTP_HOST: str | None = os.environ.get("SMTP_HOST")
+SMTP_PORT: int | None = (
+    int(os.environ["SMTP_PORT"]) if "SMTP_PORT" in os.environ else None
 )
+
+
+@worker_init.connect
+def validate_smtp_config(**kwargs):
+    """Validate that all required SMTP environment variables are set when worker starts."""
+    required_smtp_vars = {
+        "SMTP_EMAIL": SMTP_EMAIL,
+        "SMTP_USER": SMTP_USER,
+        "SMTP_PASSWORD": SMTP_PASSWORD,
+        "SMTP_HOST": SMTP_HOST,
+        "SMTP_PORT": SMTP_PORT,
+    }
+
+    missing = [name for name, value in required_smtp_vars.items() if value is None]
+
+    if missing:
+        error_msg = f"Missing required SMTP environment variables: {', '.join(missing)}"
+        logger.error(error_msg)
+        sys.exit(1)
+
+    logger.info(f"SMTP configured: {SMTP_USER}@{SMTP_HOST}:{SMTP_PORT}")
+
+
+if redis_password:
+    logger.info(f"Using Redis URL: {REDIS_URL.replace(safe_password, '***')}")
+else:
+    logger.info(f"Using Redis URL: {REDIS_URL}")
 
 # --- CELERY APP ---
 celery_app = Celery(
@@ -49,3 +94,6 @@ celery_app.conf.task_routes = {
 
 # --- AUTODISCOVERY ---
 celery_app.autodiscover_tasks(["reports.workers"])
+
+# Import task modules to ensure they are registered
+from reports.workers import flash_report_task, tasks  # noqa: E402, F401

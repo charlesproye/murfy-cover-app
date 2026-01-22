@@ -8,7 +8,7 @@ from logging import getLogger
 
 import pandas as pd
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -229,22 +229,22 @@ def get_async_engine() -> AsyncEngine:
 
 
 def get_async_session_maker():
-    """Get or create the session maker."""
+    """Get or create the session maker factory."""
     global _session_maker
     if _session_maker is None:
         engine = get_async_engine()
-        _session_maker = sessionmaker(
+        _session_maker = async_sessionmaker(
             engine,
             class_=AsyncSession,
             expire_on_commit=False,
-            autocommit=False,
-            autoflush=False,
         )
     return _session_maker
 
 
 async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
-    session = get_async_session_maker()()
+    """Create a new database session for each request."""
+    session_maker = get_async_session_maker()
+    session = session_maker()
     try:
         yield session
     except Exception:

@@ -39,7 +39,7 @@ export const ROUTES = {
 
   // FLASH REPORT
   VIN_DECODER: `${BASE_URL}/flash_report/vin-decoder`,
-  SEND_EMAIL: `${BASE_URL}/flash_report/send-email`,
+  SEND_REPORT_GENERATION: `${BASE_URL}/flash_report/send-report-generation`,
   GENERATION_DATA: `${BASE_URL}/flash_report/generation-data`,
   ALL_MODELS_WITH_TRENDLINE: `${BASE_URL}/flash_report/models-with-trendline`,
 

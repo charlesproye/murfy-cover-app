@@ -1,7 +1,7 @@
 import uuid
 
 from reports.report_config import VERIFY_REPORT_BASE_URL
-from reports.reports_utils import generate_report_qr_code_data_url
+from reports.report_render.qr_code_utils import generate_report_qr_code_data_url
 
 
 def test_generate_report_qr_code() -> None:

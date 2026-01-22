@@ -43,6 +43,8 @@ spec:
             name: db-encryption-secret
         - secretRef:
             name: appsignal-secret
+        - secretRef:
+            name: smtp-secret
         env:
         - name: ALGORITHM
           value: HS256
@@ -60,7 +62,7 @@ spec:
           value: "bib-batteries-assets"
         - name: SMTP_EMAIL
           value: "flash-report@bib-batteries.fr"
-        - name: PREMIUM_REPORT_S3_BUCKET
+        - name: REPORT_S3_BUCKET
           value: "bib-premium-reports"
         - name: GOTENBERG_URL
           value: "http://gotenberg.data-engineering.svc:3000"

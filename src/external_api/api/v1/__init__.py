@@ -6,10 +6,10 @@ from external_api.api.v1.endpoints import (
     billing,
     dashboard,
     flash,
-    flash_report,
     in_life_data,
     individual,
     passport,
+    report_flash,
     report_premium,
     report_readout,
     report_verify,
@@ -64,7 +64,7 @@ hidden_router.include_router(passport.router, prefix="/passport", tags=["passpor
 # Admin routes are included but not exposed in OpenAPI documentation
 hidden_router.include_router(admin.router, prefix="/admin", tags=["Administration"])
 hidden_router.include_router(
-    flash_report.flash_report_router, prefix="/flash_report", tags=["Flash Report"]
+    report_flash.flash_report_router, prefix="/flash_report", tags=["Flash Report"]
 )
 hidden_router.include_router(billing.router, prefix="/billing", tags=["Billing"])
 hidden_router.include_router(tesla.tesla_router, prefix="/tesla", tags=["Tesla"])

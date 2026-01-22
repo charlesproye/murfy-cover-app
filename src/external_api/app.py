@@ -2,14 +2,17 @@ import logging
 from contextlib import asynccontextmanager
 
 import appsignal
-import structlog
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import (
+    http_exception_handler,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from fastapi_pagination import add_pagination
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from external_api import __VERSION__
@@ -21,23 +24,8 @@ from external_api.core.http_client import HTTP_CLIENT
 #     "http://localhost:3000"
 # ]
 
-# Structured logging configuration
-structlog.configure(
-    processors=[
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.dev.ConsoleRenderer(),
-    ],
-    wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
-    context_class=dict,
-    logger_factory=structlog.PrintLoggerFactory(),
-    cache_logger_on_first_use=False,
-)
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class MetricsProtectionMiddleware(BaseHTTPMiddleware):
@@ -51,48 +39,6 @@ class MetricsProtectionMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware to log requests and responses"""
-
-    async def dispatch(self, request: Request, call_next):
-        """
-        Log incoming and outgoing requests.
-        """
-        # Log incoming request
-        logger.info(
-            "Incoming request",
-            method=request.method,
-            url=str(request.url),
-            client=request.client.host if request.client else None,
-        )
-
-        # Process request
-        try:
-            response = await call_next(request)
-            # Log response
-            logger.info(
-                "Response",
-                status_code=response.status_code,
-                method=request.method,
-                url=str(request.url),
-            )
-            return response
-        except Exception as e:
-            appsignal.set_error(e)
-            # If error, log and return an error response
-            logger.error(
-                "Error processing request",
-                error=str(e),
-                method=request.method,
-                url=str(request.url),
-                exc_info=True,
-            )
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"detail": "Internal server error"},
-            )
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -100,8 +46,8 @@ async def lifespan(app: FastAPI):
     Executed at startup and shutdown.
     """
     # Code executed at startup
-    logger.info("API startup", version=__VERSION__)
-    logger.info("Environment", environment=settings.ENVIRONMENT)
+    logger.info(f"API startup. Version: {__VERSION__}")
+    logger.info(f"Environment: {settings.ENVIRONMENT}")
     HTTP_CLIENT.start()
     appsignal.start()
     instrumentator.expose(app)
@@ -152,12 +98,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request, exc):
+    if exc.status_code == 500:
+        logger.exception("HTTP exception", exc_info=exc)
+    else:
+        logger.warning(f"HTTP exception: {exc.status_code} {exc.detail}")
+    return await http_exception_handler(request, exc)
+
+
 # Add Routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
 add_pagination(app)
 
 # # Ajout du middleware de journalisation
-app.add_middleware(RequestLoggingMiddleware)  # type: ignore[arg-type]
 app.add_middleware(MetricsProtectionMiddleware)  # type: ignore[arg-type]
 
 instrumentator: Instrumentator = Instrumentator(
