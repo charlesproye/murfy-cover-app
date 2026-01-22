@@ -2,6 +2,7 @@ from logging import Logger
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
 from core.spark_utils import compute_regression_coefficients
 from transform.processed_phases.raw_ts_to_processed_phases import RawTsToProcessedPhases
@@ -21,6 +22,17 @@ class KiaRawTsToProcessedPhases(RawTsToProcessedPhases):
         )
 
     def compute_specific_features_before_aggregation(self, phase_df):
+        # Forward fill soh_oem: take last non-null value as it is a pushed data that won't change until next push
+        window_ff = (
+            Window.partitionBy("vin")
+            .orderBy("date")
+            .rowsBetween(Window.unboundedPreceding, 0)
+        )
+
+        phase_df = phase_df.withColumn(
+            "soh_oem", F.last("soh_oem", ignorenulls=True).over(window_ff)
+        )
+
         phase_df = phase_df.withColumn("soh_oem", F.col("soh_oem") / 100)
 
         phase_df = phase_df.withColumn(

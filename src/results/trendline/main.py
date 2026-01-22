@@ -50,6 +50,7 @@ def load_and_clean_scrapping_data():
             "battery_capacity",
         ],
     )
+
     df_sheet = df_sheet[df_sheet["soh"] != ""]
     df_sheet["soh"] = (
         df_sheet["soh"].apply(lambda x: x.replace("%", "").strip()).astype(float) / 100
@@ -59,6 +60,8 @@ def load_and_clean_scrapping_data():
 
     df_sheet["model_name"] = df_sheet["model_name"].apply(str.lower)
     df_sheet["make_name"] = df_sheet["make_name"].apply(str.lower)
+
+    df_sheet = df_sheet[df_sheet["soh"] != ""]
 
     df_sheet["odometer"] = (
         df_sheet["odometer"]
