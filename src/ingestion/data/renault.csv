@@ -1,9 +1,0 @@
-field_name,field_type
-diagnostics.odometer.data.value,double
-charging.battery_energy.data.value,double
-charging.battery_level.data,double
-charging.charging_rate.data.value,double
-charging.estimated_range.data.value,double
-charging.plugged_in.data,bool
-charging.battery_charge_type.data,string
-charging.status.data,string

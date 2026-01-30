@@ -1,2 +1,0 @@
-class ExistingReportException(Exception):
-    pass

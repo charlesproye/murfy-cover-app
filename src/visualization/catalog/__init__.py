@@ -1,2 +1,0 @@
-# Data catalog visualization module
-
